@@ -1,0 +1,84 @@
+{
+  "ociVersion": "1.0.1",
+  "hostname": "linglong",
+  "process": {
+    "args": [
+      "/bin/bash"
+    ],
+    "env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "TERM=xterm"
+    ],
+    "cwd": "/"
+  },
+  "linux": {
+    "seccomp": {
+      "defaultAction": "SCMP_ACT_ALLOW",
+      "architectures": [
+        "SCMP_ARCH_X86"
+      ],
+      "syscalls": [
+        {
+          "names": [
+            "syslog",
+            "uselib",
+            "acct",
+            "modify_ldt",
+            "quotactl",
+            "add_key",
+            "keyctl",
+            "request_key",
+            "move_pages",
+            "mbind",
+            "get_mempolicy",
+            "set_mempolicy",
+            "migrate_pages",
+            "unshare",
+            "mount",
+            "pivot_root"
+          ],
+          "action": "SCMP_ACT_ERRNO"
+        },
+        {
+          "names": [
+            "clone"
+          ],
+          "action": "SCMP_ACT_ERRNO",
+          "args": [
+            {
+              "index": 0,
+              "value": 268435456,
+              "valueTwo": 268435456,
+              "op": "SCMP_CMP_MASKED_EQ"
+            }
+          ]
+        },
+        {
+          "names": [
+            "ioctl"
+          ],
+          "action": "SCMP_ACT_ERRNO",
+          "args": [
+            {
+              "index": 1,
+              "value": 4294967295,
+              "valueTwo": 21522,
+              "op": "SCMP_CMP_MASKED_EQ"
+            }
+          ]
+        }
+      ]
+    },
+    "namespaces": [],
+    "uidMappings": [
+    ],
+    "gidMappings": [
+    ]
+  },
+  "mounts": [],
+  "root": {
+    "path": "/run/user/1000/linglong/ab24ae64edff4ddfa8e6922eb29e2baf",
+    "readonly": false
+  }
+}
+

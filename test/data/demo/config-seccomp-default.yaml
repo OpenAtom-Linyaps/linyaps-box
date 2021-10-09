@@ -1,0 +1,51 @@
+syscalls:
+  - names:
+      #Block dmesg
+      - syslog
+      # Useless old syscall
+      - uselib
+      # Don't allow disabling accounting
+      - acct
+      # 16-bit code is unnecessary in the sandbox, and modify_ldt is a
+      ##  historic source of interesting information leaks.
+      - modify_ldt
+      # Don't allow reading current quota use
+      - quotactl
+      # Don't allow access to the kernel keyring
+      - add_key
+      - keyctl
+      - request_key
+      # Scary VM/NUMA ops
+      - move_pages
+      - mbind
+      - get_mempolicy
+      - set_mempolicy
+      - migrate_pages
+      # Don't allow subnamespace setups:
+      - unshare
+      - mount
+      - pivot_root
+      # enable that in debug mode
+      - perf_event_open
+      - ptrace
+    action: "SCMP_ACT_ERRNO"
+  - names:
+      - clone
+    action: "SCMP_ACT_ERRNO"
+    args:
+      - index: 0
+        # CLONE_NEWUSER
+        value: 0x10000000
+        # CLONE_NEWUSER
+        valueTwo: 0x10000000
+        op: SCMP_CMP_MASKED_EQ
+  #    Don't allow faking input to the controlling tty (CVE-2017-5226)
+  - names:
+      - ioctl
+    action: "SCMP_ACT_ERRNO"
+    args:
+      - index: 1
+        value: 0xFFFFFFFF
+        valueTwo: 0x5412
+        op: SCMP_CMP_MASKED_EQ
+

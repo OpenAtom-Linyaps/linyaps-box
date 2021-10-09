@@ -1,0 +1,42 @@
+{
+  "ociVersion": "1.0.1",
+  "hostname": "linglong",
+  "process": {
+    "args": [
+      "/bin/bash"
+    ],
+    "env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "TERM=xterm"
+    ],
+    "cwd": "/"
+  },
+  "linux": {
+    "seccomp": {
+      "defaultAction": "SCMP_ACT_ALLOW",
+      "architectures": [
+        "SCMP_ARCH_X86"
+      ],
+      "syscalls": [
+        {
+          "names": [
+            "getcwd",
+            "chmod"
+          ],
+          "action": "SCMP_ACT_ERRNO"
+        }
+      ]
+    },
+    "namespaces": [],
+    "uidMappings": [
+    ],
+    "gidMappings": [
+    ]
+  },
+  "mounts": [],
+  "root": {
+    "path": "/run/user/1000/linglong/ab24ae64edff4ddfa8e6922eb29e2baf",
+    "readonly": false
+  }
+}
+

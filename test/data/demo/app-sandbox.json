@@ -1,0 +1,440 @@
+{
+  "hooks": null,
+  "hostname": "linglong",
+  "linux": {
+    "gidMappings": [
+      {
+        "containerID": 0,
+        "hostID": 65534,
+        "size": 1
+      },
+      {
+        "containerID": 1000,
+        "hostID": 1000,
+        "size": 1
+      }
+    ],
+    "namespaces": [
+      {
+        "type": "pid"
+      },
+      {
+        "type": "mount"
+      },
+      {
+        "type": "uts"
+      },
+      {
+        "type": "user"
+      }
+    ],
+    "uidMappings": [
+      {
+        "containerID": 0,
+        "hostID": 65534,
+        "size": 1
+      },
+      {
+        "containerID": 1000,
+        "hostID": 1000,
+        "size": 1
+      }
+    ],
+    "cgroupsPath": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444/root/sys/fs/cgroup",
+    "resources": {
+      "cpu": {
+        "shares": 1024,
+        "quota": 200000,
+        "period": 100000
+      }
+    }
+  },
+  "mounts": [
+    {
+      "destination": "/usr",
+      "options": [
+        "ro"
+      ],
+      "source": "/deepin/linglong/layers/com.deepin.Runtime/20/x86_64/",
+      "type": "bind"
+    },
+    {
+      "destination": "/etc",
+      "options": [
+        "ro"
+      ],
+      "source": "/deepin/linglong/layers/com.deepin.Runtime/20/x86_64/etc",
+      "type": "bind"
+    },
+    {
+      "destination": "/dev/dri",
+      "options": [
+        "bind"
+      ],
+      "source": "/dev/dri",
+      "type": "bind"
+    },
+    {
+      "destination": "/proc",
+      "options": [
+      ],
+      "source": "proc",
+      "type": "proc"
+    },
+    {
+      "destination": "/dev",
+      "options": [
+        "nosuid",
+        "strictatime",
+        "mode=755",
+        "size=65536k"
+      ],
+      "source": "tmpfs",
+      "type": "tmpfs"
+    },
+    {
+      "destination": "/dev/pts",
+      "options": [
+        "nosuid",
+        "noexec",
+        "newinstance",
+        "ptmxmode=0666",
+        "mode=0620",
+        "gid=5"
+      ],
+      "source": "devpts",
+      "type": "devpts"
+    },
+    {
+      "destination": "/dev/shm",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev",
+        "mode=1777",
+        "size=65536k"
+      ],
+      "source": "shm",
+      "type": "tmpfs"
+    },
+    {
+      "destination": "/dev/mqueue",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev"
+      ],
+      "source": "mqueue",
+      "type": "mqueue"
+    },
+    {
+      "destination": "/sys",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev"
+      ],
+      "source": "sysfs",
+      "type": "sysfs"
+    },
+    {
+      "destination": "/tmp",
+      "options": [
+        "nosuid",
+        "strictatime",
+        "mode=777",
+        "size=65536k"
+      ],
+      "source": "tmpfs",
+      "type": "tmpfs"
+    },
+    {
+      "destination": "/opt/apps/com.visualstudio.code",
+      "options": [
+        "rw"
+      ],
+      "source": "/deepin/linglong/layers/com.visualstudio.code/latest/x86_64/",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/app/libs",
+      "options": [
+        "ro"
+      ],
+      "source": "/deepin/linglong/layers/com.visualstudio.code/latest/x86_64/files/libs",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/network/etc/resolv.conf",
+      "options": [
+        "ro"
+      ],
+      "source": "/etc/resolv.conf",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/resolvconf",
+      "options": [
+        "ro"
+      ],
+      "source": "/run/resolvconf",
+      "type": "bind"
+    },
+    {
+      "destination": "/tmp/.X11-unix",
+      "options": [
+        "ro"
+      ],
+      "source": "/tmp/.X11-unix",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/appearance/fonts",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/fonts",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/appearance/fonts-cache",
+      "options": [
+        "ro"
+      ],
+      "source": "/var/cache/fontconfig",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/locale/",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/locale/",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/lib/locale/",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/lib/locale/",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/fonts",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/fonts",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/themes",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/themes",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/icons",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/icons",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/zoneinfo",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/zoneinfo",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/etc/localtime",
+      "options": [
+        "ro"
+      ],
+      "source": "/etc/localtime",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/etc/machine-id",
+      "options": [
+        "ro"
+      ],
+      "source": "/etc/machine-id",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/user/1000",
+      "options": [
+      ],
+      "source": "/home/iceyer/.linglong/com.visualstudio.code/runtime",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/user/1000/bus",
+      "options": [
+      ],
+      "source": "/run/user/1000/bus",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/dbus/system_bus_socket",
+      "options": [
+      ],
+      "source": "/run/dbus/system_bus_socket",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer",
+      "options": [
+      ],
+      "source": "/home/iceyer/.linglong/com.visualstudio.code/home",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.config",
+      "options": [
+      ],
+      "source": "/home/iceyer/.linglong/com.visualstudio.code/config",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.cache",
+      "options": [
+      ],
+      "source": "/home/iceyer/.linglong/com.visualstudio.code/cache",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/user/1000/dconf",
+      "options": [
+      ],
+      "source": "/run/user/1000/dconf",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.config/user-dirs.dirs",
+      "options": [
+      ],
+      "source": "/home/iceyer/.config/user-dirs.dirs",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.local/share/fonts",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/.local/share/fonts",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.config/fontconfig",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/.config/fontconfig",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/appearance/user-fonts",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/.local/share/fonts",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.Xauthority",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/.Xauthority",
+      "type": "bind"
+    },
+    {
+      "destination": "/etc/passwd",
+      "options": [
+      ],
+      "source": "/etc/passwd",
+      "type": "bind"
+    },
+    {
+      "destination": "/etc/group",
+      "options": [
+      ],
+      "source": "/etc/group",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/Documents",
+      "options": [
+      ],
+      "source": "/home/iceyer/Documents",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/Desktop",
+      "options": [
+      ],
+      "source": "/home/iceyer/Desktop",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/Downloads",
+      "options": [
+      ],
+      "source": "/home/iceyer/Downloads",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/app/env",
+      "options": [
+      ],
+      "source": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444/env",
+      "type": "bind"
+    }
+  ],
+  "ociVersion": "1.0.1",
+  "process": {
+    "args": [
+      "/bin/bash"
+    ],
+    "cwd": "/home/iceyer",
+    "env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "TERM=xterm",
+      "_=/usr/bin/env",
+      "PS1=️\\033[48;5;214;38;5;26m${debian_chroot:+($debian_chroot)}\\h ⚛ \\w\\033[0m",
+      "LD_LIBRARY_PATH=/opt/apps/com.visualstudio.code/files/libs",
+      "QT_PLUGIN_PATH=/usr/lib/plugins",
+      "QT_QPA_PLATFORM_PLUGIN_PATH=/usr/lib/plugins/platforms",
+      "HOME=/home/iceyer",
+      "XDG_RUNTIME_DIR=/run/user/1000",
+      "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus",
+      "DISPLAY=:0",
+      "LANG=zh_CN.UTF-8",
+      "LANGUAGE=zh_CN",
+      "XAUTHORITY=/home/iceyer/.Xauthority",
+      "XDG_SESSION_DESKTOP=deepin",
+      "D_DISABLE_RT_SCREEN_SCALE=",
+      "XMODIFIERS=@im=fcitx",
+      "DESKTOP_SESSION=deepin",
+      "DEEPIN_WINE_SCALE=2.00",
+      "XDG_CURRENT_DESKTOP=Deepin",
+      "XIM=fcitx",
+      "XDG_SESSION_TYPE=x11=",
+      "CLUTTER_IM_MODULE=fcitx",
+      "QT4_IM_MODULE=",
+      "GTK_IM_MODULE=fcitx"
+    ]
+  },
+  "root": {
+    "path": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444/root",
+    "readonly": false
+  }
+}

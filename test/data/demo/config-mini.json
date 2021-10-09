@@ -1,0 +1,187 @@
+{
+  "ociVersion": "1.0.1",
+  "hostname": "linglong",
+  "process": {
+    "args": [
+      "/bin/bash"
+    ],
+    "env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "TERM=xterm"
+    ],
+    "cwd": "/"
+  },
+  "linux": {
+    "seccomp": {
+      "defaultAction": "SCMP_ACT_ALLOW",
+      "architectures": [
+        "SCMP_ARCH_X86",
+        "SCMP_ARCH_X32"
+      ],
+      "syscalls": [
+        {
+          "names": [
+            "getcwd",
+            "chmod"
+          ],
+          "action": "SCMP_ACT_ERRNO"
+        }
+      ]
+    },
+    "uidMappings": [
+      {
+        "hostID": 65534,
+        "containerID": 0,
+        "size": 1
+      },
+      {
+        "hostID": 1000,
+        "containerID": 1000,
+        "size": 1
+      }
+    ],
+    "gidMappings": [
+      {
+        "hostID": 65534,
+        "containerID": 0,
+        "size": 1
+      },
+      {
+        "hostID": 1000,
+        "containerID": 1000,
+        "size": 1
+      }
+    ],
+    "cgroupsPath": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444/root/sys/fs/cgroup",
+    "resources": {
+      "cpu": {
+        "shares": 512,
+        "quota": 33000,
+        "period": 100000
+      }
+    },
+    "namespaces": [
+      {
+        "type": "pid"
+      },
+      {
+        "type": "mount"
+      },
+      {
+        "type": "uts"
+      },
+      {
+        "type": "network"
+      },
+      {
+        "type": "user"
+      }
+    ]
+  },
+  "mounts": [
+    {
+      "destination": "/proc",
+      "type": "proc",
+      "source": "proc"
+    },
+    {
+      "destination": "/dev",
+      "type": "tmpfs",
+      "source": "tmpfs",
+      "options": [
+        "nosuid",
+        "strictatime",
+        "mode=755",
+        "size=65536k"
+      ]
+    },
+    {
+      "destination": "/dev/pts",
+      "type": "devpts",
+      "source": "devpts",
+      "options": [
+        "nosuid",
+        "noexec",
+        "newinstance",
+        "ptmxmode=0666",
+        "mode=0620",
+        "gid=5"
+      ]
+    },
+    {
+      "destination": "/dev/shm",
+      "type": "tmpfs",
+      "source": "shm",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev",
+        "mode=1777",
+        "size=65536k"
+      ]
+    },
+    {
+      "destination": "/dev/mqueue",
+      "type": "mqueue",
+      "source": "mqueue",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev"
+      ]
+    },
+    {
+      "destination": "/sys",
+      "type": "sysfs",
+      "source": "sysfs",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev"
+      ]
+    },
+    {
+      "destination": "/sys/fs/cgroup",
+      "type": "cgroup2",
+      "source": "none",
+      "options": [
+      ]
+    },
+    {
+      "destination": "/dev/dri",
+      "type": "bind",
+      "source": "/dev/dri"
+    },
+    {
+      "destination": "/etc",
+      "type": "bind",
+      "source": "/etc"
+    },
+    {
+      "destination": "/usr",
+      "type": "bind",
+      "source": "/usr"
+    },
+    {
+      "destination": "/etc",
+      "type": "bind",
+      "source": "/etc"
+    },
+    {
+      "destination": "/tmp",
+      "type": "tmpfs",
+      "source": "tmpfs",
+      "options": [
+        "nosuid",
+        "strictatime",
+        "mode=777",
+        "size=65536k"
+      ]
+    }
+  ],
+  "root": {
+    "path": "/run/user/1000/linglong/ab24ae64edff4ddfa8e6922eb29e2baf",
+    "readonly": false
+  }
+}
+

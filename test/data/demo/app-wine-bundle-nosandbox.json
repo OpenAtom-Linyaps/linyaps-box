@@ -1,0 +1,116 @@
+{
+  "hooks": null,
+  "hostname": "linglong",
+  "linux": {
+    "gidMappings": [
+      {
+        "containerID": 0,
+        "hostID": 1000,
+        "size": 1
+      }
+    ],
+    "uidMappings": [
+      {
+        "containerID": 0,
+        "hostID": 1000,
+        "size": 1
+      }
+    ],
+    "namespaces": [
+      {
+        "type": "mount"
+      },
+      {
+        "type": "pid"
+      }
+    ],
+    "cgroupsPath": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd422/root/sys/fs/cgroup",
+    "resources": {
+      "cpu": {
+        "shares": 1024,
+        "quota": 200000,
+        "period": 100000
+      }
+    }
+  },
+  "mounts": [
+    {
+      "destination": "/proc",
+      "options": [
+      ],
+      "source": "proc",
+      "type": "proc"
+    },
+    {
+      "destination": "/opt",
+      "options": [
+        "nodev",
+        "nosuid"
+      ],
+      "source": "tmpfs",
+      "type": "tmpfs"
+    },
+    {
+      "destination": "/opt/apps/com.qq.weixin.deepin",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/Desktop/removable/com.qq.weixin.deepin/3.2.1.154/x86_64",
+      "type": "bind"
+    },
+    {
+      "destination": "/opt/deepinwine",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/Desktop/removable/deepinwine",
+      "type": "bind"
+    },
+    {
+      "destination": "/opt/deepin-wine6-stable",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/Desktop/removable/deepin-wine6-stable",
+      "type": "bind"
+    }
+  ],
+  "ociVersion": "1.0.1",
+  "process": {
+    "args": [
+      "/bin/bash"
+    ],
+    "cwd": "/home/iceyer",
+    "env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "TERM=xterm",
+      "_=/usr/bin/env",
+      "PS1=️\\033[48;5;214;38;5;26m${debian_chroot:+($debian_chroot)}\\h ⚛ \\w\\033[0m",
+      "LD_LIBRARY_PATH=/opt/apps/com.qq.weixin.deepin/files/libs",
+      "QT_PLUGIN_PATH=/usr/lib/plugins",
+      "QT_QPA_PLATFORM_PLUGIN_PATH=/usr/lib/plugins/platforms",
+      "HOME=/home/iceyer",
+      "XDG_RUNTIME_DIR=/run/user/1000",
+      "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus",
+      "DISPLAY=:0",
+      "LANG=zh_CN.UTF-8",
+      "LANGUAGE=zh_CN",
+      "XAUTHORITY=/home/iceyer/.Xauthority",
+      "XDG_SESSION_DESKTOP=deepin",
+      "D_DISABLE_RT_SCREEN_SCALE=",
+      "XMODIFIERS=@im=fcitx",
+      "DESKTOP_SESSION=deepin",
+      "DEEPIN_WINE_SCALE=2.00",
+      "XDG_CURRENT_DESKTOP=Deepin",
+      "XIM=fcitx",
+      "XDG_SESSION_TYPE=x11=",
+      "CLUTTER_IM_MODULE=fcitx",
+      "QT4_IM_MODULE=",
+      "GTK_IM_MODULE=fcitx"
+    ]
+  },
+  "root": {
+    "path": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd422/root",
+    "readonly": false
+  }
+}
