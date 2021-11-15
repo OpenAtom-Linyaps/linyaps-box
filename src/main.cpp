@@ -8,13 +8,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
 #include <unistd.h>
-#include <util/logger.h>
-#include <container/container_option.h>
 
+#include <iostream>
+
+#include "util/logger.h"
 #include "util/oci-runtime.h"
 #include "container/container.h"
+#include "container/container_option.h"
+
+extern linglong::Runtime loadBundle(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
@@ -45,13 +48,17 @@ int main(int argc, char **argv)
             debug.close();
         }
 
+        linglong::Runtime r;
         linglong::Option opt;
         if (geteuid() != 0) {
             opt.rootless = true;
             opt.linkLFS = false;
-        }
+            r = loadBundle(argc, argv);
+        } else {
+            r = linglong::fromString(content);
+        };
 
-        linglong::Container c(linglong::fromString(content));
+        linglong::Container c(r);
         return c.start(opt);
     } catch (const std::exception &e) {
         logErr() << "failed: " << e.what();

@@ -6,6 +6,7 @@ set(LINK_LIBS
 
 add_executable(ll-box
                main.cpp
+               loader.cpp
                util/common.cpp
                util/filesystem.cpp
                util/semaphore.cpp
