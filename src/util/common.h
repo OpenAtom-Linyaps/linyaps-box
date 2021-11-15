@@ -10,6 +10,8 @@
 
 #pragma once
 
+#pragma GCC diagnostic ignored "-Wformat-security"
+
 #include <vector>
 #include <iostream>
 #include <iterator>
