@@ -10,54 +10,13 @@
 
 #pragma once
 
-#pragma GCC diagnostic ignored "-Wformat-security"
+#include <memory>
+#include <cstring>
+#include <cstdarg>
 
 #include <vector>
 #include <iostream>
 #include <iterator>
-#include <memory>
-
-#if (__cplusplus <= 201103L)
-
-#include <cstddef>
-#include <memory>
-#include <type_traits>
-#include <utility>
-
-namespace std {
-template<class T>
-struct _Unique_if {
-    typedef unique_ptr<T> _Single_object;
-};
-
-template<class T>
-struct _Unique_if<T[]> {
-    typedef unique_ptr<T[]> _Unknown_bound;
-};
-
-template<class T, size_t N>
-struct _Unique_if<T[N]> {
-    typedef void _Known_bound;
-};
-
-template<class T, class... Args>
-typename _Unique_if<T>::_Single_object make_unique(Args &&...args)
-{
-    return unique_ptr<T>(new T(std::forward<Args>(args)...));
-}
-
-template<class T>
-typename _Unique_if<T>::_Unknown_bound make_unique(size_t n)
-{
-    typedef typename remove_extent<T>::type U;
-    return unique_ptr<T>(new U[n]());
-}
-
-template<class T, class... Args>
-typename _Unique_if<T>::_Known_bound make_unique(Args &&...) = delete;
-} // namespace std
-
-#endif
 
 namespace linglong {
 namespace util {
@@ -68,28 +27,24 @@ str_vec str_spilt(const std::string &s, const std::string &sep);
 
 std::string str_vec_join(const str_vec &vec, char sep);
 
-template<typename... Args>
-std::string format(const std::string &format, Args... args)
+inline std::string format(const std::string fmt, ...)
 {
-    int size_s = std::snprintf(nullptr, 0, format.c_str(), args...) + 1; // Extra space for '\0'
-    if (size_s <= 0) {
-        throw std::runtime_error("format error");
+    int n = ((int)fmt.size()) * 2;
+    std::unique_ptr<char[]> formatted;
+    va_list ap;
+    while (true) {
+        formatted.reset(new char[n]);
+        strcpy(&formatted[0], fmt.c_str());
+        va_start(ap, fmt);
+        int final_n = vsnprintf(&formatted[0], n, fmt.c_str(), ap);
+        va_end(ap);
+        if (final_n < 0 || final_n >= n)
+            n += abs(final_n - n + 1);
+        else
+            break;
     }
-    auto size = static_cast<size_t>(size_s);
-    auto buf = std::make_unique<char[]>(size);
-    std::snprintf(buf.get(), size, format.c_str(), args...);
-    return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
+    return std::string {formatted.get()};
 }
-
-class try_break : public std::logic_error
-{
-public:
-    explicit try_break(const std::string &what)
-        : std::logic_error(what)
-    {
-    }
-    ~try_break() override = default;
-};
 
 } // namespace util
 } // namespace linglong

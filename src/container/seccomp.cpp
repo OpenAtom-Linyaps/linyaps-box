@@ -130,9 +130,6 @@ int configSeccomp(const tl::optional<linglong::Seccomp> &seccomp)
             }
         }
         ret = seccomp_load(ctx);
-    } catch (const util::try_break &tb) {
-        logDbg() << "normal break try:" << tb.what();
-        ret = 0;
     } catch (const std::exception &e) {
         logErr() << "config seccomp failed:" << e.what();
         ret = -1;
