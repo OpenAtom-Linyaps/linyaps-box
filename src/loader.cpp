@@ -80,6 +80,8 @@ const std::string kLoadTemplate = R"KLT00(
 
 using namespace linglong;
 
+#include <dirent.h>
+
 // start container from tmp mount path
 linglong::Runtime loadBundle(int argc, char **argv)
 {
@@ -92,30 +94,58 @@ linglong::Runtime loadBundle(int argc, char **argv)
     std::string bundleRoot = argv[2];
     std::string exec = argv[3];
 
-    if (util::fs::exists(bundleRoot + "/opt")) {
-        Mount m;
-        m.source = bundleRoot + "/opt";
-        m.destination = "/opt";
-        r.mounts->push_back(m);
-    } else {
+    {
         Mount m;
         m.source = "tmpfs";
         m.type = "tmpfs";
+        m.fsType = Mount::Tmpfs;
         m.options = {"nodev", "nosuid"};
         m.destination = "/opt";
         r.mounts->push_back(m);
     }
 
-    if (util::fs::exists(bundleRoot + "files")) {
+    if (util::fs::exists(bundleRoot + "/opt")) {
+        std::string source = bundleRoot + "/opt";
+        util::str_vec namelist;
+        DIR *dir;
+        struct dirent *ent;
+
+        if ((dir = opendir(source.c_str())) != nullptr) {
+            /* print all the files and directories within directory */
+            while ((ent = readdir(dir)) != nullptr) {
+                if (util::fs::is_dir(source + "/" + ent->d_name)) {
+                    namelist.push_back(ent->d_name);
+                }
+            }
+            closedir(dir);
+        }
+
         Mount m;
+        m.type = "bind";
+        m.fsType = Mount::Bind;
+
+        for (auto const &name : namelist) {
+            m.source = source.append("/") + name;
+            m.destination = "/opt/" + name;
+            r.mounts->push_back(m);
+        }
+    }
+
+    // app files
+    if (util::fs::exists(bundleRoot + "/files")) {
+        Mount m;
+        m.type = "bind";
+        m.fsType = Mount::Bind;
         m.source = bundleRoot;
         m.destination = util::format("/opt/apps/%s", id.c_str());
         r.mounts->push_back(m);
     }
 
     // process runtime
-    if (util::fs::exists(bundleRoot + "runtime")) {
+    if (util::fs::exists(bundleRoot + "/runtime")) {
         Mount m;
+        m.type = "bind";
+        m.fsType = Mount::Bind;
         m.source = bundleRoot + "runtime";
         m.destination = util::format("/runtime");
         r.mounts->push_back(m);
@@ -130,12 +160,13 @@ linglong::Runtime loadBundle(int argc, char **argv)
     r.process.cwd = getenv("HOME");
 
     r.process.args = util::str_vec {exec};
-    //    r.process.args.push_back(exec);
 
     /// run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd422/root
     char dirTemplate[] = "/run/user/1000/linglong/XXXXXX";
+    util::fs::create_directories(util::fs::path(dirTemplate).parent_path(), 0755);
+
     char *dirName = mkdtemp(dirTemplate);
-    if (dirName == NULL) {
+    if (dirName == nullptr) {
         throw std::runtime_error("mkdtemp failed");
     }
 
