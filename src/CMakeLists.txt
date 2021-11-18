@@ -4,22 +4,29 @@ set(LINK_LIBS
     seccomp
     stdc++)
 
-add_executable(ll-box
-               main.cpp
-               loader.cpp
-               util/common.cpp
-               util/filesystem.cpp
-               util/semaphore.cpp
-               util/debug/debug.cpp
-               util/platform.cpp
-               util/logger.cpp
-               util/message_reader.cpp
-               container/container.cpp
-               container/mount/host_mount.cpp
-               container/mount/filesystem_driver.cpp
-               container/seccomp.cpp)
-
+set(LL_BOX_SOURCES
+    # cmake-format: sortable
+    main.cpp
+    loader.cpp
+    util/common.cpp
+    util/filesystem.cpp
+    util/semaphore.cpp
+    util/debug/debug.cpp
+    util/platform.cpp
+    util/logger.cpp
+    util/message_reader.cpp
+    container/container.cpp
+    container/mount/host_mount.cpp
+    container/mount/filesystem_driver.cpp
+    container/seccomp.cpp
+    )
+add_executable(ll-box ${LL_BOX_SOURCES})
 target_link_libraries(ll-box ${LINK_LIBS})
+
+if (BUILD_STATIC)
+  add_executable(ll-box-static ${LL_BOX_SOURCES})
+  target_link_libraries(ll-box-static -static ${LINK_LIBS})
+endif (BUILD_STATIC)
 
 install(TARGETS ll-box RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 #install(TARGETS ll-box RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

@@ -8,6 +8,8 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(VERSION "1.0")
 
+option(BUILD_STATIC "Build the static binary" OFF)
+
 # configure debug mode and asan
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose Release or Debug" FORCE)
