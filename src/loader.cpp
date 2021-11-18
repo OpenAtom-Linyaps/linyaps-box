@@ -48,11 +48,10 @@ const std::string kLoadTemplate = R"KLT00(
 		],
         "cwd":"/",
 		"env": [
-			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"PATH=/runtime/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 			"TERM=xterm",
 			"_=/usr/bin/env",
 			"PS1=️\\033[48;5;214;38;5;26m${debian_chroot:+($debian_chroot)}\\h ⚛ \\w\\033[0m",
-			"LD_LIBRARY_PATH=/opt/apps/com.qq.weixin.deepin/files/libs",
 			"QT_PLUGIN_PATH=/usr/lib/plugins",
 			"QT_QPA_PLATFORM_PLUGIN_PATH=/usr/lib/plugins/platforms",
 			"DISPLAY=:0",
@@ -113,6 +112,9 @@ linglong::Runtime loadBundle(int argc, char **argv)
         if ((dir = opendir(source.c_str())) != nullptr) {
             /* print all the files and directories within directory */
             while ((ent = readdir(dir)) != nullptr) {
+                if ("." == std::string(ent->d_name) || ".." == std::string(ent->d_name)) {
+                    continue;
+                }
                 if (util::fs::is_dir(source + "/" + ent->d_name)) {
                     namelist.push_back(ent->d_name);
                 }
@@ -127,6 +129,7 @@ linglong::Runtime loadBundle(int argc, char **argv)
         for (auto const &name : namelist) {
             m.source = source.append("/") + name;
             m.destination = "/opt/" + name;
+            logInf() << m.source << "to" << m.destination << name;
             r.mounts->push_back(m);
         }
     }
@@ -146,8 +149,12 @@ linglong::Runtime loadBundle(int argc, char **argv)
         Mount m;
         m.type = "bind";
         m.fsType = Mount::Bind;
-        m.source = bundleRoot + "runtime";
-        m.destination = util::format("/runtime");
+        m.source = bundleRoot + "/runtime";
+        m.destination = util::format("/opt/runtime");
+        r.mounts->push_back(m);
+
+        m.source = bundleRoot + "/runtime/lib/i386-linux-gnu";
+        m.destination = util::format("/usr/lib/i386-linux-gnu");
         r.mounts->push_back(m);
     }
 
@@ -156,6 +163,16 @@ linglong::Runtime loadBundle(int argc, char **argv)
     r.process.env.push_back(util::format("XDG_RUNTIME_DIR=%s", getenv("XDG_RUNTIME_DIR")));
     r.process.env.push_back(util::format("DBUS_SESSION_BUS_ADDRESS=%s", getenv("DBUS_SESSION_BUS_ADDRESS")));
     r.process.env.push_back(util::format("HOME=%s", getenv("HOME")));
+
+    util::str_vec ldLibraryPath;
+
+    if (getenv("LD_LIBRARY_PATH")) {
+        ldLibraryPath.push_back(getenv("LD_LIBRARY_PATH"));
+    }
+    ldLibraryPath.push_back("/opt/runtime/lib");
+    ldLibraryPath.push_back("/opt/runtime/lib/i386-linux-gnu");
+    ldLibraryPath.push_back("/opt/runtime/lib/x86_64-linux-gnu");
+    r.process.env.push_back(util::format("LD_LIBRARY_PATH=%s", util::str_vec_join(ldLibraryPath, ':').c_str()));
 
     r.process.cwd = getenv("HOME");
 

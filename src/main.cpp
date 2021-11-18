@@ -42,12 +42,6 @@ int main(int argc, char **argv)
     }
 
     try {
-        if (linglong::util::fs::exists("/tmp/ll-debug")) {
-            std::ofstream debug(linglong::util::format("/tmp/ll-debug/%d.json", getpid()));
-            debug << content;
-            debug.close();
-        }
-
         linglong::Runtime r;
         linglong::Option opt;
         if (geteuid() != 0) {
@@ -56,7 +50,14 @@ int main(int argc, char **argv)
             r = loadBundle(argc, argv);
         } else {
             r = linglong::fromString(content);
-        };
+        }
+
+        if (linglong::util::fs::exists("/tmp/ll-debug")) {
+            nlohmann::json j = r;
+            std::ofstream debug(linglong::util::format("/tmp/ll-debug/%d.json", getpid()));
+            debug << j.dump();
+            debug.close();
+        }
 
         linglong::Container c(r);
         return c.start(opt);
