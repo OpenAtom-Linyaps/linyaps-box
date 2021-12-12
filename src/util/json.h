@@ -8,7 +8,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_UTIL_JSON_H_
+#define LINGLONG_BOX_SRC_UTIL_JSON_H_
 
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 
@@ -52,3 +53,5 @@ tl::optional<T> optional(const nlohmann::json &j, const char *key)
 }
 
 } // namespace linglong
+
+#endif /* LINGLONG_BOX_SRC_UTIL_JSON_H_ */

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(linglong-sandbox)
+project(linglong-box)
 
 # 保证项目兼容性
 set(CMAKE_CXX_STANDARD 11)
@@ -26,8 +26,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 include(GNUInstallDirs)
-include_directories(${linglong-sandbox_SOURCE_DIR})
-include_directories(${linglong-sandbox_SOURCE_DIR}/src)
+include_directories(${linglong-box_SOURCE_DIR})
+include_directories(${linglong-box_SOURCE_DIR}/src)
 
 
 find_package(PkgConfig)

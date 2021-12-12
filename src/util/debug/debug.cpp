@@ -19,9 +19,11 @@
 
 namespace linglong {
 
-void dumpIDMap()
+#define DUMP_DBG(func, line) (linglong::util::Logger(linglong::util::Logger::Debug, func, line))
+
+void DumpIDMap()
 {
-    logDbg() << "dumpIDMap start -----------";
+    logDbg() << "DumpIDMap Start -----------";
     std::ifstream uidMap("/proc/self/uid_map");
     for (std::string line; getline(uidMap, line);) {
         logDbg() << "uid_map of pid:" << getpid() << line;
@@ -37,12 +39,12 @@ void dumpIDMap()
     std::string line;
     std::getline(setgroupsFileRead, line);
     logDbg() << "setgroups of pid:" << getpid() << line;
-    logDbg() << "dumpIDMap end -----------";
+    logDbg() << "DumpIDMap end -----------";
 }
 
-void dumpUidGidGroup()
+void DumpUidGidGroup()
 {
-    logDbg() << "dumpUidGidGroup start -----------";
+    logDbg() << "DumpUidGidGroup Start -----------";
     //    __uid_t uid = getuid(); // you can change this to be the uid that you want
     //
     //    struct passwd *pw = getpwuid(uid);
@@ -79,18 +81,21 @@ void dumpUidGidGroup()
         groupListStr += util::format("%d ", list[i]);
     }
     logDbg() << "getgroups size " << groupSize << ", list:" << groupListStr;
-    logDbg() << "dumpUidGidGroup end -----------";
+    logDbg() << "DumpUidGidGroup end -----------";
 }
 
-void dumpFilesystem(const std::string &path)
+void DumpFilesystem(const std::string &path, const char *func, int line)
 {
-    logDbg() << "dumpFilesystem begin -----------";
+    if (nullptr == func) {
+        func = const_cast<char *>(__FUNCTION__);
+    }
+    DUMP_DBG(func, line) << "DumpFilesystem begin -----------" << path;
     DIR *dir;
-    struct dirent *ent;
     if ((dir = opendir(path.c_str())) != NULL) {
+        struct dirent *ent;
         /* print all the files and directories within directory */
         while ((ent = readdir(dir)) != NULL) {
-            logDbg() << path + "/" + ent->d_name;
+            DUMP_DBG(func, line) << path + "/" + ent->d_name;
         }
         closedir(dir);
     } else {
@@ -98,14 +103,24 @@ void dumpFilesystem(const std::string &path)
         logErr() << linglong::util::errnoString() << errno;
         return;
     }
-    logDbg() << "dumpFilesystem end -----------";
+    DUMP_DBG(func, line) << "DumpFilesystem end -----------" << path;
 }
 
-void dumpFileInfo(const std::string &path)
+void DumpFileInfo(const std::string &path)
 {
-    struct stat destStat {
-    };
-    lstat(path.c_str(), &destStat);
-    logDbg() << path << destStat.st_uid << destStat.st_gid << ((destStat.st_mode & S_IFMT) == S_IFDIR);
+    DumpFileInfo1(path, __FUNCTION__, __LINE__);
 }
+
+void DumpFileInfo1(const std::string &path, const char *func, int line)
+{
+    struct stat st {
+    };
+    auto ret = lstat(path.c_str(), &st);
+    if (0 != ret) {
+        DUMP_DBG(func, line) << path << util::RetErrString(ret);
+    } else {
+        DUMP_DBG(func, line) << path << st.st_uid << st.st_gid << ((st.st_mode & S_IFMT) == S_IFDIR);
+    }
+}
+
 } // namespace linglong

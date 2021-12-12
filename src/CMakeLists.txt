@@ -13,9 +13,12 @@ add_executable(ll-box
                util/debug/debug.cpp
                util/platform.cpp
                container/container.cpp
+               container/mount/host_mount.cpp
+               container/mount/filesystem_driver.cpp
                container/seccomp.cpp)
 
 target_link_libraries(ll-box ${LINK_LIBS})
 
-install(TARGETS ll-box RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID)
+install(TARGETS ll-box RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+#install(TARGETS ll-box RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+#        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID)

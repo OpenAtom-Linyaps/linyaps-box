@@ -8,10 +8,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_CONTAINER_SECCOMP_H_
+#define LINGLONG_BOX_SRC_CONTAINER_SECCOMP_H_
 
-#include "util/oci-runtime.h"
+#include "util/oci_runtime.h"
 
 namespace linglong {
-int configSeccomp(const tl::optional<linglong::Seccomp> &seccomp);
+int ConfigSeccomp(const tl::optional<linglong::Seccomp> &seccomp);
 }
+
+#endif /* LINGLONG_BOX_SRC_CONTAINER_SECCOMP_H_ */

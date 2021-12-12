@@ -8,15 +8,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_CONTAINER_CONTAINER_H_
+#define LINGLONG_BOX_SRC_CONTAINER_CONTAINER_H_
 
 #include <memory>
 
-#include "util/oci-runtime.h"
+#include "util/oci_runtime.h"
 
 namespace linglong {
 
 struct Option;
+struct ContainerPrivate;
 
 class Container
 {
@@ -25,12 +27,12 @@ public:
 
     ~Container();
 
-    int start(const Option &opt);
-
-    struct ContainerPrivate;
+    int Start(const Option &opt);
 
 private:
     std::unique_ptr<ContainerPrivate> dd_ptr;
 };
 
 } // namespace linglong
+
+#endif /* LINGLONG_BOX_SRC_CONTAINER_CONTAINER_H_ */

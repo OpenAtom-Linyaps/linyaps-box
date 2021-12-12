@@ -1,0 +1,415 @@
+{
+  "annotations": {
+    "container_root_path": "/run/user/1000/linglong/d2a9e8e46b8c4d5697d7e9aff919bf0e",
+    "native": {
+      "mounts": [
+        {
+          "destination": "/usr",
+          "options": [
+            "ro"
+          ],
+          "source": "/usr",
+          "type": "bind"
+        },
+        {
+          "destination": "/runtime",
+          "options": [
+            "ro"
+          ],
+          "source": "/deepin/linglong/layers/org.deepin.Runtime/20/x86_64",
+          "type": "bind"
+        },
+        {
+          "destination": "/opt/apps/org.deepin.music",
+          "options": [
+            "ro"
+          ],
+          "source": "/deepin/linglong/layers/org.deepin.music/6.0.1.54/x86_64/",
+          "type": "bind"
+        }
+      ]
+    }
+  },
+  "hooks": null,
+  "hostname": "linglong",
+  "linux": {
+    "cgroupsPath": "",
+    "gidMappings": [
+      {
+        "containerID": 0,
+        "hostID": 1000,
+        "size": 1
+      }
+    ],
+    "namespaces": [
+      {
+        "type": "pid"
+      },
+      {
+        "type": "mount"
+      },
+      {
+        "type": "uts"
+      },
+      {
+        "type": "user"
+      }
+    ],
+    "resources": {
+      "cpu": {
+        "period": 100000,
+        "quota": 100000,
+        "shares": 1024
+      },
+      "memory": {
+        "limit": -1,
+        "reservation": -1,
+        "swap": -1
+      }
+    },
+    "seccomp": null,
+    "uidMappings": [
+      {
+        "containerID": 0,
+        "hostID": 1000,
+        "size": 1
+      }
+    ]
+  },
+  "mounts": [
+    {
+      "destination": "/sys",
+      "options": [
+      ],
+      "source": "sysfs",
+      "type": "sysfs"
+    },
+    {
+      "destination": "/proc",
+      "options": [],
+      "source": "proc",
+      "type": "proc"
+    },
+    {
+      "destination": "/dev",
+      "options": [
+        "nosuid",
+        "strictatime",
+        "mode=755",
+        "size=65536k"
+      ],
+      "source": "tmpfs",
+      "type": "tmpfs"
+    },
+    {
+      "destination": "/dev/pts",
+      "options": [
+        "nosuid",
+        "noexec",
+        "newinstance",
+        "ptmxmode=0666",
+        "mode=0620",
+        "gid=5"
+      ],
+      "source": "devpts",
+      "type": "devpts"
+    },
+    {
+      "destination": "/dev/shm",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev",
+        "mode=1777",
+        "size=65536k"
+      ],
+      "source": "shm",
+      "type": "tmpfs"
+    },
+    {
+      "destination": "/dev/mqueue",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev"
+      ],
+      "source": "mqueue",
+      "type": "mqueue"
+    },
+    {
+      "destination": "/tmp",
+      "options": [
+        "nosuid",
+        "strictatime",
+        "mode=777",
+        "size=65536k"
+      ],
+      "source": "tmpfs",
+      "type": "tmpfs"
+    },
+    {
+      "destination": "/dev/dri",
+      "options": [
+        "bind"
+      ],
+      "source": "/dev/dri",
+      "type": "bind"
+    },
+    {
+      "destination": "/dev/snd",
+      "options": [
+        "bind"
+      ],
+      "source": "/dev/snd",
+      "type": "bind"
+    },
+    {
+      "destination": "/tmp/.X11-unix",
+      "options": [
+        "ro"
+      ],
+      "source": "/tmp/.X11-unix",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/network/etc/resolv.conf",
+      "options": [
+        "ro"
+      ],
+      "source": "/etc/resolv.conf",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/resolvconf",
+      "options": [
+        "ro"
+      ],
+      "source": "/run/resolvconf",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/appearance/fonts",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/fonts",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/locale/",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/locale/",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/lib/locale/",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/lib/locale/",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/fonts",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/fonts",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/themes",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/themes",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/icons",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/icons",
+      "type": "bind"
+    },
+    {
+      "destination": "/usr/share/zoneinfo",
+      "options": [
+        "ro"
+      ],
+      "source": "/usr/share/zoneinfo",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/etc/localtime",
+      "options": [
+        "ro"
+      ],
+      "source": "/etc/localtime",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/etc/machine-id",
+      "options": [
+        "ro"
+      ],
+      "source": "/etc/machine-id",
+      "type": "bind"
+    },
+    {
+      "destination": "/etc/machine-id",
+      "options": [
+        "ro"
+      ],
+      "source": "/etc/machine-id",
+      "type": "bind"
+    },
+    {
+      "destination": "/var",
+      "options": [
+        "ro"
+      ],
+      "source": "/var",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/appearance/fonts-cache",
+      "options": [
+        "ro"
+      ],
+      "source": "/var/cache/fontconfig",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/user/1000",
+      "options": [
+        "nodev",
+        "nosuid"
+      ],
+      "source": "tmpfs",
+      "type": "tmpfs"
+    },
+    {
+      "destination": "/run/user/1000/bus",
+      "options": [],
+      "source": "/run/user/1000/bus",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/dbus/system_bus_socket",
+      "options": [],
+      "source": "/run/dbus/system_bus_socket",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer",
+      "options": [],
+      "source": "/home/iceyer/.linglong/org.deepin.music/home",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.config",
+      "options": [],
+      "source": "/home/iceyer/.linglong/org.deepin.music/config",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.cache",
+      "options": [],
+      "source": "/home/iceyer/.linglong/org.deepin.music/cache",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/user/1000/dconf",
+      "options": [],
+      "source": "/run/user/1000/dconf",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.config/user-dirs.dirs",
+      "options": [],
+      "source": "/home/iceyer/.config/user-dirs.dirs",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.local/share/fonts",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/.local/share/fonts",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.config/fontconfig",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/.config/fontconfig",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/host/appearance/user-fonts",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/.local/share/fonts",
+      "type": "bind"
+    },
+    {
+      "destination": "/home/iceyer/.Xauthority",
+      "options": [
+        "ro"
+      ],
+      "source": "/home/iceyer/.Xauthority",
+      "type": "bind"
+    },
+    {
+      "destination": "/run/app/env",
+      "options": [],
+      "source": "/run/user/1000/linglong/d2a9e8e46b8c4d5697d7e9aff919bf0e/env",
+      "type": "bind"
+    }
+  ],
+  "ociVersion": "1.0.1",
+  "process": {
+    "args": [
+      "/bin/bash"
+    ],
+    "cwd": "/home/iceyer",
+    "env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "TERM=xterm",
+      "_=/usr/bin/env",
+      "PS1=️\\033[48;5;214;38;5;26m${debian_chroot:+($debian_chroot)}\\h ⚛ \\w\\033[0m",
+      "LD_LIBRARY_PATH=/opt/apps/org.deepin.music/files/lib:/runtime/lib:/runtime/lib/x86_64-linux-gnu:/runtime/lib/i386-linux-gnu",
+      "QT_PLUGIN_PATH=/usr/lib/plugins:/runtime/plugins",
+      "QT_QPA_PLATFORM_PLUGIN_PATH=/usr/lib/plugins/platforms:/runtime/plugins/platforms",
+      "PATH=/opt/apps/org.deepin.music/files/bin:/home/iceyer/.local/bin:/home/iceyer/Develop/miniconda3/bin:/home/iceyer/Develop/miniconda3/condabin:/home/iceyer/.bash/bin:/home/iceyer/.gvm/pkgsets/go1.16.5/global/bin:/home/iceyer/.gvm/gos/go1.16.5/bin:/home/iceyer/.gvm/pkgsets/go1.16.5/global/overlay/bin:/home/iceyer/.gvm/bin:/home/iceyer/.gvm/bin:/home/iceyer/Develop/golang/bin:/home/iceyer/Develop/node/bin:/home/iceyer/.gvm/pkgsets/go1.16.5/global/bin:/home/iceyer/.gvm/gos/go1.16.5/bin:/home/iceyer/.gvm/pkgsets/go1.16.5/global/overlay/bin:/home/iceyer/.gvm/bin:/home/iceyer/.gvm/bin:/home/iceyer/.config/nvm/versions/node/v12.21.0/bin:/home/iceyer/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/sbin:/usr/sbin",
+      "HOME=/home/iceyer",
+      "XDG_RUNTIME_DIR=/run/user/1000",
+      "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus",
+      "DISPLAY=:0",
+      "LANG=zh_CN.UTF-8",
+      "LANGUAGE=zh_CN",
+      "XAUTHORITY=/home/iceyer/.Xauthority",
+      "XDG_SESSION_DESKTOP=deepin",
+      "D_DISABLE_RT_SCREEN_SCALE=",
+      "XMODIFIERS=@im=fcitx",
+      "DESKTOP_SESSION=deepin",
+      "DEEPIN_WINE_SCALE=2.00",
+      "XDG_CURRENT_DESKTOP=Deepin",
+      "XIM=fcitx",
+      "XDG_SESSION_TYPE=x11",
+      "CLUTTER_IM_MODULE=fcitx",
+      "QT4_IM_MODULE=",
+      "GTK_IM_MODULE=fcitx"
+    ]
+  },
+  "root": {
+    "path": "/run/user/1000/linglong/d2a9e8e46b8c4d5697d7e9aff919bf0e/root",
+    "readonly": false
+  }
+}

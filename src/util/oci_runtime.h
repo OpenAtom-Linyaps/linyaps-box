@@ -8,7 +8,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_UTIL_OCI_RUNTIME_H_
+#define LINGLONG_BOX_SRC_UTIL_OCI_RUNTIME_H_
 
 #include <sys/mount.h>
 
@@ -386,6 +387,63 @@ inline void to_json(nlohmann::json &j, const Hooks &o)
     j["prestart"] = o.prestart;
 }
 
+struct AnnotationsOverlayfs {
+    std::string lower_parent;
+    std::string upper;
+    std::string workdir;
+    std::vector<Mount> mounts;
+};
+
+LLJS_FROM_OBJ(AnnotationsOverlayfs)
+{
+    LLJS_FROM(lower_parent);
+    LLJS_FROM(upper);
+    LLJS_FROM(workdir);
+    LLJS_FROM(mounts);
+}
+
+LLJS_TO_OBJ(AnnotationsOverlayfs)
+{
+    LLJS_TO(lower_parent);
+    LLJS_TO(upper);
+    LLJS_TO(workdir);
+    LLJS_TO(mounts);
+}
+
+struct AnnotationsNativeRootfs {
+    std::vector<Mount> mounts;
+};
+
+LLJS_FROM_OBJ(AnnotationsNativeRootfs)
+{
+    LLJS_FROM(mounts);
+}
+
+LLJS_TO_OBJ(AnnotationsNativeRootfs)
+{
+    LLJS_TO(mounts);
+}
+
+struct Annotations {
+    std::string container_root_path;
+    tl::optional<AnnotationsOverlayfs> overlayfs;
+    tl::optional<AnnotationsNativeRootfs> native;
+};
+
+LLJS_FROM_OBJ(Annotations)
+{
+    LLJS_FROM(container_root_path);
+    LLJS_FROM_OPT(overlayfs);
+    LLJS_FROM_OPT(native);
+}
+
+LLJS_TO_OBJ(Annotations)
+{
+    LLJS_TO(container_root_path);
+    LLJS_TO(overlayfs);
+    LLJS_TO(native);
+}
+
 struct Runtime {
     std::string version;
     Root root;
@@ -394,6 +452,7 @@ struct Runtime {
     Linux linux;
     tl::optional<std::vector<Mount>> mounts;
     tl::optional<Hooks> hooks;
+    tl::optional<Annotations> annotations;
 };
 
 inline void from_json(const nlohmann::json &j, Runtime &o)
@@ -406,6 +465,7 @@ inline void from_json(const nlohmann::json &j, Runtime &o)
     // maybe optional
     LLJS_FROM(root);
     o.hooks = optional<decltype(o.hooks)::value_type>(j, "hooks");
+    LLJS_FROM_OPT(annotations);
 }
 
 inline void to_json(nlohmann::json &j, const Runtime &o)
@@ -417,6 +477,7 @@ inline void to_json(nlohmann::json &j, const Runtime &o)
     j["linux"] = o.linux;
     j["root"] = o.root;
     j["hooks"] = o.hooks;
+    LLJS_TO(annotations);
 }
 
 inline static Runtime fromFile(const std::string &filepath)
@@ -430,3 +491,5 @@ inline static Runtime fromString(const std::string &content)
 }
 
 } // namespace linglong
+
+#endif /* LINGLONG_BOX_SRC_UTIL_OCI_RUNTIME_H_ */

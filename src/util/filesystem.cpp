@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include "filesystem.h"
+#include "logger.h"
 
 namespace linglong {
 namespace util {
@@ -31,7 +32,15 @@ bool create_directories(const path &p, __mode_t mode)
     std::string fullPath;
     for (const auto &e : p.components()) {
         fullPath += "/" + e;
-        mkdir(fullPath.c_str(), mode);
+        if (is_dir(fullPath)) {
+            continue;
+        }
+
+        auto ret = mkdir(fullPath.c_str(), mode);
+        if (0 != ret) {
+            logErr() << util::RetErrString(ret) << fullPath << mode;
+            return false;
+        }
     }
     return true;
 }

@@ -8,11 +8,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_CONTAINER_CONTAINER_OPTION_H_
+#define LINGLONG_BOX_SRC_CONTAINER_CONTAINER_OPTION_H_
 
 #include "util/json.h"
 
 namespace linglong {
+
 /*!
  * It's seem not a good idea to add extra config option.
  * The oci runtime json should contain option, but now it's hard to modify
@@ -21,6 +23,9 @@ namespace linglong {
  */
 struct Option {
     bool rootless = false;
-    bool linkLFS = true;
+    bool link_lfs = true;
 };
+
 } // namespace linglong
+
+#endif /* LINGLONG_BOX_SRC_CONTAINER_CONTAINER_OPTION_H_ */

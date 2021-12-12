@@ -8,7 +8,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_UTIL_SEMAPHORE_H_
+#define LINGLONG_BOX_SRC_UTIL_SEMAPHORE_H_
 
 #include <memory>
 
@@ -38,3 +39,5 @@ private:
 };
 
 } // namespace linglong
+
+#endif /* LINGLONG_BOX_SRC_UTIL_SEMAPHORE_H_ */

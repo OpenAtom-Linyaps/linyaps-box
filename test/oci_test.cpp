@@ -10,7 +10,7 @@
 
 #include <gtest/gtest.h>
 
-#include "util/oci-runtime.h"
+#include "util/oci_runtime.h"
 
 using namespace linglong;
 

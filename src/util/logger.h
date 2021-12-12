@@ -8,7 +8,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_UTIL_LOGGER_H_
+#define LINGLONG_BOX_SRC_UTIL_LOGGER_H_
 
 #include "util.h"
 
@@ -18,7 +19,6 @@
 #include <sstream>
 #include <algorithm>
 #include <cstring>
-
 #include <utility>
 
 namespace linglong {
@@ -50,25 +50,25 @@ public:
             break;
         case Info:
             prefix = "[IFO |";
-            std::cout << "\033[1m\033[96;5;214m";
+            std::cout << "\033[1;96m";
             std::cout << prefix << getpid() << " | " << function << ":" << line << " ] " << ss.str();
             std::cout << "\033[0m" << std::endl;
             break;
         case Warring:
             prefix = "[WAN |";
-            std::cout << "\033[1m\033[93;5;214m";
+            std::cout << "\033[1;93m";
             std::cout << prefix << getpid() << " | " << function << ":" << line << " ] " << ss.str();
             std::cout << "\033[0m" << std::endl;
             break;
         case Error:
             prefix = "[ERR |";
-            std::cout << "\033[1m\033[31;5;214m";
+            std::cout << "\033[1;31m";
             std::cout << prefix << getpid() << " | " << function << ":" << line << " ] " << ss.str();
             std::cout << "\033[0m" << std::endl;
             break;
         case Fatal:
             prefix = "[FAL |";
-            std::cout << "\033[1m\033[91;5;214m";
+            std::cout << "\033[1;91m";
             std::cout << prefix << getpid() << " | " << function << ":" << line << " ] " << ss.str();
             std::cout << "\033[0m" << std::endl;
             // FIXME: need crash;
@@ -106,10 +106,12 @@ inline std::string errnoString()
     return util::format("errno(%d): %s", errno, strerror(errno));
 }
 
-inline std::string retErrString(int ret)
+inline std::string RetErrString(int ret)
 {
     return util::format("ret(%d),errno(%d): %s", ret, errno, strerror(errno));
 }
 
 } // namespace util
 } // namespace linglong
+
+#endif /* LINGLONG_BOX_SRC_UTIL_LOGGER_H_ */

@@ -8,7 +8,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_UTIL_FILESYSTEM_H_
+#define LINGLONG_BOX_SRC_UTIL_FILESYSTEM_H_
 
 #include <vector>
 #include <ostream>
@@ -20,7 +21,7 @@ namespace linglong {
 namespace util {
 namespace fs {
 
-class path
+class path : public std::basic_string<char>
 {
 public:
     explicit path(const std::string &s)
@@ -34,11 +35,7 @@ public:
         return *this;
     }
 
-    path &operator=(const path &p1)
-    {
-        p = p1.p;
-        return *this;
-    }
+    path &operator=(const path &p1) = default;
 
     bool operator==(const path &s) const { return this->p == s.p; }
 
@@ -150,3 +147,5 @@ path read_symlink(const path &p);
 } // namespace fs
 } // namespace util
 } // namespace linglong
+
+#endif /* LINGLONG_BOX_SRC_UTIL_FILESYSTEM_H_ */

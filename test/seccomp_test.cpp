@@ -15,7 +15,7 @@
 #include <sys/klog.h>
 #include <climits>
 
-#include "util/oci-runtime.h"
+#include "util/oci_runtime.h"
 
 #include "container/seccomp.h"
 
@@ -33,13 +33,13 @@ TEST(OCI, Seccomp)
     auto filepath = "../../test/data/demo/config-seccomp.json";
     auto r = linglong::fromFile(filepath);
 
-    EXPECT_EQ(configSeccomp(r.linux.seccomp), 0);
+    EXPECT_EQ(ConfigSeccomp(r.linux.seccomp), 0);
 
     getcwd(buf, bufSize);
     EXPECT_EQ(errno, EPERM);
 
     r.linux.seccomp->defaultAction = "INVALID_ACTION";
-    EXPECT_EQ(configSeccomp(r.linux.seccomp), -1);
+    EXPECT_EQ(ConfigSeccomp(r.linux.seccomp), -1);
 }
 
 TEST(OCI, SeccompDefault)
@@ -50,7 +50,7 @@ TEST(OCI, SeccompDefault)
     auto filepath = "../../test/data/demo/config-seccomp-default.json";
     auto r = linglong::fromFile(filepath);
 
-    EXPECT_EQ(configSeccomp(r.linux.seccomp), 0);
+    EXPECT_EQ(ConfigSeccomp(r.linux.seccomp), 0);
 
     klogctl(2, buf, bufSize);
     EXPECT_EQ(errno, EPERM);
@@ -59,7 +59,7 @@ TEST(OCI, SeccompDefault)
     filepath = "../../test/data/demo/config-seccomp.json";
     r = linglong::fromFile(filepath);
 
-    EXPECT_EQ(configSeccomp(r.linux.seccomp), 0);
+    EXPECT_EQ(ConfigSeccomp(r.linux.seccomp), 0);
 
     klogctl(2, buf, bufSize);
     EXPECT_EQ(errno, EPERM);

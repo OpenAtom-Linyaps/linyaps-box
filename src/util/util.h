@@ -8,7 +8,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#pragma once
+#ifndef LINGLONG_BOX_SRC_UTIL_UTIL_H_
+#define LINGLONG_BOX_SRC_UTIL_UTIL_H_
 
 #include "macro.h"
 #include "common.h"
@@ -39,3 +40,5 @@ inline nlohmann::json fromFile(const std::string &filepath)
 } // namespace json
 } // namespace util
 } // namespace linglong
+
+#endif /* LINGLONG_BOX_SRC_UTIL_UTIL_H_ */
