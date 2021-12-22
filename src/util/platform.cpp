@@ -59,7 +59,7 @@ int Exec(const util::str_vec &args, tl::optional<std::vector<std::string>> env_l
 
     logDbg() << "execve" << targetArgv[0] << " in pid:" << getpid();
 
-    int ret = execve(targetArgv[0], const_cast<char **>(targetArgv), const_cast<char **>(targetEnvv));
+    int ret = execvpe(targetArgv[0], const_cast<char **>(targetArgv), const_cast<char **>(targetEnvv));
 
     delete[] targetEnvv;
 

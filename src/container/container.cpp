@@ -447,6 +447,12 @@ int NonePrivilegeProc(void *arg)
     }
 
     if (0 == pid) {
+        for (auto env : c.r.process.env) {
+            auto kv = util::str_spilt(env, "=");
+            if (kv.size() > 1 && kv.at(0) == "PATH") {
+                setenv("PATH", kv.at(1).c_str(), 1);
+            }
+        }
         auto ret = util::Exec(c.r.process.args, c.r.process.env);
         if (0 != ret) {
             logErr() << "execve failed" << util::RetErrString(ret);
