@@ -1,3 +1,0 @@
-#!/bin/bash
-
-[[ -f /usr/bin/ll-box ]] && chmod u+s /usr/bin/ll-box
