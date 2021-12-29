@@ -157,6 +157,7 @@ public:
         , r(std::move(r))
         , native_mounter_(new HostMount)
         , overlayfs_mounter_(new HostMount)
+        , fuseproxy_mounter_(new HostMount)
     {
     }
 
@@ -177,6 +178,7 @@ public:
 
     std::unique_ptr<HostMount> native_mounter_;
     std::unique_ptr<HostMount> overlayfs_mounter_;
+    std::unique_ptr<HostMount> fuseproxy_mounter_;
 
     HostMount *container_mounter_ = nullptr;
 
@@ -337,6 +339,21 @@ public:
             return -1;
         };
 
+        auto PrepareFuseProxyRootfs = [&](const AnnotationsOverlayfs &overlayfs) -> int {
+            native_mounter_->Setup(new NativeFilesystemDriver(overlayfs.lower_parent));
+
+            util::str_vec mounts = {};
+            for (auto const &m : overlayfs.mounts) {
+                auto mount_item = util::format("%s:%s\n", m.source.c_str(), m.destination.c_str());
+                mounts.push_back(mount_item);
+            }
+
+            fuseproxy_mounter_->Setup(new FuseProxyFilesystemDriver(mounts, host_root_));
+
+            container_mounter_ = fuseproxy_mounter_.get();
+            return -1;
+        };
+
         auto PrepareNativeRootfs = [&](const AnnotationsNativeRootfs &native) -> int {
             native_mounter_->Setup(new NativeFilesystemDriver(r.root.path));
 
@@ -350,7 +367,11 @@ public:
 
         if (r.annotations.has_value() && r.annotations->overlayfs.has_value()) {
             clone_new_pid_ = true;
-            return PrepareOverlayfsRootfs(r.annotations->overlayfs.value());
+            if (std::string(getenv("LL_BOX_FS_BACKEND")) == "overlayfs") {
+                return PrepareOverlayfsRootfs(r.annotations->overlayfs.value());
+            } else {
+                return PrepareFuseProxyRootfs(r.annotations->overlayfs.value());
+            }
         } else {
             return PrepareNativeRootfs(r.annotations->native.value());
         }

@@ -45,6 +45,24 @@ private:
     std::string mount_point_;
 };
 
+class FuseProxyFilesystemDriver : public FilesystemDriver
+{
+public:
+    explicit FuseProxyFilesystemDriver(util::str_vec mounts, std::string mount_point);
+
+    int Setup() override;
+
+    int CreateDestinationPath(const util::fs::path &container_destination_path) override;
+
+    util::fs::path HostPath(const util::fs::path &dest_full_path) const override;
+
+    util::fs::path HostSource(const util::fs::path &dest_full_path) const override;
+
+private:
+    util::str_vec mounts_;
+    std::string mount_point_;
+};
+
 class NativeFilesystemDriver : public FilesystemDriver
 {
 public:
