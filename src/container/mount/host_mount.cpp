@@ -114,7 +114,7 @@ public:
 
         switch (m.fsType) {
         case Mount::Bind:
-            ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), nullptr, MS_BIND, opts.c_str());
+            ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), nullptr, MS_BIND | MS_REC, opts.c_str());
             if (0 != ret) {
                 break;
             }
