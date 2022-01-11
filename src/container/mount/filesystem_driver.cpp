@@ -159,6 +159,7 @@ int FuseProxyFilesystemDriver::Setup()
         close(pipe_ends[0]);
 
         util::fs::create_directories(util::fs::path(mount_point_), 0755);
+        util::fs::create_directories(util::fs::path(mount_point_ + "/.root"), 0755);
 
         util::str_vec args;
         args.push_back("/usr/bin/ll-fuse-proxy");
@@ -170,6 +171,8 @@ int FuseProxyFilesystemDriver::Setup()
         exit(0);
     } else {
         close(pipe_ends[0]);
+        std::string root_mount = mount_point_ + "/.root:/\n";
+        write(pipe_ends[1], root_mount.c_str(), root_mount.size()); // FIXME: handle write error
         for (auto const &m : mounts_) {
             write(pipe_ends[1], m.c_str(), m.size());
         }
