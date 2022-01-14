@@ -1,3 +1,9 @@
+linglong-box (1.2.0-1) unstable; urgency=medium
+
+  *  mount add a MS_REC flag
+
+ -- liujianqiang <liujianqiang@uniontech.com>  Fri, 14 Jan 2022 10:51:13 +0800
+
 linglong-box (1.0.1-1) unstable; urgency=medium
 
   * support rootless and fuse
