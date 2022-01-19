@@ -114,7 +114,8 @@ public:
 
         switch (m.fsType) {
         case Mount::Bind:
-            ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), nullptr, MS_BIND | MS_REC, opts.c_str());
+            ret =
+                ::mount(source.c_str(), host_dest_full_path.string().c_str(), nullptr, MS_BIND | MS_REC, opts.c_str());
             if (0 != ret) {
                 break;
             }
@@ -135,6 +136,13 @@ public:
         case Mount::Tmpfs:
         case Mount::Sysfs:
             ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(), flags, nullptr);
+            if (ret < 0) {
+                // https://github.com/containers/crun/blob/38e1b5e2a3e9567ff188258b435085e329aaba42/src/libcrun/linux.c#L768-L789
+                if (m.fsType == Mount::Sysfs) {
+                    ret = mount("/sys", host_dest_full_path.string().c_str(), "/sys", MS_BIND | MS_REC | MS_SLAVE,
+                                opts.c_str());
+                }
+            }
             break;
         case Mount::Cgroup:
             ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(), flags, opts.c_str());
@@ -180,8 +188,6 @@ int HostMount::Setup(FilesystemDriver *driver)
     return dd_ptr->driver_->Setup();
 }
 
-HostMount::~HostMount()
-{
-};
+HostMount::~HostMount() {};
 
 } // namespace linglong
