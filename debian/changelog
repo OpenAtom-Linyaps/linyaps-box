@@ -1,3 +1,12 @@
+linglong-box (1.2.1-1) unstable; urgency=medium
+
+  *  1. fuse proxy support
+  *  2. fix construct string with nullptr cause crash
+  *  3. fallback to bind when sysfs mount failed
+  *  4. root mount for ll-fuse-proxy
+
+ -- liujianqiang <liujianqiang@uniontech.com>  Mon, 24 Jan 2022 08:55:58 +0800
+
 linglong-box (1.2.0-1) unstable; urgency=medium
 
   *  mount add a MS_REC flag
