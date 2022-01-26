@@ -95,7 +95,7 @@
       "options": [
         "nosuid",
         "strictatime",
-        "mode=755",
+        "mode=0755",
         "size=65536k"
       ],
       "source": "tmpfs",
@@ -108,8 +108,7 @@
         "noexec",
         "newinstance",
         "ptmxmode=0666",
-        "mode=0620",
-        "gid=5"
+        "mode=0620"
       ],
       "source": "devpts",
       "type": "devpts"
