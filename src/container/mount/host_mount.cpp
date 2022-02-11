@@ -29,7 +29,7 @@ public:
         return driver_->CreateDestinationPath(container_destination_path);
     }
 
-    int MountNode(const struct Mount &m) const
+    int MountNode(const struct Mount &m)
     {
         int ret = -1;
         struct stat source_stat {
@@ -103,6 +103,10 @@ public:
                 break;
             }
 
+            if (source == "/sys") {
+                sysfs_is_binded = true;
+            }
+
             if (opts.empty()) {
                 break;
             }
@@ -120,15 +124,27 @@ public:
         case Mount::Sysfs:
             ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(), flags, opts.c_str());
             if (ret < 0) {
+                // refers:
+                // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L178
                 // https://github.com/containers/crun/blob/38e1b5e2a3e9567ff188258b435085e329aaba42/src/libcrun/linux.c#L768-L789
                 if (m.fsType == Mount::Sysfs) {
-                    ret = mount("/sys", host_dest_full_path.string().c_str(), "/sys", MS_BIND | MS_REC | MS_SLAVE,
-                                opts.c_str());
+                    ret = ::mount("/sys", host_dest_full_path.string().c_str(), nullptr, MS_BIND | MS_REC, nullptr);
+                    if (ret == 0) {
+                        sysfs_is_binded = true;
+                    }
+                } else if (m.fsType == Mount::Mqueue) {
+                    ret = ::mount("/dev/mqueue", host_dest_full_path.string().c_str(), nullptr, MS_BIND | MS_REC,
+                                  nullptr);
                 }
             }
             break;
         case Mount::Cgroup:
             ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(), flags, opts.c_str());
+            // When sysfs is bind-mounted, It is ok to let cgroup mount failed.
+            // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L281
+            if (sysfs_is_binded) {
+                ret = 0;
+            }
             break;
         default:
             logErr() << "unsupported type" << m.type;
@@ -179,6 +195,7 @@ public:
 
     std::unique_ptr<FilesystemDriver> driver_;
     static std::map<std::string, MountFlag> mount_flags;
+    bool sysfs_is_binded = false;
 };
 
 std::map<std::string, HostMountPrivate::MountFlag> HostMountPrivate::mount_flags = {
