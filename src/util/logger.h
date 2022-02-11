@@ -23,6 +23,9 @@
 
 namespace linglong {
 namespace util {
+std::string errnoString();
+std::string RetErrString(int);
+
 class Logger
 {
 public:
@@ -42,11 +45,13 @@ public:
     ~Logger()
     {
         std::string prefix;
-        const std::string buf = ss.str().substr(0, ss.str().size() - 1);
+        if (level < LOGLEVEL) {
+            return;
+        }
         switch (level) {
         case Debug:
             prefix = "[DBG |";
-            std::cout << prefix << getpid() << " | " << function << ":" << line << " ] " << buf << std::endl;
+            std::cout << prefix << getpid() << " | " << function << ":" << line << " ] " << ss.str() << std::endl;
             break;
         case Info:
             prefix = "[IFO |";
@@ -71,7 +76,7 @@ public:
             std::cout << "\033[1;91m";
             std::cout << prefix << getpid() << " | " << function << ":" << line << " ] " << ss.str();
             std::cout << "\033[0m" << std::endl;
-            // FIXME: need crash;
+            exit(-1);
             break;
         }
     }
@@ -84,6 +89,7 @@ public:
     }
 
 private:
+    static Level LOGLEVEL;
     Level level = Debug;
     const char *function;
     int line;
@@ -97,21 +103,5 @@ private:
 #define logInf() (linglong::util::Logger(linglong::util::Logger::Info, __FUNCTION__, __LINE__))
 #define logErr() (linglong::util::Logger(linglong::util::Logger::Error, __FUNCTION__, __LINE__))
 #define logFal() (linglong::util::Logger(linglong::util::Logger::Fatal, __FUNCTION__, __LINE__))
-
-namespace linglong {
-namespace util {
-
-inline std::string errnoString()
-{
-    return util::format("errno(%d): %s", errno, strerror(errno));
-}
-
-inline std::string RetErrString(int ret)
-{
-    return util::format("ret(%d),errno(%d): %s", ret, errno, strerror(errno));
-}
-
-} // namespace util
-} // namespace linglong
 
 #endif /* LINGLONG_BOX_SRC_UTIL_LOGGER_H_ */

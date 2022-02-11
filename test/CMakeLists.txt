@@ -17,6 +17,7 @@ set(LINK_LIBS
 add_executable(ll-test
                oci_test.cpp
                seccomp_test.cpp
+               ../src/util/logger.cpp
                ../src/container/seccomp.cpp)
 
 target_link_libraries(ll-test ${LINK_LIBS})
