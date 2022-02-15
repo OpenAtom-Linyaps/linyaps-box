@@ -98,7 +98,7 @@ linglong::Runtime loadBundle(int argc, char **argv)
         m.source = "tmpfs";
         m.type = "tmpfs";
         m.fsType = Mount::Tmpfs;
-        m.options = {"nodev", "nosuid"};
+        m.data = {"nodev", "nosuid"};
         m.destination = "/opt";
         r.mounts->push_back(m);
     }

@@ -91,14 +91,21 @@ public:
             break;
         }
 
-        auto opt_pair = praseMountOptions(m);
-        auto flags = opt_pair.first;
-        auto opts = opt_pair.second;
+        auto data = util::str_vec_join(m.data, ',');
+        auto real_data = data;
+        auto real_flags = m.flags;
 
         switch (m.fsType) {
         case Mount::Bind:
-            ret =
-                ::mount(source.c_str(), host_dest_full_path.string().c_str(), nullptr, MS_BIND | MS_REC, opts.c_str());
+            // make sure m.flags always have MS_BIND
+            real_flags |= MS_BIND;
+
+            // When doing a bind mount, all flags expect MS_BIND and MS_REC are ignored by kernel.
+            real_flags &= (MS_BIND | MS_REC);
+
+            // When doing a bind mount, data and fstype are ignored by kernel. We should set them by remounting.
+            real_data = "";
+            ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), nullptr, real_flags, nullptr);
             if (0 != ret) {
                 break;
             }
@@ -107,39 +114,45 @@ public:
                 sysfs_is_binded = true;
             }
 
-            if (opts.empty()) {
+            if (data.empty() && (m.flags & ~(MS_BIND | MS_REC | MS_REMOUNT)) == 0) {
+                // no need to be remounted
                 break;
             }
 
-            ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), nullptr, flags | MS_BIND | MS_REMOUNT,
-                          opts.c_str());
-            if (0 != ret) {
-                break;
-            }
+            real_flags = m.flags | MS_BIND | MS_REMOUNT;
+
+            // When doing a remount, source and fstype are ignored by kernel.
+            real_data = data;
+            ret = ::mount(nullptr, host_dest_full_path.string().c_str(), nullptr, real_flags, real_data.c_str());
             break;
         case Mount::Proc:
         case Mount::Devpts:
         case Mount::Mqueue:
         case Mount::Tmpfs:
         case Mount::Sysfs:
-            ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(), flags, opts.c_str());
+            ret =
+                ::mount(source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(), real_flags, real_data.c_str());
             if (ret < 0) {
                 // refers:
                 // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L178
                 // https://github.com/containers/crun/blob/38e1b5e2a3e9567ff188258b435085e329aaba42/src/libcrun/linux.c#L768-L789
                 if (m.fsType == Mount::Sysfs) {
-                    ret = ::mount("/sys", host_dest_full_path.string().c_str(), nullptr, MS_BIND | MS_REC, nullptr);
+                    real_flags = MS_BIND | MS_REC;
+                    real_data = "";
+                    ret = ::mount("/sys", host_dest_full_path.string().c_str(), nullptr, real_flags, nullptr);
                     if (ret == 0) {
                         sysfs_is_binded = true;
                     }
                 } else if (m.fsType == Mount::Mqueue) {
-                    ret = ::mount("/dev/mqueue", host_dest_full_path.string().c_str(), nullptr, MS_BIND | MS_REC,
-                                  nullptr);
+                    real_flags = MS_BIND | MS_REC;
+                    real_data = "";
+                    ret = ::mount("/dev/mqueue", host_dest_full_path.string().c_str(), nullptr, real_flags, nullptr);
                 }
             }
             break;
         case Mount::Cgroup:
-            ret = ::mount(source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(), flags, opts.c_str());
+            ret =
+                ::mount(source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(), real_flags, real_data.c_str());
             // When sysfs is bind-mounted, It is ok to let cgroup mount failed.
             // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L281
             if (sysfs_is_binded) {
@@ -152,7 +165,7 @@ public:
 
         if (EXIT_SUCCESS != ret) {
             logErr() << "mount" << source << "to" << host_dest_full_path << "failed:" << util::RetErrString(ret)
-                     << "\nmount args is:" << m.type << flags << opts;
+                     << "\nmount args is:" << m.type << real_flags << real_data;
             if (is_path) {
                 logErr() << "source file type is: 0x" << std::hex << (source_stat.st_mode & S_IFMT);
                 DUMP_FILE_INFO(source);
@@ -163,77 +176,8 @@ public:
         return ret;
     }
 
-    struct MountFlag {
-        bool clear;
-        uint32_t flag;
-    };
-
-    // parses options and returns a flag and data depends on options set accordingly.
-    std::pair<uint32_t, std::string> praseMountOptions(const struct Mount &m) const
-    {
-        // TODO support "propagation flags" and "recursive mount attrs"
-        // https://github.com/opencontainers/runc/blob/c83abc503de7e8b3017276e92e7510064eee02a8/libcontainer/specconv/spec_linux.go#L958
-        uint32_t flags = m.flags;
-        util::str_vec options;
-
-        for (const auto &option : m.options) {
-            auto it = mount_flags.find(option);
-            if (it != mount_flags.end()) {
-                auto mountFlag = it->second;
-                if (mountFlag.clear)
-                    flags &= ~mountFlag.flag;
-                else
-                    flags |= mountFlag.flag;
-            } else {
-                options.push_back(option);
-            }
-        }
-
-        auto data = util::str_vec_join(options, ',');
-        return std::make_pair(flags, data);
-    }
-
     std::unique_ptr<FilesystemDriver> driver_;
-    static std::map<std::string, MountFlag> mount_flags;
     mutable bool sysfs_is_binded = false;
-};
-
-std::map<std::string, HostMountPrivate::MountFlag> HostMountPrivate::mount_flags = {
-    {"acl", {false, MS_POSIXACL}},
-    {"async", {true, MS_SYNCHRONOUS}},
-    {"atime", {true, MS_NOATIME}},
-    {"bind", {false, MS_BIND}},
-    {"defaults", {false, 0}},
-    {"dev", {true, MS_NODEV}},
-    {"diratime", {true, MS_NODIRATIME}},
-    {"dirsync", {false, MS_DIRSYNC}},
-    {"exec", {true, MS_NOEXEC}},
-    {"iversion", {false, MS_I_VERSION}},
-    {"lazytime", {false, MS_LAZYTIME}},
-    {"loud", {true, MS_SILENT}},
-    {"mand", {false, MS_MANDLOCK}},
-    {"noacl", {true, MS_POSIXACL}},
-    {"noatime", {false, MS_NOATIME}},
-    {"nodev", {false, MS_NODEV}},
-    {"nodiratime", {false, MS_NODIRATIME}},
-    {"noexec", {false, MS_NOEXEC}},
-    {"noiversion", {true, MS_I_VERSION}},
-    {"nolazytime", {true, MS_LAZYTIME}},
-    {"nomand", {true, MS_MANDLOCK}},
-    {"norelatime", {true, MS_RELATIME}},
-    {"nostrictatime", {true, MS_STRICTATIME}},
-    {"nosuid", {false, MS_NOSUID}},
-    // {"nosymfollow",{false, MS_NOSYMFOLLOW}}, // since kernel 5.10
-    {"rbind", {false, MS_BIND | MS_REC}},
-    {"relatime", {false, MS_RELATIME}},
-    {"remount", {false, MS_REMOUNT}},
-    {"ro", {false, MS_RDONLY}},
-    {"rw", {true, MS_RDONLY}},
-    {"silent", {false, MS_SILENT}},
-    {"strictatime", {false, MS_STRICTATIME}},
-    {"suid", {true, MS_NOSUID}},
-    {"sync", {false, MS_SYNCHRONOUS}},
-    // {"symfollow",{true, MS_NOSYMFOLLOW}}, // since kernel 5.10
 };
 
 HostMount::HostMount()

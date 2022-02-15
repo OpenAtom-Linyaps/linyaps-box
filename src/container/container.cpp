@@ -248,11 +248,11 @@ public:
                 Mount m;
                 m.destination = dev.path;
                 m.type = "bind";
-                m.options = std::vector<std::string> {"bind"};
+                m.data = std::vector<std::string> {};
+                m.flags = MS_BIND;
                 m.fsType = Mount::Bind;
                 m.source = dev.path;
 
-                // FIXME(iceyer): how to mount node?
                 this->container_mounter_->MountNode(m);
             }
         }

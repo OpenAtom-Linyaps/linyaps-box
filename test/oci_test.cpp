@@ -23,7 +23,7 @@ TEST(OCI, Runtime)
     EXPECT_EQ(r.process.env[1], "TERM=xterm");
 
     EXPECT_EQ(r.mounts.has_value(), true);
-    EXPECT_EQ(r.mounts->at(1).options.at(1), "strictatime");
+    EXPECT_EQ(r.mounts->at(1).data.at(1), "strictatime");
 
     EXPECT_EQ(r.hooks, tl::nullopt);
 

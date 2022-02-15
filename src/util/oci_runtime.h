@@ -79,7 +79,7 @@ struct Mount {
     std::string destination;
     std::string type;
     std::string source;
-    util::str_vec options;
+    util::str_vec data;
 
     Type fsType;
     uint32_t flags = 0u;
@@ -92,22 +92,71 @@ inline void from_json(const nlohmann::json &j, Mount &o)
         {"tmpfs", Mount::Tmpfs}, {"sysfs", Mount::Sysfs}, {"cgroup", Mount::Cgroup}, {"cgroup2", Mount::Cgroup2},
     };
 
-    static std::map<std::string, uint32_t> optionFlags = {
-        {"nosuid", MS_NOSUID}, {"strictatime", MS_STRICTATIME}, {"noexec", MS_NOEXEC},
-        {"nodev", MS_NODEV},   {"relatime", MS_RELATIME},       {"ro", MS_RDONLY},
+    struct mountFlag {
+        bool clear;
+        uint32_t flag;
+    };
+
+    static std::map<std::string, mountFlag> optionFlags = {
+        {"acl", {false, MS_POSIXACL}},
+        {"async", {true, MS_SYNCHRONOUS}},
+        {"atime", {true, MS_NOATIME}},
+        {"bind", {false, MS_BIND}},
+        {"defaults", {false, 0}},
+        {"dev", {true, MS_NODEV}},
+        {"diratime", {true, MS_NODIRATIME}},
+        {"dirsync", {false, MS_DIRSYNC}},
+        {"exec", {true, MS_NOEXEC}},
+        {"iversion", {false, MS_I_VERSION}},
+        {"lazytime", {false, MS_LAZYTIME}},
+        {"loud", {true, MS_SILENT}},
+        {"mand", {false, MS_MANDLOCK}},
+        {"noacl", {true, MS_POSIXACL}},
+        {"noatime", {false, MS_NOATIME}},
+        {"nodev", {false, MS_NODEV}},
+        {"nodiratime", {false, MS_NODIRATIME}},
+        {"noexec", {false, MS_NOEXEC}},
+        {"noiversion", {true, MS_I_VERSION}},
+        {"nolazytime", {true, MS_LAZYTIME}},
+        {"nomand", {true, MS_MANDLOCK}},
+        {"norelatime", {true, MS_RELATIME}},
+        {"nostrictatime", {true, MS_STRICTATIME}},
+        {"nosuid", {false, MS_NOSUID}},
+        // {"nosymfollow",{false, MS_NOSYMFOLLOW}}, // since kernel 5.10
+        {"rbind", {false, MS_BIND | MS_REC}},
+        {"relatime", {false, MS_RELATIME}},
+        {"remount", {false, MS_REMOUNT}},
+        {"ro", {false, MS_RDONLY}},
+        {"rw", {true, MS_RDONLY}},
+        {"silent", {false, MS_SILENT}},
+        {"strictatime", {false, MS_STRICTATIME}},
+        {"suid", {true, MS_NOSUID}},
+        {"sync", {false, MS_SYNCHRONOUS}},
+        // {"symfollow",{true, MS_NOSYMFOLLOW}}, // since kernel 5.10
     };
 
     o.destination = j.at("destination").get<std::string>();
     o.type = j.at("type").get<std::string>();
     o.fsType = fsTypes.find(o.type)->second;
+    if (o.fsType == Mount::Bind) {
+        o.flags = MS_BIND;
+    }
     o.source = j.at("source").get<std::string>();
+    o.data = {};
 
-    o.options = j.value("options", util::str_vec());
-    if (o.options.size() > 0) {
-        for (auto const &opt : o.options) {
-            if (optionFlags.find(opt) != optionFlags.end()) {
-                o.flags |= optionFlags.find(opt)->second;
-            }
+    // Parse options to data and flags.
+    // FIXME: support "propagation flags" and "recursive mount attrs"
+    // https://github.com/opencontainers/runc/blob/c83abc503de7e8b3017276e92e7510064eee02a8/libcontainer/specconv/spec_linux.go#L958
+    auto options = j.value("options", util::str_vec());
+    for (auto const &opt : options) {
+        auto it = optionFlags.find(opt);
+        if (it != optionFlags.end()) {
+            if (it->second.clear) {
+                o.flags &= ~it->second.flag;
+            } else
+                o.flags |= it->second.flag;
+        } else {
+            o.data.push_back(opt);
         }
     }
 }
@@ -117,7 +166,7 @@ inline void to_json(nlohmann::json &j, const Mount &o)
     j["destination"] = o.destination;
     j["source"] = o.source;
     j["type"] = o.type;
-    j["options"] = o.options;
+    j["options"] = o.data; // FIXME: this data is not original options, some of them have been prased to flags.
 }
 
 struct Namespace {
