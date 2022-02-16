@@ -29,7 +29,7 @@ public:
         return driver_->CreateDestinationPath(container_destination_path);
     }
 
-    int MountNode(const struct Mount &m)
+    int MountNode(const struct Mount &m) const
     {
         int ret = -1;
         struct stat source_stat {
@@ -195,7 +195,7 @@ public:
 
     std::unique_ptr<FilesystemDriver> driver_;
     static std::map<std::string, MountFlag> mount_flags;
-    bool sysfs_is_binded = false;
+    mutable bool sysfs_is_binded = false;
 };
 
 std::map<std::string, HostMountPrivate::MountFlag> HostMountPrivate::mount_flags = {
