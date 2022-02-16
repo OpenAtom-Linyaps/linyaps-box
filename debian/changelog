@@ -1,3 +1,13 @@
+linglong-box (1.2.2-1) unstable; urgency=medium
+
+  * 1. fix read/write /dev/null failed.
+  * 2. add log fliter.
+  * 3. fix mount mqueue amd cgroup in rootless mode.
+  * 4. fix make mountnode const again.
+  * 5. fix make ro bind work.
+
+ -- liujianqiang <liujianqiang@uniontech.com>  Wed, 16 Feb 2022 13:47:58 +0800
+
 linglong-box (1.2.1-1) unstable; urgency=medium
 
   *  1. fuse proxy support
