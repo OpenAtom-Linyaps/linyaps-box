@@ -368,10 +368,10 @@ public:
         if (r.annotations.has_value() && r.annotations->overlayfs.has_value()) {
             clone_new_pid_ = true;
             auto env = getenv("LL_BOX_FS_BACKEND");
-            if (env && std::string(env) == "overlayfs") {
-                return PrepareOverlayfsRootfs(r.annotations->overlayfs.value());
-            } else {
+            if (env && std::string(env) == "fuse-proxy") {
                 return PrepareFuseProxyRootfs(r.annotations->overlayfs.value());
+            } else {
+                return PrepareOverlayfsRootfs(r.annotations->overlayfs.value());
             }
         } else {
             return PrepareNativeRootfs(r.annotations->native.value());
