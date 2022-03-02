@@ -144,6 +144,14 @@ file_status status(const path &p, std::error_code &ec);
 
 path read_symlink(const path &p);
 
+// This function do_mount_with_fd do mount in a secure way by check the target we are going to mount is within container
+// rootfs or not before actually call mount.
+// refer to
+// https://github.com/opencontainers/runc/commit/0ca91f44f1664da834bc61115a849b56d22f595f
+// NOTE: we should never directly do mount exists in oci json without this check.
+int do_mount_with_fd(const char *root, const char *__special_file, const char *__dir, const char *__fstype,
+                     unsigned long int __rwflag, const void *__data) __THROW;
+
 } // namespace fs
 } // namespace util
 } // namespace linglong

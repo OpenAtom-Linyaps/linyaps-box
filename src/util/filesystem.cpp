@@ -9,6 +9,9 @@
  */
 
 #include <sys/stat.h>
+#include <sys/mount.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #include <string>
 #include <climits>
 #include <unistd.h>
@@ -175,6 +178,40 @@ file_type file_status::type() const noexcept
 perms file_status::permissions() const noexcept
 {
     return p;
+}
+
+int do_mount_with_fd(const char *root, const char *__special_file, const char *__dir, const char *__fstype,
+                     unsigned long int __rwflag, const void *__data) __THROW
+{
+    // https://github.com/opencontainers/runc/blob/0ca91f44f1664da834bc61115a849b56d22f595f/libcontainer/utils/utils.go#L112
+
+    int fd = open(__dir, O_PATH | O_CLOEXEC);
+    if (fd < 0) {
+        logFal() << util::format("fail to open target(%s):", __dir) << errnoString();
+    }
+
+    // Refer to `man readlink`, readlink dose not append '\0' to the end of conent it read from path, so we have to add
+    // an extra char to buffer to ensure '\0' always exists.
+    char *buf = (char *)malloc(sizeof(char) * PATH_MAX + 1);
+    if (buf == nullptr) {
+        logFal() << "fail to alloc memery:" << errnoString();
+    }
+
+    memset(buf, 0, PATH_MAX + 1);
+
+    auto target = util::format("/proc/self/fd/%d", fd);
+    int len = readlink(target.c_str(), buf, PATH_MAX);
+    if (len == -1) {
+        logFal() << util::format("fail to readlink from proc fd (%s):", target.c_str()) << errnoString();
+    }
+
+    string realpath(buf);
+    if (realpath.rfind(root, 0) != 0) {
+        logFal() << util::format("possibly malicious path detected (%s vs %s) -- refusing to operate", target.c_str(),
+                                 realpath.c_str());
+    }
+
+    return ::mount(__special_file, target.c_str(), __fstype, __rwflag, __data);
 }
 
 } // namespace fs
