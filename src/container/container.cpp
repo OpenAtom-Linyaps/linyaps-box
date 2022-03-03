@@ -520,7 +520,8 @@ int EntryProc(void *arg)
     flags = MS_NODEV | MS_NOSUID;
     ret = mount("tmpfs", container_root.c_str(), "tmpfs", flags, nullptr);
     if (0 != ret) {
-        logErr() << "mount" << container_root << "failed" << util::RetErrString(ret);
+        logErr() << util::format("mount container root (%s) failed:", container_root.c_str())
+                 << util::RetErrString(ret);
         return -1;
     }
 
