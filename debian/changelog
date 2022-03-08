@@ -1,3 +1,9 @@
+linglong-box (1.2.4-1) unstable; urgency=medium
+
+  * 1. void c_str() of destoryed string
+
+ -- chenlinxuan <chenlinxuan@uniontech.com>  Tue, 08 Mar 2022 13:27:24 +0800
+
 linglong-box (1.2.3-1) unstable; urgency=medium
 
   * 1. make fuse-overlayfs defalut.
