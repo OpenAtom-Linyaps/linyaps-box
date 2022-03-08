@@ -1,3 +1,11 @@
+linglong-box (1.2.3-1) unstable; urgency=medium
+
+  * 1. make fuse-overlayfs defalut.
+  * 2. fix update error info.
+  * 3. fix do mount by proc fd.
+
+ -- liujianqiang <liujianqiang@uniontech.com>  Tue, 08 Mar 2022 13:27:24 +0800
+
 linglong-box (1.2.2-1) unstable; urgency=medium
 
   * 1. fix read/write /dev/null failed.
