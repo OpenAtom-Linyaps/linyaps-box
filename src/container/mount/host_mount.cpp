@@ -56,7 +56,7 @@ public:
         auto dest_full_path = util::fs::path(m.destination);
         auto dest_parent_path = util::fs::path(dest_full_path).parent_path();
         auto host_dest_full_path = driver_->HostPath(dest_full_path);
-        auto root = driver_->HostPath(util::fs::path("/")).c_str();
+        auto root = driver_->HostPath(util::fs::path("/"));
 
         switch (source_stat.st_mode & S_IFMT) {
         case S_IFCHR: {
@@ -106,8 +106,8 @@ public:
 
             // When doing a bind mount, data and fstype are ignored by kernel. We should set them by remounting.
             real_data = "";
-            ret = util::fs::do_mount_with_fd(root, source.c_str(), host_dest_full_path.string().c_str(), nullptr,
-                                             real_flags, nullptr);
+            ret = util::fs::do_mount_with_fd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
+                                             nullptr, real_flags, nullptr);
             if (0 != ret) {
                 break;
             }
@@ -125,16 +125,16 @@ public:
 
             // When doing a remount, source and fstype are ignored by kernel.
             real_data = data;
-            ret = util::fs::do_mount_with_fd(root, nullptr, host_dest_full_path.string().c_str(), nullptr, real_flags,
-                                             real_data.c_str());
+            ret = util::fs::do_mount_with_fd(root.c_str(), nullptr, host_dest_full_path.string().c_str(), nullptr,
+                                             real_flags, real_data.c_str());
             break;
         case Mount::Proc:
         case Mount::Devpts:
         case Mount::Mqueue:
         case Mount::Tmpfs:
         case Mount::Sysfs:
-            ret = util::fs::do_mount_with_fd(root, source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(),
-                                             real_flags, real_data.c_str());
+            ret = util::fs::do_mount_with_fd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
+                                             m.type.c_str(), real_flags, real_data.c_str());
             if (ret < 0) {
                 // refers:
                 // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L178
@@ -142,22 +142,22 @@ public:
                 if (m.fsType == Mount::Sysfs) {
                     real_flags = MS_BIND | MS_REC;
                     real_data = "";
-                    ret = util::fs::do_mount_with_fd(root, "/sys", host_dest_full_path.string().c_str(), nullptr,
-                                                     real_flags, nullptr);
+                    ret = util::fs::do_mount_with_fd(root.c_str(), "/sys", host_dest_full_path.string().c_str(),
+                                                     nullptr, real_flags, nullptr);
                     if (ret == 0) {
                         sysfs_is_binded = true;
                     }
                 } else if (m.fsType == Mount::Mqueue) {
                     real_flags = MS_BIND | MS_REC;
                     real_data = "";
-                    ret = util::fs::do_mount_with_fd(root, "/dev/mqueue", host_dest_full_path.string().c_str(), nullptr,
-                                                     real_flags, nullptr);
+                    ret = util::fs::do_mount_with_fd(root.c_str(), "/dev/mqueue", host_dest_full_path.string().c_str(),
+                                                     nullptr, real_flags, nullptr);
                 }
             }
             break;
         case Mount::Cgroup:
-            ret = util::fs::do_mount_with_fd(root, source.c_str(), host_dest_full_path.string().c_str(), m.type.c_str(),
-                                             real_flags, real_data.c_str());
+            ret = util::fs::do_mount_with_fd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
+                                             m.type.c_str(), real_flags, real_data.c_str());
             // When sysfs is bind-mounted, It is ok to let cgroup mount failed.
             // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L281
             if (sysfs_is_binded) {

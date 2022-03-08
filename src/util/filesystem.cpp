@@ -207,6 +207,7 @@ int do_mount_with_fd(const char *root, const char *__special_file, const char *_
 
     string realpath(buf);
     if (realpath.rfind(root, 0) != 0) {
+        logDbg() << util::format("container root=\"%s\"", root);
         logFal() << util::format("possibly malicious path detected (%s vs %s) -- refusing to operate", target.c_str(),
                                  realpath.c_str());
     }
