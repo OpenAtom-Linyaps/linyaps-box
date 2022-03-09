@@ -68,8 +68,8 @@ int OverlayfsFuseFilesystemDriver::Setup()
 
         exit(0);
     }
-
-    return waitpid(pid, 0, 0);
+    util::Wait(pid);
+    return 0;
 }
 
 util::fs::path OverlayfsFuseFilesystemDriver::HostSource(const util::fs::path &dest_full_path) const

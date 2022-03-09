@@ -23,6 +23,10 @@ int PlatformClone(int (*callback)(void *), int flags, void *arg, ...);
 
 int Exec(const util::str_vec &args, tl::optional<std::vector<std::string>> env_list);
 
+void Wait(const int pid);
+void WaitAll();
+void WaitAllUntil(const int pid);
+
 } // namespace util
 
 } // namespace linglong

@@ -457,6 +457,7 @@ int NonePrivilegeProc(void *arg)
         ContainerPrivate::DropPermissions();
     }
 
+    // FIXME: parent may dead before this return.
     prctl(PR_SET_PDEATHSIG, SIGKILL);
 
     logDbg() << "c.r.process.args:" << c.r.process.args;
@@ -482,13 +483,8 @@ int NonePrivilegeProc(void *arg)
         exit(ret);
     }
 
-    while (true) {
-        int childPid = waitpid(-1, nullptr, 0);
-        if (childPid < 0) {
-            logDbg() << "all child exit" << childPid;
-            return 0;
-        }
-    }
+    util::WaitAll();
+    return 0;
 }
 
 int EntryProc(void *arg)
@@ -600,23 +596,13 @@ int EntryProc(void *arg)
     }
 
     ContainerPrivate::DropPermissions();
+
+    // FIXME: parent may dead before this return.
     prctl(PR_SET_PDEATHSIG, SIGKILL);
 
     // FIXME(interactive bash): if need keep interactive shell
-    while (true) {
-        int childPid = waitpid(-1, nullptr, 0);
-        if (noPrivilegePid == childPid) {
-            logDbg() << "wait noPrivilegePid" << noPrivilegePid << "exit";
-            return 0;
-        }
-        if (childPid <= 0) {
-            logDbg() << "all child exit" << childPid;
-            return 0;
-        }
-        if (childPid > 0) {
-            logDbg() << "wait" << childPid << "exit";
-        }
-    }
+    util::WaitAllUntil(noPrivilegePid);
+    return 0;
 }
 
 Container::Container(const Runtime &r)
@@ -679,19 +665,12 @@ int Container::Start(const Option &opt)
     }
 
     ContainerPrivate::DropPermissions();
+
+    // FIXME: parent may dead before this return.
     prctl(PR_SET_PDEATHSIG, SIGKILL);
 
     // FIXME(interactive bash): if need keep interactive shell
-    while (true) {
-        int childPid = waitpid(-1, nullptr, 0);
-        if (childPid <= 0) {
-            logDbg() << "all child exit" << childPid;
-            return 0;
-        }
-        if (childPid > 0) {
-            logDbg() << "wait" << childPid << "exit";
-        }
-    }
+    util::WaitAllUntil(entry_pid);
 
     return 0;
 }

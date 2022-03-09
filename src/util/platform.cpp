@@ -14,6 +14,7 @@
 
 #include <sched.h>
 #include <cstdlib>
+#include <sys/wait.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -64,6 +65,72 @@ int Exec(const util::str_vec &args, tl::optional<std::vector<std::string>> env_l
     delete[] targetEnvv;
 
     return ret;
+}
+
+// if wstatus says child exit normally, return true else false
+static bool parse_wstatus(const int &wstatus, std::string &info)
+{
+    if (WIFEXITED(wstatus)) {
+        auto code = WEXITSTATUS(wstatus);
+        info = util::format("exited with code %d", code);
+        return code == 0;
+    } else if (WIFSIGNALED(wstatus)) {
+        info = util::format("terminated by signal %d", WTERMSIG(wstatus));
+        return false;
+    } else {
+        info = util::format("is dead with wstatus=%d", wstatus);
+        return false;
+    }
+}
+
+// call waitpid with pid until waitpid return value equals to target or all child exited
+static void DoWait(const int pid, const int target = 0)
+{
+    int wstatus;
+    while (int child = waitpid(pid, &wstatus, 0)) {
+        if (child > 0) {
+            std::string info;
+            auto normal = parse_wstatus(wstatus, info);
+            info = format("child [%d] [%s], wait done.", child, info.c_str());
+            if (normal) {
+                logDbg() << info;
+            } else {
+                logWan() << info;
+            }
+            if (child == target)
+                // this will never happen when target <= 0
+                return;
+        } else if (child < 0) {
+            if (errno == ECHILD) {
+                logDbg() << format("no child to wait");
+                return;
+            } else {
+                auto str = errnoString();
+                logErr() << format("waitpid failed, %s", str.c_str());
+                return;
+            }
+        }
+    }
+    // when we pass options=0 to waitpid, it will never return 0
+    logWan() << "waitpid return 0, this should not happen normally";
+}
+
+// wait all child
+void WaitAll()
+{
+    DoWait(-1);
+}
+
+// wait pid to exit
+void Wait(const int pid)
+{
+    DoWait(pid);
+}
+
+// wait all child until pid exit
+void WaitAllUntil(const int pid)
+{
+    DoWait(-1, pid);
 }
 
 } // namespace util
