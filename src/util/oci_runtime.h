@@ -17,10 +17,13 @@
 
 namespace linglong {
 
-#define LLJS_FROM(KEY) (o.KEY = j.at(#KEY).get<decltype(o.KEY)>())
-#define LLJS_FROM_OPT(KEY) (o.KEY = optional<decltype(o.KEY)::value_type>(j, #KEY))
+#define LLJS_FROM(KEY) (LLJS_FROM_VARNAME(KEY, KEY))
+#define LLJS_FROM_VARNAME(KEY, VAR) (o.VAR = j.at(#KEY).get<decltype(o.VAR)>())
+#define LLJS_FROM_OPT(KEY) (LLJS_FROM_OPT_VARNAME(KEY, KEY))
+#define LLJS_FROM_OPT_VARNAME(KEY, VAR) (o.VAR = optional<decltype(o.VAR)::value_type>(j, #KEY))
 
-#define LLJS_TO(KEY) (j[#KEY] = o.KEY)
+#define LLJS_TO(KEY) (LLJS_TO_VARNAME(KEY, KEY))
+#define LLJS_TO_VARNAME(KEY, VAR) (j[#KEY] = o.VAR)
 
 #define LLJS_FROM_OBJ(TYPE) inline void from_json(const nlohmann::json &j, TYPE &o)
 #define LLJS_TO_OBJ(TYPE) inline void to_json(nlohmann::json &j, const TYPE &o)
@@ -445,7 +448,7 @@ struct AnnotationsOverlayfs {
 
 LLJS_FROM_OBJ(AnnotationsOverlayfs)
 {
-    LLJS_FROM(lower_parent);
+    LLJS_FROM_VARNAME(lowerParent, lower_parent);
     LLJS_FROM(upper);
     LLJS_FROM(workdir);
     LLJS_FROM(mounts);
@@ -453,7 +456,7 @@ LLJS_FROM_OBJ(AnnotationsOverlayfs)
 
 LLJS_TO_OBJ(AnnotationsOverlayfs)
 {
-    LLJS_TO(lower_parent);
+    LLJS_TO_VARNAME(lowerParent, lower_parent);
     LLJS_TO(upper);
     LLJS_TO(workdir);
     LLJS_TO(mounts);
@@ -481,14 +484,14 @@ struct Annotations {
 
 LLJS_FROM_OBJ(Annotations)
 {
-    LLJS_FROM(container_root_path);
+    LLJS_FROM_VARNAME(containerRootPath, container_root_path);
     LLJS_FROM_OPT(overlayfs);
     LLJS_FROM_OPT(native);
 }
 
 LLJS_TO_OBJ(Annotations)
 {
-    LLJS_TO(container_root_path);
+    LLJS_TO_VARNAME(containerRootPath, container_root_path);
     LLJS_TO(overlayfs);
     LLJS_TO(native);
 }
