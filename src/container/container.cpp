@@ -38,6 +38,58 @@
 
 namespace linglong {
 
+static const std::string ll_dbus_proxy_bin = "/usr/bin/ll-dbus-proxy";
+// start dbus proxy
+static int StartDbusProxy(const Runtime &r)
+{
+    if (!(r.annotations.has_value() && r.annotations->dbus_proxy_info.has_value()
+          && r.annotations->dbus_proxy_info->enable)) {
+        logInf() << "dbus proxy disabled";
+        return -1;
+    }
+
+    const auto &info = r.annotations->dbus_proxy_info;
+
+    std::string socket_path = info->proxy_path;
+
+    pid_t proxy_pid = fork();
+    if (proxy_pid < 0) {
+        logErr() << "fork to start dbus proxy failed:", util::errnoString();
+        return -1;
+    }
+
+    if (0 == proxy_pid) {
+        // FIXME: parent may dead before this return.
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        std::string bus_type = info->bus_type;
+        std::string app_id = info->app_id;
+        std::vector<std::string> name_fliter = info->name;
+        std::vector<std::string> path_fliter = info->path;
+        std::vector<std::string> interface_fliter = info->interface;
+        std::string name_fliter_string = linglong::util::str_vec_join(name_fliter, ',');
+        std::string path_fliter_string = linglong::util::str_vec_join(path_fliter, ',');
+        std::string interface_fliter_string = linglong::util::str_vec_join(interface_fliter, ',');
+        char const *const args[] = {ll_dbus_proxy_bin.c_str(),
+                                    app_id.c_str(),
+                                    bus_type.c_str(),
+                                    socket_path.c_str(),
+                                    name_fliter_string.c_str(),
+                                    path_fliter_string.c_str(),
+                                    interface_fliter_string.c_str(),
+                                    NULL};
+        int ret = execvp(args[0], (char **)args);
+        logErr() << "start dbus proxy failed, ret=" << ret;
+        exit(ret);
+    } else {
+        // FIXME: this call make 10ms lag at least
+        if (util::fs::path(socket_path).wait_until_exsit() != 0) {
+            logErr() << util::format("timeout! socketPath [\"%s\"] not exsit", socket_path.c_str());
+            return -1;
+        }
+    }
+    return 0;
+}
+
 int DropToNormalUser(int uid, int gid)
 {
     setuid(uid);
@@ -656,13 +708,18 @@ int Container::Start(const Option &opt)
         return -1;
     }
 
+    logDbg() << "wait child Start" << entry_pid;
+    sem.passeren();
     if (/*c.use_delay_new_user_ns ||*/ opt.rootless) {
-        logDbg() << "wait child Start" << entry_pid;
-        sem.passeren();
         ConfigUserNamespace(c.r.linux, entry_pid);
-        sem.vrijgeven();
-        logDbg() << "wait child end";
     }
+    if (setpgid(entry_pid, entry_pid) != 0) {
+        auto str = util::errnoString();
+        logErr() << util::format("setgid pid=%d to pgid=%d failed, %s", entry_pid, entry_pid, str.c_str());
+    }
+    StartDbusProxy(c.r);
+    sem.vrijgeven();
+    logDbg() << "wait child end";
 
     ContainerPrivate::DropPermissions();
 

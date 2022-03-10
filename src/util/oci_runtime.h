@@ -476,10 +476,43 @@ LLJS_TO_OBJ(AnnotationsNativeRootfs)
     LLJS_TO(mounts);
 }
 
+struct DbusProxyInfo {
+    bool enable;
+    std::string bus_type;
+    std::string app_id;
+    std::string proxy_path;
+    std::vector<std::string> name;
+    std::vector<std::string> path;
+    std::vector<std::string> interface;
+};
+
+LLJS_FROM_OBJ(DbusProxyInfo)
+{
+    LLJS_FROM(enable);
+    LLJS_FROM_VARNAME(busType, bus_type);
+    LLJS_FROM_VARNAME(appID, app_id);
+    LLJS_FROM_VARNAME(proxyPath, proxy_path);
+    LLJS_FROM(name);
+    LLJS_FROM(path);
+    LLJS_FROM(interface);
+}
+
+LLJS_TO_OBJ(DbusProxyInfo)
+{
+    LLJS_TO(enable);
+    LLJS_TO_VARNAME(busType, bus_type);
+    LLJS_TO_VARNAME(appID, app_id);
+    LLJS_TO_VARNAME(proxyPath, proxy_path);
+    LLJS_TO(name);
+    LLJS_TO(path);
+    LLJS_TO(interface);
+}
+
 struct Annotations {
     std::string container_root_path;
     tl::optional<AnnotationsOverlayfs> overlayfs;
     tl::optional<AnnotationsNativeRootfs> native;
+    tl::optional<DbusProxyInfo> dbus_proxy_info;
 };
 
 LLJS_FROM_OBJ(Annotations)
@@ -487,6 +520,7 @@ LLJS_FROM_OBJ(Annotations)
     LLJS_FROM_VARNAME(containerRootPath, container_root_path);
     LLJS_FROM_OPT(overlayfs);
     LLJS_FROM_OPT(native);
+    LLJS_FROM_OPT_VARNAME(dbusProxyInfo, dbus_proxy_info);
 }
 
 LLJS_TO_OBJ(Annotations)
@@ -494,6 +528,7 @@ LLJS_TO_OBJ(Annotations)
     LLJS_TO_VARNAME(containerRootPath, container_root_path);
     LLJS_TO(overlayfs);
     LLJS_TO(native);
+    LLJS_TO_VARNAME(dbusProxyInfo, dbus_proxy_info);
 }
 
 struct Runtime {

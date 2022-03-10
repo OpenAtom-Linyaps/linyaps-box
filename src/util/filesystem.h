@@ -15,6 +15,8 @@
 #include <ostream>
 #include <system_error>
 
+#include <unistd.h>
+
 #include "common.h"
 
 namespace linglong {
@@ -60,6 +62,23 @@ public:
     std::string string() const { return "/" + str_vec_join(p, '/'); }
 
     str_vec components() const { return p; }
+
+    // call to this function will block until `path` exists (rerturn 0) or timeout (return -1)
+    // default timeout is 1 second
+    int wait_until_exsit(int utimeout = 1000)
+    {
+        int time = 0;
+        while (true) {
+            if (access(this->string().c_str(), F_OK) == 0) {
+                return 0;
+            } else if (++time > utimeout) {
+                return -1;
+            } else {
+                usleep(10);
+            }
+        }
+        return 0;
+    }
 
 private:
     friend std::ostream &operator<<(std::ostream &cout, path obj);
