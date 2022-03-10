@@ -212,7 +212,13 @@ int do_mount_with_fd(const char *root, const char *__special_file, const char *_
                                  realpath.c_str());
     }
 
-    return ::mount(__special_file, target.c_str(), __fstype, __rwflag, __data);
+    auto ret = ::mount(__special_file, target.c_str(), __fstype, __rwflag, __data);
+    auto olderrno = errno;
+
+    close(fd);
+
+    errno = olderrno;
+    return ret;
 }
 
 } // namespace fs
