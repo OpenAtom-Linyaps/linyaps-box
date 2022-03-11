@@ -565,7 +565,7 @@ int EntryProc(void *arg)
     Semaphore none_privilege_sem(c.sem_id);
     none_privilege_sem.init();
 
-    int none_privilege_proc_flag = SIGCHLD | CLONE_NEWNS | CLONE_NEWPID;
+    int none_privilege_proc_flag = SIGCHLD | CLONE_NEWNS;
     if (c.clone_new_pid_) {
         none_privilege_proc_flag |= CLONE_NEWPID;
     }
