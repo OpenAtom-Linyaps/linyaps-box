@@ -708,14 +708,12 @@ int Container::Start(const Option &opt)
         return -1;
     }
 
+    // FIXME: maybe we need c.opt.child_need_wait?
+
     logDbg() << "wait child Start" << entry_pid;
     sem.passeren();
     if (/*c.use_delay_new_user_ns ||*/ opt.rootless) {
         ConfigUserNamespace(c.r.linux, entry_pid);
-    }
-    if (setpgid(entry_pid, entry_pid) != 0) {
-        auto str = util::errnoString();
-        logErr() << util::format("setgid pid=%d to pgid=%d failed, %s", entry_pid, entry_pid, str.c_str());
     }
     StartDbusProxy(c.r);
     sem.vrijgeven();
