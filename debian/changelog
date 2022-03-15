@@ -1,3 +1,14 @@
+linglong-box (1.2.5-1) unstable; urgency=medium
+
+  * 1. rename json fields.
+  * 2. close leaked fds.
+  * 3. remove forced CLONE_NEWPID flag for second clone.
+  * 4. add waitpid helper.
+  * 5. add support for dbus proxy.
+  * 6. remove unused code.
+
+ -- liujianqiang <liujianqiang@uniontech.com>  Tue, 15 Mar 2022 10:04:16 +0800
+
 linglong-box (1.2.4-1) unstable; urgency=medium
 
   * 1. void c_str() of destoryed string
