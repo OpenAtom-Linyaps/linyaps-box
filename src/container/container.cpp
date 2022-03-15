@@ -653,7 +653,14 @@ int EntryProc(void *arg)
     prctl(PR_SET_PDEATHSIG, SIGKILL);
 
     // FIXME(interactive bash): if need keep interactive shell
-    util::WaitAllUntil(noPrivilegePid);
+
+    if (c.clone_new_pid_) {
+        util::WaitAllUntil(noPrivilegePid);
+    } else {
+        // NOTE: if third-level box do not new pid ns, the init process of app is second-level box, so we need to wait
+        // all here
+        util::WaitAll();
+    };
     return 0;
 }
 
