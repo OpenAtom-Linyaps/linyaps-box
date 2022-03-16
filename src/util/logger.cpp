@@ -13,6 +13,15 @@ std::string RetErrString(int ret)
     return util::format("ret(%d),errno(%d): %s", ret, errno, strerror(errno));
 }
 
+std::string GetPidnsPid()
+{
+    char buf[30];
+    memset(buf, 0, sizeof(buf));
+    readlink("/proc/self/ns/pid", buf, sizeof(buf) - 1);
+    std::string str = buf;
+    return str.substr(5, str.length() - 6) + ":" + std::to_string(getpid()); // 6 = strlen("pid:[]")
+}
+
 static Logger::Level getLogLevelFromStr(std::string str)
 {
     if (str == "Debug") {
