@@ -84,22 +84,25 @@ static bool parse_wstatus(const int &wstatus, std::string &info)
 }
 
 // call waitpid with pid until waitpid return value equals to target or all child exited
-static void DoWait(const int pid, const int target = 0)
+static void DoWait(const int pid, int target = 0)
 {
+    logDbg() << util::format("DoWait called with pid=%d, target=%d", pid, target);
     int wstatus;
     while (int child = waitpid(pid, &wstatus, 0)) {
         if (child > 0) {
             std::string info;
             auto normal = parse_wstatus(wstatus, info);
-            info = format("child [%d] [%s], wait done.", child, info.c_str());
+            info = format("child [%d] [%s].", child, info.c_str());
             if (normal) {
                 logDbg() << info;
             } else {
                 logWan() << info;
             }
-            if (child == target)
+            if (child == target || child == pid) {
                 // this will never happen when target <= 0
+                logDbg() << "wait done";
                 return;
+            }
         } else if (child < 0) {
             if (errno == ECHILD) {
                 logDbg() << format("no child to wait");

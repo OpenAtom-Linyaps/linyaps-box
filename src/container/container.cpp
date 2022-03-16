@@ -106,7 +106,8 @@ static int ConfigUserNamespace(const linglong::Linux &linux, int initPid)
         pid = util::format("%d", initPid);
     }
 
-    logDbg() << "write uid_map and pid_map" << initPid;
+    logDbg() << "old uid:" << getuid() << "gid:" << getgid();
+    logDbg() << "start write uid_map and pid_map" << initPid;
 
     // write uid map
     std::ofstream uidMapFile(util::format("/proc/%s/uid_map", pid.c_str()));
@@ -127,7 +128,7 @@ static int ConfigUserNamespace(const linglong::Linux &linux, int initPid)
     }
     gidMapFile.close();
 
-    logDbg() << "finish write uid_map and pid_map";
+    logDbg() << "new uid:" << getuid() << "gid:" << getgid();
     return 0;
 }
 
@@ -470,30 +471,31 @@ int NonePrivilegeProc(void *arg)
 {
     auto &c = *reinterpret_cast<ContainerPrivate *>(arg);
 
+    if (c.opt.rootless) {
+        // TODO(iceyer): use option
+
+        Linux linux;
+        IDMap id_map;
+
+        id_map.containerID = c.host_uid_;
+        id_map.hostID = 0;
+        id_map.size = 1;
+        linux.uidMappings.push_back(id_map);
+
+        id_map.containerID = c.host_gid_;
+        id_map.hostID = 0;
+        id_map.size = 1;
+        linux.gidMappings.push_back(id_map);
+
+        ConfigUserNamespace(linux, 0);
+    }
+
     if (c.clone_new_pid_) {
         auto ret = mount("proc", "/proc", "proc", 0, nullptr);
         if (0 != ret) {
             logErr() << "mount proc failed" << util::RetErrString(ret);
             return -1;
         }
-    }
-
-    if (c.opt.rootless) {
-        // TODO(iceyer): use option
-
-        auto unshare_flags = CLONE_NEWUSER;
-        if (unshare_flags) {
-            auto ret = unshare(unshare_flags);
-            if (0 != ret) {
-                logErr() << "unshare failed" << unshare_flags << util::RetErrString(ret);
-            }
-        }
-
-        logDbg() << "wait switch to normal user" << c.sem_id;
-        Semaphore noPrivilegeSem(c.sem_id);
-        noPrivilegeSem.vrijgeven();
-        noPrivilegeSem.passeren();
-        logDbg() << "wait switch to normal user end";
     }
 
     if (c.r.hooks.has_value() && c.r.hooks->prestart.has_value()) {
@@ -543,11 +545,8 @@ int EntryProc(void *arg)
 {
     auto &c = *reinterpret_cast<ContainerPrivate *>(arg);
 
-    Semaphore s(c.sem_id);
-
     if (c.opt.rootless) {
-        s.vrijgeven();
-        s.passeren();
+        ConfigUserNamespace(c.r.linux, 0);
     }
 
     // FIXME: change HOSTNAME will broken XAUTH
@@ -609,42 +608,17 @@ int EntryProc(void *arg)
         //        }
     }
 
-    c.sem_id = getpid();
-    Semaphore none_privilege_sem(c.sem_id);
-    none_privilege_sem.init();
-
-    int none_privilege_proc_flag = SIGCHLD | CLONE_NEWNS;
+    int none_privilege_proc_flag = SIGCHLD | CLONE_NEWUSER;
     if (c.clone_new_pid_) {
-        none_privilege_proc_flag |= CLONE_NEWPID;
+        none_privilege_proc_flag |= CLONE_NEWPID | CLONE_NEWNS;
+    } else {
+        none_privilege_proc_flag |= CLONE_FS;
     }
 
     int noPrivilegePid = util::PlatformClone(NonePrivilegeProc, none_privilege_proc_flag, arg);
     if (noPrivilegePid < 0) {
         logErr() << "clone failed" << util::RetErrString(noPrivilegePid);
         return -1;
-    }
-
-    if (c.opt.rootless) {
-        none_privilege_sem.passeren();
-
-        Linux linux;
-        IDMap id_map;
-
-        id_map.containerID = c.host_uid_;
-        id_map.hostID = 0;
-        id_map.size = 1;
-        linux.uidMappings.push_back(id_map);
-
-        id_map.containerID = c.host_gid_;
-        id_map.hostID = 0;
-        id_map.size = 1;
-        linux.gidMappings.push_back(id_map);
-
-        logDbg() << "switch to normal user" << noPrivilegePid;
-        ConfigUserNamespace(linux, noPrivilegePid);
-
-        none_privilege_sem.vrijgeven();
-        logDbg() << "switch to normal end" << noPrivilegePid;
     }
 
     ContainerPrivate::DropPermissions();
@@ -705,9 +679,7 @@ int Container::Start(const Option &opt)
         flags |= CLONE_NEWUSER;
     }
 
-    c.sem_id = getpid();
-    Semaphore sem(c.sem_id);
-    sem.init();
+    StartDbusProxy(c.r);
 
     int entry_pid = util::PlatformClone(EntryProc, flags, (void *)dd_ptr.get());
     if (entry_pid < 0) {
@@ -716,15 +688,6 @@ int Container::Start(const Option &opt)
     }
 
     // FIXME: maybe we need c.opt.child_need_wait?
-
-    logDbg() << "wait child Start" << entry_pid;
-    sem.passeren();
-    if (/*c.use_delay_new_user_ns ||*/ opt.rootless) {
-        ConfigUserNamespace(c.r.linux, entry_pid);
-    }
-    StartDbusProxy(c.r);
-    sem.vrijgeven();
-    logDbg() << "wait child end";
 
     ContainerPrivate::DropPermissions();
 
