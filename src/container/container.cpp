@@ -611,8 +611,6 @@ int EntryProc(void *arg)
     int none_privilege_proc_flag = SIGCHLD | CLONE_NEWUSER;
     if (c.clone_new_pid_) {
         none_privilege_proc_flag |= CLONE_NEWPID | CLONE_NEWNS;
-    } else {
-        none_privilege_proc_flag |= CLONE_FS;
     }
 
     int noPrivilegePid = util::PlatformClone(NonePrivilegeProc, none_privilege_proc_flag, arg);
