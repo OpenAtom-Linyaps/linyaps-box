@@ -312,7 +312,7 @@ public:
 
         // FIXME(iceyer): /dev/console is set up if terminal is enabled in the config by bind mounting the
         // pseudoterminal slave to /dev/console.
-        symlink("/dev/ptmx", "/dev/pts/ptmx");
+        symlink("/dev/pts/ptmx", (this->host_root_ + "/dev/ptmx").c_str());
 
         return 0;
     }
