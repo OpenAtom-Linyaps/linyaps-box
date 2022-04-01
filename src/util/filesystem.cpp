@@ -78,11 +78,13 @@ bool exists(const std::string &s)
 
 path read_symlink(const path &p)
 {
-    char buf[PATH_MAX];
-    if (readlink(p.string().c_str(), buf, sizeof(buf)) < 0) {
-        return p;
+    char *buf = realpath(p.string().c_str(), nullptr);
+    if (buf) {
+        auto ret = path(string(buf));
+        free(buf);
+        return ret;
     } else {
-        return path(string(buf));
+        return p;
     }
 }
 
