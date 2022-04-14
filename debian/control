@@ -5,7 +5,6 @@ Maintainer: Deepin Packages Builder <packages@deepin.org>
 Build-Depends:
  debhelper (>= 11),
  cmake,
- nlohmann-json3-dev,
  libyaml-cpp-dev,
  pkg-config,
  libseccomp-dev,
