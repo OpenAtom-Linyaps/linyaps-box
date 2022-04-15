@@ -1,3 +1,9 @@
+linglong-box (1.2.7-1) unstable; urgency=medium
+
+  * fix build issue. 
+
+ -- liujianqiang <liujianqiang@uniontech.com>  Fri, 15 Apr 2022 18:33:27 +0800
+
 linglong-box (1.2.6-1) unstable; urgency=medium
 
   * 1. adjust wait pid strategy.
