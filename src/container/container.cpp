@@ -17,12 +17,15 @@
 #include <sys/sysmacros.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
+#include <sys/signalfd.h>
+#include <sys/epoll.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <sched.h>
 #include <unistd.h>
 
 #include <cerrno>
+#include <map>
 #include <utility>
 
 #include "util/logger.h"
@@ -203,14 +206,41 @@ static int ConfigCgroupV2(const std::string &cgroupsPath, const linglong::Resour
     return 0;
 }
 
+inline void epoll_ctl_add(int epfd, int fd)
+{
+    static epoll_event ev = {};
+    ev.events = EPOLLIN;
+    ev.data.fd = fd;
+    int ret = epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
+    if (ret != 0)
+        logWan() << util::errnoString();
+}
+
+// if wstatus says child exit normally, return true else false
+static bool parse_wstatus(const int &wstatus, std::string &info)
+{
+    if (WIFEXITED(wstatus)) {
+        auto code = WEXITSTATUS(wstatus);
+        info = util::format("exited with code %d", code);
+        return code == 0;
+    } else if (WIFSIGNALED(wstatus)) {
+        info = util::format("terminated by signal %d", WTERMSIG(wstatus));
+        return false;
+    } else {
+        info = util::format("is dead with wstatus=%d", wstatus);
+        return false;
+    }
+}
+
 struct ContainerPrivate {
 public:
-    ContainerPrivate(Runtime r, Container * /*parent*/)
+    ContainerPrivate(Runtime r, std::unique_ptr<util::MessageReader> reader, Container * /*parent*/)
         : host_root_(r.root.path)
         , r(std::move(r))
         , native_mounter_(new HostMount)
         , overlayfs_mounter_(new HostMount)
         , fuseproxy_mounter_(new HostMount)
+        , reader(std::move(reader))
     {
     }
 
@@ -234,6 +264,10 @@ public:
     std::unique_ptr<HostMount> fuseproxy_mounter_;
 
     HostMount *container_mounter_ = nullptr;
+
+    std::unique_ptr<util::MessageReader> reader;
+
+    std::map<int, std::string> pidMap;
 
 public:
     static int DropPermissions()
@@ -315,6 +349,119 @@ public:
         symlink("/dev/pts/ptmx", (this->host_root_ + "/dev/ptmx").c_str());
 
         return 0;
+    }
+
+    void waitChildAndExec()
+    {
+        sigset_t mask;
+        sigemptyset(&mask);
+        sigaddset(&mask, SIGCHLD);
+
+        /* Block signals so that they aren't handled
+           according to their default dispositions. */
+
+        if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+            logWan() << "sigprocmask";
+
+        int sfd = signalfd(-1, &mask, 0);
+        if (sfd == -1)
+            logWan() << "signalfd";
+
+        auto epfd = epoll_create(1);
+        epoll_ctl_add(epfd, sfd);
+        epoll_ctl_add(epfd, reader->fd);
+
+        for (;;) {
+            struct epoll_event events[10];
+            int event_cnt = epoll_wait(epfd, events, 5, -1);
+            for (int i = 0; i < event_cnt; i++) {
+                const auto &event = events[i];
+                if (event.data.fd == sfd) {
+                    struct signalfd_siginfo fdsi;
+                    ssize_t s = read(sfd, &fdsi, sizeof(fdsi));
+                    if (s != sizeof(fdsi)) {
+                        logWan() << "error read from signal fd";
+                    }
+                    if (fdsi.ssi_signo == SIGCHLD) {
+                        logWan() << "recive SIGCHLD";
+
+                        int wstatus;
+                        while (int child = waitpid(-1, &wstatus, WNOHANG)) {
+                            if (child > 0) {
+                                std::string info;
+                                auto normal = parse_wstatus(wstatus, info);
+                                info = util::format("child [%d] [%s].", child, info.c_str());
+                                if (normal) {
+                                    logDbg() << info;
+                                } else {
+                                    logWan() << info;
+                                }
+                                auto it = pidMap.find(child);
+                                if (it != pidMap.end()) {
+                                    reader->writeChildExit(child, it->second, wstatus, info);
+                                    pidMap.erase(it);
+                                }
+                            } else if (child < 0) {
+                                if (errno == ECHILD) {
+                                    logDbg() << util::format("no child to wait");
+                                    return;
+                                } else {
+                                    auto str = util::errnoString();
+                                    logErr() << util::format("waitpid failed, %s", str.c_str());
+                                    return;
+                                }
+                            }
+                        }
+                    } else {
+                        logWan() << util::format("Read unexpected signal [%d]\n", fdsi.ssi_signo);
+                    }
+                } else if (event.data.fd == reader->fd) {
+                    while (true) {
+                        auto json = reader->read();
+                        if (json.empty()) {
+                            break;
+                        }
+                        auto p = json.get<Process>();
+                        forkAndExecProcess(p);
+                    }
+                } else {
+                    logWan() << "Unknown fd";
+                }
+            }
+        }
+        return;
+    }
+
+    bool forkAndExecProcess(const Process p)
+    {
+        // FIXME: parent may dead before this return.
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+
+        int pid = fork();
+        if (pid < 0) {
+            logErr() << "fork failed" << util::RetErrString(pid);
+            return false;
+        }
+
+        if (0 == pid) {
+            logDbg() << "r.process.args:" << r.process.args;
+            chdir(r.process.cwd.c_str());
+
+            for (auto env : p.env) {
+                auto kv = util::str_spilt(env, "=");
+                setenv(kv.at(0).c_str(), kv.at(1).c_str(), 1);
+            }
+
+            auto ret = util::Exec(p.args, p.env);
+            if (0 != ret) {
+                logErr() << "execve failed" << util::RetErrString(ret);
+            }
+            exit(ret);
+        } else {
+            pidMap.insert(make_pair(pid, p.args[0]));
+        }
+
+        return true;
     }
 
     int PivotRoot() const
@@ -511,33 +658,10 @@ int NonePrivilegeProc(void *arg)
         ContainerPrivate::DropPermissions();
     }
 
-    // FIXME: parent may dead before this return.
-    prctl(PR_SET_PDEATHSIG, SIGKILL);
+    c.forkAndExecProcess(c.r.process);
 
-    logDbg() << "c.r.process.args:" << c.r.process.args;
-    chdir(c.r.process.cwd.c_str());
-
-    int pid = fork();
-    if (pid < 0) {
-        logErr() << "fork failed" << util::RetErrString(pid);
-        return -1;
-    }
-
-    if (0 == pid) {
-        for (auto env : c.r.process.env) {
-            auto kv = util::str_spilt(env, "=");
-            if (kv.size() > 1 && kv.at(0) == "PATH") {
-                setenv("PATH", kv.at(1).c_str(), 1);
-            }
-        }
-        auto ret = util::Exec(c.r.process.args, c.r.process.env);
-        if (0 != ret) {
-            logErr() << "execve failed" << util::RetErrString(ret);
-        }
-        exit(ret);
-    }
-
-    util::WaitAll();
+    if (c.clone_new_pid_)
+        c.waitChildAndExec();
     return 0;
 }
 
@@ -627,17 +751,18 @@ int EntryProc(void *arg)
     // FIXME(interactive bash): if need keep interactive shell
 
     if (c.clone_new_pid_) {
+        c.reader.reset();
         util::WaitAllUntil(noPrivilegePid);
     } else {
         // NOTE: if third-level box do not new pid ns, the init process of app is second-level box, so we need to wait
         // all here
-        util::WaitAll();
+        c.waitChildAndExec();
     };
-    return 0;
+    return -1;
 }
 
-Container::Container(const Runtime &r)
-    : dd_ptr(new ContainerPrivate(r, this))
+Container::Container(const Runtime &r, std::unique_ptr<util::MessageReader> reader)
+    : dd_ptr(new ContainerPrivate(r, std::move(reader), this))
 {
 }
 
@@ -684,6 +809,8 @@ int Container::Start(const Option &opt)
         logErr() << "clone failed" << util::RetErrString(entry_pid);
         return -1;
     }
+
+    c.reader.reset();
 
     // FIXME: maybe we need c.opt.child_need_wait?
 

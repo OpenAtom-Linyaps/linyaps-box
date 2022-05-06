@@ -13,6 +13,7 @@ add_executable(ll-box
                util/debug/debug.cpp
                util/platform.cpp
                util/logger.cpp
+               util/message_reader.cpp
                container/container.cpp
                container/mount/host_mount.cpp
                container/mount/filesystem_driver.cpp

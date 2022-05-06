@@ -14,6 +14,7 @@
 #include <memory>
 
 #include "util/oci_runtime.h"
+#include "util/message_reader.h"
 
 namespace linglong {
 
@@ -23,7 +24,7 @@ struct ContainerPrivate;
 class Container
 {
 public:
-    explicit Container(const Runtime &r);
+    explicit Container(const Runtime &r, std::unique_ptr<util::MessageReader> reader);
 
     ~Container();
 

@@ -9,6 +9,9 @@
  */
 
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <iostream>
 
@@ -16,13 +19,15 @@
 #include "util/oci_runtime.h"
 #include "container/container.h"
 #include "container/container_option.h"
+#include "util/message_reader.h"
 
 extern linglong::Runtime loadBundle(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
     // TODO(iceyer): move loader to ll-loader?
-    bool is_load_bundle = (argc == 4);
+    // NOTE(clx): just comment out loadBundle source for now, as currently unused.
+    // bool is_load_bundle = (argc == 4);
 
     linglong::Option opt;
     // TODO(iceyer): default in rootless
@@ -32,48 +37,30 @@ int main(int argc, char **argv)
 
     try {
         linglong::Runtime r;
-        std::string content;
 
-        if (is_load_bundle) {
-            r = loadBundle(argc, argv);
-        } else {
-            int readFD = atoi(argv[1]);
+        // if (is_load_bundle) {
+        // r = loadBundle(argc, argv);
+        // } else {
 
-            if (readFD <= 0) {
-                std::ifstream f(argv[1]);
-                std::string str((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-                content = str;
-            } else {
-                const size_t bufSize = 1024;
-                char buf[bufSize] = {};
-                size_t ret = 0;
-                do {
-                    ret = read(readFD, buf, bufSize);
-                    if (ret > 0) {
-                        content.append(buf, ret);
-                    }
-                } while (ret > 0);
-            }
-
-            if (readFD > 0) {
-                r = linglong::fromString(content);
-            } else {
-                r = linglong::fromFile(argv[1]);
-            }
+        int socket = atoi(argv[1]);
+        if (socket <= 0) {
+            socket = open(argv[1], O_RDONLY | O_CLOEXEC);
         }
 
-        if (linglong::util::fs::exists("/tmp/ll-debug")) {
-            nlohmann::json j = r;
-            std::ofstream debug(linglong::util::format("/tmp/ll-debug/%d.json", getpid()));
-            debug << j.dump();
-            debug.close();
+        std::unique_ptr<linglong::util::MessageReader> reader(new linglong::util::MessageReader(socket));
+        auto json = reader->read();
 
-            std::ofstream origin(linglong::util::format("/tmp/ll-debug/%d-orgin.json", getpid()));
-            origin << content;
+        r = json.get<linglong::Runtime>();
+
+        // }
+
+        if (linglong::util::fs::exists("/tmp/ll-debug")) {
+            std::ofstream origin(linglong::util::format("/tmp/ll-debug/%d.json", getpid()));
+            origin << json.dump(4);
             origin.close();
         }
 
-        linglong::Container c(r);
+        linglong::Container c(r, std::move(reader));
         return c.Start(opt);
     } catch (const std::exception &e) {
         logErr() << "failed: " << e.what();
