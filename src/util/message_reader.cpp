@@ -49,6 +49,12 @@ nlohmann::json MessageReader::read()
         }
     }
 
+    if (!source.empty()) {
+        auto json = nlohmann::json::parse(source);
+        source = "";
+        return json;
+    }
+
     return nlohmann::json();
 }
 
