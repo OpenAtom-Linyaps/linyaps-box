@@ -447,6 +447,18 @@ public:
             logDbg() << "r.process.args:" << r.process.args;
             chdir(r.process.cwd.c_str());
 
+            // for PATH
+            for (auto env : p.env) {
+                auto kv = util::str_spilt(env, "=");
+                if (kv.size() == 2)
+                    setenv(kv.at(0).c_str(), kv.at(1).c_str(), 1);
+                else if (kv.size() == 1) {
+                    setenv(kv.at(0).c_str(), "", 1);
+                } else {
+                    logWan() << "Unknown env:" << env;
+                }
+            }
+
             auto ret = util::Exec(p.args, p.env);
             if (0 != ret) {
                 logErr() << "execve failed" << util::RetErrString(ret);
