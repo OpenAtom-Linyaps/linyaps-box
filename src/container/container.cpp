@@ -252,7 +252,6 @@ public:
 
     //    bool use_delay_new_user_ns = false;
     bool use_new_cgroup_ns = false;
-    bool clone_new_pid_ = false;
 
     Option opt;
 
@@ -573,7 +572,6 @@ public:
         };
 
         if (r.annotations.has_value() && r.annotations->overlayfs.has_value()) {
-            clone_new_pid_ = true;
             auto env = getenv("LL_BOX_FS_BACKEND");
             if (env && std::string(env) == "fuse-proxy") {
                 return PrepareFuseProxyRootfs(r.annotations->overlayfs.value());
@@ -644,12 +642,10 @@ int NonePrivilegeProc(void *arg)
         ConfigUserNamespace(linux, 0);
     }
 
-    if (c.clone_new_pid_) {
-        auto ret = mount("proc", "/proc", "proc", 0, nullptr);
-        if (0 != ret) {
-            logErr() << "mount proc failed" << util::RetErrString(ret);
-            return -1;
-        }
+    auto ret = mount("proc", "/proc", "proc", 0, nullptr);
+    if (0 != ret) {
+        logErr() << "mount proc failed" << util::RetErrString(ret);
+        return -1;
     }
 
     if (c.r.hooks.has_value() && c.r.hooks->prestart.has_value()) {
@@ -667,8 +663,7 @@ int NonePrivilegeProc(void *arg)
 
     c.forkAndExecProcess(c.r.process);
 
-    if (c.clone_new_pid_)
-        c.waitChildAndExec();
+    c.waitChildAndExec();
     return 0;
 }
 
@@ -739,10 +734,7 @@ int EntryProc(void *arg)
         //        }
     }
 
-    int none_privilege_proc_flag = SIGCHLD | CLONE_NEWUSER;
-    if (c.clone_new_pid_) {
-        none_privilege_proc_flag |= CLONE_NEWPID | CLONE_NEWNS;
-    }
+    int none_privilege_proc_flag = SIGCHLD | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNS;
 
     int noPrivilegePid = util::PlatformClone(NonePrivilegeProc, none_privilege_proc_flag, arg);
     if (noPrivilegePid < 0) {
@@ -757,14 +749,8 @@ int EntryProc(void *arg)
 
     // FIXME(interactive bash): if need keep interactive shell
 
-    if (c.clone_new_pid_) {
-        c.reader.reset();
-        util::WaitAllUntil(noPrivilegePid);
-    } else {
-        // NOTE: if third-level box do not new pid ns, the init process of app is second-level box, so we need to wait
-        // all here
-        c.waitChildAndExec();
-    };
+    c.reader.reset();
+    util::WaitAllUntil(noPrivilegePid);
     return -1;
 }
 
