@@ -443,8 +443,13 @@ public:
         }
 
         if (0 == pid) {
-            logDbg() << "r.process.args:" << r.process.args;
-            chdir(r.process.cwd.c_str());
+            logDbg() << "process.args:" << p.args;
+
+            int ret;
+            ret = chdir(p.cwd.c_str());
+            if (ret) {
+                logErr() << "failed to chdir to" << p.cwd.c_str();
+            }
 
             // for PATH
             for (auto env : p.env) {
@@ -458,9 +463,10 @@ public:
                 }
             }
 
-            auto ret = util::Exec(p.args, p.env);
+            logInf() << "start exec process";
+            ret = util::Exec(p.args, p.env);
             if (0 != ret) {
-                logErr() << "execve failed" << util::RetErrString(ret);
+                logErr() << "exec failed" << util::RetErrString(ret);
             }
             exit(ret);
         } else {
