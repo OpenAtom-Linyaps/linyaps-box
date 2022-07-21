@@ -370,7 +370,8 @@ public:
 
         auto epfd = epoll_create(1);
         epoll_ctl_add(epfd, sfd);
-        epoll_ctl_add(epfd, reader->fd);
+        if (reader.get() != nullptr)
+            epoll_ctl_add(epfd, reader->fd);
 
         for (;;) {
             struct epoll_event events[10];
@@ -399,7 +400,8 @@ public:
                                 }
                                 auto it = pidMap.find(child);
                                 if (it != pidMap.end()) {
-                                    reader->writeChildExit(child, it->second, wstatus, info);
+                                    if (reader.get() != nullptr)
+                                        reader->writeChildExit(child, it->second, wstatus, info);
                                     pidMap.erase(it);
                                 }
                             } else if (child < 0) {
@@ -420,7 +422,7 @@ public:
                     } else {
                         logWan() << util::format("Read unexpected signal [%d]\n", fdsi.ssi_signo);
                     }
-                } else if (event.data.fd == reader->fd) {
+                } else if (reader.get() != nullptr && event.data.fd == reader->fd) {
                     auto json = reader->read();
                     if (json.empty()) {
                         break;
@@ -598,7 +600,8 @@ public:
                 return PrepareOverlayfsRootfs(r.annotations->overlayfs.value());
             }
         } else {
-            return PrepareNativeRootfs(r.annotations->native.value());
+            return PrepareNativeRootfs(r.annotations->native.has_value() ? r.annotations->native.value()
+                                                                         : AnnotationsNativeRootfs());
         }
 
         return -1;

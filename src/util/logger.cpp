@@ -18,7 +18,9 @@ std::string GetPidnsPid()
 {
     char buf[30];
     memset(buf, 0, sizeof(buf));
-    readlink("/proc/self/ns/pid", buf, sizeof(buf) - 1);
+    if (readlink("/proc/self/ns/pid", buf, sizeof(buf) - 1) == -1) {
+        return "";
+    };
     std::string str = buf;
     return str.substr(5, str.length() - 6) + ":" + std::to_string(getpid()); // 6 = strlen("pid:[]")
 }

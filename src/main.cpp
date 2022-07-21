@@ -26,8 +26,7 @@ extern linglong::Runtime loadBundle(int argc, char **argv);
 int main(int argc, char **argv)
 {
     // TODO(iceyer): move loader to ll-loader?
-    // NOTE(clx): just comment out loadBundle source for now, as currently unused.
-    // bool is_load_bundle = (argc == 4);
+    bool is_load_bundle = (argc == 4);
 
     linglong::Option opt;
     // TODO(iceyer): default in rootless
@@ -37,22 +36,24 @@ int main(int argc, char **argv)
 
     try {
         linglong::Runtime r;
+        nlohmann::json json;
+        std::unique_ptr<linglong::util::MessageReader> reader = nullptr;
 
-        // if (is_load_bundle) {
-        // r = loadBundle(argc, argv);
-        // } else {
+        if (is_load_bundle) {
+            r = loadBundle(argc, argv);
+            linglong::to_json(json, r);
+        } else {
+            int socket = atoi(argv[1]);
+            if (socket <= 0) {
+                socket = open(argv[1], O_RDONLY | O_CLOEXEC);
+            }
 
-        int socket = atoi(argv[1]);
-        if (socket <= 0) {
-            socket = open(argv[1], O_RDONLY | O_CLOEXEC);
+            reader.reset(new linglong::util::MessageReader(socket));
+
+            json = reader->read();
+
+            r = json.get<linglong::Runtime>();
         }
-
-        std::unique_ptr<linglong::util::MessageReader> reader(new linglong::util::MessageReader(socket));
-        auto json = reader->read();
-
-        r = json.get<linglong::Runtime>();
-
-        // }
 
         if (linglong::util::fs::exists("/tmp/ll-debug")) {
             std::ofstream origin(linglong::util::format("/tmp/ll-debug/%d.json", getpid()));

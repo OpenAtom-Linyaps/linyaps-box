@@ -26,6 +26,7 @@ target_link_libraries(ll-box ${LINK_LIBS})
 if (BUILD_STATIC)
   add_executable(ll-box-static ${LL_BOX_SOURCES})
   target_link_libraries(ll-box-static -static ${LINK_LIBS})
+  install(TARGETS ll-box-static RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/libexec)
 endif (BUILD_STATIC)
 
 install(TARGETS ll-box RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
