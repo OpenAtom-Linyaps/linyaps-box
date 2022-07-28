@@ -355,6 +355,8 @@ public:
         sigset_t mask;
         sigemptyset(&mask);
         sigaddset(&mask, SIGCHLD);
+        sigaddset(&mask, SIGTERM);
+        // FIXME: add more signals.
 
         /* Block signals so that they aren't handled
            according to their default dispositions. */
@@ -411,6 +413,10 @@ public:
                                 }
                             }
                         }
+                    } else if (fdsi.ssi_signo == SIGTERM) {
+                        // FIXME: box should exit with failed return code.
+                        logWan() << util::format("Terminated\n");
+                        break;
                     } else {
                         logWan() << util::format("Read unexpected signal [%d]\n", fdsi.ssi_signo);
                     }
