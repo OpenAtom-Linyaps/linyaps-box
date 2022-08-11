@@ -35,7 +35,7 @@ static Logger::Level getLogLevelFromStr(std::string str)
     } else if (str == "Fatal") {
         return Logger::Fatal;
     } else {
-        return Logger::Info;
+        return Logger::Level(Logger::Fatal + 1);
     }
 }
 
