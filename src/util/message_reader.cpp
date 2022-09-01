@@ -34,8 +34,10 @@ nlohmann::json MessageReader::read()
     int ret;
     while ((ret = ::read(fd, buf.get(), step))) {
         if (ret == -1) {
-            logWan() << "read fail:" << errnoString();
-            break;
+            if (errno != EAGAIN) {
+                logWan() << "read fail:" << errnoString();
+                break;
+            }
         } else {
             char *it = buf.get();
             for (; it < buf.get() + ret && *it != '\0'; it++) {
