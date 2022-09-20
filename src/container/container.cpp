@@ -416,7 +416,7 @@ public:
                     } else if (fdsi.ssi_signo == SIGTERM) {
                         // FIXME: box should exit with failed return code.
                         logWan() << util::format("Terminated\n");
-                        break;
+                        return;
                     } else {
                         logWan() << util::format("Read unexpected signal [%d]\n", fdsi.ssi_signo);
                     }
@@ -679,6 +679,12 @@ int NonePrivilegeProc(void *arg)
     return 0;
 }
 
+void sigtermHandler(int)
+{
+    exit(-1);
+}
+
+
 int EntryProc(void *arg)
 {
     auto &c = *reinterpret_cast<ContainerPrivate *>(arg);
@@ -762,6 +768,7 @@ int EntryProc(void *arg)
     // FIXME(interactive bash): if need keep interactive shell
 
     c.reader.reset();
+    signal(SIGTERM, sigtermHandler);
     util::WaitAllUntil(noPrivilegePid);
     return -1;
 }
