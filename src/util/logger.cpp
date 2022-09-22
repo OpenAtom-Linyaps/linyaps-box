@@ -1,4 +1,5 @@
 #include "logger.h"
+#include <sys/syslog.h>
 
 namespace linglong {
 namespace util {
@@ -41,6 +42,7 @@ static Logger::Level getLogLevelFromStr(std::string str)
 
 static Logger::Level initLogLevel()
 {
+    openlog("ll-box", LOG_PID, LOG_USER);
     auto env = getenv("LINGLONG_LOG_LEVEL");
     return getLogLevelFromStr(env ? env : "");
 }

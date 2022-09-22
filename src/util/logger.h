@@ -14,6 +14,7 @@
 #include "util.h"
 
 #include <unistd.h>
+#include <sys/syslog.h>
 
 #include <iostream>
 #include <sstream>
@@ -47,6 +48,20 @@ public:
     {
         std::string prefix;
         auto pid_ns = GetPidnsPid();
+        int syslogLevel = LOG_DEBUG;
+        switch (level) {
+        case Debug:
+            syslogLevel = LOG_DEBUG;
+        case Info:
+            syslogLevel = LOG_INFO;
+        case Warring:
+            syslogLevel = LOG_WARNING;
+        case Error:
+            syslogLevel = LOG_ERR;
+        case Fatal:
+            syslogLevel = LOG_ERR;
+        }
+        syslog(syslogLevel, "%s|%s:%d %s", pid_ns.c_str(), function, line, ss.str().c_str());
         if (level < LOGLEVEL) {
             return;
         }
