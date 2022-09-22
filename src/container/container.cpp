@@ -421,14 +421,12 @@ public:
                         logWan() << util::format("Read unexpected signal [%d]\n", fdsi.ssi_signo);
                     }
                 } else if (event.data.fd == reader->fd) {
-                    while (true) {
-                        auto json = reader->read();
-                        if (json.empty()) {
-                            break;
-                        }
-                        auto p = json.get<Process>();
-                        forkAndExecProcess(p);
+                    auto json = reader->read();
+                    if (json.empty()) {
+                        break;
                     }
+                    auto p = json.get<Process>();
+                    forkAndExecProcess(p);
                 } else {
                     logWan() << "Unknown fd";
                 }
@@ -683,7 +681,6 @@ void sigtermHandler(int)
 {
     exit(-1);
 }
-
 
 int EntryProc(void *arg)
 {
