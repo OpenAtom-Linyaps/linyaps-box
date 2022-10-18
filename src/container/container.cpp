@@ -362,7 +362,7 @@ public:
            according to their default dispositions. */
 
         if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
-            logWan() << "sigprocmask";
+            logWan() << "sigprocmask block";
 
         int sfd = signalfd(-1, &mask, 0);
         if (sfd == -1)
@@ -426,7 +426,7 @@ public:
                         break;
                     }
                     auto p = json.get<Process>();
-                    forkAndExecProcess(p);
+                    forkAndExecProcess(p, true);
                 } else {
                     logWan() << "Unknown fd";
                 }
@@ -435,7 +435,7 @@ public:
         return;
     }
 
-    bool forkAndExecProcess(const Process p)
+    bool forkAndExecProcess(const Process p, bool unblock = false)
     {
         // FIXME: parent may dead before this return.
         prctl(PR_SET_PDEATHSIG, SIGKILL);
@@ -447,6 +447,15 @@ public:
         }
 
         if (0 == pid) {
+            if (unblock) {
+                // FIXME: As we use signalfd, we have to block signal, but child created by fork
+                // will inherit blocked signal set, so we have to unblock it. This is just a
+                // workround.
+                sigset_t mask;
+                sigfillset(&mask);
+                if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
+                    logWan() << "sigprocmask unblock";
+            }
             logDbg() << "process.args:" << p.args;
 
             int ret;
