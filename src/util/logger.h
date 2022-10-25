@@ -93,8 +93,7 @@ public:
             std::cout << "\033[1;91m";
             std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] " << ss.str();
             std::cout << "\033[0m" << std::endl;
-            exit(-1);
-            break;
+            abort();
         }
     }
 
