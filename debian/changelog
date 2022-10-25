@@ -85,7 +85,7 @@ linglong-box (1.2.2-1) unstable; urgency=medium
 
   * 1. fix read/write /dev/null failed.
   * 2. add log fliter.
-  * 3. fix mount mqueue amd cgroup in rootless mode.
+  * 3. fix mount mqueue amd cgroup in rootLess mode.
   * 4. fix make mountnode const again.
   * 5. fix make ro bind work.
 
@@ -108,7 +108,7 @@ linglong-box (1.2.0-1) unstable; urgency=medium
 
 linglong-box (1.0.1-1) unstable; urgency=medium
 
-  * support rootless and fuse
+  * support rootLess and fuse
 
  -- iceyer <me@iceyer.net>  Wed, 29 Dec 2021 17:57:01 +0800
 

@@ -66,7 +66,7 @@ public:
         }
         case S_IFSOCK: {
             driver_->CreateDestinationPath(dest_parent_path);
-            // FIXME: can not mound dbus socket on rootless
+            // FIXME: can not mound dbus socket on rootLess
             std::ofstream output(host_dest_full_path.string());
             break;
         }

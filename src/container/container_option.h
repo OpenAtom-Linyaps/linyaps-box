@@ -22,8 +22,8 @@ namespace linglong {
  * If there is more information about how to deal user namespace, it can remove
  */
 struct Option {
-    bool rootless = false;
-    bool link_lfs = true;
+    bool rootLess = false;
+    bool linkLfs = true;
 };
 
 } // namespace linglong

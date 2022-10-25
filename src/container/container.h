@@ -28,7 +28,7 @@ public:
 
     ~Container();
 
-    int Start(const Option &opt);
+    int start(const Option &opt);
 
 private:
     std::unique_ptr<ContainerPrivate> dd_ptr;

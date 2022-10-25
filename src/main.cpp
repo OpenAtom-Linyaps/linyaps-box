@@ -32,13 +32,13 @@ int main(int argc, char **argv)
     // bool is_load_bundle = (argc == 4);
 
     linglong::Option opt;
-    // TODO(iceyer): default in rootless
+    // TODO(iceyer): default in rootLess
     if (geteuid() != 0) {
-        opt.rootless = true;
+        opt.rootLess = true;
     }
 
     try {
-        linglong::Runtime r;
+        linglong::Runtime runtime;
 
         int socket = atoi(argv[1]);
         if (socket <= 0) {
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
         std::unique_ptr<linglong::util::MessageReader> reader(new linglong::util::MessageReader(socket));
         auto json = reader->read();
 
-        r = json.get<linglong::Runtime>();
+        runtime = json.get<linglong::Runtime>();
 
         // }
 
@@ -58,8 +58,8 @@ int main(int argc, char **argv)
             origin.close();
         }
 
-        linglong::Container c(r, std::move(reader));
-        return c.Start(opt);
+        linglong::Container container(runtime, std::move(reader));
+        return container.start(opt);
     } catch (const std::exception &e) {
         logErr() << "failed: " << e.what();
         return -1;

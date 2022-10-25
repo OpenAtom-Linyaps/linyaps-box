@@ -286,7 +286,7 @@ public:
     {
         chdir("/");
 
-        if (opt.link_lfs) {
+        if (opt.linkLfs) {
             symlink("/usr/bin", "/bin");
             symlink("/usr/lib", "/lib");
             symlink("/usr/lib32", "/lib32");
@@ -319,7 +319,7 @@ public:
         };
 
         // TODO(iceyer): not work now
-        if (!opt.rootless) {
+        if (!opt.rootLess) {
             for (auto const &dev : list) {
                 auto path = host_root_ + dev.path;
                 int ret = mknod(path.c_str(), dev.mode, dev.dev);
@@ -485,7 +485,7 @@ public:
         int ret = -1;
         chdir(host_root_.c_str());
 
-        if (opt.rootless && r.annotations->overlayfs.has_value()) {
+        if (opt.rootLess && r.annotations->overlayfs.has_value()) {
             int flag = MS_MOVE;
             ret = mount(".", "/", nullptr, flag, nullptr);
             if (0 != ret) {
@@ -633,7 +633,7 @@ int NonePrivilegeProc(void *arg)
 {
     auto &c = *reinterpret_cast<ContainerPrivate *>(arg);
 
-    if (c.opt.rootless) {
+    if (c.opt.rootLess) {
         // TODO(iceyer): use option
 
         Linux linux;
@@ -664,7 +664,7 @@ int NonePrivilegeProc(void *arg)
         }
     }
 
-    if (!c.opt.rootless) {
+    if (!c.opt.rootLess) {
         seteuid(0);
         // todo: check return value
         ConfigSeccomp(c.r.linux.seccomp);
@@ -686,7 +686,7 @@ int EntryProc(void *arg)
 {
     auto &c = *reinterpret_cast<ContainerPrivate *>(arg);
 
-    if (c.opt.rootless) {
+    if (c.opt.rootLess) {
         ConfigUserNamespace(c.r.linux, 0);
     }
 
@@ -728,7 +728,7 @@ int EntryProc(void *arg)
 
     c.PrepareLinks();
 
-    if (!c.opt.rootless) {
+    if (!c.opt.rootLess) {
         auto unshare_flags = 0;
         // TODO(iceyer): no need user namespace in setuid
         //        if (c.use_delay_new_user_ns) {
@@ -775,12 +775,12 @@ Container::Container(const Runtime &r, std::unique_ptr<util::MessageReader> read
 {
 }
 
-int Container::Start(const Option &opt)
+int Container::start(const Option &opt)
 {
     auto &c = *reinterpret_cast<ContainerPrivate *>(dd_ptr.get());
     c.opt = opt;
 
-    if (opt.rootless) {
+    if (opt.rootLess) {
         c.host_uid_ = geteuid();
         c.host_gid_ = getegid();
     }
@@ -807,7 +807,7 @@ int Container::Start(const Option &opt)
         }
     }
 
-    if (opt.rootless) {
+    if (opt.rootLess) {
         flags |= CLONE_NEWUSER;
     }
 
