@@ -453,7 +453,7 @@ public:
             }
 
             // for PATH
-            for (auto env : p.env) {
+            for (auto const &env : p.env) {
                 auto kv = util::strSpilt(env, "=");
                 if (kv.size() == 2)
                     setenv(kv.at(0).c_str(), kv.at(1).c_str(), 1);
