@@ -31,7 +31,7 @@ public:
     int start(const Option &opt);
 
 private:
-    std::unique_ptr<ContainerPrivate> dd_ptr;
+    std::unique_ptr<ContainerPrivate> containerPrivate;
 };
 
 } // namespace linglong

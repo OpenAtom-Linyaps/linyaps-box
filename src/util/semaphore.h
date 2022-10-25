@@ -23,19 +23,19 @@ public:
 
     int init();
 
-    //! passeren -1 to value
+    //! minusOne -1 to value
     //! if value < 0, block
     //! \return
-    int passeren();
+    int minusOne();
 
-    //! passeren +1 to value
+    //! minusOne +1 to value
     //! if value <= 0, release process in queue
     //! \return
-    int vrijgeven();
+    int plusOne();
 
 private:
     struct SemaphorePrivate;
-    std::unique_ptr<SemaphorePrivate> dd_ptr;
+    std::unique_ptr<SemaphorePrivate> semaphorePrivate;
 };
 
 } // namespace linglong

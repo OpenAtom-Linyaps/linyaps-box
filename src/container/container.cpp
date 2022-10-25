@@ -85,7 +85,7 @@ static int startDbusProxy(const Runtime &runtime)
         exit(ret);
     } else {
         // FIXME: this call make 10ms lag at least
-        if (util::fs::path(socketPath).waitUntilExsit() != 0) {
+        if (util::fs::Path(socketPath).waitUntilExsit() != 0) {
             logErr() << util::format("timeout! socketPath [\"%s\"] not exsit", socketPath.c_str());
             return -1;
         }
@@ -115,7 +115,7 @@ static int configUserNamespace(const linglong::Linux &linux, int initPid)
     // write uid map
     std::ofstream uidMapFile(util::format("/proc/%s/uid_map", pid.c_str()));
     for (auto const &idMap : linux.uidMappings) {
-        uidMapFile << util::format("%lu %lu %lu\n", idMap.containerID, idMap.hostID, idMap.size);
+        uidMapFile << util::format("%lu %lu %lu\n", idMap.containerId, idMap.hostId, idMap.size);
     }
     uidMapFile.close();
 
@@ -127,7 +127,7 @@ static int configUserNamespace(const linglong::Linux &linux, int initPid)
 
     std::ofstream gidMapFile(util::format("/proc/%s/gid_map", pid.c_str()));
     for (auto const &idMap : linux.gidMappings) {
-        gidMapFile << util::format("%lu %lu %lu\n", idMap.containerID, idMap.hostID, idMap.size);
+        gidMapFile << util::format("%lu %lu %lu\n", idMap.containerId, idMap.hostId, idMap.size);
     }
     gidMapFile.close();
 
@@ -152,7 +152,7 @@ static int configCgroupV2(const std::string &cgroupsPath, const linglong::Resour
         }
     };
 
-    auto cgroupsRoot = util::fs::path(cgroupsPath);
+    auto cgroupsRoot = util::fs::Path(cgroupsPath);
     util::fs::createDirectories(cgroupsRoot, 0755);
 
     int ret = mount("cgroup2", cgroupsRoot.string().c_str(), "cgroup2", 0u, nullptr);
@@ -161,9 +161,9 @@ static int configCgroupV2(const std::string &cgroupsPath, const linglong::Resour
         return -1;
     }
 
-    // TODO: should sub path with pid?
+    // TODO: should sub Path with pid?
     auto subCgroupRoot = cgroupsRoot / "ll-box";
-    if (!util::fs::createDirectories(util::fs::path(subCgroupRoot), 0755)) {
+    if (!util::fs::createDirectories(util::fs::Path(subCgroupRoot), 0755)) {
         logErr() << "createDirectories subCgroupRoot failed" << util::errnoString();
         return -1;
     }
@@ -304,7 +304,7 @@ public:
     int prepareDefaultDevices() const
     {
         struct Device {
-            std::string path;
+            std::string Path;
             mode_t mode;
             dev_t dev;
         };
@@ -318,23 +318,23 @@ public:
         // TODO(iceyer): not work now
         if (!opt.rootLess) {
             for (auto const &dev : list) {
-                auto path = hostRoot + dev.path;
-                int ret = mknod(path.c_str(), dev.mode, dev.dev);
+                auto Path = hostRoot + dev.Path;
+                int ret = mknod(Path.c_str(), dev.mode, dev.dev);
                 if (0 != ret) {
-                    logErr() << "mknod" << path << dev.mode << dev.dev << "failed with" << util::retErrString(ret);
+                    logErr() << "mknod" << Path << dev.mode << dev.dev << "failed with" << util::retErrString(ret);
                 }
-                chmod(path.c_str(), dev.mode | 0xFFFF);
-                chown(path.c_str(), 0, 0);
+                chmod(Path.c_str(), dev.mode | 0xFFFF);
+                chown(Path.c_str(), 0, 0);
             }
         } else {
             for (auto const &dev : list) {
                 Mount m;
-                m.destination = dev.path;
+                m.destination = dev.Path;
                 m.type = "bind";
                 m.data = std::vector<std::string> {};
                 m.flags = MS_BIND;
-                m.fsType = Mount::Bind;
-                m.source = dev.path;
+                m.fsType = Mount::kBind;
+                m.source = dev.Path;
 
                 this->containerMounter->mountNode(m);
             }
@@ -425,7 +425,7 @@ public:
                     auto p = json.get<Process>();
                     forkAndExecProcess(p);
                 } else {
-                    logWan() << "Unknown fd";
+                    logWan() << "kUnknown fd";
                 }
             }
         }
@@ -460,7 +460,7 @@ public:
                 else if (kv.size() == 1) {
                     setenv(kv.at(0).c_str(), "", 1);
                 } else {
-                    logWan() << "Unknown env:" << env;
+                    logWan() << "kUnknown env:" << env;
                 }
             }
 
@@ -505,11 +505,11 @@ public:
 
             auto lingLongHostFilename = "ll-host";
 
-            auto ll_host_path = hostRoot + "/" + lingLongHostFilename;
+            auto lingLongHostPath = hostRoot + "/" + lingLongHostFilename;
 
-            mkdir(ll_host_path.c_str(), 0755);
+            mkdir(lingLongHostPath.c_str(), 0755);
 
-            ret = syscall(SYS_pivot_root, hostRoot.c_str(), ll_host_path.c_str());
+            ret = syscall(SYS_pivot_root, hostRoot.c_str(), lingLongHostPath.c_str());
             if (0 != ret) {
                 logErr() << "SYS_pivot_root failed" << hostRoot << util::errnoString() << errno << ret;
                 return -1;
@@ -532,28 +532,28 @@ public:
     int prepareRootfs()
     {
         auto PrepareOverlayfsRootfs = [&](const AnnotationsOverlayfs &overlayfs) -> int {
-            nativeMounter->setup(new NativeFilesystemDriver(overlayfs.lower_parent));
+            nativeMounter->setup(new NativeFilesystemDriver(overlayfs.lowerParent));
 
-            util::strVec lower_dirs = {};
+            util::strVec lowerDirs = {};
             int prefix_index = 0;
             for (auto m : overlayfs.mounts) {
-                auto prefix = util::fs::path(util::format("/%d", prefix_index));
+                auto prefix = util::fs::Path(util::format("/%d", prefix_index));
                 m.destination = (prefix / m.destination).string();
                 if (0 == nativeMounter->mountNode(m)) {
-                    lower_dirs.push_back((util::fs::path(overlayfs.lower_parent) / prefix).string());
+                    lowerDirs.push_back((util::fs::Path(overlayfs.lowerParent) / prefix).string());
                 }
                 ++prefix_index;
             }
 
             overlayfsMounter->setup(
-                new OverlayfsFuseFilesystemDriver(lower_dirs, overlayfs.upper, overlayfs.workdir, hostRoot));
+                new OverlayfsFuseFilesystemDriver(lowerDirs, overlayfs.upper, overlayfs.workdir, hostRoot));
 
             containerMounter = overlayfsMounter.get();
             return -1;
         };
 
         auto PrepareFuseProxyRootfs = [&](const AnnotationsOverlayfs &overlayfs) -> int {
-            nativeMounter->setup(new NativeFilesystemDriver(overlayfs.lower_parent));
+            nativeMounter->setup(new NativeFilesystemDriver(overlayfs.lowerParent));
 
             util::strVec mounts = {};
             for (auto const &m : overlayfs.mounts) {
@@ -580,7 +580,7 @@ public:
 
         if (runtime.annotations.has_value() && runtime.annotations->overlayfs.has_value()) {
             auto env = getenv("LL_BOX_FS_BACKEND");
-            if (env && std::string(env) == "fuse-proxy") {
+            if (env && "fuse-proxy" == std::string(env)) {
                 return PrepareFuseProxyRootfs(runtime.annotations->overlayfs.value());
             } else {
                 return PrepareOverlayfsRootfs(runtime.annotations->overlayfs.value());
@@ -612,7 +612,7 @@ int hookExec(const Hook &hook)
         return -1;
     }
 
-    if (execPid == 0) {
+    if (0 == execPid) {
         util::strVec argStrVec;
         argStrVec.push_back(hook.path);
 
@@ -636,13 +636,13 @@ int nonePrivilegeProc(void *arg)
         Linux linux;
         IDMap IdMap;
 
-        IdMap.containerID = container.hostUid;
-        IdMap.hostID = 0;
+        IdMap.containerId = container.hostUid;
+        IdMap.hostId = 0;
         IdMap.size = 1;
         linux.uidMappings.push_back(IdMap);
 
-        IdMap.containerID = container.hostGid;
-        IdMap.hostID = 0;
+        IdMap.containerId = container.hostGid;
+        IdMap.hostId = 0;
         IdMap.size = 1;
         linux.gidMappings.push_back(IdMap);
 
@@ -655,8 +655,8 @@ int nonePrivilegeProc(void *arg)
         return -1;
     }
 
-    if (container.runtime.hooks.has_value() && container.runtime.hooks->prestart.has_value()) {
-        for (auto const &preStart : *container.runtime.hooks->prestart) {
+    if (container.runtime.hooks.has_value() && container.runtime.hooks->preStart.has_value()) {
+        for (auto const &preStart : *container.runtime.hooks->preStart) {
             hookExec(preStart);
         }
     }
@@ -741,8 +741,8 @@ int entryProc(void *arg)
             }
         }
         //        if (c.use_delay_new_user_ns) {
-        //            s.vrijgeven();
-        //            s.passeren();
+        //            s.plusOne();
+        //            s.minusOne();
         //        }
     }
 
@@ -768,13 +768,13 @@ int entryProc(void *arg)
 }
 
 Container::Container(const Runtime &r, std::unique_ptr<util::MessageReader> reader)
-    : dd_ptr(new ContainerPrivate(r, std::move(reader), this))
+    : containerPrivate(new ContainerPrivate(r, std::move(reader), this))
 {
 }
 
 int Container::start(const Option &opt)
 {
-    auto &container = *reinterpret_cast<ContainerPrivate *>(dd_ptr.get());
+    auto &container = *reinterpret_cast<ContainerPrivate *>(containerPrivate.get());
     container.opt = opt;
 
     if (opt.rootLess) {
@@ -784,7 +784,7 @@ int Container::start(const Option &opt)
 
     int flags = SIGCHLD | CLONE_NEWNS;
 
-    for (auto const &ns : dd_ptr->runtime.linux.namespaces) {
+    for (auto const &ns : containerPrivate->runtime.linux.namespaces) {
         switch (ns.type) {
         case CLONE_NEWIPC:
         case CLONE_NEWUTS:
@@ -794,10 +794,10 @@ int Container::start(const Option &opt)
             flags |= ns.type;
             break;
         case CLONE_NEWUSER:
-            //            dd_ptr->use_delay_new_user_ns = true;
+            //            containerPrivate->use_delay_new_user_ns = true;
             break;
         case CLONE_NEWCGROUP:
-            dd_ptr->useNewCgroupNs = true;
+            containerPrivate->useNewCgroupNs = true;
             break;
         default:
             return -1;
@@ -810,7 +810,7 @@ int Container::start(const Option &opt)
 
     startDbusProxy(container.runtime);
 
-    int entryPid = util::platformClone(entryProc, flags, (void *)dd_ptr.get());
+    int entryPid = util::platformClone(entryProc, flags, (void *)containerPrivate.get());
     if (entryPid < 0) {
         logErr() << "clone failed" << util::retErrString(entryPid);
         return -1;

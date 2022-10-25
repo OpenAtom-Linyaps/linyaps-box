@@ -4,13 +4,13 @@
   "linux": {
     "gidMappings": [
       {
-        "containerID": 0,
-        "hostID": 65534,
+        "containerId": 0,
+        "hostId": 65534,
         "size": 1
       },
       {
-        "containerID": 1000,
-        "hostID": 1000,
+        "containerId": 1000,
+        "hostId": 1000,
         "size": 1
       }
     ],
@@ -33,13 +33,13 @@
     ],
     "uidMappings": [
       {
-        "containerID": 0,
-        "hostID": 65534,
+        "containerId": 0,
+        "hostId": 65534,
         "size": 1
       },
       {
-        "containerID": 1000,
-        "hostID": 1000,
+        "containerId": 1000,
+        "hostId": 1000,
         "size": 1
       }
     ],
@@ -79,8 +79,7 @@
     },
     {
       "destination": "/proc",
-      "options": [
-      ],
+      "options": [],
       "source": "proc",
       "type": "proc"
     },
@@ -273,57 +272,49 @@
     },
     {
       "destination": "/run/user/1000",
-      "options": [
-      ],
+      "options": [],
       "source": "/home/iceyer/.linglong/com.baidu.baidunetdisk/runtime",
       "type": "bind"
     },
     {
       "destination": "/run/user/1000/bus",
-      "options": [
-      ],
+      "options": [],
       "source": "/run/user/1000/bus",
       "type": "bind"
     },
     {
       "destination": "/run/dbus/system_bus_socket",
-      "options": [
-      ],
+      "options": [],
       "source": "/run/dbus/system_bus_socket",
       "type": "bind"
     },
     {
       "destination": "/home/iceyer",
-      "options": [
-      ],
+      "options": [],
       "source": "/home/iceyer/.linglong/com.baidu.baidunetdisk/home",
       "type": "bind"
     },
     {
       "destination": "/home/iceyer/.config",
-      "options": [
-      ],
+      "options": [],
       "source": "/home/iceyer/.linglong/com.baidu.baidunetdisk/config",
       "type": "bind"
     },
     {
       "destination": "/home/iceyer/.cache",
-      "options": [
-      ],
+      "options": [],
       "source": "/home/iceyer/.linglong/com.baidu.baidunetdisk/cache",
       "type": "bind"
     },
     {
       "destination": "/run/user/1000/dconf",
-      "options": [
-      ],
+      "options": [],
       "source": "/run/user/1000/dconf",
       "type": "bind"
     },
     {
       "destination": "/home/iceyer/.config/user-dirs.dirs",
-      "options": [
-      ],
+      "options": [],
       "source": "/home/iceyer/.config/user-dirs.dirs",
       "type": "bind"
     },
@@ -361,43 +352,37 @@
     },
     {
       "destination": "/etc/passwd",
-      "options": [
-      ],
+      "options": [],
       "source": "/etc/passwd",
       "type": "bind"
     },
     {
       "destination": "/etc/group",
-      "options": [
-      ],
+      "options": [],
       "source": "/etc/group",
       "type": "bind"
     },
     {
       "destination": "/home/iceyer/Documents",
-      "options": [
-      ],
+      "options": [],
       "source": "/home/iceyer/Documents",
       "type": "bind"
     },
     {
       "destination": "/home/iceyer/Desktop",
-      "options": [
-      ],
+      "options": [],
       "source": "/home/iceyer/Desktop",
       "type": "bind"
     },
     {
       "destination": "/home/iceyer/Downloads",
-      "options": [
-      ],
+      "options": [],
       "source": "/home/iceyer/Downloads",
       "type": "bind"
     },
     {
       "destination": "/run/app/env",
-      "options": [
-      ],
+      "options": [],
       "source": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444/env",
       "type": "bind"
     }

@@ -8,9 +8,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <dirent.h>
+
 #include "util/logger.h"
 #include "util/oci_runtime.h"
 #include "container/container_option.h"
+
+using namespace linglong;
+
+
 
 const std::string kLoadTemplate = R"KLT00(
 {
@@ -18,13 +24,13 @@ const std::string kLoadTemplate = R"KLT00(
 	"hostname": "linglong",
 	"linux": {
 		"gidMappings": [{
-			"containerID": 0,
-			"hostID": 1000,
+			"containerId": 0,
+			"hostId": 1000,
 			"size": 1
 		}],
 		"uidMappings": [{
-			"containerID": 0,
-			"hostID": 1000,
+			"containerId": 0,
+			"hostId": 1000,
 			"size": 1
 		}],
 		"namespaces": [{
@@ -77,9 +83,7 @@ const std::string kLoadTemplate = R"KLT00(
 }
 )KLT00";
 
-using namespace linglong;
 
-#include <dirent.h>
 
 // start container from tmp mount path
 linglong::Runtime loadBundle(int argc, char **argv)
@@ -97,7 +101,7 @@ linglong::Runtime loadBundle(int argc, char **argv)
         Mount mount;
         mount.source = "tmpfs";
         mount.type = "tmpfs";
-        mount.fsType = Mount::Tmpfs;
+        mount.fsType = Mount::kTmpfs;
         mount.data = {"nodev", "nosuid"};
         mount.destination = "/opt";
         runtime.mounts->push_back(mount);
@@ -124,7 +128,7 @@ linglong::Runtime loadBundle(int argc, char **argv)
 
         Mount mount;
         mount.type = "bind";
-        mount.fsType = Mount::Bind;
+        mount.fsType = Mount::kBind;
 
         for (auto const &name : namelist) {
             mount.source = source.append("/") + name;
@@ -138,7 +142,7 @@ linglong::Runtime loadBundle(int argc, char **argv)
     if (util::fs::exists(bundleRoot + "/files")) {
         Mount mount;
         mount.type = "bind";
-        mount.fsType = Mount::Bind;
+        mount.fsType = Mount::kBind;
         mount.source = bundleRoot;
         mount.destination = util::format("/opt/apps/%s", id.c_str());
         runtime.mounts->push_back(mount);
@@ -148,7 +152,7 @@ linglong::Runtime loadBundle(int argc, char **argv)
     if (util::fs::exists(bundleRoot + "/runtime")) {
         Mount mount;
         mount.type = "bind";
-        mount.fsType = Mount::Bind;
+        mount.fsType = Mount::kBind;
         mount.source = bundleRoot + "/runtime";
         mount.destination = util::format("/opt/runtime");
         runtime.mounts->push_back(mount);
@@ -179,21 +183,21 @@ linglong::Runtime loadBundle(int argc, char **argv)
 
     /// run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd422/root
     char dirTemplate[] = "/run/user/1000/linglong/XXXXXX";
-    util::fs::createDirectories(util::fs::path(dirTemplate).parent_path(), 0755);
+    util::fs::createDirectories(util::fs::Path(dirTemplate).parent_path(), 0755);
 
     char *dirName = mkdtemp(dirTemplate);
     if (dirName == nullptr) {
         throw std::runtime_error("mkdtemp failed");
     }
 
-    auto rootPath = util::fs::path(dirName) / "root";
+    auto rootPath = util::fs::Path(dirName) / "root";
     util::fs::createDirectories(rootPath, 0755);
 
     runtime.root.path = rootPath.string();
 
     // FIXME: workaround id map
-    runtime.linux.uidMappings[0].hostID = getuid();
-    runtime.linux.gidMappings[0].hostID = getgid();
+    runtime.linux.uidMappings[0].hostId = getuid();
+    runtime.linux.gidMappings[0].hostId = getgid();
 
     return runtime;
 }

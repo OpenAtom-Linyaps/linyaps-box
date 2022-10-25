@@ -45,7 +45,7 @@ struct Context {
 
     std::string targetExecute;
     util::strVec args;
-    int semID {};
+    int semId {};
 };
 
 int entryProc(void *arg)
@@ -60,10 +60,10 @@ int entryProc(void *arg)
         logErr() << "unshare failed" << unshareFlags << util::retErrString(ret);
     }
 
-    Semaphore s(c.semID);
+    Semaphore s(c.semId);
     logDbg() << "wait parent start";
-    s.vrijgeven();
-    s.passeren();
+    s.plusOne();
+    s.minusOne();
     logDbg() << "parent process finish";
 
     prctl(PR_SET_PDEATHSIG, SIGKILL);
@@ -131,8 +131,8 @@ int main(int argc, char **argv)
 
     int flags = SIGCHLD;
 
-    ctx.semID = getpid();
-    Semaphore s(ctx.semID);
+    ctx.semId = getpid();
+    Semaphore s(ctx.semId);
     s.init();
 
     int entryPid = clone(entryProc, stackTop, flags, (void *)&ctx);
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
     }
 
     logDbg() << "wait child start" << entryPid;
-    s.passeren();
+    s.minusOne();
     // write gid map
     auto setgroupsPath = util::format("/proc/%d/setgroups", entryPid);
     std::ofstream setgroupsFile(setgroupsPath);
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
     uidMapFile.close();
 
     logDbg() << "notify child continue" << entryPid;
-    s.vrijgeven();
+    s.plusOne();
 
     // FIXME(interactive bash): if need keep interactive shell
     if (waitpid(-1, nullptr, 0) < 0) {

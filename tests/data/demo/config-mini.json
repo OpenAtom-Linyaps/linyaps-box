@@ -30,25 +30,25 @@
     },
     "uidMappings": [
       {
-        "hostID": 65534,
-        "containerID": 0,
+        "hostId": 65534,
+        "containerId": 0,
         "size": 1
       },
       {
-        "hostID": 1000,
-        "containerID": 1000,
+        "hostId": 1000,
+        "containerId": 1000,
         "size": 1
       }
     ],
     "gidMappings": [
       {
-        "hostID": 65534,
-        "containerID": 0,
+        "hostId": 65534,
+        "containerId": 0,
         "size": 1
       },
       {
-        "hostID": 1000,
-        "containerID": 1000,
+        "hostId": 1000,
+        "containerId": 1000,
         "size": 1
       }
     ],
@@ -144,8 +144,7 @@
       "destination": "/sys/fs/cgroup",
       "type": "cgroup2",
       "source": "none",
-      "options": [
-      ]
+      "options": []
     },
     {
       "destination": "/dev/dri",
@@ -184,4 +183,3 @@
     "readonly": false
   }
 }
-

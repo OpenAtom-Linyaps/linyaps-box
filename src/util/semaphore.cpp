@@ -24,26 +24,26 @@ union semun {
 
 struct Semaphore::SemaphorePrivate {
     explicit SemaphorePrivate(Semaphore *parent = nullptr)
-        : q_ptr(parent)
+        : semaphore(parent)
     {
-        (void)q_ptr;
+        (void)semaphore;
     }
 
-    struct sembuf sem_lock = {0, -1, SEM_UNDO};
+    struct sembuf semLock = {0, -1, SEM_UNDO};
 
-    struct sembuf sem_unlock = {0, 1, SEM_UNDO};
+    struct sembuf semUnlock = {0, 1, SEM_UNDO};
 
-    int sem_id = -1;
+    int semId = -1;
 
-    Semaphore *q_ptr;
+    Semaphore *semaphore;
 };
 
 Semaphore::Semaphore(int key)
-    : dd_ptr(new SemaphorePrivate(this))
+    : semaphorePrivate(new SemaphorePrivate(this))
 {
-    dd_ptr->sem_id = semget(key, 1, IPC_CREAT | 0666);
-    if (dd_ptr->sem_id < 0) {
-        logErr() << "semget failed" << util::retErrString(dd_ptr->sem_id);
+    semaphorePrivate->semId = semget(key, 1, IPC_CREAT | 0666);
+    if (semaphorePrivate->semId < 0) {
+        logErr() << "semget failed" << util::retErrString(semaphorePrivate->semId);
     }
 }
 
@@ -51,23 +51,23 @@ Semaphore::~Semaphore() = default;
 
 int Semaphore::init()
 {
-    union semun sem_union = {0};
-    sem_union.val = 0;
-    logDbg() << "semctl " << dd_ptr->sem_id;
-    if (semctl(dd_ptr->sem_id, 0, SETVAL, sem_union) == -1) {
+    union semun semUnion = {0};
+    semUnion.val = 0;
+    logDbg() << "semctl " << semaphorePrivate->semId;
+    if (semctl(semaphorePrivate->semId, 0, SETVAL, semUnion) == -1) {
         logErr() << "semctl failed" << util::retErrString(-1);
     }
     return 0;
 }
 
-int Semaphore::passeren()
+int Semaphore::minusOne()
 {
-    return semop(dd_ptr->sem_id, &dd_ptr->sem_lock, 1);
+    return semop(semaphorePrivate->semId, &semaphorePrivate->semLock, 1);
 }
 
-int Semaphore::vrijgeven()
+int Semaphore::plusOne()
 {
-    return semop(dd_ptr->sem_id, &dd_ptr->sem_unlock, 1);
+    return semop(semaphorePrivate->semId, &semaphorePrivate->semUnlock, 1);
 }
 
 } // namespace linglong

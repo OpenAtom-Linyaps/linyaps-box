@@ -29,7 +29,7 @@ public:
     int mountNode(const Mount &mount);
 
 private:
-    std::unique_ptr<HostMountPrivate> dd_ptr;
+    std::unique_ptr<HostMountPrivate> hostMountPrivate;
 };
 
 } // namespace linglong

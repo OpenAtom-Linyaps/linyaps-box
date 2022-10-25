@@ -30,7 +30,7 @@ sudo apt-get install cmake build-essential libyaml-cpp-dev nlohmann-json3-dev li
 - [ ] Configuration
     - [x] Root
     - [ ] Mount
-        - [ ] Cgroup
+        - [ ] kCgroup
     - [X] Hostname
 - [ ] Linux Container
     - [x] Default Filesystems

@@ -30,13 +30,13 @@ TEST(OCI, Runtime)
     EXPECT_EQ(r.linux.namespaces.size(), 5);
 
     EXPECT_EQ(r.linux.uidMappings.size(), 2);
-    EXPECT_EQ(r.linux.uidMappings.at(1).hostID, 1000);
-    EXPECT_EQ(r.linux.uidMappings.at(1).containerID, 1000);
+    EXPECT_EQ(r.linux.uidMappings.at(1).hostId, 1000);
+    EXPECT_EQ(r.linux.uidMappings.at(1).containerId, 1000);
     EXPECT_EQ(r.linux.uidMappings.at(1).size, 1);
 
     EXPECT_EQ(r.linux.gidMappings.size(), 2);
-    EXPECT_EQ(r.linux.gidMappings.at(0).hostID, 65534);
-    EXPECT_EQ(r.linux.gidMappings.at(0).containerID, 0);
+    EXPECT_EQ(r.linux.gidMappings.at(0).hostId, 65534);
+    EXPECT_EQ(r.linux.gidMappings.at(0).containerId, 0);
     EXPECT_EQ(r.linux.gidMappings.at(0).size, 1);
 
     EXPECT_EQ(r.linux.seccomp->defaultAction, "SCMP_ACT_ALLOW");

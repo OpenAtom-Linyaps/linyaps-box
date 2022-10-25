@@ -40,7 +40,7 @@ int platformClone(int (*callback)(void *), int flags, void *arg, ...)
     return clone(callback, stackTop, flags, arg);
 }
 
-int exec(const util::strVec &args, tl::optional<std::vector<std::string>> env_list)
+int exec(const util::strVec &args, tl::optional<std::vector<std::string>> envList)
 {
     auto targetArgc = args.size();
     const char *targetArgv[targetArgc + 1];
@@ -49,11 +49,11 @@ int exec(const util::strVec &args, tl::optional<std::vector<std::string>> env_li
     }
     targetArgv[targetArgc] = nullptr;
 
-    auto targetEnvc = env_list.has_value() ? env_list->size() : 0;
+    auto targetEnvc = envList.has_value() ? envList->size() : 0;
     const char **targetEnvv = targetEnvc ? new const char *[targetEnvc + 1] : nullptr;
     if (targetEnvv) {
         for (decltype(targetEnvc) i = 0; i < targetEnvc; i++) {
-            targetEnvv[i] = env_list.value().at(i).c_str();
+            targetEnvv[i] = envList.value().at(i).c_str();
         }
         targetEnvv[targetEnvc] = nullptr;
     }

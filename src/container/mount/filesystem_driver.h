@@ -19,30 +19,30 @@ class FilesystemDriver
 {
 public:
     virtual int setup() = 0;
-    virtual int CreateDestinationPath(const util::fs::path &container_destination_path) = 0;
-    virtual util::fs::path HostPath(const util::fs::path &container_destination_path) const = 0;
-    virtual util::fs::path HostSource(const util::fs::path &container_destination_path) const = 0;
+    virtual int createDestinationPath(const util::fs::Path &containerDestinationPath) = 0;
+    virtual util::fs::Path hostPath(const util::fs::Path &containerDestinationPath) const = 0;
+    virtual util::fs::Path hostSource(const util::fs::Path &containerDestinationPath) const = 0;
 };
 
 class OverlayfsFuseFilesystemDriver : public FilesystemDriver
 {
 public:
-    explicit OverlayfsFuseFilesystemDriver(util::strVec lower_dirs, std::string upper_dir, std::string work_dir,
+    explicit OverlayfsFuseFilesystemDriver(util::strVec lowerDirs, std::string upper_dir, std::string work_dir,
                                            std::string mount_point);
 
     int setup() override;
 
-    int CreateDestinationPath(const util::fs::path &container_destination_path) override;
+    int createDestinationPath(const util::fs::Path &containerDestinationPath) override;
 
-    util::fs::path HostPath(const util::fs::path &dest_full_path) const override;
+    util::fs::Path hostPath(const util::fs::Path &destFullPath) const override;
 
-    util::fs::path HostSource(const util::fs::path &dest_full_path) const override;
+    util::fs::Path hostSource(const util::fs::Path &destFullPath) const override;
 
 private:
-    util::strVec lower_dirs_;
-    std::string upper_dir_;
-    std::string work_dir_;
-    std::string mount_point_;
+    util::strVec lowerDirs;
+    std::string upperDir;
+    std::string workDir;
+    std::string mountPoint;
 };
 
 class FuseProxyFilesystemDriver : public FilesystemDriver
@@ -52,33 +52,33 @@ public:
 
     int setup() override;
 
-    int CreateDestinationPath(const util::fs::path &container_destination_path) override;
+    int createDestinationPath(const util::fs::Path &containerDestinationPath) override;
 
-    util::fs::path HostPath(const util::fs::path &dest_full_path) const override;
+    util::fs::Path hostPath(const util::fs::Path &destFullPath) const override;
 
-    util::fs::path HostSource(const util::fs::path &dest_full_path) const override;
+    util::fs::Path hostSource(const util::fs::Path &destFullPath) const override;
 
 private:
-    util::strVec mounts_;
-    std::string mount_point_;
+    util::strVec mounts;
+    std::string mountPoint;
 };
 
 class NativeFilesystemDriver : public FilesystemDriver
 {
 public:
-    explicit NativeFilesystemDriver(std::string root_path);
+    explicit NativeFilesystemDriver(std::string rootPath);
     ~NativeFilesystemDriver();
 
     int setup() override { return 0; }
 
-    int CreateDestinationPath(const util::fs::path &container_destination_path) override;
+    int createDestinationPath(const util::fs::Path &containerDestinationPath) override;
 
-    util::fs::path HostPath(const util::fs::path &dest_full_path) const override;
+    util::fs::Path hostPath(const util::fs::Path &destFullPath) const override;
 
-    util::fs::path HostSource(const util::fs::path &dest_full_path) const override;
+    util::fs::Path hostSource(const util::fs::Path &destFullPath) const override;
 
 private:
-    std::string root_path_;
+    std::string rootPath;
 };
 
 } // namespace linglong

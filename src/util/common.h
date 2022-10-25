@@ -24,7 +24,7 @@ namespace util {
 
 typedef std::vector<std::string> strVec;
 
-strVec strSpilt(const std::string &s, const std::string &sep);
+strVec strSpilt(const std::string &str, const std::string &sep);
 
 std::string strVecJoin(const strVec &vec, char sep);
 

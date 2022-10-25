@@ -194,15 +194,15 @@
     ],
     "uidMappings": [
       {
-        "hostID": 0,
-        "containerID": 0,
+        "hostId": 0,
+        "containerId": 0,
         "size": 32000
       }
     ],
     "gidMappings": [
       {
-        "hostID": 0,
-        "containerID": 0,
+        "hostId": 0,
+        "containerId": 0,
         "size": 32000
       }
     ],
@@ -359,4 +359,3 @@
     "readonly": false
   }
 }
-

@@ -19,7 +19,7 @@
 
 namespace linglong {
 
-#define DUMP_DBG(func, line) (linglong::util::Logger(linglong::util::Logger::Debug, func, line))
+#define DUMP_DBG(func, line) (linglong::util::Logger(linglong::util::Logger::kDebug, func, line))
 
 void dumpIdMap()
 {

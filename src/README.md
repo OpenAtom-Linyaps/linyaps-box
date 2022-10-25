@@ -14,7 +14,7 @@ ll-box is a standard oci runtime.
 - [ ] Configuration
     - [x] Root
     - [ ] Mount
-        - [x] Cgroup
+        - [x] kCgroup
         - [ ] All support
     - [x] Hostname
 - [ ] Linux Container

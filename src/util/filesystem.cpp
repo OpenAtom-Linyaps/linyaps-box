@@ -25,15 +25,15 @@ namespace fs {
 
 using namespace std;
 
-bool create_directory(const path &p, __mode_t mode)
+bool create_directory(const Path &path, __mode_t mode)
 {
-    return mkdir(p.string().c_str(), mode);
+    return mkdir(path.string().c_str(), mode);
 }
 
-bool createDirectories(const path &p, __mode_t mode)
+bool createDirectories(const Path &path, __mode_t mode)
 {
     std::string fullPath;
-    for (const auto &e : p.components()) {
+    for (const auto &e : path.components()) {
         fullPath += "/" + e;
         if (isDir(fullPath)) {
             continue;
@@ -48,12 +48,12 @@ bool createDirectories(const path &p, __mode_t mode)
     return true;
 }
 
-bool isDir(const std::string &s)
+bool isDir(const std::string &str)
 {
     struct stat st {
     };
 
-    if (0 != lstat(s.c_str(), &st)) {
+    if (0 != lstat(str.c_str(), &st)) {
         return false;
     }
 
@@ -76,42 +76,42 @@ bool exists(const std::string &s)
     return true;
 }
 
-path readSymlink(const path &p)
+Path readSymlink(const Path &path)
 {
-    char *buf = realpath(p.string().c_str(), nullptr);
+    char *buf = realpath(path.string().c_str(), nullptr);
     if (buf) {
-        auto ret = path(string(buf));
+        auto ret = Path(string(buf));
         free(buf);
         return ret;
     } else {
-        return p;
+        return path;
     }
 }
 
-FileStatus status(const path &p, std::error_code &ec)
+FileStatus status(const Path &path, std::error_code &errorCode)
 {
-    fileType ft;
-    perms perm = no_perms;
+    FileType fileType;
+    Perms perm = kNoPerms;
 
     struct stat st {
     };
 
-    if (0 != lstat(p.string().c_str(), &st)) {
+    if (0 != lstat(path.string().c_str(), &st)) {
         if (errno == ENOENT) {
-            ft = file_not_found;
+            fileType = kFileNotFound;
         } else {
-            ft = status_error;
+            fileType = kStatusError;
         }
-        return FileStatus(ft, perm);
+        return FileStatus(fileType, perm);
     }
 
-    // FIXME: perms
+    // FIXME: Perms
     // https://www.boost.org/doc/libs/1_75_0/libs/filesystem/doc/reference.html#FileStatus
     //    int st_perm = st.st_mode & 0xFFFF;
 
     //    switch (st_perm) {
     //    case S_IRUSR:
-    //        perm = owner_read;
+    //        perm = kOwnerRead;
     //        break;
     //    case S_IWUSR:
     //    case S_IXUSR:
@@ -121,65 +121,65 @@ FileStatus status(const path &p, std::error_code &ec)
 
     switch (st.st_mode & S_IFMT) {
     case S_IFREG:
-        ft = regular_file;
+        fileType = kRegularFile;
         break;
     case S_IFDIR:
-        ft = directory_file;
+        fileType = kDirectoryFile;
         break;
     case S_IFLNK:
-        ft = symlink_file;
+        fileType = kSymlinkFile;
         break;
     case S_IFBLK:
-        ft = block_file;
+        fileType = kBlockFile;
         break;
     case S_IFCHR:
-        ft = character_file;
+        fileType = kCharacterFile;
         break;
     case S_IFIFO:
-        ft = fifo_file;
+        fileType = kFifoFile;
     case S_IFSOCK:
         break;
     default:
-        ft = type_unknown;
+        fileType = kTypeUnknown;
         break;
     }
 
-    return FileStatus(ft, perm);
+    return FileStatus(fileType, perm);
 }
 
 FileStatus::FileStatus() noexcept
 {
 }
 
-FileStatus::FileStatus(fileType ft, perms perms) noexcept
-    : ft(ft)
-    , p(perms)
+FileStatus::FileStatus(FileType fileType, Perms perms) noexcept
+    : fileType(fileType)
+    , perms(perms)
 {
 }
 
 FileStatus::FileStatus(const FileStatus &fs) noexcept
 {
-    ft = fs.ft;
-    p = fs.p;
+    fileType = fs.fileType;
+    perms = fs.perms;
 }
 
 FileStatus &FileStatus::operator=(const FileStatus &fs) noexcept
 {
-    ft = fs.ft;
-    p = fs.p;
+    fileType = fs.fileType;
+    perms = fs.perms;
     return *this;
 }
 
 FileStatus::~FileStatus() noexcept = default;
 
-fileType FileStatus::type() const noexcept
+FileType FileStatus::type() const noexcept
 {
-    return ft;
+    return fileType;
 }
 
-perms FileStatus::permissions() const noexcept
+Perms FileStatus::permissions() const noexcept
 {
-    return p;
+    return perms;
 }
 
 int doMountWithFd(const char *root, const char *__special_file, const char *__dir, const char *__fstype,
@@ -192,7 +192,7 @@ int doMountWithFd(const char *root, const char *__special_file, const char *__di
         logFal() << util::format("fail to open target(%s):", __dir) << errnoString();
     }
 
-    // Refer to `man readlink`, readlink dose not append '\0' to the end of conent it read from path, so we have to add
+    // Refer to `man readlink`, readlink dose not append '\0' to the end of conent it read from Path, so we have to add
     // an extra char to buffer to ensure '\0' always exists.
     char *buf = (char *)malloc(sizeof(char) * PATH_MAX + 1);
     if (buf == nullptr) {
@@ -211,16 +211,16 @@ int doMountWithFd(const char *root, const char *__special_file, const char *__di
     free(buf);
     if (realpath.rfind(root, 0) != 0) {
         logDbg() << util::format("container root=\"%s\"", root);
-        logFal() << util::format("possibly malicious path detected (%s vs %s) -- refusing to operate", target.c_str(),
+        logFal() << util::format("possibly malicious Path detected (%s vs %s) -- refusing to operate", target.c_str(),
                                  realpath.c_str());
     }
 
     auto ret = ::mount(__special_file, target.c_str(), __fstype, __rwflag, __data);
-    auto olderrno = errno;
+    auto oldErrNo = errno;
 
     close(fd);
 
-    errno = olderrno;
+    errno = oldErrNo;
     return ret;
 }
 

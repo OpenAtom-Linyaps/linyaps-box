@@ -69,15 +69,15 @@ inline void to_json(nlohmann::json &j, const Process &o)
 
 struct Mount {
     enum Type {
-        Unknown,
-        Bind,
-        Proc,
-        Sysfs,
-        Devpts,
-        Mqueue,
-        Tmpfs,
-        Cgroup,
-        Cgroup2,
+        kUnknown,
+        kBind,
+        kProc,
+        kSysfs,
+        kDevpts,
+        kMqueue,
+        kTmpfs,
+        kCgroup,
+        kCgroup2,
     };
     std::string destination;
     std::string type;
@@ -91,8 +91,8 @@ struct Mount {
 inline void from_json(const nlohmann::json &j, Mount &o)
 {
     static std::map<std::string, Mount::Type> fsTypes = {
-        {"bind", Mount::Bind},   {"proc", Mount::Proc},   {"devpts", Mount::Devpts}, {"mqueue", Mount::Mqueue},
-        {"tmpfs", Mount::Tmpfs}, {"sysfs", Mount::Sysfs}, {"cgroup", Mount::Cgroup}, {"cgroup2", Mount::Cgroup2},
+        {"bind", Mount::kBind},   {"proc", Mount::kProc},   {"devpts", Mount::kDevpts}, {"mqueue", Mount::kMqueue},
+        {"tmpfs", Mount::kTmpfs}, {"sysfs", Mount::kSysfs}, {"cgroup", Mount::kCgroup}, {"cgroup2", Mount::kCgroup2},
     };
 
     struct mountFlag {
@@ -141,7 +141,7 @@ inline void from_json(const nlohmann::json &j, Mount &o)
     o.destination = j.at("destination").get<std::string>();
     o.type = j.at("type").get<std::string>();
     o.fsType = fsTypes.find(o.type)->second;
-    if (o.fsType == Mount::Bind) {
+    if (o.fsType == Mount::kBind) {
         o.flags = MS_BIND;
     }
     o.source = j.at("source").get<std::string>();
@@ -194,22 +194,22 @@ inline void to_json(nlohmann::json &j, const Namespace &o)
 }
 
 struct IDMap {
-    uint64_t containerID = 0u;
-    uint64_t hostID = 0u;
+    uint64_t containerId = 0u;
+    uint64_t hostId = 0u;
     uint64_t size = 0u;
 };
 
 inline void from_json(const nlohmann::json &j, IDMap &o)
 {
-    o.hostID = j.value("hostID", 0);
-    o.containerID = j.value("containerID", 0);
+    o.hostId = j.value("hostId", 0);
+    o.containerId = j.value("containerId", 0);
     o.size = j.value("size", 0);
 }
 
 inline void to_json(nlohmann::json &j, const IDMap &o)
 {
-    j["hostID"] = o.hostID;
-    j["containerID"] = o.containerID;
+    j["hostId"] = o.hostId;
+    j["containerId"] = o.containerId;
     j["size"] = o.size;
 }
 
@@ -374,7 +374,7 @@ inline void to_json(nlohmann::json &j, const Linux &o)
 
 /*
     "hooks": {
-        "prestart": [
+        "preStart": [
             {
                 "path": "/usr/bin/fix-mounts",
                 "args": ["fix-mounts", "arg1", "arg2"],
@@ -384,13 +384,13 @@ inline void to_json(nlohmann::json &j, const Linux &o)
                 "path": "/usr/bin/setup-network"
             }
         ],
-        "poststart": [
+        "postStart": [
             {
                 "path": "/usr/bin/notify-start",
                 "timeout": 5
             }
         ],
-        "poststop": [
+        "postStop": [
             {
                 "path": "/usr/sbin/cleanup.sh",
                 "args": ["cleanup.sh", "-f"]
@@ -420,27 +420,27 @@ inline void to_json(nlohmann::json &j, const Hook &o)
 }
 
 struct Hooks {
-    tl::optional<std::vector<Hook>> prestart;
-    tl::optional<std::vector<Hook>> poststart;
-    tl::optional<std::vector<Hook>> poststop;
+    tl::optional<std::vector<Hook>> preStart;
+    tl::optional<std::vector<Hook>> postStart;
+    tl::optional<std::vector<Hook>> postStop;
 };
 
 inline void from_json(const nlohmann::json &j, Hooks &o)
 {
-    LLJS_FROM_OPT(prestart);
-    LLJS_FROM_OPT(poststart);
-    LLJS_FROM_OPT(poststop);
+    LLJS_FROM_OPT(preStart);
+    LLJS_FROM_OPT(postStart);
+    LLJS_FROM_OPT(postStop);
 }
 
 inline void to_json(nlohmann::json &j, const Hooks &o)
 {
-    j["poststop"] = o.poststop;
-    j["poststart"] = o.poststart;
-    j["prestart"] = o.prestart;
+    j["postStop"] = o.postStop;
+    j["postStart"] = o.postStart;
+    j["preStart"] = o.preStart;
 }
 
 struct AnnotationsOverlayfs {
-    std::string lower_parent;
+    std::string lowerParent;
     std::string upper;
     std::string workdir;
     std::vector<Mount> mounts;
@@ -448,7 +448,7 @@ struct AnnotationsOverlayfs {
 
 LLJS_FROM_OBJ(AnnotationsOverlayfs)
 {
-    LLJS_FROM_VARNAME(lowerParent, lower_parent);
+    LLJS_FROM_VARNAME(lowerParent, lowerParent);
     LLJS_FROM(upper);
     LLJS_FROM(workdir);
     LLJS_FROM(mounts);
@@ -456,7 +456,7 @@ LLJS_FROM_OBJ(AnnotationsOverlayfs)
 
 LLJS_TO_OBJ(AnnotationsOverlayfs)
 {
-    LLJS_TO_VARNAME(lowerParent, lower_parent);
+    LLJS_TO_VARNAME(lowerParent, lowerParent);
     LLJS_TO(upper);
     LLJS_TO(workdir);
     LLJS_TO(mounts);
@@ -490,7 +490,7 @@ LLJS_FROM_OBJ(DbusProxyInfo)
 {
     LLJS_FROM(enable);
     LLJS_FROM_VARNAME(busType, busType);
-    LLJS_FROM_VARNAME(appID, appId);
+    LLJS_FROM_VARNAME(appId, appId);
     LLJS_FROM_VARNAME(proxyPath, proxyPath);
     LLJS_FROM(name);
     LLJS_FROM(path);
@@ -501,7 +501,7 @@ LLJS_TO_OBJ(DbusProxyInfo)
 {
     LLJS_TO(enable);
     LLJS_TO_VARNAME(busType, busType);
-    LLJS_TO_VARNAME(appID, appId);
+    LLJS_TO_VARNAME(appId, appId);
     LLJS_TO_VARNAME(proxyPath, proxyPath);
     LLJS_TO(name);
     LLJS_TO(path);

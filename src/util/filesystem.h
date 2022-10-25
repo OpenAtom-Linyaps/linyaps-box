@@ -23,47 +23,47 @@ namespace linglong {
 namespace util {
 namespace fs {
 
-class path : public std::basic_string<char>
+class Path : public std::basic_string<char>
 {
 public:
-    explicit path(const std::string &s)
-        : p(util::strSpilt(s, "/"))
+    explicit Path(const std::string &path)
+        : strVector(util::strSpilt(path, "/"))
     {
     }
 
-    path &operator=(const std::string &s)
+    Path &operator=(const std::string &path)
     {
-        p = util::strSpilt(s, "/");
+        strVector = util::strSpilt(path, "/");
         return *this;
     }
 
-    path &operator=(const path &p1) = default;
+    Path &operator=(const Path &path) = default;
 
-    bool operator==(const path &s) const { return this->p == s.p; }
+    bool operator==(const Path &path) const { return this->strVector == path.strVector; }
 
-    bool operator!=(const path &s) const { return this->p != s.p; }
+    bool operator!=(const Path &path) const { return this->strVector != path.strVector; }
 
-    path operator/(const path &p1) const
+    Path operator/(const Path &path) const
     {
         auto np = *this;
-        std::copy(p1.p.begin(), p1.p.end(), back_inserter(np.p));
+        std::copy(path.strVector.begin(), path.strVector.end(), back_inserter(np.strVector));
         return np;
     }
 
-    path operator/(const std::string &str) const { return operator/(path(str)); }
+    Path operator/(const std::string &str) const { return operator/(Path(str)); }
 
-    path parent_path() const
+    Path parent_path() const
     {
-        path pn(*this);
-        pn.p.pop_back();
+        Path pn(*this);
+        pn.strVector.pop_back();
         return pn;
     }
 
-    std::string string() const { return "/" + strVecJoin(p, '/'); }
+    std::string string() const { return "/" + strVecJoin(strVector, '/'); }
 
-    strVec components() const { return p; }
+    strVec components() const { return strVector; }
 
-    // call to this function will block until `path` exists (rerturn 0) or timeout (return -1)
+    // call to this function will block until `Path` exists (rerturn 0) or timeout (return -1)
     // default timeout is 1 second
     int waitUntilExsit(int utimeout = 1000)
     {
@@ -81,57 +81,57 @@ public:
     }
 
 private:
-    friend std::ostream &operator<<(std::ostream &cout, path obj);
-    std::vector<std::string> p;
+    friend std::ostream &operator<<(std::ostream &cout, Path path);
+    std::vector<std::string> strVector;
 };
 
-inline std::ostream &operator<<(std::ostream &cout, path obj)
+inline std::ostream &operator<<(std::ostream &cout, Path path)
 {
-    for (auto const &s : obj.p) {
-        cout << "/" << s;
+    for (auto const &str : path.strVector) {
+        cout << "/" << str;
     }
     return cout;
 }
 
-bool createDirectories(const path &p, __mode_t mode);
+bool createDirectories(const Path &path, __mode_t mode);
 
-enum fileType {
-    status_error,
-    file_not_found,
-    regular_file,
-    directory_file,
-    symlink_file,
-    block_file,
-    character_file,
-    fifo_file,
-    socket_file,
-    reparse_file,
-    type_unknown
+enum FileType {
+    kStatusError,
+    kFileNotFound,
+    kRegularFile,
+    kDirectoryFile,
+    kSymlinkFile,
+    kBlockFile,
+    kCharacterFile,
+    kFifoFile,
+    kSocketFile,
+    kReparseFile,
+    kTypeUnknown
 };
 
-enum perms {
-    no_perms,
-    owner_read,
-    owner_write,
-    owner_exe,
-    owner_all,
-    group_read,
-    group_write,
-    group_exe,
-    group_all,
-    others_read,
-    others_write,
-    others_exe,
-    others_all,
-    all_all,
-    set_uid_on_exe,
-    set_gid_on_exe,
-    sticky_bit,
-    perms_mask,
-    perms_not_known,
-    add_perms,
-    remove_perms,
-    symlink_perms
+enum Perms {
+    kNoPerms,
+    kOwnerRead,
+    kOwnerWrite,
+    kOwnerExe,
+    kOwnerAll,
+    kGroupRead,
+    kGroupWrite,
+    kGroupExe,
+    kGroupAll,
+    kOthersRead,
+    kOthersWrite,
+    kOthersExe,
+    kOthersAll,
+    kAllAll,
+    kSetUidOnExe,
+    kSetGidOnExe,
+    kStickyBit,
+    PermsMask,
+    kPermsNotKnown,
+    AddPerms,
+    kRemovePerms,
+    kSymlinkPerms
 };
 
 class FileStatus
@@ -139,7 +139,7 @@ class FileStatus
 public:
     // constructors
     FileStatus() noexcept;
-    explicit FileStatus(fileType ft, perms p = perms_not_known) noexcept;
+    explicit FileStatus(FileType fileType, Perms perms = kPermsNotKnown) noexcept;
 
     // compiler generated
     FileStatus(const FileStatus &) noexcept;
@@ -147,21 +147,21 @@ public:
     ~FileStatus() noexcept;
 
     // observers
-    fileType type() const noexcept;
-    perms permissions() const noexcept;
+    FileType type() const noexcept;
+    Perms permissions() const noexcept;
 
 private:
-    fileType ft;
-    perms p;
+    FileType fileType;
+    Perms perms;
 };
 
-bool isDir(const std::string &s);
+bool isDir(const std::string &str);
 
-bool exists(const std::string &s);
+bool exists(const std::string &str);
 
-FileStatus status(const path &p, std::error_code &ec);
+FileStatus status(const Path &strVector, std::error_code &errorCode);
 
-path readSymlink(const path &p);
+Path readSymlink(const Path &strVector);
 
 // This function doMountWithFd do mount in a secure way by check the target we are going to mount is within container
 // rootfs or not before actually call mount.

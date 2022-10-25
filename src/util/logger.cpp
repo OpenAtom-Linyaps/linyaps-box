@@ -14,7 +14,7 @@ std::string retErrString(int ret)
     return util::format("ret(%d),errno(%d): %s", ret, errno, strerror(errno));
 }
 
-std::string getPidnsPid()
+std::string getPidNsPid()
 {
     char buf[30];
     memset(buf, 0, sizeof(buf));
@@ -25,18 +25,18 @@ std::string getPidnsPid()
 
 static Logger::Level getLogLevelFromStr(std::string str)
 {
-    if (str == "Debug") {
-        return Logger::Debug;
-    } else if (str == "Info") {
-        return Logger::Info;
+    if (str == "kDebug") {
+        return Logger::kDebug;
+    } else if (str == "kInfo") {
+        return Logger::kInfo;
     } else if (str == "Warning") {
-        return Logger::Warring;
-    } else if (str == "Error") {
-        return Logger::Error;
-    } else if (str == "Fatal") {
-        return Logger::Fatal;
+        return Logger::kWarring;
+    } else if (str == "kError") {
+        return Logger::kError;
+    } else if (str == "kFatal") {
+        return Logger::kFatal;
     } else {
-        return Logger::Level(Logger::Fatal + 1);
+        return Logger::Level(Logger::kFatal + 1);
     }
 }
 

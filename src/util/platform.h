@@ -21,7 +21,7 @@ namespace util {
 
 int platformClone(int (*callback)(void *), int flags, void *arg, ...);
 
-int exec(const util::strVec &args, tl::optional<std::vector<std::string>> env_list);
+int exec(const util::strVec &args, tl::optional<std::vector<std::string>> envList);
 
 void wait(const int pid);
 void waitAll();

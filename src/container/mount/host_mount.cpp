@@ -24,186 +24,186 @@ class HostMountPrivate
 public:
     explicit HostMountPrivate() = default;
 
-    int CreateDestinationPath(const util::fs::path &container_destination_path) const
+    int createDestinationPath(const util::fs::Path &containerDestinationPath) const
     {
-        return driver_->CreateDestinationPath(container_destination_path);
+        return filesystemDriver->createDestinationPath(containerDestinationPath);
     }
 
-    int mountNode(const struct Mount &m) const
+    int mountNode(const struct Mount &mount) const
     {
         int ret = -1;
         struct stat source_stat {
         };
-        bool is_path = false;
+        bool isPath = false;
 
-        auto source = m.source;
+        auto source = mount.source;
 
-        if (!m.source.empty() && m.source[0] == '/') {
-            is_path = true;
-            source = driver_->HostSource(util::fs::path(m.source)).string();
+        if (!mount.source.empty() && mount.source[0] == '/') {
+            isPath = true;
+            source = filesystemDriver->hostSource(util::fs::Path(mount.source)).string();
         }
 
         ret = lstat(source.c_str(), &source_stat);
         if (0 == ret) {
         } else {
             // source not exist
-            if (m.fsType == Mount::Bind) {
+            if (mount.fsType == Mount::kBind) {
                 logErr() << "lstat" << source << "failed";
                 return -1;
             }
         }
 
-        auto dest_full_path = util::fs::path(m.destination);
-        auto dest_parent_path = util::fs::path(dest_full_path).parent_path();
-        auto host_dest_full_path = driver_->HostPath(dest_full_path);
-        auto root = driver_->HostPath(util::fs::path("/"));
+        auto destFullPath = util::fs::Path(mount.destination);
+        auto destParentPath = util::fs::Path(destFullPath).parent_path();
+        auto hostDestFullPath = filesystemDriver->hostPath(destFullPath);
+        auto root = filesystemDriver->hostPath(util::fs::Path("/"));
 
         switch (source_stat.st_mode & S_IFMT) {
         case S_IFCHR: {
-            driver_->CreateDestinationPath(dest_parent_path);
-            std::ofstream output(host_dest_full_path.string());
+            filesystemDriver->createDestinationPath(destParentPath);
+            std::ofstream output(hostDestFullPath.string());
             break;
         }
         case S_IFSOCK: {
-            driver_->CreateDestinationPath(dest_parent_path);
+            filesystemDriver->createDestinationPath(destParentPath);
             // FIXME: can not mound dbus socket on rootLess
-            std::ofstream output(host_dest_full_path.string());
+            std::ofstream output(hostDestFullPath.string());
             break;
         }
         case S_IFLNK: {
-            driver_->CreateDestinationPath(dest_parent_path);
-            std::ofstream output(host_dest_full_path.string());
-            source = util::fs::readSymlink(util::fs::path(source)).string();
+            filesystemDriver->createDestinationPath(destParentPath);
+            std::ofstream output(hostDestFullPath.string());
+            source = util::fs::readSymlink(util::fs::Path(source)).string();
             break;
         }
         case S_IFREG: {
-            driver_->CreateDestinationPath(dest_parent_path);
-            std::ofstream output(host_dest_full_path.string());
+            filesystemDriver->createDestinationPath(destParentPath);
+            std::ofstream output(hostDestFullPath.string());
             break;
         }
         case S_IFDIR:
-            driver_->CreateDestinationPath(dest_full_path);
+            filesystemDriver->createDestinationPath(destFullPath);
             break;
         default:
-            driver_->CreateDestinationPath(dest_full_path);
-            if (is_path) {
+            filesystemDriver->createDestinationPath(destFullPath);
+            if (isPath) {
                 logWan() << "unknown file type" << (source_stat.st_mode & S_IFMT) << source;
             }
             break;
         }
 
-        auto data = util::strVecJoin(m.data, ',');
-        auto real_data = data;
-        auto real_flags = m.flags;
+        auto data = util::strVecJoin(mount.data, ',');
+        auto realData = data;
+        auto realFlags = mount.flags;
 
-        switch (m.fsType) {
-        case Mount::Bind:
-            // make sure m.flags always have MS_BIND
-            real_flags |= MS_BIND;
+        switch (mount.fsType) {
+        case Mount::kBind:
+            // make sure mount.flags always have MS_BIND
+            realFlags |= MS_BIND;
 
             // When doing a bind mount, all flags expect MS_BIND and MS_REC are ignored by kernel.
-            real_flags &= (MS_BIND | MS_REC);
+            realFlags &= (MS_BIND | MS_REC);
 
             // When doing a bind mount, data and fstype are ignored by kernel. We should set them by remounting.
-            real_data = "";
-            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(), nullptr,
-                                          real_flags, nullptr);
+            realData = "";
+            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), hostDestFullPath.string().c_str(), nullptr,
+                                          realFlags, nullptr);
             if (0 != ret) {
                 break;
             }
 
             if (source == "/sys") {
-                sysfs_is_binded = true;
+                sysfsIsBinded = true;
             }
 
-            if (data.empty() && (m.flags & ~(MS_BIND | MS_REC | MS_REMOUNT)) == 0) {
+            if (data.empty() && (mount.flags & ~(MS_BIND | MS_REC | MS_REMOUNT)) == 0) {
                 // no need to be remounted
                 break;
             }
 
-            real_flags = m.flags | MS_BIND | MS_REMOUNT;
+            realFlags = mount.flags | MS_BIND | MS_REMOUNT;
 
             // When doing a remount, source and fstype are ignored by kernel.
-            real_data = data;
-            ret = util::fs::doMountWithFd(root.c_str(), nullptr, host_dest_full_path.string().c_str(), nullptr,
-                                          real_flags, real_data.c_str());
+            realData = data;
+            ret = util::fs::doMountWithFd(root.c_str(), nullptr, hostDestFullPath.string().c_str(), nullptr, realFlags,
+                                          realData.c_str());
             break;
-        case Mount::Proc:
-        case Mount::Devpts:
-        case Mount::Mqueue:
-        case Mount::Tmpfs:
-        case Mount::Sysfs:
-            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
-                                          m.type.c_str(), real_flags, real_data.c_str());
+        case Mount::kProc:
+        case Mount::kDevpts:
+        case Mount::kMqueue:
+        case Mount::kTmpfs:
+        case Mount::kSysfs:
+            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), hostDestFullPath.string().c_str(),
+                                          mount.type.c_str(), realFlags, realData.c_str());
             if (ret < 0) {
                 // refers:
                 // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L178
                 // https://github.com/containers/crun/blob/38e1b5e2a3e9567ff188258b435085e329aaba42/src/libcrun/linux.c#L768-L789
-                if (m.fsType == Mount::Sysfs) {
-                    real_flags = MS_BIND | MS_REC;
-                    real_data = "";
-                    ret = util::fs::doMountWithFd(root.c_str(), "/sys", host_dest_full_path.string().c_str(), nullptr,
-                                                  real_flags, nullptr);
+                if (mount.fsType == Mount::kSysfs) {
+                    realFlags = MS_BIND | MS_REC;
+                    realData = "";
+                    ret = util::fs::doMountWithFd(root.c_str(), "/sys", hostDestFullPath.string().c_str(), nullptr,
+                                                  realFlags, nullptr);
                     if (ret == 0) {
-                        sysfs_is_binded = true;
+                        sysfsIsBinded = true;
                     }
-                } else if (m.fsType == Mount::Mqueue) {
-                    real_flags = MS_BIND | MS_REC;
-                    real_data = "";
-                    ret = util::fs::doMountWithFd(root.c_str(), "/dev/mqueue", host_dest_full_path.string().c_str(),
-                                                  nullptr, real_flags, nullptr);
+                } else if (mount.fsType == Mount::kMqueue) {
+                    realFlags = MS_BIND | MS_REC;
+                    realData = "";
+                    ret = util::fs::doMountWithFd(root.c_str(), "/dev/mqueue", hostDestFullPath.string().c_str(),
+                                                  nullptr, realFlags, nullptr);
                 }
             }
             break;
-        case Mount::Cgroup:
-            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
-                                          m.type.c_str(), real_flags, real_data.c_str());
+        case Mount::kCgroup:
+            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), hostDestFullPath.string().c_str(),
+                                          mount.type.c_str(), realFlags, realData.c_str());
             // When sysfs is bind-mounted, It is ok to let cgroup mount failed.
             // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L281
-            if (sysfs_is_binded) {
+            if (sysfsIsBinded) {
                 ret = 0;
             }
             break;
         default:
-            logErr() << "unsupported type" << m.type;
+            logErr() << "unsupported type" << mount.type;
         }
 
         if (EXIT_SUCCESS != ret) {
-            logErr() << "mount" << source << "to" << host_dest_full_path << "failed:" << util::retErrString(ret)
-                     << "\nmount args is:" << m.type << real_flags << real_data;
-            if (is_path) {
+            logErr() << "mount" << source << "to" << hostDestFullPath << "failed:" << util::retErrString(ret)
+                     << "\nmount args is:" << mount.type << realFlags << realData;
+            if (isPath) {
                 logErr() << "source file type is: 0x" << std::hex << (source_stat.st_mode & S_IFMT);
                 DUMP_FILE_INFO(source);
             }
-            DUMP_FILE_INFO(host_dest_full_path.string());
+            DUMP_FILE_INFO(hostDestFullPath.string());
         }
 
         return ret;
     }
 
-    std::unique_ptr<FilesystemDriver> driver_;
-    mutable bool sysfs_is_binded = false;
+    std::unique_ptr<FilesystemDriver> filesystemDriver;
+    mutable bool sysfsIsBinded = false;
 };
 
 HostMount::HostMount()
-    : dd_ptr(new HostMountPrivate())
+    : hostMountPrivate(new HostMountPrivate())
 {
 }
 
 int HostMount::mountNode(const struct Mount &mount)
 {
-    return dd_ptr->mountNode(mount);
+    return hostMountPrivate->mountNode(mount);
 }
 
 int HostMount::setup(FilesystemDriver *driver)
 {
     if (nullptr == driver) {
-        logWan() << this << dd_ptr->driver_.get();
+        logWan() << this << hostMountPrivate->filesystemDriver.get();
         return 0;
     }
 
-    dd_ptr->driver_ = std::unique_ptr<FilesystemDriver>(driver);
-    return dd_ptr->driver_->setup();
+    hostMountPrivate->filesystemDriver = std::unique_ptr<FilesystemDriver>(driver);
+    return hostMountPrivate->filesystemDriver->setup();
 }
 
 HostMount::~HostMount() {};

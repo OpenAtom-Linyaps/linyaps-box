@@ -19,27 +19,27 @@ std::string strVecJoin(const strVec &vec, char sep)
         return "";
     }
 
-    std::string s;
+    std::string str;
     for (auto iterator = vec.begin(); iterator != std::prev(vec.end()); ++iterator) {
-        s += *iterator + sep;
+        str += *iterator + sep;
     }
-    s += vec.back();
-    return s;
+    str += vec.back();
+    return str;
 }
 
-strVec strSpilt(const std::string &s, const std::string &sep)
+strVec strSpilt(const std::string &str, const std::string &sep)
 {
     strVec vec;
     size_t pos_begin = 0;
     size_t pos_end = 0;
-    while ((pos_end = s.find(sep, pos_begin)) != std::string::npos) {
-        auto t = s.substr(pos_begin, pos_end - pos_begin);
+    while ((pos_end = str.find(sep, pos_begin)) != std::string::npos) {
+        auto t = str.substr(pos_begin, pos_end - pos_begin);
         if (!t.empty()) {
             vec.push_back(t);
         }
         pos_begin = pos_end + sep.size();
     }
-    auto t = s.substr(pos_begin, s.size() - pos_begin);
+    auto t = str.substr(pos_begin, str.size() - pos_begin);
     if (!t.empty()) {
         vec.push_back(t);
     }

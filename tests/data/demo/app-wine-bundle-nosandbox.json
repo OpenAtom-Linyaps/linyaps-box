@@ -4,15 +4,15 @@
   "linux": {
     "gidMappings": [
       {
-        "containerID": 0,
-        "hostID": 1000,
+        "containerId": 0,
+        "hostId": 1000,
         "size": 1
       }
     ],
     "uidMappings": [
       {
-        "containerID": 0,
-        "hostID": 1000,
+        "containerId": 0,
+        "hostId": 1000,
         "size": 1
       }
     ],
@@ -36,8 +36,7 @@
   "mounts": [
     {
       "destination": "/proc",
-      "options": [
-      ],
+      "options": [],
       "source": "proc",
       "type": "proc"
     },

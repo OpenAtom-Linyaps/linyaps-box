@@ -36,8 +36,8 @@
     "cgroupsPath": "",
     "gidMappings": [
       {
-        "containerID": 0,
-        "hostID": 1000,
+        "containerId": 0,
+        "hostId": 1000,
         "size": 1
       }
     ],
@@ -70,8 +70,8 @@
     "seccomp": null,
     "uidMappings": [
       {
-        "containerID": 0,
-        "hostID": 1000,
+        "containerId": 0,
+        "hostId": 1000,
         "size": 1
       }
     ]
@@ -79,8 +79,7 @@
   "mounts": [
     {
       "destination": "/sys",
-      "options": [
-      ],
+      "options": [],
       "source": "sysfs",
       "type": "sysfs"
     },
