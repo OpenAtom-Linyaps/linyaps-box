@@ -1,6 +1,6 @@
 {
   "annotations": {
-    "container_root_path": "/run/user/1000/linglong/d2a9e8e46b8c4d5697d7e9aff919bf0e",
+    "containerRootPath": "/run/user/1000/linglong/d2a9e8e46b8c4d5697d7e9aff919bf0e",
     "native": {
       "mounts": [
         {

@@ -48,15 +48,15 @@ LLJS_TO_OBJ(Root)
 }
 
 struct Process {
-    util::str_vec args;
-    util::str_vec env;
+    util::strVec args;
+    util::strVec env;
     std::string cwd;
 };
 
 inline void from_json(const nlohmann::json &j, Process &o)
 {
-    o.args = j.at("args").get<util::str_vec>();
-    o.env = j.at("env").get<util::str_vec>();
+    o.args = j.at("args").get<util::strVec>();
+    o.env = j.at("env").get<util::strVec>();
     o.cwd = j.at("cwd").get<std::string>();
 }
 
@@ -82,7 +82,7 @@ struct Mount {
     std::string destination;
     std::string type;
     std::string source;
-    util::str_vec data;
+    util::strVec data;
 
     Type fsType;
     uint32_t flags = 0u;
@@ -150,7 +150,7 @@ inline void from_json(const nlohmann::json &j, Mount &o)
     // Parse options to data and flags.
     // FIXME: support "propagation flags" and "recursive mount attrs"
     // https://github.com/opencontainers/runc/blob/c83abc503de7e8b3017276e92e7510064eee02a8/libcontainer/specconv/spec_linux.go#L958
-    auto options = j.value("options", util::str_vec());
+    auto options = j.value("options", util::strVec());
     for (auto const &opt : options) {
         auto it = optionFlags.find(opt);
         if (it != optionFlags.end()) {
@@ -240,14 +240,14 @@ inline void to_json(nlohmann::json &j, const SyscallArg &o)
 }
 
 struct Syscall {
-    util::str_vec names;
+    util::strVec names;
     SeccompAction action;
     std::vector<SyscallArg> args;
 };
 
 inline void from_json(const nlohmann::json &j, Syscall &o)
 {
-    o.names = j.at("names").get<util::str_vec>();
+    o.names = j.at("names").get<util::strVec>();
     o.action = j.at("action").get<SeccompAction>();
     o.args = j.value("args", std::vector<SyscallArg>());
 }
@@ -401,7 +401,7 @@ inline void to_json(nlohmann::json &j, const Linux &o)
 
 struct Hook {
     std::string path;
-    tl::optional<util::str_vec> args;
+    tl::optional<util::strVec> args;
     tl::optional<std::vector<std::string>> env;
 };
 
@@ -478,9 +478,9 @@ LLJS_TO_OBJ(AnnotationsNativeRootfs)
 
 struct DbusProxyInfo {
     bool enable;
-    std::string bus_type;
-    std::string app_id;
-    std::string proxy_path;
+    std::string busType;
+    std::string appId;
+    std::string proxyPath;
     std::vector<std::string> name;
     std::vector<std::string> path;
     std::vector<std::string> interface;
@@ -489,9 +489,9 @@ struct DbusProxyInfo {
 LLJS_FROM_OBJ(DbusProxyInfo)
 {
     LLJS_FROM(enable);
-    LLJS_FROM_VARNAME(busType, bus_type);
-    LLJS_FROM_VARNAME(appID, app_id);
-    LLJS_FROM_VARNAME(proxyPath, proxy_path);
+    LLJS_FROM_VARNAME(busType, busType);
+    LLJS_FROM_VARNAME(appID, appId);
+    LLJS_FROM_VARNAME(proxyPath, proxyPath);
     LLJS_FROM(name);
     LLJS_FROM(path);
     LLJS_FROM(interface);
@@ -500,35 +500,35 @@ LLJS_FROM_OBJ(DbusProxyInfo)
 LLJS_TO_OBJ(DbusProxyInfo)
 {
     LLJS_TO(enable);
-    LLJS_TO_VARNAME(busType, bus_type);
-    LLJS_TO_VARNAME(appID, app_id);
-    LLJS_TO_VARNAME(proxyPath, proxy_path);
+    LLJS_TO_VARNAME(busType, busType);
+    LLJS_TO_VARNAME(appID, appId);
+    LLJS_TO_VARNAME(proxyPath, proxyPath);
     LLJS_TO(name);
     LLJS_TO(path);
     LLJS_TO(interface);
 }
 
 struct Annotations {
-    std::string container_root_path;
+    std::string containerRootPath;
     tl::optional<AnnotationsOverlayfs> overlayfs;
     tl::optional<AnnotationsNativeRootfs> native;
-    tl::optional<DbusProxyInfo> dbus_proxy_info;
+    tl::optional<DbusProxyInfo> dbusProxyInfo;
 };
 
 LLJS_FROM_OBJ(Annotations)
 {
-    LLJS_FROM_VARNAME(containerRootPath, container_root_path);
+    LLJS_FROM_VARNAME(containerRootPath, containerRootPath);
     LLJS_FROM_OPT(overlayfs);
     LLJS_FROM_OPT(native);
-    LLJS_FROM_OPT_VARNAME(dbusProxyInfo, dbus_proxy_info);
+    LLJS_FROM_OPT_VARNAME(dbusProxyInfo, dbusProxyInfo);
 }
 
 LLJS_TO_OBJ(Annotations)
 {
-    LLJS_TO_VARNAME(containerRootPath, container_root_path);
+    LLJS_TO_VARNAME(containerRootPath, containerRootPath);
     LLJS_TO(overlayfs);
     LLJS_TO(native);
-    LLJS_TO_VARNAME(dbusProxyInfo, dbus_proxy_info);
+    LLJS_TO_VARNAME(dbusProxyInfo, dbusProxyInfo);
 }
 
 struct Runtime {

@@ -22,11 +22,11 @@
 namespace linglong {
 namespace util {
 
-typedef std::vector<std::string> str_vec;
+typedef std::vector<std::string> strVec;
 
-str_vec str_spilt(const std::string &s, const std::string &sep);
+strVec strSpilt(const std::string &s, const std::string &sep);
 
-std::string str_vec_join(const str_vec &vec, char sep);
+std::string strVecJoin(const strVec &vec, char sep);
 
 inline std::string format(const std::string fmt, ...)
 {

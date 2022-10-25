@@ -396,7 +396,7 @@
     ]
   },
   "annotations": {
-    "container_root_path": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444",
+    "containerRootPath": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444",
     "overlayfs": {
       "lower_parent": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444/.overlayfs/lower_parent",
       "upper": "/run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd444/.overlayfs/upper",

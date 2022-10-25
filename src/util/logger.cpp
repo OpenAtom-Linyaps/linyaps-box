@@ -9,12 +9,12 @@ std::string errnoString()
     return util::format("errno(%d): %s", errno, strerror(errno));
 }
 
-std::string RetErrString(int ret)
+std::string retErrString(int ret)
 {
     return util::format("ret(%d),errno(%d): %s", ret, errno, strerror(errno));
 }
 
-std::string GetPidnsPid()
+std::string getPidnsPid()
 {
     char buf[30];
     memset(buf, 0, sizeof(buf));

@@ -88,24 +88,24 @@ linglong::Runtime loadBundle(int argc, char **argv)
         throw std::runtime_error("invalid load args count");
     }
 
-    auto r = linglong::fromString(kLoadTemplate);
+    auto runtime = linglong::fromString(kLoadTemplate);
     std::string id = argv[1];
     std::string bundleRoot = argv[2];
     std::string exec = argv[3];
 
     {
-        Mount m;
-        m.source = "tmpfs";
-        m.type = "tmpfs";
-        m.fsType = Mount::Tmpfs;
-        m.data = {"nodev", "nosuid"};
-        m.destination = "/opt";
-        r.mounts->push_back(m);
+        Mount mount;
+        mount.source = "tmpfs";
+        mount.type = "tmpfs";
+        mount.fsType = Mount::Tmpfs;
+        mount.data = {"nodev", "nosuid"};
+        mount.destination = "/opt";
+        runtime.mounts->push_back(mount);
     }
 
     if (util::fs::exists(bundleRoot + "/opt")) {
         std::string source = bundleRoot + "/opt";
-        util::str_vec namelist;
+        util::strVec namelist;
         DIR *dir;
         struct dirent *ent;
 
@@ -115,56 +115,56 @@ linglong::Runtime loadBundle(int argc, char **argv)
                 if ("." == std::string(ent->d_name) || ".." == std::string(ent->d_name)) {
                     continue;
                 }
-                if (util::fs::is_dir(source + "/" + ent->d_name)) {
+                if (util::fs::isDir(source + "/" + ent->d_name)) {
                     namelist.push_back(ent->d_name);
                 }
             }
             closedir(dir);
         }
 
-        Mount m;
-        m.type = "bind";
-        m.fsType = Mount::Bind;
+        Mount mount;
+        mount.type = "bind";
+        mount.fsType = Mount::Bind;
 
         for (auto const &name : namelist) {
-            m.source = source.append("/") + name;
-            m.destination = "/opt/" + name;
-            logInf() << m.source << "to" << m.destination << name;
-            r.mounts->push_back(m);
+            mount.source = source.append("/") + name;
+            mount.destination = "/opt/" + name;
+            logInf() << mount.source << "to" << mount.destination << name;
+            runtime.mounts->push_back(mount);
         }
     }
 
     // app files
     if (util::fs::exists(bundleRoot + "/files")) {
-        Mount m;
-        m.type = "bind";
-        m.fsType = Mount::Bind;
-        m.source = bundleRoot;
-        m.destination = util::format("/opt/apps/%s", id.c_str());
-        r.mounts->push_back(m);
+        Mount mount;
+        mount.type = "bind";
+        mount.fsType = Mount::Bind;
+        mount.source = bundleRoot;
+        mount.destination = util::format("/opt/apps/%s", id.c_str());
+        runtime.mounts->push_back(mount);
     }
 
     // process runtime
     if (util::fs::exists(bundleRoot + "/runtime")) {
-        Mount m;
-        m.type = "bind";
-        m.fsType = Mount::Bind;
-        m.source = bundleRoot + "/runtime";
-        m.destination = util::format("/opt/runtime");
-        r.mounts->push_back(m);
+        Mount mount;
+        mount.type = "bind";
+        mount.fsType = Mount::Bind;
+        mount.source = bundleRoot + "/runtime";
+        mount.destination = util::format("/opt/runtime");
+        runtime.mounts->push_back(mount);
 
-        m.source = bundleRoot + "/runtime/lib/i386-linux-gnu";
-        m.destination = util::format("/usr/lib/i386-linux-gnu");
-        r.mounts->push_back(m);
+        mount.source = bundleRoot + "/runtime/lib/i386-linux-gnu";
+        mount.destination = util::format("/usr/lib/i386-linux-gnu");
+        runtime.mounts->push_back(mount);
     }
 
     // process env
-    r.process.env.push_back(util::format("XAUTHORITY=%s", getenv("XAUTHORITY")));
-    r.process.env.push_back(util::format("XDG_RUNTIME_DIR=%s", getenv("XDG_RUNTIME_DIR")));
-    r.process.env.push_back(util::format("DBUS_SESSION_BUS_ADDRESS=%s", getenv("DBUS_SESSION_BUS_ADDRESS")));
-    r.process.env.push_back(util::format("HOME=%s", getenv("HOME")));
+    runtime.process.env.push_back(util::format("XAUTHORITY=%s", getenv("XAUTHORITY")));
+    runtime.process.env.push_back(util::format("XDG_RUNTIME_DIR=%s", getenv("XDG_RUNTIME_DIR")));
+    runtime.process.env.push_back(util::format("DBUS_SESSION_BUS_ADDRESS=%s", getenv("DBUS_SESSION_BUS_ADDRESS")));
+    runtime.process.env.push_back(util::format("HOME=%s", getenv("HOME")));
 
-    util::str_vec ldLibraryPath;
+    util::strVec ldLibraryPath;
 
     if (getenv("LD_LIBRARY_PATH")) {
         ldLibraryPath.push_back(getenv("LD_LIBRARY_PATH"));
@@ -172,14 +172,14 @@ linglong::Runtime loadBundle(int argc, char **argv)
     ldLibraryPath.push_back("/opt/runtime/lib");
     ldLibraryPath.push_back("/opt/runtime/lib/i386-linux-gnu");
     ldLibraryPath.push_back("/opt/runtime/lib/x86_64-linux-gnu");
-    r.process.env.push_back(util::format("LD_LIBRARY_PATH=%s", util::str_vec_join(ldLibraryPath, ':').c_str()));
+    runtime.process.env.push_back(util::format("LD_LIBRARY_PATH=%s", util::strVecJoin(ldLibraryPath, ':').c_str()));
 
-    r.process.cwd = getenv("HOME");
-    r.process.args = util::str_vec {exec};
+    runtime.process.cwd = getenv("HOME");
+    runtime.process.args = util::strVec {exec};
 
     /// run/user/1000/linglong/375f5681145f4f4f9ffeb3a67aebd422/root
     char dirTemplate[] = "/run/user/1000/linglong/XXXXXX";
-    util::fs::create_directories(util::fs::path(dirTemplate).parent_path(), 0755);
+    util::fs::createDirectories(util::fs::path(dirTemplate).parent_path(), 0755);
 
     char *dirName = mkdtemp(dirTemplate);
     if (dirName == nullptr) {
@@ -187,13 +187,13 @@ linglong::Runtime loadBundle(int argc, char **argv)
     }
 
     auto rootPath = util::fs::path(dirName) / "root";
-    util::fs::create_directories(rootPath, 0755);
+    util::fs::createDirectories(rootPath, 0755);
 
-    r.root.path = rootPath.string();
+    runtime.root.path = rootPath.string();
 
     // FIXME: workaround id map
-    r.linux.uidMappings[0].hostID = getuid();
-    r.linux.gidMappings[0].hostID = getgid();
+    runtime.linux.uidMappings[0].hostID = getuid();
+    runtime.linux.gidMappings[0].hostID = getgid();
 
-    return r;
+    return runtime;
 }

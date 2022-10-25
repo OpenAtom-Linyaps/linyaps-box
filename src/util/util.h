@@ -31,10 +31,10 @@ inline nlohmann::json fromByteArray(const std::string &content)
 
 inline nlohmann::json fromFile(const std::string &filepath)
 {
-    std::ifstream f(filepath);
-    std::string str((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    auto j = fromByteArray(str);
-    return j;
+    std::ifstream file(filepath);
+    std::string str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    auto json = fromByteArray(str);
+    return json;
 }
 
 } // namespace json

@@ -15,19 +15,19 @@
 
 namespace linglong {
 
-#define DUMP_FILESYSTEM(path) DumpFilesystem(path, __FUNCTION__, __LINE__)
+#define DUMP_FILESYSTEM(path) dumpFilesystem(path, __FUNCTION__, __LINE__)
 
-#define DUMP_FILE_INFO(path) DumpFileInfo1(path, __FUNCTION__, __LINE__)
+#define DUMP_FILE_INFO(path) dumpFileInfo1(path, __FUNCTION__, __LINE__)
 
-void DumpIDMap();
+void dumpIdMap();
 
-void DumpUidGidGroup();
+void dumpUidGidGroup();
 
-void DumpFilesystem(const std::string &path, const char *func = nullptr, int line = -1);
+void dumpFilesystem(const std::string &path, const char *func = nullptr, int line = -1);
 
-void DumpFileInfo(const std::string &path);
+void dumpFileInfo(const std::string &path);
 
-void DumpFileInfo1(const std::string &path, const char *func = nullptr, int line = -1);
+void dumpFileInfo1(const std::string &path, const char *func = nullptr, int line = -1);
 
 } // namespace linglong
 

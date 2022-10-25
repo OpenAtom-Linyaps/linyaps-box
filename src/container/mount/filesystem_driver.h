@@ -18,7 +18,7 @@ namespace linglong {
 class FilesystemDriver
 {
 public:
-    virtual int Setup() = 0;
+    virtual int setup() = 0;
     virtual int CreateDestinationPath(const util::fs::path &container_destination_path) = 0;
     virtual util::fs::path HostPath(const util::fs::path &container_destination_path) const = 0;
     virtual util::fs::path HostSource(const util::fs::path &container_destination_path) const = 0;
@@ -27,10 +27,10 @@ public:
 class OverlayfsFuseFilesystemDriver : public FilesystemDriver
 {
 public:
-    explicit OverlayfsFuseFilesystemDriver(util::str_vec lower_dirs, std::string upper_dir, std::string work_dir,
+    explicit OverlayfsFuseFilesystemDriver(util::strVec lower_dirs, std::string upper_dir, std::string work_dir,
                                            std::string mount_point);
 
-    int Setup() override;
+    int setup() override;
 
     int CreateDestinationPath(const util::fs::path &container_destination_path) override;
 
@@ -39,7 +39,7 @@ public:
     util::fs::path HostSource(const util::fs::path &dest_full_path) const override;
 
 private:
-    util::str_vec lower_dirs_;
+    util::strVec lower_dirs_;
     std::string upper_dir_;
     std::string work_dir_;
     std::string mount_point_;
@@ -48,9 +48,9 @@ private:
 class FuseProxyFilesystemDriver : public FilesystemDriver
 {
 public:
-    explicit FuseProxyFilesystemDriver(util::str_vec mounts, std::string mount_point);
+    explicit FuseProxyFilesystemDriver(util::strVec mounts, std::string mount_point);
 
-    int Setup() override;
+    int setup() override;
 
     int CreateDestinationPath(const util::fs::path &container_destination_path) override;
 
@@ -59,7 +59,7 @@ public:
     util::fs::path HostSource(const util::fs::path &dest_full_path) const override;
 
 private:
-    util::str_vec mounts_;
+    util::strVec mounts_;
     std::string mount_point_;
 };
 
@@ -69,7 +69,7 @@ public:
     explicit NativeFilesystemDriver(std::string root_path);
     ~NativeFilesystemDriver();
 
-    int Setup() override { return 0; }
+    int setup() override { return 0; }
 
     int CreateDestinationPath(const util::fs::path &container_destination_path) override;
 

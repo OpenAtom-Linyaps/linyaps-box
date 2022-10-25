@@ -27,13 +27,13 @@ class path : public std::basic_string<char>
 {
 public:
     explicit path(const std::string &s)
-        : p(util::str_spilt(s, "/"))
+        : p(util::strSpilt(s, "/"))
     {
     }
 
     path &operator=(const std::string &s)
     {
-        p = util::str_spilt(s, "/");
+        p = util::strSpilt(s, "/");
         return *this;
     }
 
@@ -59,13 +59,13 @@ public:
         return pn;
     }
 
-    std::string string() const { return "/" + str_vec_join(p, '/'); }
+    std::string string() const { return "/" + strVecJoin(p, '/'); }
 
-    str_vec components() const { return p; }
+    strVec components() const { return p; }
 
     // call to this function will block until `path` exists (rerturn 0) or timeout (return -1)
     // default timeout is 1 second
-    int wait_until_exsit(int utimeout = 1000)
+    int waitUntilExsit(int utimeout = 1000)
     {
         int time = 0;
         while (true) {
@@ -93,9 +93,9 @@ inline std::ostream &operator<<(std::ostream &cout, path obj)
     return cout;
 }
 
-bool create_directories(const path &p, __mode_t mode);
+bool createDirectories(const path &p, __mode_t mode);
 
-enum file_type {
+enum fileType {
     status_error,
     file_not_found,
     regular_file,
@@ -134,42 +134,42 @@ enum perms {
     symlink_perms
 };
 
-class file_status
+class FileStatus
 {
 public:
     // constructors
-    file_status() noexcept;
-    explicit file_status(file_type ft, perms p = perms_not_known) noexcept;
+    FileStatus() noexcept;
+    explicit FileStatus(fileType ft, perms p = perms_not_known) noexcept;
 
     // compiler generated
-    file_status(const file_status &) noexcept;
-    file_status &operator=(const file_status &) noexcept;
-    ~file_status() noexcept;
+    FileStatus(const FileStatus &) noexcept;
+    FileStatus &operator=(const FileStatus &) noexcept;
+    ~FileStatus() noexcept;
 
     // observers
-    file_type type() const noexcept;
+    fileType type() const noexcept;
     perms permissions() const noexcept;
 
 private:
-    file_type ft;
+    fileType ft;
     perms p;
 };
 
-bool is_dir(const std::string &s);
+bool isDir(const std::string &s);
 
 bool exists(const std::string &s);
 
-file_status status(const path &p, std::error_code &ec);
+FileStatus status(const path &p, std::error_code &ec);
 
-path read_symlink(const path &p);
+path readSymlink(const path &p);
 
-// This function do_mount_with_fd do mount in a secure way by check the target we are going to mount is within container
+// This function doMountWithFd do mount in a secure way by check the target we are going to mount is within container
 // rootfs or not before actually call mount.
 // refer to
 // https://github.com/opencontainers/runc/commit/0ca91f44f1664da834bc61115a849b56d22f595f
 // NOTE: we should never directly do mount exists in oci json without this check.
-int do_mount_with_fd(const char *root, const char *__special_file, const char *__dir, const char *__fstype,
-                     unsigned long int __rwflag, const void *__data) __THROW;
+int doMountWithFd(const char *root, const char *__special_file, const char *__dir, const char *__fstype,
+                  unsigned long int __rwflag, const void *__data) __THROW;
 
 } // namespace fs
 } // namespace util

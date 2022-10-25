@@ -17,7 +17,7 @@
 
 namespace linglong {
 
-OverlayfsFuseFilesystemDriver::OverlayfsFuseFilesystemDriver(util::str_vec lower_dirs, std::string upper_dir,
+OverlayfsFuseFilesystemDriver::OverlayfsFuseFilesystemDriver(util::strVec lower_dirs, std::string upper_dir,
                                                              std::string work_dir, std::string mount_point)
     : lower_dirs_(std::move(lower_dirs))
     , upper_dir_(std::move(upper_dir))
@@ -36,39 +36,39 @@ int OverlayfsFuseFilesystemDriver::CreateDestinationPath(const util::fs::path &c
     __mode_t dest_mode = 0755;
 
     auto host_destination_path = HostSource(util::fs::path(mount_point_) / container_destination_path);
-    if (!util::fs::create_directories(host_destination_path, dest_mode)) {
-        logErr() << "create_directories" << host_destination_path << util::errnoString();
+    if (!util::fs::createDirectories(host_destination_path, dest_mode)) {
+        logErr() << "createDirectories" << host_destination_path << util::errnoString();
         return -1;
     }
 
     return 0;
 }
 
-int OverlayfsFuseFilesystemDriver::Setup()
+int OverlayfsFuseFilesystemDriver::setup()
 {
     // fork and exec fuse
     int pid = fork();
     if (0 == pid) {
-        util::fs::create_directories(util::fs::path(work_dir_), 0755);
-        util::fs::create_directories(util::fs::path(upper_dir_), 0755);
-        util::fs::create_directories(util::fs::path(mount_point_), 0755);
+        util::fs::createDirectories(util::fs::path(work_dir_), 0755);
+        util::fs::createDirectories(util::fs::path(upper_dir_), 0755);
+        util::fs::createDirectories(util::fs::path(mount_point_), 0755);
         // fuse-overlayfs -o lowerdir=/ -o upperdir=./upper -o workdir=./work overlaydir
-        util::str_vec args;
+        util::strVec args;
         args.push_back("/usr/bin/fuse-overlayfs");
         args.push_back("-o");
-        args.push_back("lowerdir=" + util::str_vec_join(lower_dirs_, ':'));
+        args.push_back("lowerdir=" + util::strVecJoin(lower_dirs_, ':'));
         args.push_back("-o");
         args.push_back("upperdir=" + upper_dir_);
         args.push_back("-o");
         args.push_back("workdir=" + work_dir_);
         args.push_back(mount_point_);
 
-        logErr() << util::Exec(args, {});
+        logErr() << util::exec(args, {});
         logErr() << util::errnoString();
 
         exit(0);
     }
-    util::Wait(pid);
+    util::wait(pid);
     return 0;
 }
 
@@ -93,7 +93,7 @@ int NativeFilesystemDriver::CreateDestinationPath(const util::fs::path &containe
 
     auto host_destination_path = util::fs::path(root_path_) / container_destination_path;
 
-    util::fs::create_directories(host_destination_path, dest_mode);
+    util::fs::createDirectories(host_destination_path, dest_mode);
 
     return 0;
 }
@@ -107,7 +107,7 @@ NativeFilesystemDriver::~NativeFilesystemDriver()
 {
 }
 
-FuseProxyFilesystemDriver::FuseProxyFilesystemDriver(util::str_vec mounts, std::string mount_point)
+FuseProxyFilesystemDriver::FuseProxyFilesystemDriver(util::strVec mounts, std::string mount_point)
     : mounts_(mounts)
     , mount_point_(mount_point)
 {
@@ -128,15 +128,15 @@ int FuseProxyFilesystemDriver::CreateDestinationPath(const util::fs::path &conta
     __mode_t dest_mode = 0755;
 
     auto host_destination_path = HostSource(util::fs::path(mount_point_) / container_destination_path);
-    if (!util::fs::create_directories(host_destination_path, dest_mode)) {
-        logErr() << "create_directories" << host_destination_path << util::errnoString();
+    if (!util::fs::createDirectories(host_destination_path, dest_mode)) {
+        logErr() << "createDirectories" << host_destination_path << util::errnoString();
         return -1;
     }
 
     return 0;
 }
 
-int FuseProxyFilesystemDriver::Setup()
+int FuseProxyFilesystemDriver::setup()
 {
     int pipe_ends[2];
     if (0 != pipe(pipe_ends)) {
@@ -158,15 +158,15 @@ int FuseProxyFilesystemDriver::Setup()
         }
         close(pipe_ends[0]);
 
-        util::fs::create_directories(util::fs::path(mount_point_), 0755);
-        util::fs::create_directories(util::fs::path(mount_point_ + "/.root"), 0755);
+        util::fs::createDirectories(util::fs::path(mount_point_), 0755);
+        util::fs::createDirectories(util::fs::path(mount_point_ + "/.root"), 0755);
 
-        util::str_vec args;
+        util::strVec args;
         args.push_back("/usr/bin/ll-fuse-proxy");
         args.push_back("112");
         args.push_back(mount_point_);
 
-        logErr() << util::Exec(args, {});
+        logErr() << util::exec(args, {});
 
         exit(0);
     } else {

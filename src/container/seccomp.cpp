@@ -66,7 +66,7 @@ int toSyscallNumber(const std::string &name)
 
 namespace linglong {
 
-int ConfigSeccomp(const tl::optional<linglong::Seccomp> &seccomp)
+int configSeccomp(const tl::optional<linglong::Seccomp> &seccomp)
 {
     if (!seccomp.has_value()) {
         return 0;

@@ -43,7 +43,7 @@ Semaphore::Semaphore(int key)
 {
     dd_ptr->sem_id = semget(key, 1, IPC_CREAT | 0666);
     if (dd_ptr->sem_id < 0) {
-        logErr() << "semget failed" << util::RetErrString(dd_ptr->sem_id);
+        logErr() << "semget failed" << util::retErrString(dd_ptr->sem_id);
     }
 }
 
@@ -55,7 +55,7 @@ int Semaphore::init()
     sem_union.val = 0;
     logDbg() << "semctl " << dd_ptr->sem_id;
     if (semctl(dd_ptr->sem_id, 0, SETVAL, sem_union) == -1) {
-        logErr() << "semctl failed" << util::RetErrString(-1);
+        logErr() << "semctl failed" << util::retErrString(-1);
     }
     return 0;
 }

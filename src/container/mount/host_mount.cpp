@@ -29,7 +29,7 @@ public:
         return driver_->CreateDestinationPath(container_destination_path);
     }
 
-    int MountNode(const struct Mount &m) const
+    int mountNode(const struct Mount &m) const
     {
         int ret = -1;
         struct stat source_stat {
@@ -73,7 +73,7 @@ public:
         case S_IFLNK: {
             driver_->CreateDestinationPath(dest_parent_path);
             std::ofstream output(host_dest_full_path.string());
-            source = util::fs::read_symlink(util::fs::path(source)).string();
+            source = util::fs::readSymlink(util::fs::path(source)).string();
             break;
         }
         case S_IFREG: {
@@ -92,7 +92,7 @@ public:
             break;
         }
 
-        auto data = util::str_vec_join(m.data, ',');
+        auto data = util::strVecJoin(m.data, ',');
         auto real_data = data;
         auto real_flags = m.flags;
 
@@ -106,8 +106,8 @@ public:
 
             // When doing a bind mount, data and fstype are ignored by kernel. We should set them by remounting.
             real_data = "";
-            ret = util::fs::do_mount_with_fd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
-                                             nullptr, real_flags, nullptr);
+            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(), nullptr,
+                                          real_flags, nullptr);
             if (0 != ret) {
                 break;
             }
@@ -125,16 +125,16 @@ public:
 
             // When doing a remount, source and fstype are ignored by kernel.
             real_data = data;
-            ret = util::fs::do_mount_with_fd(root.c_str(), nullptr, host_dest_full_path.string().c_str(), nullptr,
-                                             real_flags, real_data.c_str());
+            ret = util::fs::doMountWithFd(root.c_str(), nullptr, host_dest_full_path.string().c_str(), nullptr,
+                                          real_flags, real_data.c_str());
             break;
         case Mount::Proc:
         case Mount::Devpts:
         case Mount::Mqueue:
         case Mount::Tmpfs:
         case Mount::Sysfs:
-            ret = util::fs::do_mount_with_fd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
-                                             m.type.c_str(), real_flags, real_data.c_str());
+            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
+                                          m.type.c_str(), real_flags, real_data.c_str());
             if (ret < 0) {
                 // refers:
                 // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L178
@@ -142,22 +142,22 @@ public:
                 if (m.fsType == Mount::Sysfs) {
                     real_flags = MS_BIND | MS_REC;
                     real_data = "";
-                    ret = util::fs::do_mount_with_fd(root.c_str(), "/sys", host_dest_full_path.string().c_str(),
-                                                     nullptr, real_flags, nullptr);
+                    ret = util::fs::doMountWithFd(root.c_str(), "/sys", host_dest_full_path.string().c_str(), nullptr,
+                                                  real_flags, nullptr);
                     if (ret == 0) {
                         sysfs_is_binded = true;
                     }
                 } else if (m.fsType == Mount::Mqueue) {
                     real_flags = MS_BIND | MS_REC;
                     real_data = "";
-                    ret = util::fs::do_mount_with_fd(root.c_str(), "/dev/mqueue", host_dest_full_path.string().c_str(),
-                                                     nullptr, real_flags, nullptr);
+                    ret = util::fs::doMountWithFd(root.c_str(), "/dev/mqueue", host_dest_full_path.string().c_str(),
+                                                  nullptr, real_flags, nullptr);
                 }
             }
             break;
         case Mount::Cgroup:
-            ret = util::fs::do_mount_with_fd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
-                                             m.type.c_str(), real_flags, real_data.c_str());
+            ret = util::fs::doMountWithFd(root.c_str(), source.c_str(), host_dest_full_path.string().c_str(),
+                                          m.type.c_str(), real_flags, real_data.c_str());
             // When sysfs is bind-mounted, It is ok to let cgroup mount failed.
             // https://github.com/containers/podman/blob/466b8991c4025006eeb43cb30e6dc990d92df72d/pkg/specgen/generate/oci.go#L281
             if (sysfs_is_binded) {
@@ -169,7 +169,7 @@ public:
         }
 
         if (EXIT_SUCCESS != ret) {
-            logErr() << "mount" << source << "to" << host_dest_full_path << "failed:" << util::RetErrString(ret)
+            logErr() << "mount" << source << "to" << host_dest_full_path << "failed:" << util::retErrString(ret)
                      << "\nmount args is:" << m.type << real_flags << real_data;
             if (is_path) {
                 logErr() << "source file type is: 0x" << std::hex << (source_stat.st_mode & S_IFMT);
@@ -190,12 +190,12 @@ HostMount::HostMount()
 {
 }
 
-int HostMount::MountNode(const struct Mount &m)
+int HostMount::mountNode(const struct Mount &mount)
 {
-    return dd_ptr->MountNode(m);
+    return dd_ptr->mountNode(mount);
 }
 
-int HostMount::Setup(FilesystemDriver *driver)
+int HostMount::setup(FilesystemDriver *driver)
 {
     if (nullptr == driver) {
         logWan() << this << dd_ptr->driver_.get();
@@ -203,7 +203,7 @@ int HostMount::Setup(FilesystemDriver *driver)
     }
 
     dd_ptr->driver_ = std::unique_ptr<FilesystemDriver>(driver);
-    return dd_ptr->driver_->Setup();
+    return dd_ptr->driver_->setup();
 }
 
 HostMount::~HostMount() {};

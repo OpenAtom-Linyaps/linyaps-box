@@ -13,7 +13,7 @@
 namespace linglong {
 namespace util {
 
-std::string str_vec_join(const str_vec &vec, char sep)
+std::string strVecJoin(const strVec &vec, char sep)
 {
     if (vec.empty()) {
         return "";
@@ -27,9 +27,9 @@ std::string str_vec_join(const str_vec &vec, char sep)
     return s;
 }
 
-str_vec str_spilt(const std::string &s, const std::string &sep)
+strVec strSpilt(const std::string &s, const std::string &sep)
 {
-    str_vec vec;
+    strVec vec;
     size_t pos_begin = 0;
     size_t pos_end = 0;
     while ((pos_end = s.find(sep, pos_begin)) != std::string::npos) {

@@ -51,7 +51,7 @@ linglong-box (1.2.6-1) unstable; urgency=medium
   * 1. adjust wait pid strategy.
   * 2. print pidns in log.
   * 3. configure uid/gid mapping after clone.
-  * 4. remove CLONE-FS flag when cloning NonePrivilegeProc.
+  * 4. remove CLONE-FS flag when cloning nonePrivilegeProc.
   * 5. wrong /dev/ptmx link.
 
  -- liujianqiang <liujianqiang@uniontech.com>  Tue, 22 Mar 2022 13:38:53 +0800

@@ -25,8 +25,8 @@
 namespace linglong {
 namespace util {
 std::string errnoString();
-std::string RetErrString(int);
-std::string GetPidnsPid();
+std::string retErrString(int);
+std::string getPidnsPid();
 
 class Logger
 {
@@ -47,7 +47,7 @@ public:
     ~Logger()
     {
         std::string prefix;
-        auto pid_ns = GetPidnsPid();
+        auto pid_ns = getPidnsPid();
         int syslogLevel = LOG_DEBUG;
         switch (level) {
         case Debug:

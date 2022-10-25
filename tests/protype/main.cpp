@@ -44,7 +44,7 @@ struct Context {
     }
 
     std::string targetExecute;
-    util::str_vec args;
+    util::strVec args;
     int semID {};
 };
 

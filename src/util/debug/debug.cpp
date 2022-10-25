@@ -21,9 +21,9 @@ namespace linglong {
 
 #define DUMP_DBG(func, line) (linglong::util::Logger(linglong::util::Logger::Debug, func, line))
 
-void DumpIDMap()
+void dumpIdMap()
 {
-    logDbg() << "DumpIDMap Start -----------";
+    logDbg() << "dumpIdMap Start -----------";
     std::ifstream uidMap("/proc/self/uid_map");
     for (std::string line; getline(uidMap, line);) {
         logDbg() << "uid_map of pid:" << getpid() << line;
@@ -39,12 +39,12 @@ void DumpIDMap()
     std::string line;
     std::getline(setgroupsFileRead, line);
     logDbg() << "setgroups of pid:" << getpid() << line;
-    logDbg() << "DumpIDMap end -----------";
+    logDbg() << "dumpIdMap end -----------";
 }
 
-void DumpUidGidGroup()
+void dumpUidGidGroup()
 {
-    logDbg() << "DumpUidGidGroup Start -----------";
+    logDbg() << "dumpUidGidGroup Start -----------";
     //    __uid_t uid = getuid(); // you can change this to be the uid that you want
     //
     //    struct passwd *pw = getpwuid(uid);
@@ -81,15 +81,15 @@ void DumpUidGidGroup()
         groupListStr += util::format("%d ", list[i]);
     }
     logDbg() << "getgroups size " << groupSize << ", list:" << groupListStr;
-    logDbg() << "DumpUidGidGroup end -----------";
+    logDbg() << "dumpUidGidGroup end -----------";
 }
 
-void DumpFilesystem(const std::string &path, const char *func, int line)
+void dumpFilesystem(const std::string &path, const char *func, int line)
 {
     if (nullptr == func) {
         func = const_cast<char *>(__FUNCTION__);
     }
-    DUMP_DBG(func, line) << "DumpFilesystem begin -----------" << path;
+    DUMP_DBG(func, line) << "dumpFilesystem begin -----------" << path;
     DIR *dir;
     if ((dir = opendir(path.c_str())) != NULL) {
         struct dirent *ent;
@@ -103,21 +103,21 @@ void DumpFilesystem(const std::string &path, const char *func, int line)
         logErr() << linglong::util::errnoString() << errno;
         return;
     }
-    DUMP_DBG(func, line) << "DumpFilesystem end -----------" << path;
+    DUMP_DBG(func, line) << "dumpFilesystem end -----------" << path;
 }
 
-void DumpFileInfo(const std::string &path)
+void dumpFileInfo(const std::string &path)
 {
-    DumpFileInfo1(path, __FUNCTION__, __LINE__);
+    dumpFileInfo1(path, __FUNCTION__, __LINE__);
 }
 
-void DumpFileInfo1(const std::string &path, const char *func, int line)
+void dumpFileInfo1(const std::string &path, const char *func, int line)
 {
     struct stat st {
     };
     auto ret = lstat(path.c_str(), &st);
     if (0 != ret) {
-        DUMP_DBG(func, line) << path << util::RetErrString(ret);
+        DUMP_DBG(func, line) << path << util::retErrString(ret);
     } else {
         DUMP_DBG(func, line) << path << st.st_uid << st.st_gid << ((st.st_mode & S_IFMT) == S_IFDIR);
     }

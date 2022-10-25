@@ -24,9 +24,9 @@ public:
     HostMount();
     ~HostMount();
 
-    int Setup(FilesystemDriver *driver);
+    int setup(FilesystemDriver *driver);
 
-    int MountNode(const Mount &m);
+    int mountNode(const Mount &mount);
 
 private:
     std::unique_ptr<HostMountPrivate> dd_ptr;

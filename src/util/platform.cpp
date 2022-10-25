@@ -24,7 +24,7 @@ const int kStackSize = (1024 * 1024);
 
 namespace util {
 
-int PlatformClone(int (*callback)(void *), int flags, void *arg, ...)
+int platformClone(int (*callback)(void *), int flags, void *arg, ...)
 {
     char *stack;
     char *stackTop;
@@ -40,7 +40,7 @@ int PlatformClone(int (*callback)(void *), int flags, void *arg, ...)
     return clone(callback, stackTop, flags, arg);
 }
 
-int Exec(const util::str_vec &args, tl::optional<std::vector<std::string>> env_list)
+int exec(const util::strVec &args, tl::optional<std::vector<std::string>> env_list)
 {
     auto targetArgc = args.size();
     const char *targetArgv[targetArgc + 1];
@@ -68,7 +68,7 @@ int Exec(const util::str_vec &args, tl::optional<std::vector<std::string>> env_l
 }
 
 // if wstatus says child exit normally, return true else false
-static bool parse_wstatus(const int &wstatus, std::string &info)
+static bool parseWstatus(const int &wstatus, std::string &info)
 {
     if (WIFEXITED(wstatus)) {
         auto code = WEXITSTATUS(wstatus);
@@ -84,14 +84,14 @@ static bool parse_wstatus(const int &wstatus, std::string &info)
 }
 
 // call waitpid with pid until waitpid return value equals to target or all child exited
-static void DoWait(const int pid, int target = 0)
+static void doWait(const int pid, int target = 0)
 {
-    logDbg() << util::format("DoWait called with pid=%d, target=%d", pid, target);
+    logDbg() << util::format("doWait called with pid=%d, target=%d", pid, target);
     int wstatus;
     while (int child = waitpid(pid, &wstatus, 0)) {
         if (child > 0) {
             std::string info;
-            auto normal = parse_wstatus(wstatus, info);
+            auto normal = parseWstatus(wstatus, info);
             info = format("child [%d] [%s].", child, info.c_str());
             if (normal) {
                 logDbg() << info;
@@ -119,21 +119,21 @@ static void DoWait(const int pid, int target = 0)
 }
 
 // wait all child
-void WaitAll()
+void waitAll()
 {
-    DoWait(-1);
+    doWait(-1);
 }
 
 // wait pid to exit
-void Wait(const int pid)
+void wait(const int pid)
 {
-    DoWait(pid);
+    doWait(pid);
 }
 
 // wait all child until pid exit
-void WaitAllUntil(const int pid)
+void waitAllUntil(const int pid)
 {
-    DoWait(-1, pid);
+    doWait(-1, pid);
 }
 
 } // namespace util
