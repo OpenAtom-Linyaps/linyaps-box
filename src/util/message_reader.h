@@ -1,9 +1,5 @@
 /*
- * Copyright (c) 2020-2021. Uniontech Software Ltd. All rights reserved.
- *
- * Author:     Linxuan Chen <chenlinxuan@uniontech.com>
- *
- * Maintainer: Linxuan Chen <chenlinxuan@uniontech.com>
+ * SPDX-FileCopyrightText: 2022 UnionTech Software Technology Co., Ltd.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
