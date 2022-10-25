@@ -27,6 +27,8 @@ int main(int argc, char **argv)
 {
     // TODO(iceyer): move loader to ll-loader?
     // NOTE(clx): just comment out loadBundle source for now, as currently unused.
+
+    // TODO(iceyer): load uab?
     // bool is_load_bundle = (argc == 4);
 
     linglong::Option opt;
