@@ -40,10 +40,6 @@ int main(int argc, char **argv)
     try {
         linglong::Runtime r;
 
-        // if (is_load_bundle) {
-        // r = loadBundle(argc, argv);
-        // } else {
-
         int socket = atoi(argv[1]);
         if (socket <= 0) {
             socket = open(argv[1], O_RDONLY | O_CLOEXEC);
