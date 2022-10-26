@@ -58,27 +58,29 @@ public:
         auto host_dest_full_path = driver_->HostPath(dest_full_path);
         auto root = driver_->HostPath(util::fs::path("/"));
 
+        logDbg() << "host_dest_full_path" << host_dest_full_path;
+
         switch (source_stat.st_mode & S_IFMT) {
         case S_IFCHR: {
             driver_->CreateDestinationPath(dest_parent_path);
-            std::ofstream output(host_dest_full_path.string());
+            host_dest_full_path.touch();
             break;
         }
         case S_IFSOCK: {
             driver_->CreateDestinationPath(dest_parent_path);
             // FIXME: can not mound dbus socket on rootless
-            std::ofstream output(host_dest_full_path.string());
+            host_dest_full_path.touch();
             break;
         }
         case S_IFLNK: {
             driver_->CreateDestinationPath(dest_parent_path);
-            std::ofstream output(host_dest_full_path.string());
+            host_dest_full_path.touch();
             source = util::fs::read_symlink(util::fs::path(source)).string();
             break;
         }
         case S_IFREG: {
             driver_->CreateDestinationPath(dest_parent_path);
-            std::ofstream output(host_dest_full_path.string());
+            host_dest_full_path.touch();
             break;
         }
         case S_IFDIR:

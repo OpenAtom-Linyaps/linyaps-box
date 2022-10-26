@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <ostream>
+#include <fstream>
 #include <system_error>
 
 #include <unistd.h>
@@ -22,6 +23,8 @@
 namespace linglong {
 namespace util {
 namespace fs {
+
+bool exists(const std::string &s);
 
 class path : public std::basic_string<char>
 {
@@ -78,6 +81,13 @@ public:
             }
         }
         return 0;
+    }
+
+    bool touch()
+    {
+        if (!exists(this->string())) {
+            std::ofstream(this->string());
+        }
     }
 
 private:
@@ -156,8 +166,6 @@ private:
 };
 
 bool is_dir(const std::string &s);
-
-bool exists(const std::string &s);
 
 file_status status(const path &p, std::error_code &ec);
 
