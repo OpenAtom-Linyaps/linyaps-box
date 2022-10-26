@@ -23,8 +23,8 @@ public:
 class OverlayfsFuseFilesystemDriver : public FilesystemDriver
 {
 public:
-    explicit OverlayfsFuseFilesystemDriver(util::strVec lowerDirs, std::string upper_dir, std::string work_dir,
-                                           std::string mount_point);
+    explicit OverlayfsFuseFilesystemDriver(util::strVec lowerDirs, std::string upperDir, std::string workDir,
+                                           std::string mountPoint);
 
     int setup() override;
 
@@ -44,7 +44,7 @@ private:
 class FuseProxyFilesystemDriver : public FilesystemDriver
 {
 public:
-    explicit FuseProxyFilesystemDriver(util::strVec mounts, std::string mount_point);
+    explicit FuseProxyFilesystemDriver(util::strVec mounts, std::string mountPoint);
 
     int setup() override;
 

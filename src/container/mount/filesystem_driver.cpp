@@ -13,12 +13,12 @@
 
 namespace linglong {
 
-OverlayfsFuseFilesystemDriver::OverlayfsFuseFilesystemDriver(util::strVec lowerDirs, std::string upper_dir,
-                                                             std::string work_dir, std::string mount_point)
+OverlayfsFuseFilesystemDriver::OverlayfsFuseFilesystemDriver(util::strVec lowerDirs, std::string upperDir,
+                                                             std::string workDir, std::string mountPoint)
     : lowerDirs(std::move(lowerDirs))
-    , upperDir(std::move(upper_dir))
-    , workDir(std::move(work_dir))
-    , mountPoint(std::move(mount_point))
+    , upperDir(std::move(upperDir))
+    , workDir(std::move(workDir))
+    , mountPoint(std::move(mountPoint))
 {
 }
 
@@ -103,9 +103,9 @@ NativeFilesystemDriver::~NativeFilesystemDriver()
 {
 }
 
-FuseProxyFilesystemDriver::FuseProxyFilesystemDriver(util::strVec mounts, std::string mount_point)
+FuseProxyFilesystemDriver::FuseProxyFilesystemDriver(util::strVec mounts, std::string mountPoint)
     : mounts(mounts)
-    , mountPoint(mount_point)
+    , mountPoint(mountPoint)
 {
 }
 
