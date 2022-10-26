@@ -716,17 +716,17 @@ linglong::Runtime loadBundle(int argc, char **argv)
     }
 
     // process runtime
-    if (util::fs::exists(bundleRoot + "/runtime")) {
-        Mount m;
-        m.type = "bind";
-        m.fsType = Mount::Bind;
-        m.source = bundleRoot + "/runtime";
-        m.destination = util::format("/opt/runtime");
-        r.mounts->push_back(m);
-
-        m.source = bundleRoot + "/runtime/lib/i386-linux-gnu";
-        m.destination = util::format("/usr/lib/i386-linux-gnu");
-        r.mounts->push_back(m);
+    if (util::fs::exists(bundleRoot + "/lib/extra_files.txt")) {
+        std::ifstream extraFiles(bundleRoot + "/lib/extra_files.txt");
+        std::string path;
+        while (std::getline(extraFiles, path)) {
+            Mount m;
+            m.type = "rbind";
+            m.fsType = Mount::Bind;
+            m.source = bundleRoot + "/lib" + path;
+            m.destination = path;
+            r.mounts->push_back(m);
+        }
     }
 
     // process env
