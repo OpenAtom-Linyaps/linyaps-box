@@ -2,11 +2,11 @@
 include /usr/share/dpkg/default.mk
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
+VERSION = $(DEB_HOST_MULTIARCH)
+_PACK_VER = $(shell echo $(VERSION) | awk -F'[+_~-]' '{print $$1}')
+
 %:
 	dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure -- \
-	  -DCMAKE_BUILD_TYPE=Release \
-	  -DCMAKE_INSTALL_PREFIX=/usr \
-      -DAPP_VERSION=$(DEB_VERSION_UPSTREAM) -DVERSION=$(DEB_VERSION_UPSTREAM) LIB_INSTALL_DIR=/usr/lib DH_AUTO_ARGS
+	dh_auto_configure -- -DDVERSION=$(_PACK_VER)
