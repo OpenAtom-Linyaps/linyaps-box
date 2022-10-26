@@ -1,7 +1,7 @@
 /*
  * SPDX-FileCopyrightText: 2022 UnionTech Software Technology Co., Ltd.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
 #include <dirent.h>
@@ -11,8 +11,6 @@
 #include "container/container_option.h"
 
 using namespace linglong;
-
-
 
 const std::string kLoadTemplate = R"KLT00(
 {
@@ -78,8 +76,6 @@ const std::string kLoadTemplate = R"KLT00(
 	}
 }
 )KLT00";
-
-
 
 // start container from tmp mount path
 linglong::Runtime loadBundle(int argc, char **argv)

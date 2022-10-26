@@ -1,7 +1,7 @@
 /*
  * SPDX-FileCopyrightText: 2022 UnionTech Software Technology Co., Ltd.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
 #ifndef LINGLONG_BOX_SRC_UTIL_MESSAGE_READER_H_
@@ -20,7 +20,7 @@ public:
     ~MessageReader();
     nlohmann::json read();
     void write(std::string msg);
-    void writeChildExit(int pid, std::string cmd,int wstatus, std::string info);
+    void writeChildExit(int pid, std::string cmd, int wstatus, std::string info);
     int fd;
 
 private:
