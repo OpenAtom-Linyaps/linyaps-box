@@ -83,7 +83,7 @@ public:
         return 0;
     }
 
-    bool touch()
+    void touch()
     {
         if (!exists(this->string())) {
             std::ofstream(this->string());
