@@ -1,3 +1,9 @@
+linglong-box (1.3.3.12-1) unstable; urgency=medium
+
+  * update version.
+
+ -- Chen Linxuan <chenlinxuan@uniontech.com>  Thu, 27 Oct 2022 14:58:00 +0800
+
 linglong-box (1.3.3.11-1) unstable; urgency=medium
 
   * update version to 1.3.3.11-1 for deepin.
