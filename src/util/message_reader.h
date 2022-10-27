@@ -24,7 +24,7 @@ public:
     ~MessageReader();
     nlohmann::json read();
     void write(std::string msg);
-    void writeChildExit(int pid, std::string cmd,int wstatus, std::string info);
+    void writeChildExit(int pid, std::string cmd, int wstatus, std::string info);
     int fd;
 
 private:
