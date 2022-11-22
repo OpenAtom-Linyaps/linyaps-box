@@ -41,17 +41,17 @@
 
 namespace linglong {
 
-static const std::string ll_dbus_proxy_bin = "/usr/bin/ll-dbus-proxy";
+static const std::string llDbusProxyBin = "/usr/bin/ll-dbus-proxy";
 // start dbus proxy
-static int StartDbusProxy(const Runtime &r)
+static int StartDbusProxy(const Runtime &runtime)
 {
-    if (!(r.annotations.has_value() && r.annotations->dbus_proxy_info.has_value()
-          && r.annotations->dbus_proxy_info->enable)) {
+    if (!(runtime.annotations.has_value() && runtime.annotations->dbus_proxy_info.has_value()
+          && runtime.annotations->dbus_proxy_info->enable)) {
         logInf() << "dbus proxy disabled";
         return -1;
     }
 
-    const auto &info = r.annotations->dbus_proxy_info;
+    const auto &info = runtime.annotations->dbus_proxy_info;
 
     std::string socket_path = info->proxy_path;
 
@@ -72,7 +72,7 @@ static int StartDbusProxy(const Runtime &r)
         std::string name_fliter_string = linglong::util::str_vec_join(name_fliter, ',');
         std::string path_fliter_string = linglong::util::str_vec_join(path_fliter, ',');
         std::string interface_fliter_string = linglong::util::str_vec_join(interface_fliter, ',');
-        char const *const args[] = {ll_dbus_proxy_bin.c_str(),
+        char const *const args[] = {llDbusProxyBin.c_str(),
                                     app_id.c_str(),
                                     bus_type.c_str(),
                                     socket_path.c_str(),
@@ -235,34 +235,32 @@ static bool parse_wstatus(const int &wstatus, std::string &info)
 struct ContainerPrivate {
 public:
     ContainerPrivate(Runtime r, std::unique_ptr<util::MessageReader> reader, Container * /*parent*/)
-        : host_root_(r.root.path)
-        , r(std::move(r))
-        , native_mounter_(new HostMount)
-        , overlayfs_mounter_(new HostMount)
-        , fuseproxy_mounter_(new HostMount)
+        : hostRoot(r.root.path)
+        , runtime(std::move(r))
+        , nativeMounter(new HostMount)
+        , overlayfsMounter(new HostMount)
+        , fuseproxyMounter(new HostMount)
         , reader(std::move(reader))
     {
     }
 
-    int sem_id = -1;
+    std::string hostRoot;
 
-    std::string host_root_;
-
-    Runtime r;
+    Runtime runtime;
 
     //    bool use_delay_new_user_ns = false;
-    bool use_new_cgroup_ns = false;
+    bool useNewCgroupNs = false;
 
-    Option opt;
+    Option option;
 
-    uid_t host_uid_ = -1;
-    gid_t host_gid_ = -1;
+    uid_t hostUid = -1;
+    gid_t hostGid = -1;
 
-    std::unique_ptr<HostMount> native_mounter_;
-    std::unique_ptr<HostMount> overlayfs_mounter_;
-    std::unique_ptr<HostMount> fuseproxy_mounter_;
+    std::unique_ptr<HostMount> nativeMounter;
+    std::unique_ptr<HostMount> overlayfsMounter;
+    std::unique_ptr<HostMount> fuseproxyMounter;
 
-    HostMount *container_mounter_ = nullptr;
+    HostMount *containerMounter = nullptr;
 
     std::unique_ptr<util::MessageReader> reader;
 
@@ -286,7 +284,7 @@ public:
     {
         chdir("/");
 
-        if (opt.link_lfs) {
+        if (option.linkLfs) {
             symlink("/usr/bin", "/bin");
             symlink("/usr/lib", "/lib");
             symlink("/usr/lib32", "/lib32");
@@ -319,9 +317,9 @@ public:
         };
 
         // TODO(iceyer): not work now
-        if (!opt.rootless) {
+        if (!option.rootless) {
             for (auto const &dev : list) {
-                auto path = host_root_ + dev.path;
+                auto path = hostRoot + dev.path;
                 int ret = mknod(path.c_str(), dev.mode, dev.dev);
                 if (0 != ret) {
                     logErr() << "mknod" << path << dev.mode << dev.dev << "failed with" << util::RetErrString(ret);
@@ -331,21 +329,21 @@ public:
             }
         } else {
             for (auto const &dev : list) {
-                Mount m;
-                m.destination = dev.path;
-                m.type = "bind";
-                m.data = std::vector<std::string> {};
-                m.flags = MS_BIND;
-                m.fsType = Mount::Bind;
-                m.source = dev.path;
+                Mount mount;
+                mount.destination = dev.path;
+                mount.type = "bind";
+                mount.data = std::vector<std::string> {};
+                mount.flags = MS_BIND;
+                mount.fsType = Mount::Bind;
+                mount.source = dev.path;
 
-                this->container_mounter_->MountNode(m);
+                this->containerMounter->MountNode(mount);
             }
         }
 
         // FIXME(iceyer): /dev/console is set up if terminal is enabled in the config by bind mounting the
         // pseudoterminal slave to /dev/console.
-        symlink("/dev/pts/ptmx", (this->host_root_ + "/dev/ptmx").c_str());
+        symlink("/dev/pts/ptmx", (this->hostRoot + "/dev/ptmx").c_str());
 
         return 0;
     }
@@ -427,8 +425,8 @@ public:
                     if (json.empty()) {
                         break;
                     }
-                    auto p = json.get<Process>();
-                    forkAndExecProcess(p, true);
+                    auto process = json.get<Process>();
+                    forkAndExecProcess(process, true);
                 } else {
                     logWan() << "Unknown fd";
                 }
@@ -437,7 +435,7 @@ public:
         return;
     }
 
-    bool forkAndExecProcess(const Process p, bool unblock = false)
+    bool forkAndExecProcess(const Process process, bool unblock = false)
     {
         // FIXME: parent may dead before this return.
         prctl(PR_SET_PDEATHSIG, SIGKILL);
@@ -458,16 +456,16 @@ public:
                 if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
                     logWan() << "sigprocmask unblock";
             }
-            logDbg() << "process.args:" << p.args;
+            logDbg() << "process.args:" << process.args;
 
             int ret;
-            ret = chdir(p.cwd.c_str());
+            ret = chdir(process.cwd.c_str());
             if (ret) {
-                logErr() << "failed to chdir to" << p.cwd.c_str();
+                logErr() << "failed to chdir to" << process.cwd.c_str();
             }
 
             // for PATH
-            for (auto env : p.env) {
+            for (const auto &env : process.env) {
                 auto kv = util::str_spilt(env, "=");
                 if (kv.size() == 2)
                     setenv(kv.at(0).c_str(), kv.at(1).c_str(), 1);
@@ -479,13 +477,13 @@ public:
             }
 
             logInf() << "start exec process";
-            ret = util::Exec(p.args, p.env);
+            ret = util::Exec(process.args, process.env);
             if (0 != ret) {
                 logErr() << "exec failed" << util::RetErrString(ret);
             }
             exit(ret);
         } else {
-            pidMap.insert(make_pair(pid, p.args[0]));
+            pidMap.insert(make_pair(pid, process.args[0]));
         }
 
         return true;
@@ -494,9 +492,9 @@ public:
     int PivotRoot() const
     {
         int ret = -1;
-        chdir(host_root_.c_str());
+        chdir(hostRoot.c_str());
 
-        if (opt.rootless && r.annotations->overlayfs.has_value()) {
+        if (option.rootless && runtime.annotations->overlayfs.has_value()) {
             int flag = MS_MOVE;
             ret = mount(".", "/", nullptr, flag, nullptr);
             if (0 != ret) {
@@ -517,27 +515,27 @@ public:
                 return -1;
             }
 
-            auto ll_host_filename = "ll-host";
+            auto llHostFilename = "ll-host";
 
-            auto ll_host_path = host_root_ + "/" + ll_host_filename;
+            auto llHostPath = hostRoot + "/" + llHostFilename;
 
-            mkdir(ll_host_path.c_str(), 0755);
+            mkdir(llHostPath.c_str(), 0755);
 
-            ret = syscall(SYS_pivot_root, host_root_.c_str(), ll_host_path.c_str());
+            ret = syscall(SYS_pivot_root, hostRoot.c_str(), llHostPath.c_str());
             if (0 != ret) {
-                logErr() << "SYS_pivot_root failed" << host_root_ << util::errnoString() << errno << ret;
+                logErr() << "SYS_pivot_root failed" << hostRoot << util::errnoString() << errno << ret;
                 return -1;
             }
 
             chdir("/");
             ret = chroot(".");
             if (0 != ret) {
-                logErr() << "chroot failed" << host_root_ << util::errnoString() << errno;
+                logErr() << "chroot failed" << hostRoot << util::errnoString() << errno;
                 return -1;
             }
 
             chdir("/");
-            umount2(ll_host_filename, MNT_DETACH);
+            umount2(llHostFilename, MNT_DETACH);
         }
 
         return 0;
@@ -546,62 +544,62 @@ public:
     int PrepareRootfs()
     {
         auto PrepareOverlayfsRootfs = [&](const AnnotationsOverlayfs &overlayfs) -> int {
-            native_mounter_->Setup(new NativeFilesystemDriver(overlayfs.lower_parent));
+            nativeMounter->Setup(new NativeFilesystemDriver(overlayfs.lower_parent));
 
-            util::str_vec lower_dirs = {};
-            int prefix_index = 0;
-            for (auto m : overlayfs.mounts) {
-                auto prefix = util::fs::path(util::format("/%d", prefix_index));
-                m.destination = (prefix / m.destination).string();
-                if (0 == native_mounter_->MountNode(m)) {
-                    lower_dirs.push_back((util::fs::path(overlayfs.lower_parent) / prefix).string());
+            util::str_vec lowerDirs = {};
+            int prefixIndex = 0;
+            for (auto mount : overlayfs.mounts) {
+                auto prefix = util::fs::path(util::format("/%d", prefixIndex));
+                mount.destination = (prefix / mount.destination).string();
+                if (0 == nativeMounter->MountNode(mount)) {
+                    lowerDirs.push_back((util::fs::path(overlayfs.lower_parent) / prefix).string());
                 }
-                ++prefix_index;
+                ++prefixIndex;
             }
 
-            overlayfs_mounter_->Setup(
-                new OverlayfsFuseFilesystemDriver(lower_dirs, overlayfs.upper, overlayfs.workdir, host_root_));
+            overlayfsMounter->Setup(
+                new OverlayfsFuseFilesystemDriver(lowerDirs, overlayfs.upper, overlayfs.workdir, hostRoot));
 
-            container_mounter_ = overlayfs_mounter_.get();
+            containerMounter = overlayfsMounter.get();
             return -1;
         };
 
         auto PrepareFuseProxyRootfs = [&](const AnnotationsOverlayfs &overlayfs) -> int {
-            native_mounter_->Setup(new NativeFilesystemDriver(overlayfs.lower_parent));
+            nativeMounter->Setup(new NativeFilesystemDriver(overlayfs.lower_parent));
 
             util::str_vec mounts = {};
-            for (auto const &m : overlayfs.mounts) {
-                auto mount_item = util::format("%s:%s\n", m.source.c_str(), m.destination.c_str());
-                mounts.push_back(mount_item);
+            for (auto const &mount : overlayfs.mounts) {
+                auto mountItem = util::format("%s:%s\n", mount.source.c_str(), mount.destination.c_str());
+                mounts.push_back(mountItem);
             }
 
-            fuseproxy_mounter_->Setup(new FuseProxyFilesystemDriver(mounts, host_root_));
+            fuseproxyMounter->Setup(new FuseProxyFilesystemDriver(mounts, hostRoot));
 
-            container_mounter_ = fuseproxy_mounter_.get();
+            containerMounter = fuseproxyMounter.get();
             return -1;
         };
 
         auto PrepareNativeRootfs = [&](const AnnotationsNativeRootfs &native) -> int {
-            native_mounter_->Setup(new NativeFilesystemDriver(r.root.path));
+            nativeMounter->Setup(new NativeFilesystemDriver(runtime.root.path));
 
-            for (auto m : native.mounts) {
-                native_mounter_->MountNode(m);
+            for (const auto &mount : native.mounts) {
+                nativeMounter->MountNode(mount);
             }
 
-            container_mounter_ = native_mounter_.get();
+            containerMounter = nativeMounter.get();
             return -1;
         };
 
-        if (r.annotations.has_value() && r.annotations->overlayfs.has_value()) {
+        if (runtime.annotations.has_value() && runtime.annotations->overlayfs.has_value()) {
             auto env = getenv("LL_BOX_FS_BACKEND");
             if (env && std::string(env) == "fuse-proxy") {
-                return PrepareFuseProxyRootfs(r.annotations->overlayfs.value());
+                return PrepareFuseProxyRootfs(runtime.annotations->overlayfs.value());
             } else {
-                return PrepareOverlayfsRootfs(r.annotations->overlayfs.value());
+                return PrepareOverlayfsRootfs(runtime.annotations->overlayfs.value());
             }
         } else {
-            return PrepareNativeRootfs(r.annotations->native.has_value() ? r.annotations->native.value()
-                                                                         : AnnotationsNativeRootfs());
+            return PrepareNativeRootfs(runtime.annotations->native.has_value() ? runtime.annotations->native.value()
+                                                                               : AnnotationsNativeRootfs());
         }
 
         return -1;
@@ -609,9 +607,9 @@ public:
 
     int MountContainerPath()
     {
-        if (r.mounts.has_value()) {
-            for (auto const &m : r.mounts.value()) {
-                container_mounter_->MountNode(m);
+        if (runtime.mounts.has_value()) {
+            for (auto const &mount : runtime.mounts.value()) {
+                containerMounter->MountNode(mount);
             }
         };
 
@@ -643,23 +641,23 @@ int HookExec(const Hook &hook)
 
 int NonePrivilegeProc(void *arg)
 {
-    auto &c = *reinterpret_cast<ContainerPrivate *>(arg);
+    auto &containerPrivate = *reinterpret_cast<ContainerPrivate *>(arg);
 
-    if (c.opt.rootless) {
+    if (containerPrivate.option.rootless) {
         // TODO(iceyer): use option
 
         Linux linux;
-        IDMap id_map;
+        IDMap idMap;
 
-        id_map.containerID = c.host_uid_;
-        id_map.hostID = 0;
-        id_map.size = 1;
-        linux.uidMappings.push_back(id_map);
+        idMap.containerID = containerPrivate.hostUid;
+        idMap.hostID = 0;
+        idMap.size = 1;
+        linux.uidMappings.push_back(idMap);
 
-        id_map.containerID = c.host_gid_;
-        id_map.hostID = 0;
-        id_map.size = 1;
-        linux.gidMappings.push_back(id_map);
+        idMap.containerID = containerPrivate.hostGid;
+        idMap.hostID = 0;
+        idMap.size = 1;
+        linux.gidMappings.push_back(idMap);
 
         ConfigUserNamespace(linux, 0);
     }
@@ -670,22 +668,22 @@ int NonePrivilegeProc(void *arg)
         return -1;
     }
 
-    if (c.r.hooks.has_value() && c.r.hooks->prestart.has_value()) {
-        for (auto const &preStart : *c.r.hooks->prestart) {
+    if (containerPrivate.runtime.hooks.has_value() && containerPrivate.runtime.hooks->prestart.has_value()) {
+        for (auto const &preStart : *containerPrivate.runtime.hooks->prestart) {
             HookExec(preStart);
         }
     }
 
-    if (!c.opt.rootless) {
+    if (!containerPrivate.option.rootless) {
         seteuid(0);
         // todo: check return value
-        ConfigSeccomp(c.r.linux.seccomp);
+        ConfigSeccomp(containerPrivate.runtime.linux.seccomp);
         ContainerPrivate::DropPermissions();
     }
 
-    c.forkAndExecProcess(c.r.process);
+    containerPrivate.forkAndExecProcess(containerPrivate.runtime.process);
 
-    c.waitChildAndExec();
+    containerPrivate.waitChildAndExec();
     return 0;
 }
 
@@ -696,14 +694,14 @@ void sigtermHandler(int)
 
 int EntryProc(void *arg)
 {
-    auto &c = *reinterpret_cast<ContainerPrivate *>(arg);
+    auto &containerPrivate = *reinterpret_cast<ContainerPrivate *>(arg);
 
-    if (c.opt.rootless) {
-        ConfigUserNamespace(c.r.linux, 0);
+    if (containerPrivate.option.rootless) {
+        ConfigUserNamespace(containerPrivate.runtime.linux, 0);
     }
 
     // FIXME: change HOSTNAME will broken XAUTH
-    auto new_hostname = c.r.hostname;
+    auto new_hostname = containerPrivate.runtime.hostname;
     //    if (sethostname(new_hostname.c_str(), strlen(new_hostname.c_str())) == -1) {
     //        logErr() << "sethostname failed" << util::errnoString();
     //        return -1;
@@ -716,7 +714,7 @@ int EntryProc(void *arg)
         return -1;
     }
 
-    std::string container_root = c.r.annotations->container_root_path;
+    std::string container_root = containerPrivate.runtime.annotations->container_root_path;
     flags = MS_NODEV | MS_NOSUID;
     ret = mount("tmpfs", container_root.c_str(), "tmpfs", flags, nullptr);
     if (0 != ret) {
@@ -726,33 +724,33 @@ int EntryProc(void *arg)
     }
 
     // NOTE(iceyer): it's not standard oci action
-    c.PrepareRootfs();
+    containerPrivate.PrepareRootfs();
 
-    c.MountContainerPath();
+    containerPrivate.MountContainerPath();
 
-    if (c.use_new_cgroup_ns) {
-        ConfigCgroupV2(c.r.linux.cgroupsPath, c.r.linux.resources, getpid());
+    if (containerPrivate.useNewCgroupNs) {
+        ConfigCgroupV2(containerPrivate.runtime.linux.cgroupsPath, containerPrivate.runtime.linux.resources, getpid());
     }
 
-    c.PrepareDefaultDevices();
+    containerPrivate.PrepareDefaultDevices();
 
-    c.PivotRoot();
+    containerPrivate.PivotRoot();
 
-    c.PrepareLinks();
+    containerPrivate.PrepareLinks();
 
-    if (!c.opt.rootless) {
-        auto unshare_flags = 0;
+    if (!containerPrivate.option.rootless) {
+        auto unshareFlags = 0;
         // TODO(iceyer): no need user namespace in setuid
         //        if (c.use_delay_new_user_ns) {
         //            unshare_flags |= CLONE_NEWUSER;
         //        }
-        if (c.use_new_cgroup_ns) {
-            unshare_flags |= CLONE_NEWCGROUP;
+        if (containerPrivate.useNewCgroupNs) {
+            unshareFlags |= CLONE_NEWCGROUP;
         }
-        if (unshare_flags) {
-            ret = unshare(unshare_flags);
+        if (unshareFlags) {
+            ret = unshare(unshareFlags);
             if (0 != ret) {
-                logErr() << "unshare failed" << unshare_flags << util::RetErrString(ret);
+                logErr() << "unshare failed" << unshareFlags << util::RetErrString(ret);
             }
         }
         //        if (c.use_delay_new_user_ns) {
@@ -761,9 +759,9 @@ int EntryProc(void *arg)
         //        }
     }
 
-    int none_privilege_proc_flag = SIGCHLD | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNS;
+    int nonePrivilegeProcFlag = SIGCHLD | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNS;
 
-    int noPrivilegePid = util::PlatformClone(NonePrivilegeProc, none_privilege_proc_flag, arg);
+    int noPrivilegePid = util::PlatformClone(NonePrivilegeProc, nonePrivilegeProcFlag, arg);
     if (noPrivilegePid < 0) {
         logErr() << "clone failed" << util::RetErrString(noPrivilegePid);
         return -1;
@@ -776,7 +774,7 @@ int EntryProc(void *arg)
 
     // FIXME(interactive bash): if need keep interactive shell
 
-    c.reader.reset();
+    containerPrivate.reader.reset();
     signal(SIGTERM, sigtermHandler);
     util::WaitAllUntil(noPrivilegePid);
     return -1;
@@ -787,19 +785,19 @@ Container::Container(const Runtime &r, std::unique_ptr<util::MessageReader> read
 {
 }
 
-int Container::Start(const Option &opt)
+int Container::Start(const Option &option)
 {
-    auto &c = *reinterpret_cast<ContainerPrivate *>(dd_ptr.get());
-    c.opt = opt;
+    auto &contanerPrivate = *reinterpret_cast<ContainerPrivate *>(dd_ptr.get());
+    contanerPrivate.option = option;
 
-    if (opt.rootless) {
-        c.host_uid_ = geteuid();
-        c.host_gid_ = getegid();
+    if (option.rootless) {
+        contanerPrivate.hostUid = geteuid();
+        contanerPrivate.hostGid = getegid();
     }
 
     int flags = SIGCHLD | CLONE_NEWNS;
 
-    for (auto const &n : dd_ptr->r.linux.namespaces) {
+    for (auto const &n : contanerPrivate.runtime.linux.namespaces) {
         switch (n.type) {
         case CLONE_NEWIPC:
         case CLONE_NEWUTS:
@@ -812,26 +810,26 @@ int Container::Start(const Option &opt)
             //            dd_ptr->use_delay_new_user_ns = true;
             break;
         case CLONE_NEWCGROUP:
-            dd_ptr->use_new_cgroup_ns = true;
+            contanerPrivate.useNewCgroupNs = true;
             break;
         default:
             return -1;
         }
     }
 
-    if (opt.rootless) {
+    if (option.rootless) {
         flags |= CLONE_NEWUSER;
     }
 
-    StartDbusProxy(c.r);
+    StartDbusProxy(contanerPrivate.runtime);
 
-    int entry_pid = util::PlatformClone(EntryProc, flags, (void *)dd_ptr.get());
-    if (entry_pid < 0) {
-        logErr() << "clone failed" << util::RetErrString(entry_pid);
+    int entryPid = util::PlatformClone(EntryProc, flags, (void *)dd_ptr.get());
+    if (entryPid < 0) {
+        logErr() << "clone failed" << util::RetErrString(entryPid);
         return -1;
     }
 
-    c.reader.reset();
+    contanerPrivate.reader.reset();
 
     // FIXME: maybe we need c.opt.child_need_wait?
 
@@ -841,7 +839,7 @@ int Container::Start(const Option &opt)
     prctl(PR_SET_PDEATHSIG, SIGKILL);
 
     // FIXME(interactive bash): if need keep interactive shell
-    util::WaitAllUntil(entry_pid);
+    util::WaitAllUntil(entryPid);
 
     return 0;
 }

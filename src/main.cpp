@@ -28,20 +28,20 @@ int main(int argc, char **argv)
     // TODO(iceyer): move loader to ll-loader?
     bool is_load_bundle = (argc == 4);
 
-    linglong::Option opt;
+    linglong::Option option;
     // TODO(iceyer): default in rootless
     if (geteuid() != 0) {
-        opt.rootless = true;
+        option.rootless = true;
     }
 
     try {
-        linglong::Runtime r;
+        linglong::Runtime runtime;
         nlohmann::json json;
         std::unique_ptr<linglong::util::MessageReader> reader = nullptr;
 
         if (is_load_bundle) {
-            r = loadBundle(argc, argv);
-            linglong::to_json(json, r);
+            runtime = loadBundle(argc, argv);
+            linglong::to_json(json, runtime);
         } else {
             int socket = atoi(argv[1]);
             if (socket <= 0) {
@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 
             json = reader->read();
 
-            r = json.get<linglong::Runtime>();
+            runtime = json.get<linglong::Runtime>();
         }
 
         if (linglong::util::fs::exists("/tmp/ll-debug")) {
@@ -61,8 +61,8 @@ int main(int argc, char **argv)
             origin.close();
         }
 
-        linglong::Container c(r, std::move(reader));
-        return c.Start(opt);
+        linglong::Container container(runtime, std::move(reader));
+        return container.Start(option);
     } catch (const std::exception &e) {
         logErr() << "failed: " << e.what();
         return -1;

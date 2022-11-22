@@ -108,8 +108,8 @@ static void DoWait(const int pid, int target = 0)
                 logDbg() << format("no child to wait");
                 return;
             } else {
-                auto str = errnoString();
-                logErr() << format("waitpid failed, %s", str.c_str());
+                auto string = errnoString();
+                logErr() << format("waitpid failed, %s", string.c_str());
                 return;
             }
         }

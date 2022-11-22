@@ -23,7 +23,7 @@ namespace linglong {
  */
 struct Option {
     bool rootless = false;
-    bool link_lfs = true;
+    bool linkLfs = true;
 };
 
 } // namespace linglong
