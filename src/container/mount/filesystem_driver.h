@@ -19,6 +19,7 @@ class FilesystemDriver
 {
 public:
     virtual int Setup() = 0;
+    virtual ~FilesystemDriver();
     virtual int CreateDestinationPath(const util::fs::path &container_destination_path) = 0;
     virtual util::fs::path HostPath(const util::fs::path &container_destination_path) const = 0;
     virtual util::fs::path HostSource(const util::fs::path &container_destination_path) const = 0;

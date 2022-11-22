@@ -137,7 +137,9 @@ file_status status(const path &p, std::error_code &ec)
         break;
     case S_IFIFO:
         ft = fifo_file;
+        break;
     case S_IFSOCK:
+        ft = socket_file;
         break;
     default:
         ft = type_unknown;

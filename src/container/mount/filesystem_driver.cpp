@@ -17,6 +17,8 @@
 
 namespace linglong {
 
+FilesystemDriver::~FilesystemDriver() = default;
+
 OverlayfsFuseFilesystemDriver::OverlayfsFuseFilesystemDriver(util::str_vec lower_dirs, std::string upper_dir,
                                                              std::string work_dir, std::string mount_point)
     : lower_dirs_(std::move(lower_dirs))
