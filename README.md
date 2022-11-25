@@ -77,7 +77,7 @@ We encourage you to report issues and contribute changes
 
 ## License
 
-This project is licensed under [GPLv3]().
+This project is licensed under LGPLv3.
 
 ## Credits and references
 
