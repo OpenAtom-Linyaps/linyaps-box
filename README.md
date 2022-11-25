@@ -78,7 +78,3 @@ We encourage you to report issues and contribute changes
 ## License
 
 This project is licensed under LGPLv3.
-
-## Credits and references
-
-- [OStree](https://github.com/ostreedev/ostree)
