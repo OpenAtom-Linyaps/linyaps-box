@@ -5,9 +5,12 @@
  */
 
 #include "message_reader.h"
-#include <fcntl.h>
-#include "unistd.h"
+
 #include "logger.h"
+#include "unistd.h"
+
+#include <fcntl.h>
+
 namespace linglong {
 namespace util {
 
@@ -58,7 +61,8 @@ nlohmann::json MessageReader::read()
 
 void MessageReader::writeChildExit(int pid, std::string cmd, int wstatus, std::string info)
 {
-    std::string msgTemplate = R"({"type":"childExit","pid":%d,"arg0":"%s","wstatus":%d,"information":"%s"})";
+    std::string msgTemplate =
+            R"({"type":"childExit","pid":%d,"arg0":"%s","wstatus":%d,"information":"%s"})";
     auto source = util::format(msgTemplate, pid, cmd.c_str(), wstatus, info.c_str());
     write(source);
 }

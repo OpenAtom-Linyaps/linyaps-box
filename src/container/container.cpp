@@ -6,38 +6,39 @@
 
 #include "container.h"
 
-#include <sys/mman.h>
+#include "container/container_option.h"
+#include "container/mount/filesystem_driver.h"
+#include "container/mount/host_mount.h"
+#include "container/seccomp.h"
+#include "util/debug/debug.h"
+#include "util/filesystem.h"
+#include "util/logger.h"
+#include "util/platform.h"
+#include "util/semaphore.h"
+
+#include <sys/epoll.h>
 #include <sys/mount.h>
-#include <sys/stat.h>
+#include <sys/prctl.h>
+#include <sys/signalfd.h>
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
-#include <sys/prctl.h>
-#include <sys/wait.h>
-#include <sys/signalfd.h>
-#include <sys/epoll.h>
-#include <fcntl.h>
-#include <grp.h>
-#include <sched.h>
-#include <unistd.h>
 
 #include <cerrno>
 #include <map>
 #include <utility>
 
-#include "util/logger.h"
-#include "util/filesystem.h"
-#include "util/semaphore.h"
-#include "util/debug/debug.h"
-#include "util/platform.h"
-
-#include "container/seccomp.h"
-#include "container/container_option.h"
-#include "container/mount/host_mount.h"
-#include "container/mount/filesystem_driver.h"
+#include <fcntl.h>
+#include <grp.h>
+#include <sched.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 namespace linglong {
 
 static const std::string llDbusProxyBin = "/usr/bin/ll-dbus-proxy";
+
 // start dbus proxy
 static int StartDbusProxy(const Runtime &runtime)
 {
@@ -68,14 +69,14 @@ static int StartDbusProxy(const Runtime &runtime)
         std::string name_fliter_string = linglong::util::str_vec_join(name_fliter, ',');
         std::string path_fliter_string = linglong::util::str_vec_join(path_fliter, ',');
         std::string interface_fliter_string = linglong::util::str_vec_join(interface_fliter, ',');
-        char const *const args[] = {llDbusProxyBin.c_str(),
-                                    app_id.c_str(),
-                                    bus_type.c_str(),
-                                    socket_path.c_str(),
-                                    name_fliter_string.c_str(),
-                                    path_fliter_string.c_str(),
-                                    interface_fliter_string.c_str(),
-                                    NULL};
+        char const *const args[] = { llDbusProxyBin.c_str(),
+                                     app_id.c_str(),
+                                     bus_type.c_str(),
+                                     socket_path.c_str(),
+                                     name_fliter_string.c_str(),
+                                     path_fliter_string.c_str(),
+                                     interface_fliter_string.c_str(),
+                                     NULL };
         int ret = execvp(args[0], (char **)args);
         logErr() << "start dbus proxy failed, ret=" << ret;
         exit(ret);
@@ -132,7 +133,9 @@ static int ConfigUserNamespace(const linglong::Linux &linux, int initPid)
 }
 
 // FIXME(iceyer): not work now
-static int ConfigCgroupV2(const std::string &cgroupsPath, const linglong::Resources &res, int initPid)
+static int ConfigCgroupV2(const std::string &cgroupsPath,
+                          const linglong::Resources &res,
+                          int initPid)
 {
     if (cgroupsPath.empty()) {
         logWan() << "skip with empty cgroupsPath";
@@ -175,9 +178,9 @@ static int ConfigCgroupV2(const std::string &cgroupsPath, const linglong::Resour
         const auto memSwapMax = res.memory.swap - memMax;
         const auto memLow = res.memory.reservation;
         writeConfig({
-            {subCgroupPath("memory.max"), util::format("%d", memMax)},
-            {subCgroupPath("memory.swap.max"), util::format("%d", memSwapMax)},
-            {subCgroupPath("memory.low"), util::format("%d", memLow)},
+                { subCgroupPath("memory.max"), util::format("%d", memMax) },
+                { subCgroupPath("memory.swap.max"), util::format("%d", memSwapMax) },
+                { subCgroupPath("memory.low"), util::format("%d", memLow) },
         });
     }
 
@@ -188,13 +191,13 @@ static int ConfigCgroupV2(const std::string &cgroupsPath, const linglong::Resour
     const auto cpuWeight = (1 + ((res.cpu.shares - 2) * 9999) / 262142);
 
     writeConfig({
-        {subCgroupPath("cpu.max"), util::format("%d %d", cpuMax, cpuPeriod)},
-        {subCgroupPath("cpu.weight"), util::format("%d", cpuWeight)},
+            { subCgroupPath("cpu.max"), util::format("%d %d", cpuMax, cpuPeriod) },
+            { subCgroupPath("cpu.weight"), util::format("%d", cpuWeight) },
     });
 
     // config pid
     writeConfig({
-        {subCgroupPath("cgroup.procs"), util::format("%d", initPid)},
+            { subCgroupPath("cgroup.procs"), util::format("%d", initPid) },
     });
 
     logDbg() << "move" << initPid << "to new cgroups";
@@ -228,7 +231,8 @@ static bool parse_wstatus(const int &wstatus, std::string &info)
     }
 }
 
-struct ContainerPrivate {
+struct ContainerPrivate
+{
 public:
     ContainerPrivate(Runtime r, std::unique_ptr<util::MessageReader> reader, Container * /*parent*/)
         : hostRoot(r.root.path)
@@ -265,7 +269,7 @@ public:
 public:
     static int DropPermissions()
     {
-        __gid_t newgid[1] = {getgid()};
+        __gid_t newgid[1] = { getgid() };
         auto newuid = getuid();
         auto olduid = geteuid();
 
@@ -300,16 +304,20 @@ public:
 
     int PrepareDefaultDevices() const
     {
-        struct Device {
+        struct Device
+        {
             std::string path;
             mode_t mode;
             dev_t dev;
         };
 
         std::vector<Device> list = {
-            {"/dev/null", S_IFCHR | 0666, makedev(1, 3)},    {"/dev/zero", S_IFCHR | 0666, makedev(1, 5)},
-            {"/dev/full", S_IFCHR | 0666, makedev(1, 7)},    {"/dev/random", S_IFCHR | 0666, makedev(1, 8)},
-            {"/dev/urandom", S_IFCHR | 0666, makedev(1, 9)}, {"/dev/tty", S_IFCHR | 0666, makedev(5, 0)},
+            { "/dev/null", S_IFCHR | 0666, makedev(1, 3) },
+            { "/dev/zero", S_IFCHR | 0666, makedev(1, 5) },
+            { "/dev/full", S_IFCHR | 0666, makedev(1, 7) },
+            { "/dev/random", S_IFCHR | 0666, makedev(1, 8) },
+            { "/dev/urandom", S_IFCHR | 0666, makedev(1, 9) },
+            { "/dev/tty", S_IFCHR | 0666, makedev(5, 0) },
         };
 
         // TODO(iceyer): not work now
@@ -318,7 +326,8 @@ public:
                 auto path = hostRoot + dev.path;
                 int ret = mknod(path.c_str(), dev.mode, dev.dev);
                 if (0 != ret) {
-                    logErr() << "mknod" << path << dev.mode << dev.dev << "failed with" << util::RetErrString(ret);
+                    logErr() << "mknod" << path << dev.mode << dev.dev << "failed with"
+                             << util::RetErrString(ret);
                 }
                 chmod(path.c_str(), dev.mode | 0xFFFF);
                 chown(path.c_str(), 0, 0);
@@ -328,7 +337,7 @@ public:
                 Mount mount;
                 mount.destination = dev.path;
                 mount.type = "bind";
-                mount.data = std::vector<std::string> {};
+                mount.data = std::vector<std::string>{};
                 mount.flags = MS_BIND;
                 mount.fsType = Mount::Bind;
                 mount.source = dev.path;
@@ -337,8 +346,8 @@ public:
             }
         }
 
-        // FIXME(iceyer): /dev/console is set up if terminal is enabled in the config by bind mounting the
-        // pseudoterminal slave to /dev/console.
+        // FIXME(iceyer): /dev/console is set up if terminal is enabled in the config by bind
+        // mounting the pseudoterminal slave to /dev/console.
         symlink("/dev/pts/ptmx", (this->hostRoot + "/dev/ptmx").c_str());
 
         return 0;
@@ -519,7 +528,8 @@ public:
 
             ret = syscall(SYS_pivot_root, hostRoot.c_str(), llHostPath.c_str());
             if (0 != ret) {
-                logErr() << "SYS_pivot_root failed" << hostRoot << util::errnoString() << errno << ret;
+                logErr() << "SYS_pivot_root failed" << hostRoot << util::errnoString() << errno
+                         << ret;
                 return -1;
             }
 
@@ -553,8 +563,10 @@ public:
                 ++prefixIndex;
             }
 
-            overlayfsMounter->Setup(
-                new OverlayfsFuseFilesystemDriver(lowerDirs, overlayfs.upper, overlayfs.workdir, hostRoot));
+            overlayfsMounter->Setup(new OverlayfsFuseFilesystemDriver(lowerDirs,
+                                                                      overlayfs.upper,
+                                                                      overlayfs.workdir,
+                                                                      hostRoot));
 
             containerMounter = overlayfsMounter.get();
             return -1;
@@ -565,7 +577,8 @@ public:
 
             util::str_vec mounts = {};
             for (auto const &mount : overlayfs.mounts) {
-                auto mountItem = util::format("%s:%s\n", mount.source.c_str(), mount.destination.c_str());
+                auto mountItem =
+                        util::format("%s:%s\n", mount.source.c_str(), mount.destination.c_str());
                 mounts.push_back(mountItem);
             }
 
@@ -594,8 +607,9 @@ public:
                 return PrepareOverlayfsRootfs(runtime.annotations->overlayfs.value());
             }
         } else {
-            return PrepareNativeRootfs(runtime.annotations->native.has_value() ? runtime.annotations->native.value()
-                                                                               : AnnotationsNativeRootfs());
+            return PrepareNativeRootfs(runtime.annotations->native.has_value()
+                                               ? runtime.annotations->native.value()
+                                               : AnnotationsNativeRootfs());
         }
 
         return -1;
@@ -664,7 +678,8 @@ int NonePrivilegeProc(void *arg)
         return -1;
     }
 
-    if (containerPrivate.runtime.hooks.has_value() && containerPrivate.runtime.hooks->prestart.has_value()) {
+    if (containerPrivate.runtime.hooks.has_value()
+        && containerPrivate.runtime.hooks->prestart.has_value()) {
         for (auto const &preStart : *containerPrivate.runtime.hooks->prestart) {
             HookExec(preStart);
         }
@@ -725,7 +740,9 @@ int EntryProc(void *arg)
     containerPrivate.MountContainerPath();
 
     if (containerPrivate.useNewCgroupNs) {
-        ConfigCgroupV2(containerPrivate.runtime.linux.cgroupsPath, containerPrivate.runtime.linux.resources, getpid());
+        ConfigCgroupV2(containerPrivate.runtime.linux.cgroupsPath,
+                       containerPrivate.runtime.linux.resources,
+                       getpid());
     }
 
     containerPrivate.PrepareDefaultDevices();

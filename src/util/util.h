@@ -7,12 +7,12 @@
 #ifndef LINGLONG_BOX_SRC_UTIL_UTIL_H_
 #define LINGLONG_BOX_SRC_UTIL_UTIL_H_
 
-#include "macro.h"
 #include "common.h"
-#include "logger.h"
-#include "semaphore.h"
 #include "filesystem.h"
 #include "json.h"
+#include "logger.h"
+#include "macro.h"
+#include "semaphore.h"
 
 #include <fstream>
 

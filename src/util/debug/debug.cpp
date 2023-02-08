@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
-#include <pwd.h>
-#include <unistd.h>
-#include <grp.h>
-#include <dirent.h>
-#include <sys/stat.h>
+#include "debug.h"
 
 #include "util/logger.h"
-#include "debug.h"
+
+#include <dirent.h>
+#include <grp.h>
+#include <pwd.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace linglong {
 
@@ -109,13 +110,16 @@ void DumpFileInfo(const std::string &path)
 
 void DumpFileInfo1(const std::string &path, const char *func, int line)
 {
-    struct stat st {
+    struct stat st
+    {
     };
+
     auto ret = lstat(path.c_str(), &st);
     if (0 != ret) {
         DUMP_DBG(func, line) << path << util::RetErrString(ret);
     } else {
-        DUMP_DBG(func, line) << path << st.st_uid << st.st_gid << ((st.st_mode & S_IFMT) == S_IFDIR);
+        DUMP_DBG(func, line) << path << st.st_uid << st.st_gid
+                             << ((st.st_mode & S_IFMT) == S_IFDIR);
     }
 }
 

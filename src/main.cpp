@@ -4,18 +4,18 @@
  * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include "container/container.h"
+#include "container/container_option.h"
+#include "util/logger.h"
+#include "util/message_reader.h"
+#include "util/oci_runtime.h"
 
 #include <iostream>
 
-#include "util/logger.h"
-#include "util/oci_runtime.h"
-#include "container/container.h"
-#include "container/container_option.h"
-#include "util/message_reader.h"
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 extern linglong::Runtime loadBundle(int argc, char **argv);
 

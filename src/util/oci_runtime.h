@@ -7,9 +7,9 @@
 #ifndef LINGLONG_BOX_SRC_UTIL_OCI_RUNTIME_H_
 #define LINGLONG_BOX_SRC_UTIL_OCI_RUNTIME_H_
 
-#include <sys/mount.h>
-
 #include "util.h"
+
+#include <sys/mount.h>
 
 namespace linglong {
 
@@ -26,7 +26,8 @@ namespace linglong {
 
 #undef linux
 
-struct Root {
+struct Root
+{
     std::string path;
     tl::optional<bool> readonly;
 };
@@ -43,7 +44,8 @@ LLJS_TO_OBJ(Root)
     LLJS_TO(readonly);
 }
 
-struct Process {
+struct Process
+{
     util::str_vec args;
     util::str_vec env;
     std::string cwd;
@@ -63,7 +65,8 @@ inline void to_json(nlohmann::json &j, const Process &o)
     j["cwd"] = o.cwd;
 }
 
-struct Mount {
+struct Mount
+{
     enum Type {
         Unknown,
         Bind,
@@ -75,6 +78,7 @@ struct Mount {
         Cgroup,
         Cgroup2,
     };
+
     std::string destination;
     std::string type;
     std::string source;
@@ -87,50 +91,52 @@ struct Mount {
 inline void from_json(const nlohmann::json &j, Mount &o)
 {
     static std::map<std::string, Mount::Type> fsTypes = {
-        {"bind", Mount::Bind},   {"proc", Mount::Proc},   {"devpts", Mount::Devpts}, {"mqueue", Mount::Mqueue},
-        {"tmpfs", Mount::Tmpfs}, {"sysfs", Mount::Sysfs}, {"cgroup", Mount::Cgroup}, {"cgroup2", Mount::Cgroup2},
+        { "bind", Mount::Bind },     { "proc", Mount::Proc },       { "devpts", Mount::Devpts },
+        { "mqueue", Mount::Mqueue }, { "tmpfs", Mount::Tmpfs },     { "sysfs", Mount::Sysfs },
+        { "cgroup", Mount::Cgroup }, { "cgroup2", Mount::Cgroup2 },
     };
 
-    struct mountFlag {
+    struct mountFlag
+    {
         bool clear;
         uint32_t flag;
     };
 
     static std::map<std::string, mountFlag> optionFlags = {
-        {"acl", {false, MS_POSIXACL}},
-        {"async", {true, MS_SYNCHRONOUS}},
-        {"atime", {true, MS_NOATIME}},
-        {"bind", {false, MS_BIND}},
-        {"defaults", {false, 0}},
-        {"dev", {true, MS_NODEV}},
-        {"diratime", {true, MS_NODIRATIME}},
-        {"dirsync", {false, MS_DIRSYNC}},
-        {"exec", {true, MS_NOEXEC}},
-        {"iversion", {false, MS_I_VERSION}},
-        {"lazytime", {false, MS_LAZYTIME}},
-        {"loud", {true, MS_SILENT}},
-        {"mand", {false, MS_MANDLOCK}},
-        {"noacl", {true, MS_POSIXACL}},
-        {"noatime", {false, MS_NOATIME}},
-        {"nodev", {false, MS_NODEV}},
-        {"nodiratime", {false, MS_NODIRATIME}},
-        {"noexec", {false, MS_NOEXEC}},
-        {"noiversion", {true, MS_I_VERSION}},
-        {"nolazytime", {true, MS_LAZYTIME}},
-        {"nomand", {true, MS_MANDLOCK}},
-        {"norelatime", {true, MS_RELATIME}},
-        {"nostrictatime", {true, MS_STRICTATIME}},
-        {"nosuid", {false, MS_NOSUID}},
+        { "acl", { false, MS_POSIXACL } },
+        { "async", { true, MS_SYNCHRONOUS } },
+        { "atime", { true, MS_NOATIME } },
+        { "bind", { false, MS_BIND } },
+        { "defaults", { false, 0 } },
+        { "dev", { true, MS_NODEV } },
+        { "diratime", { true, MS_NODIRATIME } },
+        { "dirsync", { false, MS_DIRSYNC } },
+        { "exec", { true, MS_NOEXEC } },
+        { "iversion", { false, MS_I_VERSION } },
+        { "lazytime", { false, MS_LAZYTIME } },
+        { "loud", { true, MS_SILENT } },
+        { "mand", { false, MS_MANDLOCK } },
+        { "noacl", { true, MS_POSIXACL } },
+        { "noatime", { false, MS_NOATIME } },
+        { "nodev", { false, MS_NODEV } },
+        { "nodiratime", { false, MS_NODIRATIME } },
+        { "noexec", { false, MS_NOEXEC } },
+        { "noiversion", { true, MS_I_VERSION } },
+        { "nolazytime", { true, MS_LAZYTIME } },
+        { "nomand", { true, MS_MANDLOCK } },
+        { "norelatime", { true, MS_RELATIME } },
+        { "nostrictatime", { true, MS_STRICTATIME } },
+        { "nosuid", { false, MS_NOSUID } },
         // {"nosymfollow",{false, MS_NOSYMFOLLOW}}, // since kernel 5.10
-        {"rbind", {false, MS_BIND | MS_REC}},
-        {"relatime", {false, MS_RELATIME}},
-        {"remount", {false, MS_REMOUNT}},
-        {"ro", {false, MS_RDONLY}},
-        {"rw", {true, MS_RDONLY}},
-        {"silent", {false, MS_SILENT}},
-        {"strictatime", {false, MS_STRICTATIME}},
-        {"suid", {true, MS_NOSUID}},
-        {"sync", {false, MS_SYNCHRONOUS}},
+        { "rbind", { false, MS_BIND | MS_REC } },
+        { "relatime", { false, MS_RELATIME } },
+        { "remount", { false, MS_REMOUNT } },
+        { "ro", { false, MS_RDONLY } },
+        { "rw", { true, MS_RDONLY } },
+        { "silent", { false, MS_SILENT } },
+        { "strictatime", { false, MS_STRICTATIME } },
+        { "suid", { true, MS_NOSUID } },
+        { "sync", { false, MS_SYNCHRONOUS } },
         // {"symfollow",{true, MS_NOSYMFOLLOW}}, // since kernel 5.10
     };
 
@@ -165,16 +171,19 @@ inline void to_json(nlohmann::json &j, const Mount &o)
     j["destination"] = o.destination;
     j["source"] = o.source;
     j["type"] = o.type;
-    j["options"] = o.data; // FIXME: this data is not original options, some of them have been prased to flags.
+    j["options"] = o.data; // FIXME: this data is not original options, some of them have been
+                           // prased to flags.
 }
 
-struct Namespace {
+struct Namespace
+{
     int type;
 };
 
 static std::map<std::string, int> namespaceType = {
-    {"pid", CLONE_NEWPID},     {"uts", CLONE_NEWUTS}, {"mount", CLONE_NEWNS},  {"cgroup", CLONE_NEWCGROUP},
-    {"network", CLONE_NEWNET}, {"ipc", CLONE_NEWIPC}, {"user", CLONE_NEWUSER},
+    { "pid", CLONE_NEWPID },       { "uts", CLONE_NEWUTS },     { "mount", CLONE_NEWNS },
+    { "cgroup", CLONE_NEWCGROUP }, { "network", CLONE_NEWNET }, { "ipc", CLONE_NEWIPC },
+    { "user", CLONE_NEWUSER },
 };
 
 inline void from_json(const nlohmann::json &j, Namespace &o)
@@ -184,12 +193,16 @@ inline void from_json(const nlohmann::json &j, Namespace &o)
 
 inline void to_json(nlohmann::json &j, const Namespace &o)
 {
-    auto matchPair = std::find_if(std::begin(namespaceType), std::end(namespaceType),
-                                  [&](const std::pair<std::string, int> &pair) { return pair.second == o.type; });
+    auto matchPair = std::find_if(std::begin(namespaceType),
+                                  std::end(namespaceType),
+                                  [&](const std::pair<std::string, int> &pair) {
+                                      return pair.second == o.type;
+                                  });
     j["type"] = matchPair->first;
 }
 
-struct IDMap {
+struct IDMap
+{
     uint64_t containerID = 0u;
     uint64_t hostID = 0u;
     uint64_t size = 0u;
@@ -212,11 +225,12 @@ inline void to_json(nlohmann::json &j, const IDMap &o)
 typedef std::string SeccompAction;
 typedef std::string SeccompArch;
 
-struct SyscallArg {
-    u_int index; // require
-    u_int64_t value; // require
+struct SyscallArg
+{
+    u_int index;        // require
+    u_int64_t value;    // require
     u_int64_t valueTwo; // optional
-    std::string op; // require
+    std::string op;     // require
 };
 
 inline void from_json(const nlohmann::json &j, SyscallArg &o)
@@ -235,7 +249,8 @@ inline void to_json(nlohmann::json &j, const SyscallArg &o)
     j["op"] = o.op;
 }
 
-struct Syscall {
+struct Syscall
+{
     util::str_vec names;
     SeccompAction action;
     std::vector<SyscallArg> args;
@@ -255,7 +270,8 @@ inline void to_json(nlohmann::json &j, const Syscall &o)
     j["args"] = o.args;
 }
 
-struct Seccomp {
+struct Seccomp
+{
     SeccompAction defaultAction = "INVALID_ACTION";
     std::vector<SeccompArch> architectures;
     std::vector<Syscall> syscalls;
@@ -264,8 +280,8 @@ struct Seccomp {
 inline void from_json(const nlohmann::json &j, Seccomp &o)
 {
     o.defaultAction = j.at("defaultAction").get<std::string>();
-    o.architectures = j.value("architectures", std::vector<SeccompArch> {});
-    o.syscalls = j.value("syscalls", std::vector<Syscall> {});
+    o.architectures = j.value("architectures", std::vector<SeccompArch>{});
+    o.syscalls = j.value("syscalls", std::vector<Syscall>{});
 }
 
 inline void to_json(nlohmann::json &j, const Seccomp &o)
@@ -276,7 +292,8 @@ inline void to_json(nlohmann::json &j, const Seccomp &o)
 }
 
 // https://github.com/containers/crun/blob/main/crun.1.md#memory-controller
-struct ResourceMemory {
+struct ResourceMemory
+{
     int64_t limit = -1;
     int64_t reservation = -1;
     int64_t swap = -1;
@@ -298,7 +315,8 @@ inline void to_json(nlohmann::json &j, const ResourceMemory &o)
 
 // https://github.com/containers/crun/blob/main/crun.1.md#cpu-controller
 // support v1 and v2 with conversion
-struct ResourceCPU {
+struct ResourceCPU
+{
     u_int64_t shares = 1024;
     int64_t quota = 100000;
     u_int64_t period = 100000;
@@ -322,7 +340,8 @@ inline void to_json(nlohmann::json &j, const ResourceCPU &o)
     j["period"] = o.period;
 }
 
-struct Resources {
+struct Resources
+{
     ResourceMemory memory;
     ResourceCPU cpu;
 };
@@ -339,7 +358,8 @@ inline void to_json(nlohmann::json &j, const Resources &o)
     j["memory"] = o.memory;
 }
 
-struct Linux {
+struct Linux
+{
     std::vector<Namespace> namespaces;
     std::vector<IDMap> uidMappings;
     std::vector<IDMap> gidMappings;
@@ -351,8 +371,8 @@ struct Linux {
 inline void from_json(const nlohmann::json &j, Linux &o)
 {
     o.namespaces = j.at("namespaces").get<std::vector<Namespace>>();
-    o.uidMappings = j.value("uidMappings", std::vector<IDMap> {});
-    o.gidMappings = j.value("gidMappings", std::vector<IDMap> {});
+    o.uidMappings = j.value("uidMappings", std::vector<IDMap>{});
+    o.gidMappings = j.value("gidMappings", std::vector<IDMap>{});
     o.seccomp = optional<decltype(o.seccomp)::value_type>(j, "seccomp");
     o.cgroupsPath = j.value("cgroupsPath", "");
     o.resources = j.value("resources", Resources());
@@ -395,7 +415,8 @@ inline void to_json(nlohmann::json &j, const Linux &o)
     }
  */
 
-struct Hook {
+struct Hook
+{
     std::string path;
     tl::optional<util::str_vec> args;
     tl::optional<std::vector<std::string>> env;
@@ -415,7 +436,8 @@ inline void to_json(nlohmann::json &j, const Hook &o)
     j["env"] = o.env;
 }
 
-struct Hooks {
+struct Hooks
+{
     tl::optional<std::vector<Hook>> prestart;
     tl::optional<std::vector<Hook>> poststart;
     tl::optional<std::vector<Hook>> poststop;
@@ -435,7 +457,8 @@ inline void to_json(nlohmann::json &j, const Hooks &o)
     j["prestart"] = o.prestart;
 }
 
-struct AnnotationsOverlayfs {
+struct AnnotationsOverlayfs
+{
     std::string lower_parent;
     std::string upper;
     std::string workdir;
@@ -458,7 +481,8 @@ LLJS_TO_OBJ(AnnotationsOverlayfs)
     LLJS_TO(mounts);
 }
 
-struct AnnotationsNativeRootfs {
+struct AnnotationsNativeRootfs
+{
     std::vector<Mount> mounts;
 };
 
@@ -472,7 +496,8 @@ LLJS_TO_OBJ(AnnotationsNativeRootfs)
     LLJS_TO(mounts);
 }
 
-struct DbusProxyInfo {
+struct DbusProxyInfo
+{
     bool enable;
     std::string bus_type;
     std::string app_id;
@@ -504,7 +529,8 @@ LLJS_TO_OBJ(DbusProxyInfo)
     LLJS_TO(interface);
 }
 
-struct Annotations {
+struct Annotations
+{
     std::string container_root_path;
     tl::optional<AnnotationsOverlayfs> overlayfs;
     tl::optional<AnnotationsNativeRootfs> native;
@@ -527,7 +553,8 @@ LLJS_TO_OBJ(Annotations)
     LLJS_TO_VARNAME(dbusProxyInfo, dbus_proxy_info);
 }
 
-struct Runtime {
+struct Runtime
+{
     std::string version;
     Root root;
     Process process;

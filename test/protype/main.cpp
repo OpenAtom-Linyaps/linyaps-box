@@ -4,24 +4,25 @@
  * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
-#include <sys/mman.h>
+#include "util/filesystem.h"
+#include "util/logger.h"
+#include "util/semaphore.h"
+
 #include <sys/prctl.h>
-#include <sys/wait.h>
 
 #include <grp.h>
-#include <sched.h>
-#include <unistd.h>
 #include <pwd.h>
-
-#include "util/logger.h"
-#include "util/filesystem.h"
-#include "util/semaphore.h"
+#include <sched.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #define STACK_SIZE (1024 * 1024)
 
 using namespace linglong;
 
-struct Context {
+struct Context
+{
     Context(int argc, char **argv)
     {
         const std::string execute = argv[0];
@@ -41,7 +42,7 @@ struct Context {
 
     std::string targetExecute;
     util::str_vec args;
-    int semID {};
+    int semID{};
 };
 
 int entryProc(void *arg)
@@ -117,8 +118,12 @@ int main(int argc, char **argv)
     char *stack;
     char *stackTop;
 
-    stack = reinterpret_cast<char *>(
-        mmap(nullptr, STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
+    stack = reinterpret_cast<char *>(mmap(nullptr,
+                                          STACK_SIZE,
+                                          PROT_READ | PROT_WRITE,
+                                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
+                                          -1,
+                                          0));
     if (stack == MAP_FAILED) {
         return -1;
     }

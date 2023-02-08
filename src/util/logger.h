@@ -9,14 +9,15 @@
 
 #include "util.h"
 
-#include <unistd.h>
 #include <sys/syslog.h>
 
-#include <iostream>
-#include <sstream>
 #include <algorithm>
 #include <cstring>
+#include <iostream>
+#include <sstream>
 #include <utility>
+
+#include <unistd.h>
 
 namespace linglong {
 namespace util {
@@ -38,7 +39,7 @@ public:
     explicit Logger(Level l, const char *fn, int line)
         : level(l)
         , function(fn)
-        , line(line) {};
+        , line(line){};
 
     ~Logger()
     {
@@ -64,30 +65,35 @@ public:
         switch (level) {
         case Debug:
             prefix = "[DBG |";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] " << ss.str() << std::endl;
+            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+                      << ss.str() << std::endl;
             break;
         case Info:
             prefix = "[IFO |";
             std::cout << "\033[1;96m";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] " << ss.str();
+            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+                      << ss.str();
             std::cout << "\033[0m" << std::endl;
             break;
         case Warring:
             prefix = "[WAN |";
             std::cout << "\033[1;93m";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] " << ss.str();
+            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+                      << ss.str();
             std::cout << "\033[0m" << std::endl;
             break;
         case Error:
             prefix = "[ERR |";
             std::cout << "\033[1;31m";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] " << ss.str();
+            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+                      << ss.str();
             std::cout << "\033[0m" << std::endl;
             break;
         case Fatal:
             prefix = "[FAL |";
             std::cout << "\033[1;91m";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] " << ss.str();
+            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+                      << ss.str();
             std::cout << "\033[0m" << std::endl;
             exit(-1);
             break;

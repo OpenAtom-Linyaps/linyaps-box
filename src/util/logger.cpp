@@ -5,6 +5,7 @@
  */
 
 #include "logger.h"
+
 #include <sys/syslog.h>
 
 namespace linglong {
