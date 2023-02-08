@@ -6,14 +6,13 @@
 
 #include <gtest/gtest.h>
 
-#include <seccomp.h>
-
-#include <sys/klog.h>
-#include <climits>
-
+#include "container/seccomp.h"
 #include "util/oci_runtime.h"
 
-#include "container/seccomp.h"
+#include <seccomp.h>
+#include <sys/klog.h>
+
+#include <climits>
 
 TEST(OCI, libseccomp)
 {

@@ -7,10 +7,10 @@
 #ifndef LINGLONG_BOX_SRC_CONTAINER_CONTAINER_H_
 #define LINGLONG_BOX_SRC_CONTAINER_CONTAINER_H_
 
-#include <memory>
-
-#include "util/oci_runtime.h"
 #include "util/message_reader.h"
+#include "util/oci_runtime.h"
+
+#include <memory>
 
 namespace linglong {
 

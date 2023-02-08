@@ -7,13 +7,12 @@
 #ifndef LINGLONG_BOX_SRC_UTIL_COMMON_H_
 #define LINGLONG_BOX_SRC_UTIL_COMMON_H_
 
-#include <memory>
-#include <cstring>
 #include <cstdarg>
-
-#include <vector>
+#include <cstring>
 #include <iostream>
 #include <iterator>
+#include <memory>
+#include <vector>
 
 namespace linglong {
 namespace util {
@@ -40,7 +39,7 @@ inline std::string format(const std::string fmt, ...)
         else
             break;
     }
-    return std::string {formatted.get()};
+    return std::string{ formatted.get() };
 }
 
 } // namespace util

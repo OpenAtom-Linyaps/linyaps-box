@@ -24,7 +24,9 @@ public:
 class OverlayfsFuseFilesystemDriver : public FilesystemDriver
 {
 public:
-    explicit OverlayfsFuseFilesystemDriver(util::str_vec lower_dirs, std::string upper_dir, std::string work_dir,
+    explicit OverlayfsFuseFilesystemDriver(util::str_vec lower_dirs,
+                                           std::string upper_dir,
+                                           std::string work_dir,
                                            std::string mount_point);
 
     int Setup() override;

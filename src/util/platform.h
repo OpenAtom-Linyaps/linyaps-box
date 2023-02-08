@@ -8,7 +8,6 @@
 #define LINGLONG_BOX_SRC_UTIL_PLATFORM_H_
 
 #include "3party/optional/optional.hpp"
-
 #include "common.h"
 
 namespace linglong {

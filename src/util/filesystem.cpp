@@ -4,16 +4,19 @@
  * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
-#include <sys/stat.h>
-#include <sys/mount.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <string>
-#include <climits>
-#include <unistd.h>
-
 #include "filesystem.h"
+
 #include "logger.h"
+
+#include <sys/mount.h>
+
+#include <climits>
+#include <string>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 namespace linglong {
 namespace util {
@@ -46,7 +49,8 @@ bool create_directories(const path &p, __mode_t mode)
 
 bool is_dir(const std::string &s)
 {
-    struct stat st {
+    struct stat st
+    {
     };
 
     if (0 != lstat(s.c_str(), &st)) {
@@ -63,7 +67,8 @@ bool is_dir(const std::string &s)
 
 bool exists(const std::string &s)
 {
-    struct stat st {
+    struct stat st
+    {
     };
 
     if (0 != lstat(s.c_str(), &st)) {
@@ -89,7 +94,8 @@ file_status status(const path &p, std::error_code &ec)
     file_type ft;
     perms perm = no_perms;
 
-    struct stat st {
+    struct stat st
+    {
     };
 
     if (0 != lstat(p.string().c_str(), &st)) {
@@ -145,9 +151,7 @@ file_status status(const path &p, std::error_code &ec)
     return file_status(ft, perm);
 }
 
-file_status::file_status() noexcept
-{
-}
+file_status::file_status() noexcept { }
 
 file_status::file_status(file_type ft, perms perms) noexcept
     : ft(ft)
@@ -180,8 +184,12 @@ perms file_status::permissions() const noexcept
     return p;
 }
 
-int do_mount_with_fd(const char *root, const char *__special_file, const char *__dir, const char *__fstype,
-                     unsigned long int __rwflag, const void *__data) __THROW
+int do_mount_with_fd(const char *root,
+                     const char *__special_file,
+                     const char *__dir,
+                     const char *__fstype,
+                     unsigned long int __rwflag,
+                     const void *__data) __THROW
 {
     // https://github.com/opencontainers/runc/blob/0ca91f44f1664da834bc61115a849b56d22f595f/libcontainer/utils/utils.go#L112
 
@@ -190,8 +198,8 @@ int do_mount_with_fd(const char *root, const char *__special_file, const char *_
         logFal() << util::format("fail to open target(%s):", __dir) << errnoString();
     }
 
-    // Refer to `man readlink`, readlink dose not append '\0' to the end of conent it read from path, so we have to add
-    // an extra char to buffer to ensure '\0' always exists.
+    // Refer to `man readlink`, readlink dose not append '\0' to the end of conent it read from
+    // path, so we have to add an extra char to buffer to ensure '\0' always exists.
     char *buf = (char *)malloc(sizeof(char) * PATH_MAX + 1);
     if (buf == nullptr) {
         logFal() << "fail to alloc memery:" << errnoString();
@@ -202,15 +210,18 @@ int do_mount_with_fd(const char *root, const char *__special_file, const char *_
     auto target = util::format("/proc/self/fd/%d", fd);
     int len = readlink(target.c_str(), buf, PATH_MAX);
     if (len == -1) {
-        logFal() << util::format("fail to readlink from proc fd (%s):", target.c_str()) << errnoString();
+        logFal() << util::format("fail to readlink from proc fd (%s):", target.c_str())
+                 << errnoString();
     }
 
     string realpath(buf);
     free(buf);
     if (realpath.rfind(root, 0) != 0) {
         logDbg() << util::format("container root=\"%s\"", root);
-        logFal() << util::format("possibly malicious path detected (%s vs %s) -- refusing to operate", target.c_str(),
-                                 realpath.c_str());
+        logFal() << util::format(
+                "possibly malicious path detected (%s vs %s) -- refusing to operate",
+                target.c_str(),
+                realpath.c_str());
     }
 
     auto ret = ::mount(__special_file, target.c_str(), __fstype, __rwflag, __data);

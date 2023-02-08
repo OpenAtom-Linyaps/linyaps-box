@@ -5,13 +5,15 @@
  */
 
 #include "platform.h"
+
 #include "logger.h"
 #include "util/debug/debug.h"
 
-#include <sched.h>
 #include <cstdlib>
-#include <sys/wait.h>
+
+#include <sched.h>
 #include <sys/mman.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace linglong {
@@ -25,8 +27,12 @@ int PlatformClone(int (*callback)(void *), int flags, void *arg, ...)
     char *stack;
     char *stackTop;
 
-    stack = reinterpret_cast<char *>(
-        mmap(nullptr, kStackSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
+    stack = reinterpret_cast<char *>(mmap(nullptr,
+                                          kStackSize,
+                                          PROT_READ | PROT_WRITE,
+                                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
+                                          -1,
+                                          0));
     if (stack == MAP_FAILED) {
         return EXIT_FAILURE;
     }
@@ -56,7 +62,9 @@ int Exec(const util::str_vec &args, tl::optional<std::vector<std::string>> env_l
 
     logDbg() << "execve" << targetArgv[0] << " in pid:" << getpid();
 
-    int ret = execvpe(targetArgv[0], const_cast<char **>(targetArgv), const_cast<char **>(targetEnvv));
+    int ret = execvpe(targetArgv[0],
+                      const_cast<char **>(targetArgv),
+                      const_cast<char **>(targetEnvv));
 
     delete[] targetEnvv;
 

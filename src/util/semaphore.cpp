@@ -6,9 +6,9 @@
 
 #include "semaphore.h"
 
-#include <sys/sem.h>
-
 #include "util/logger.h"
+
+#include <sys/sem.h>
 
 namespace linglong {
 
@@ -18,16 +18,17 @@ union semun {
     ushort *array;
 };
 
-struct Semaphore::SemaphorePrivate {
+struct Semaphore::SemaphorePrivate
+{
     explicit SemaphorePrivate(Semaphore *parent = nullptr)
         : q_ptr(parent)
     {
         (void)q_ptr;
     }
 
-    struct sembuf sem_lock = {0, -1, SEM_UNDO};
+    struct sembuf sem_lock = { 0, -1, SEM_UNDO };
 
-    struct sembuf sem_unlock = {0, 1, SEM_UNDO};
+    struct sembuf sem_unlock = { 0, 1, SEM_UNDO };
 
     int sem_id = -1;
 
@@ -47,7 +48,7 @@ Semaphore::~Semaphore() = default;
 
 int Semaphore::init()
 {
-    union semun sem_union = {0};
+    union semun sem_union = { 0 };
     sem_union.val = 0;
     logDbg() << "semctl " << dd_ptr->sem_id;
     if (semctl(dd_ptr->sem_id, 0, SETVAL, sem_union) == -1) {

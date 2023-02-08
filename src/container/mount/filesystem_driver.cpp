@@ -4,19 +4,22 @@
  * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
-#include <sys/wait.h>
+#include "filesystem_driver.h"
+
+#include "util/platform.h"
 
 #include <utility>
 
-#include "filesystem_driver.h"
-#include "util/platform.h"
+#include <sys/wait.h>
 
 namespace linglong {
 
 FilesystemDriver::~FilesystemDriver() = default;
 
-OverlayfsFuseFilesystemDriver::OverlayfsFuseFilesystemDriver(util::str_vec lower_dirs, std::string upper_dir,
-                                                             std::string work_dir, std::string mount_point)
+OverlayfsFuseFilesystemDriver::OverlayfsFuseFilesystemDriver(util::str_vec lower_dirs,
+                                                             std::string upper_dir,
+                                                             std::string work_dir,
+                                                             std::string mount_point)
     : lower_dirs_(std::move(lower_dirs))
     , upper_dir_(std::move(upper_dir))
     , work_dir_(std::move(work_dir))
@@ -29,11 +32,13 @@ util::fs::path OverlayfsFuseFilesystemDriver::HostPath(const util::fs::path &des
     return HostSource(util::fs::path(mount_point_) / dest_full_path);
 }
 
-int OverlayfsFuseFilesystemDriver::CreateDestinationPath(const util::fs::path &container_destination_path)
+int OverlayfsFuseFilesystemDriver::CreateDestinationPath(
+        const util::fs::path &container_destination_path)
 {
     __mode_t dest_mode = 0755;
 
-    auto host_destination_path = HostSource(util::fs::path(mount_point_) / container_destination_path);
+    auto host_destination_path =
+            HostSource(util::fs::path(mount_point_) / container_destination_path);
     if (!util::fs::create_directories(host_destination_path, dest_mode)) {
         logErr() << "create_directories" << host_destination_path << util::errnoString();
         return -1;
@@ -101,9 +106,7 @@ NativeFilesystemDriver::NativeFilesystemDriver(std::string root_path)
 {
 }
 
-NativeFilesystemDriver::~NativeFilesystemDriver()
-{
-}
+NativeFilesystemDriver::~NativeFilesystemDriver() { }
 
 FuseProxyFilesystemDriver::FuseProxyFilesystemDriver(util::str_vec mounts, std::string mount_point)
     : mounts_(mounts)
@@ -121,11 +124,13 @@ util::fs::path FuseProxyFilesystemDriver::HostSource(const util::fs::path &dest_
     return dest_full_path;
 }
 
-int FuseProxyFilesystemDriver::CreateDestinationPath(const util::fs::path &container_destination_path)
+int FuseProxyFilesystemDriver::CreateDestinationPath(
+        const util::fs::path &container_destination_path)
 {
     __mode_t dest_mode = 0755;
 
-    auto host_destination_path = HostSource(util::fs::path(mount_point_) / container_destination_path);
+    auto host_destination_path =
+            HostSource(util::fs::path(mount_point_) / container_destination_path);
     if (!util::fs::create_directories(host_destination_path, dest_mode)) {
         logErr() << "create_directories" << host_destination_path << util::errnoString();
         return -1;

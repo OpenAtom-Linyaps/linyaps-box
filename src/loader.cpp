@@ -4,18 +4,21 @@
  * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
-#include <wordexp.h>
-#include <regex>
-#include <list>
-#include <sys/stat.h>
-
+#include "container/container_option.h"
 #include "util/logger.h"
 #include "util/oci_runtime.h"
-#include "container/container_option.h"
 
-//    "lowerParent": "/run/user/<<user_uid>>/linglong/375f5681145f4f4f9ffeb3a67aebd422/.overlayfs/lower_parent",
+#include <list>
+#include <regex>
+
+#include <sys/stat.h>
+#include <wordexp.h>
+
+//    "lowerParent":
+//    "/run/user/<<user_uid>>/linglong/375f5681145f4f4f9ffeb3a67aebd422/.overlayfs/lower_parent",
 //     "upper": "/run/user/<<user_uid>>/linglong/375f5681145f4f4f9ffeb3a67aebd422/.overlayfs/upper",
-//     "workdir": "/run/user/<<user_uid>>/linglong/375f5681145f4f4f9ffeb3a67aebd422/.overlayfs/workdir",
+//     "workdir":
+//     "/run/user/<<user_uid>>/linglong/375f5681145f4f4f9ffeb3a67aebd422/.overlayfs/workdir",
 const std::string kLoadTemplate = R"KLT00(
 {
     "annotations": {
@@ -637,12 +640,17 @@ linglong::Runtime loadBundle(int argc, char **argv)
 
     std::string xDisplay = getenv("DISPLAY");
 
-    auto fixTemplateWithHomeDir = std::regex_replace(kLoadTemplate, std::regex("<<home_dir>>"), getHomeDir);
-    auto fixTemplateWithImMethod =
-        std::regex_replace(fixTemplateWithHomeDir, std::regex("<<im_mothod>>"), getCurrentImMethod);
-    auto fixTemplateWithUid = std::regex_replace(fixTemplateWithImMethod, std::regex("<<user_uid>>"), getCurrentUid);
-    auto fixTemplateWithXDisplay = std::regex_replace(fixTemplateWithUid, std::regex("<<x_display>>"), xDisplay);
-    auto fixTemplateWithAppid = std::regex_replace(fixTemplateWithXDisplay, std::regex("<<appid>>"), argv[1]);
+    auto fixTemplateWithHomeDir =
+            std::regex_replace(kLoadTemplate, std::regex("<<home_dir>>"), getHomeDir);
+    auto fixTemplateWithImMethod = std::regex_replace(fixTemplateWithHomeDir,
+                                                      std::regex("<<im_mothod>>"),
+                                                      getCurrentImMethod);
+    auto fixTemplateWithUid =
+            std::regex_replace(fixTemplateWithImMethod, std::regex("<<user_uid>>"), getCurrentUid);
+    auto fixTemplateWithXDisplay =
+            std::regex_replace(fixTemplateWithUid, std::regex("<<x_display>>"), xDisplay);
+    auto fixTemplateWithAppid =
+            std::regex_replace(fixTemplateWithXDisplay, std::regex("<<appid>>"), argv[1]);
 
     auto r = linglong::fromString(fixTemplateWithAppid);
     std::string id = argv[1];
@@ -650,14 +658,17 @@ linglong::Runtime loadBundle(int argc, char **argv)
     std::string exec = argv[3];
 
     // fix appid with user home dir
-    std::list<std::string> userHomeDirectorys = {
-        "home/Documents", "home/Downloads", "home/Music",   "home/Pictures",        "home/Videos",
-        "home/Public",    "home/Templates", "home/Desktop", "cache/deepin/dde-api", "config/systemd/user"};
+    std::list<std::string> userHomeDirectorys = { "home/Documents",       "home/Downloads",
+                                                  "home/Music",           "home/Pictures",
+                                                  "home/Videos",          "home/Public",
+                                                  "home/Templates",       "home/Desktop",
+                                                  "cache/deepin/dde-api", "config/systemd/user" };
 
     if (!util::fs::exists(getHomeDir + "/.linglong/" + id)) {
         for (const auto &dir : userHomeDirectorys) {
-            util::fs::create_directories(util::fs::path(getHomeDir + "/.linglong/" + id + "/" + dir).parent_path(),
-                                         0755);
+            util::fs::create_directories(
+                    util::fs::path(getHomeDir + "/.linglong/" + id + "/" + dir).parent_path(),
+                    0755);
         }
     }
 
@@ -666,7 +677,7 @@ linglong::Runtime loadBundle(int argc, char **argv)
         m.source = "tmpfs";
         m.type = "tmpfs";
         m.fsType = Mount::Tmpfs;
-        m.data = {"nodev", "nosuid"};
+        m.data = { "nodev", "nosuid" };
         m.destination = "/opt";
         r.mounts->push_back(m);
     }
@@ -729,7 +740,8 @@ linglong::Runtime loadBundle(int argc, char **argv)
     // process env
     r.process.env.push_back(util::format("XAUTHORITY=%s", getenv("XAUTHORITY")));
     r.process.env.push_back(util::format("XDG_RUNTIME_DIR=%s", getenv("XDG_RUNTIME_DIR")));
-    r.process.env.push_back(util::format("DBUS_SESSION_BUS_ADDRESS=%s", getenv("DBUS_SESSION_BUS_ADDRESS")));
+    r.process.env.push_back(
+            util::format("DBUS_SESSION_BUS_ADDRESS=%s", getenv("DBUS_SESSION_BUS_ADDRESS")));
     r.process.env.push_back(util::format("HOME=%s", getenv("HOME")));
 
     // extra env
@@ -739,7 +751,8 @@ linglong::Runtime loadBundle(int argc, char **argv)
     r.process.env.push_back(util::format("PYTHONHOME=%s", getenv("PYTHONHOME")));
     r.process.env.push_back(util::format("XDG_DATA_DIRS=%s", getenv("XDG_DATA_DIRS")));
     r.process.env.push_back(util::format("PERLLIB=%s", getenv("PERLLIB")));
-    r.process.env.push_back(util::format("GSETTINGS_SCHEMA_DIR=%s", getenv("GSETTINGS_SCHEMA_DIR")));
+    r.process.env.push_back(
+            util::format("GSETTINGS_SCHEMA_DIR=%s", getenv("GSETTINGS_SCHEMA_DIR")));
 
     util::str_vec ldLibraryPath;
 
@@ -749,7 +762,8 @@ linglong::Runtime loadBundle(int argc, char **argv)
     ldLibraryPath.push_back("/opt/runtime/lib");
     ldLibraryPath.push_back("/opt/runtime/lib/i386-linux-gnu");
     ldLibraryPath.push_back("/opt/runtime/lib/x86_64-linux-gnu");
-    r.process.env.push_back(util::format("LD_LIBRARY_PATH=%s", util::str_vec_join(ldLibraryPath, ':').c_str()));
+    r.process.env.push_back(
+            util::format("LD_LIBRARY_PATH=%s", util::str_vec_join(ldLibraryPath, ':').c_str()));
 
     r.process.cwd = getenv("HOME");
     // r.process.args = util::str_vec {exec,"sh"};

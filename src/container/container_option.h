@@ -17,7 +17,8 @@ namespace linglong {
  * the work flow.
  * If there is more information about how to deal user namespace, it can remove
  */
-struct Option {
+struct Option
+{
     bool rootless = false;
     bool linkLfs = true;
 };
