@@ -43,8 +43,8 @@ Files: gschema/*.xml plugins/*.xml frame/*.xml .clog.toml plugins/*.json configs
 Copyright: None
 License: CC0-1.0
 
-# in
-Files: .clang-format .cmake-format.py
+# formatter config
+Files: .clang-format 3party/.clang-format .cmake-format.py
 Copyright: None
 License: CC0-1.0
 
