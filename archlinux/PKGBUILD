@@ -1,0 +1,36 @@
+# Maintainer: Linxuan Chen <me@black-desk.cn>
+
+# shellcheck disable=SC2034,2154
+# shellcheck shell=bash
+
+pkgname=linglong-box-git
+provides=('linglong-box')
+pkgver=1.3.3.15.1.r2.gc6d5294
+pkgrel=1
+sourcename=linglong-box
+sourcetar="$sourcename"_"$pkgver".orig.tar.gz
+pkgdesc="an simple OCI runtime used by linglong"
+arch=('any')
+url="https://github.com/linuxdeepin/linglong-box"
+license=('LGPL-3.0')
+depends=(libseccomp yaml-cpp)
+makedepends=(pkg-config cmake gtest)
+source=("$sourcetar")
+sha512sums=('SKIP')
+options=(debug)
+
+build() {
+        cd "$sourcename"-"$pkgver" || exit 255
+        cmake -B. \
+                -DBUILD_STATIC=off \
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                -DCMAKE_INSTALL_PREFIX=/usr \
+                -DCMAKE_INSTALL_SYSCONFDIR=/etc \
+                -DCMAKE_INSTALL_LIBEXECDIR=/usr/lib
+        cmake --build .
+}
+
+package() {
+        cd "$sourcename"-"$pkgver" || exit 255
+        DESTDIR="$pkgdir/" cmake --install .
+}
