@@ -20,6 +20,7 @@ sha512sums=('SKIP')
 options=(debug)
 
 build() {
+
         cd "$sourcename"-"$pkgver" || exit 255
         cmake -B. \
                 -DBUILD_STATIC=off \
@@ -28,9 +29,12 @@ build() {
                 -DCMAKE_INSTALL_SYSCONFDIR=/etc \
                 -DCMAKE_INSTALL_LIBEXECDIR=/usr/lib
         cmake --build .
+
 }
 
 package() {
+
         cd "$sourcename"-"$pkgver" || exit 255
         DESTDIR="$pkgdir/" cmake --install .
+
 }
