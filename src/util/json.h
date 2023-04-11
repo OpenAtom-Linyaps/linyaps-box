@@ -42,6 +42,11 @@ tl::optional<T> optional(const nlohmann::json &j, const char *key)
     tl::optional<T> o;
     auto iter = j.template find(key);
     if (iter != j.end()) {
+        // check object is empty: {}, skip it
+        if (iter->is_object() && iter->size() == 0) {
+            return o;
+        }
+
         o = iter->template get<tl::optional<T>>();
     }
     return o;
