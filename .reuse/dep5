@@ -34,7 +34,17 @@ Copyright: None
 License: CC0-1.0
 
 # Project file
-Files: CMakeLists.txt .gitignore src/CMakeLists.txt test/CMakeLists.txt test/protype/CMakeLists.txt 3party/nlohmann/json.hpp 3party/optional/optional.hpp
+Files: CMakeLists.txt .gitignore src/CMakeLists.txt test/CMakeLists.txt test/protype/CMakeLists.txt
+Copyright: None
+License: CC0-1.0
+
+# nlohmann/json
+Files: 3party/nlohmann/json.hpp
+Copyright: Niels Lohmann
+License: MIT
+
+# optional
+Files: 3party/optional/optional.hpp
 Copyright: None
 License: CC0-1.0
 
