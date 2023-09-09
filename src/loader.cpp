@@ -640,19 +640,21 @@ linglong::Runtime loadBundle(int argc, char **argv)
 
     std::string xDisplay = getenv("DISPLAY");
 
-    auto fixTemplateWithHomeDir =
-            std::regex_replace(kLoadTemplate, std::regex("<<home_dir>>"), getHomeDir);
-    auto fixTemplateWithImMethod = std::regex_replace(fixTemplateWithHomeDir,
-                                                      std::regex("<<im_mothod>>"),
-                                                      getCurrentImMethod);
-    auto fixTemplateWithUid =
-            std::regex_replace(fixTemplateWithImMethod, std::regex("<<user_uid>>"), getCurrentUid);
-    auto fixTemplateWithXDisplay =
-            std::regex_replace(fixTemplateWithUid, std::regex("<<x_display>>"), xDisplay);
-    auto fixTemplateWithAppid =
-            std::regex_replace(fixTemplateWithXDisplay, std::regex("<<appid>>"), argv[1]);
+    std::unordered_map<std::string, std::string> patternReplacements = {
+        { "<<home_dir>>", getHomeDir },
+        { "<<im_mothod>>", getCurrentImMethod },
+        { "<<user_uid>>", getCurrentUid },
+        { "<<x_display>>", xDisplay },
+        { "<<appid>>", argv[1] }
+    };
 
-    auto r = linglong::fromString(fixTemplateWithAppid);
+    std::string replacedTemplate = kLoadTemplate;
+    for (const auto &[key, value] : patternReplacements) {
+        replacedTemplate =
+                std::regex_replace(replacedTemplate, std::regex(key), patternReplacements[key]);
+    }
+
+    auto r = linglong::fromString(replacedTemplate);
     std::string id = argv[1];
     std::string bundleRoot = argv[2];
     std::string exec = argv[3];
