@@ -455,7 +455,7 @@ public:
             if (unblock) {
                 // FIXME: As we use signalfd, we have to block signal, but child created by fork
                 // will inherit blocked signal set, so we have to unblock it. This is just a
-                // workround.
+                // workaround.
                 sigset_t mask;
                 sigfillset(&mask);
                 if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
