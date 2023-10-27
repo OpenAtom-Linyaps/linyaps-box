@@ -37,7 +37,6 @@ int main(int argc, char **argv)
 
         if (is_load_bundle) {
             runtime = loadBundle(argc, argv);
-            linglong::to_json(json, runtime);
         } else {
             int socket = atoi(argv[1]);
             if (socket <= 0) {
@@ -47,8 +46,6 @@ int main(int argc, char **argv)
             reader.reset(new linglong::util::MessageReader(socket));
 
             json = reader->read();
-
-            runtime = json.get<linglong::Runtime>();
         }
 
         if (linglong::util::fs::exists("/tmp/ll-debug")) {
@@ -56,6 +53,8 @@ int main(int argc, char **argv)
             origin << json.dump(4);
             origin.close();
         }
+
+        runtime = json.get<linglong::Runtime>();
 
         linglong::Container container(runtime, std::move(reader));
         return container.Start(option);
