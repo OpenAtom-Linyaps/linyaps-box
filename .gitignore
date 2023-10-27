@@ -1,2 +1,9 @@
 .idea/
-/build
+/build*
+/obj-x86_64-linux-gnu
+/debian/.debhelper
+/debian/linglong-box
+/debian/debhelper-build-stamp
+/debian/linglong-box.debhelper.log
+/debian/files
+/debian/linglong-box.substvars
