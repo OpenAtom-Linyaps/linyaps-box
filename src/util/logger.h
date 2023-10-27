@@ -49,14 +49,19 @@ public:
         switch (level) {
         case Debug:
             syslogLevel = LOG_DEBUG;
+            break;
         case Info:
             syslogLevel = LOG_INFO;
+            break;
         case Warring:
             syslogLevel = LOG_WARNING;
+            break;
         case Error:
             syslogLevel = LOG_ERR;
+            break;
         case Fatal:
             syslogLevel = LOG_ERR;
+            break;
         }
         syslog(syslogLevel, "%s|%s:%d %s", pid_ns.c_str(), function, line, ss.str().c_str());
         if (level < LOGLEVEL) {
