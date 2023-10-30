@@ -22,14 +22,6 @@ test_build:
                 target_repository: debian_sid
             architectures:
               - x86_64
-
-          - name: archlinux
-            paths:
-              - target_project: deepin:CI
-                target_repository: archlinux
-            architectures:
-              - x86_64
-
   filters:
     event: pull_request
 
