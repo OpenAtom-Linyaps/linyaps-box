@@ -18,6 +18,7 @@ set(LL_BOX_SOURCES
     container/mount/host_mount.cpp
     container/mount/filesystem_driver.cpp
     container/seccomp.cpp
+    container/helper.cpp
     )
 add_executable(ll-box ${LL_BOX_SOURCES})
 target_link_libraries(ll-box ${LINK_LIBS})
