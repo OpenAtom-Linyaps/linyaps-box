@@ -7,7 +7,6 @@ set(LINK_LIBS
 set(LL_BOX_SOURCES
     # cmake-format: sortable
     main.cpp
-    loader.cpp
     util/common.cpp
     util/filesystem.cpp
     util/semaphore.cpp
