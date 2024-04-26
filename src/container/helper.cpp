@@ -8,6 +8,8 @@
 
 #include "util/logger.h"
 
+#include <filesystem>
+
 namespace linglong {
 void writeContainerJson(const std::string &bundle, const std::string &id, pid_t pid)
 {
