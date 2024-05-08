@@ -9,6 +9,8 @@
 #include "filesystem_driver.h"
 #include "util/debug/debug.h"
 
+#include <linux/limits.h>
+
 #include <utility>
 
 #include <sys/stat.h>
@@ -71,6 +73,17 @@ public:
         }
         case S_IFLNK: {
             driver_->CreateDestinationPath(dest_parent_path);
+            if (m.extraFlags & OPTION_COPY_SYMLINK) {
+                std::array<char, PATH_MAX + 1> buf{};
+                buf.fill(0);
+                auto len = readlink(source.c_str(), buf._M_elems, PATH_MAX);
+                if (len == -1) {
+                    logErr() << "readlink failed:" << source << strerror(errno);
+                    return -1;
+                }
+
+                return host_dest_full_path.touch_symlink(std::string(buf.cbegin(), buf.cend()));
+            }
             host_dest_full_path.touch();
             source = util::fs::read_symlink(util::fs::path(source)).string();
             break;
@@ -197,7 +210,7 @@ public:
                      << "failed:" << util::RetErrString(ret) << "\nmount args is:" << m.type
                      << real_flags << real_data;
             if (is_path) {
-                logErr() << "source file type is: 0x" << std::hex << (source_stat.st_mode & S_IFMT);
+                logErr() << "source file type is: 0x" << std::oct << (source_stat.st_mode & S_IFMT);
                 DUMP_FILE_INFO(source);
             }
             DUMP_FILE_INFO(host_dest_full_path.string());
