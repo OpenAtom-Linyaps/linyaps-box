@@ -13,6 +13,7 @@
 
 #include <utility>
 
+#include <fcntl.h>
 #include <sys/stat.h>
 
 struct remountNode
