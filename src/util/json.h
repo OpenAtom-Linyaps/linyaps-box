@@ -9,23 +9,23 @@
 
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 
-#include "3party/nlohmann/json.hpp"
-#include "3party/optional/optional.hpp"
+#include <nlohmann/json.hpp>
+#include <optional>
 
 namespace nlohmann {
 
 template<class J, class T>
-inline void from_json(const J &j, tl::optional<T> &v)
+inline void from_json(const J &j, std::optional<T> &v)
 {
     if (j.is_null()) {
-        v = tl::nullopt;
+        v = std::nullopt;
     } else {
         v = j.template get<T>();
     }
 }
 
 template<class J, class T>
-inline void to_json(J &j, const tl::optional<T> &o)
+inline void to_json(J &j, const std::optional<T> &o)
 {
     if (o.has_value()) {
         j = o.value();
@@ -37,9 +37,9 @@ inline void to_json(J &j, const tl::optional<T> &o)
 namespace linglong {
 
 template<class T>
-tl::optional<T> optional(const nlohmann::json &j, const char *key)
+std::optional<T> optional(const nlohmann::json &j, const char *key)
 {
-    tl::optional<T> o;
+    std::optional<T> o;
     auto iter = j.template find(key);
     if (iter != j.end()) {
         // check object is empty: {}, skip it
@@ -47,7 +47,7 @@ tl::optional<T> optional(const nlohmann::json &j, const char *key)
             return o;
         }
 
-        o = iter->template get<tl::optional<T>>();
+        o = iter->template get<std::optional<T>>();
     }
     return o;
 }
