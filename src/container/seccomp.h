@@ -10,7 +10,7 @@
 #include "util/oci_runtime.h"
 
 namespace linglong {
-int ConfigSeccomp(const tl::optional<linglong::Seccomp> &seccomp);
+int ConfigSeccomp(const std::optional<linglong::Seccomp> &seccomp);
 }
 
 #endif /* LINGLONG_BOX_SRC_CONTAINER_SECCOMP_H_ */

@@ -42,7 +42,7 @@ int PlatformClone(int (*callback)(void *), int flags, void *arg, ...)
     return clone(callback, stackTop, flags, arg);
 }
 
-int Exec(const util::str_vec &args, tl::optional<std::vector<std::string>> env_list)
+int Exec(const util::str_vec &args, std::optional<std::vector<std::string>> env_list)
 {
     auto targetArgc = args.size();
     const char *targetArgv[targetArgc + 1];

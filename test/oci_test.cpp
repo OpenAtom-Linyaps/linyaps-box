@@ -21,7 +21,7 @@ TEST(OCI, Runtime)
     EXPECT_EQ(r.mounts.has_value(), true);
     EXPECT_EQ(r.mounts->at(1).data.at(1), "strictatime");
 
-    EXPECT_EQ(r.hooks, tl::nullopt);
+    EXPECT_EQ(r.hooks, std::nullopt);
 
     EXPECT_EQ(r.linux.namespaces.size(), 5);
 
@@ -56,7 +56,7 @@ TEST(OCI, JSON)
 {
     Runtime r;
 
-    r.hooks = tl::nullopt;
+    r.hooks = std::nullopt;
 
     nlohmann::json j(r);
 

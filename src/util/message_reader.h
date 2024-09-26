@@ -7,7 +7,7 @@
 #ifndef LINGLONG_BOX_SRC_UTIL_MESSAGE_READER_H_
 #define LINGLONG_BOX_SRC_UTIL_MESSAGE_READER_H_
 
-#include <3party/nlohmann/json.hpp>
+#include <nlohmann/json.hpp>
 
 namespace linglong {
 namespace util {

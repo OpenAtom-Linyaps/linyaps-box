@@ -29,7 +29,7 @@ namespace linglong {
 struct Root
 {
     std::string path;
-    tl::optional<bool> readonly;
+    std::optional<bool> readonly;
 };
 
 LLJS_FROM_OBJ(Root)
@@ -363,7 +363,7 @@ struct Linux
     std::vector<Namespace> namespaces;
     std::vector<IDMap> uidMappings;
     std::vector<IDMap> gidMappings;
-    tl::optional<Seccomp> seccomp;
+    std::optional<Seccomp> seccomp;
     std::string cgroupsPath;
     Resources resources;
 };
@@ -418,8 +418,8 @@ inline void to_json(nlohmann::json &j, const Linux &o)
 struct Hook
 {
     std::string path;
-    tl::optional<util::str_vec> args;
-    tl::optional<std::vector<std::string>> env;
+    std::optional<util::str_vec> args;
+    std::optional<std::vector<std::string>> env;
 };
 
 inline void from_json(const nlohmann::json &j, Hook &o)
@@ -438,9 +438,9 @@ inline void to_json(nlohmann::json &j, const Hook &o)
 
 struct Hooks
 {
-    tl::optional<std::vector<Hook>> prestart;
-    tl::optional<std::vector<Hook>> poststart;
-    tl::optional<std::vector<Hook>> poststop;
+    std::optional<std::vector<Hook>> prestart;
+    std::optional<std::vector<Hook>> poststart;
+    std::optional<std::vector<Hook>> poststop;
 };
 
 inline void from_json(const nlohmann::json &j, Hooks &o)
@@ -532,9 +532,9 @@ LLJS_TO_OBJ(DbusProxyInfo)
 struct Annotations
 {
     std::string container_root_path;
-    tl::optional<AnnotationsOverlayfs> overlayfs;
-    tl::optional<AnnotationsNativeRootfs> native;
-    tl::optional<DbusProxyInfo> dbus_proxy_info;
+    std::optional<AnnotationsOverlayfs> overlayfs;
+    std::optional<AnnotationsNativeRootfs> native;
+    std::optional<DbusProxyInfo> dbus_proxy_info;
 };
 
 LLJS_FROM_OBJ(Annotations)
@@ -560,9 +560,9 @@ struct Runtime
     Process process;
     std::string hostname;
     Linux linux;
-    tl::optional<std::vector<Mount>> mounts;
-    tl::optional<Hooks> hooks;
-    tl::optional<Annotations> annotations;
+    std::optional<std::vector<Mount>> mounts;
+    std::optional<Hooks> hooks;
+    std::optional<Annotations> annotations;
 };
 
 inline void from_json(const nlohmann::json &j, Runtime &o)

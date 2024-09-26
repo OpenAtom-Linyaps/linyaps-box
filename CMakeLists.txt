@@ -2,8 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 project(linglong-box)
 
-# 保证项目兼容性
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(VERSION "1.0")
@@ -20,7 +19,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 include(GNUInstallDirs)
-include_directories(${linglong-box_SOURCE_DIR})
 include_directories(${linglong-box_SOURCE_DIR}/src)
 
 
