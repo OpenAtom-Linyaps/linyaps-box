@@ -12,7 +12,7 @@ using namespace linglong;
 
 TEST(OCI, Runtime)
 {
-    auto r = linglong::fromFile("../../test/data/demo/config-mini.json");
+    auto r = linglong::fromFile("data/demo/config-mini.json");
 
     EXPECT_EQ(r.version, "1.0.1");
     EXPECT_EQ(r.process.args[0], "/bin/bash");

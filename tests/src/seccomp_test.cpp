@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: LGPL-3.0-or-later
  */
 
+#if LINYAPS_BOX_ENABLE_SECCOMP
+
 #include <gtest/gtest.h>
 
 #include "container/seccomp.h"
@@ -25,7 +27,7 @@ TEST(OCI, Seccomp)
     const size_t bufSize = 1024;
     char buf[bufSize];
 
-    auto filepath = "../../test/data/demo/config-seccomp.json";
+    auto filepath = "data/demo/config-seccomp.json";
     auto r = linglong::fromFile(filepath);
 
     EXPECT_EQ(ConfigSeccomp(r.linux.seccomp), 0);
@@ -42,7 +44,7 @@ TEST(OCI, SeccompDefault)
     const size_t bufSize = 1024;
     char buf[bufSize];
 
-    auto filepath = "../../test/data/demo/config-seccomp-default.json";
+    auto filepath = "data/demo/config-seccomp-default.json";
     auto r = linglong::fromFile(filepath);
 
     EXPECT_EQ(ConfigSeccomp(r.linux.seccomp), 0);
@@ -51,7 +53,7 @@ TEST(OCI, SeccompDefault)
     EXPECT_EQ(errno, EPERM);
 
     // reset seccomp
-    filepath = "../../test/data/demo/config-seccomp.json";
+    filepath = "data/demo/config-seccomp.json";
     r = linglong::fromFile(filepath);
 
     EXPECT_EQ(ConfigSeccomp(r.linux.seccomp), 0);
@@ -59,3 +61,4 @@ TEST(OCI, SeccompDefault)
     klogctl(2, buf, bufSize);
     EXPECT_EQ(errno, EPERM);
 }
+#endif

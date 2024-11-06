@@ -14,9 +14,9 @@
 // ll-box will open the symlink with O_PATH | O_NOFOLLOW and replace source by '/proc/self/fd/${fd}'
 // impl: method MountNode in file host_mount.cpp
 #ifndef MS_NOSYMFOLLOW
-#  define LINGLONG_MS_NOSYMFOLLOW 256
+#define LINGLONG_MS_NOSYMFOLLOW 256
 #else
-#  define LINGLONG_MS_NOSYMFOLLOW MS_NOSYMFOLLOW
+#define LINGLONG_MS_NOSYMFOLLOW MS_NOSYMFOLLOW
 #endif
 
 namespace linglong {

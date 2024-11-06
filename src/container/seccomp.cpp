@@ -6,14 +6,16 @@
 
 #include "seccomp.h"
 
+#if LINYAPS_BOX_ENABLE_SECCOMP
+
 #include <seccomp.h>
 
 namespace {
 
-#define SYSCALL_PAIR(SYSCALL)               \
-  {                                         \
-    LL_TOSTRING(SYSCALL), SCMP_SYS(SYSCALL) \
-  }
+#define SYSCALL_PAIR(SYSCALL)                   \
+    {                                           \
+        LL_TOSTRING(SYSCALL), SCMP_SYS(SYSCALL) \
+    }
 
 std::vector<struct scmp_arg_cmp> toScmpArgCmpArray(const std::vector<linglong::SyscallArg> &args)
 {
@@ -144,3 +146,5 @@ int ConfigSeccomp(const std::optional<linglong::Seccomp> &seccomp)
 }
 
 } // namespace linglong
+
+#endif

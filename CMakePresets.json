@@ -1,0 +1,117 @@
+{
+        "version": 6,
+        "cmakeMinimumRequired": {
+                "major": 3,
+                "minor": 25,
+                "patch": 0
+        },
+        "configurePresets": [
+                {
+                        "name": "dev",
+                        "displayName": "The dev profile",
+                        "description": "The default configuration for developers",
+                        "binaryDir": "${sourceDir}/build",
+                        "cacheVariables": {
+                                "CMAKE_COLOR_DIAGNOSTICS": true,
+                                "CMAKE_CXX_CLANG_TIDY": "$env{CMAKE_CXX_CLANG_TIDY}",
+                                "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -O0 -g3 -fsanitize=address,undefined $env{CXXFLAGS}",
+                                "CMAKE_BUILD_TYPE": "Debug",
+                                "CMAKE_C_CLANG_TIDY": "$env{CMAKE_C_CLANG_TIDY}",
+                                "CMAKE_C_FLAGS": "-Wall -Wextra -Wpedantic -Werror -O0 -g3 -fsanitize=address,undefined $env{CFLAGS}",
+                                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+                                "CMAKE_LINKER_TYPE": "$env{CMAKE_LINKER_TYPE}",
+                                "linyaps-box_ENABLE_CPACK": "ON",
+                                "linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": ""
+                        }
+                },
+                {
+                        "name": "release",
+                        "displayName": "The release profile",
+                        "description": "The default configuration for release",
+                        "binaryDir": "${sourceDir}/build-release",
+                        "cacheVariables": {
+                                "CMAKE_COLOR_DIAGNOSTICS": true,
+                                "CMAKE_BUILD_TYPE": "RelWithDbgInfo",
+                                "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror $env{CXXFLAGS}",
+                                "CMAKE_C_FLAGS": "-Wall -Wextra -Wpedantic -Werror $env{CFLAGS}",
+                                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+                                "CMAKE_LINKER_TYPE": "$env{CMAKE_LINKER_TYPE}",
+                                "linyaps-box_ENABLE_CPACK": "ON"
+                        }
+                }
+        ],
+        "buildPresets": [
+                {
+                        "name": "dev",
+                        "configurePreset": "dev"
+                },
+                {
+                        "name": "release",
+                        "configurePreset": "release"
+                }
+        ],
+        "testPresets": [
+                {
+                        "name": "dev",
+                        "configurePreset": "dev",
+                        "output": {
+                                "outputOnFailure": true
+                        },
+                        "execution": {
+                                "noTestsAction": "default",
+                                "stopOnFailure": true
+                        }
+                },
+                {
+                        "name": "release",
+                        "configurePreset": "release",
+                        "output": {
+                                "outputOnFailure": true
+                        },
+                        "execution": {
+                                "noTestsAction": "default",
+                                "stopOnFailure": true
+                        }
+                }
+        ],
+        "workflowPresets": [
+                {
+                        "name": "dev",
+                        "displayName": "The default workflow for developers",
+                        "description": "Configure, build then test with dev profile",
+                        "steps": [
+                                {
+                                        "type": "configure",
+                                        "name": "dev"
+                                },
+                                {
+                                        "type": "build",
+                                        "name": "dev"
+                                },
+                                {
+                                        "type": "test",
+                                        "name": "dev"
+                                }
+                        ]
+                },
+                {
+                        "name": "release",
+                        "displayName": "The default workflow for release",
+                        "description": "Configure, build then test with release profile",
+                        "steps": [
+                                {
+                                        "type": "configure",
+                                        "name": "release"
+                                },
+                                {
+                                        "type": "build",
+                                        "name": "release"
+                                },
+                                {
+                                        "type": "test",
+                                        "name": "release"
+                                }
+                        ]
+                }
+        ]
+}

@@ -59,8 +59,8 @@ NamespaceIndentation: None
 
 # Allow indentation for preprocessing directives (if/ifdef/endif). https://reviews.llvm.org/rL312125
 IndentPPDirectives: AfterHash
-# We only indent with 2 spaces for preprocessor directives
-PPIndentWidth: 2
+# We do not indent preprocessor directives
+PPIndentWidth: 0
 
 # Horizontally align arguments after an open bracket.
 # The coding style does not specify the following, but this is what gives
