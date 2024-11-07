@@ -139,7 +139,7 @@ int ConfigSeccomp(const std::optional<linglong::Seccomp> &seccomp)
         ret = -1;
     }
 
-    if (!ctx) {
+    if (ctx) {
         seccomp_release(ctx);
     }
     return ret;
