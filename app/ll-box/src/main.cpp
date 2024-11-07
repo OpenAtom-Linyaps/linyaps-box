@@ -22,7 +22,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-const char *argp_program_bug_address = "https://github.com/linuxdeepin/linglong/issues"; // NOLINT
+const char *argp_program_bug_address =
+        "https://github.com/OpenAtom-Linyaps/linyaps-box/issues"; // NOLINT
 
 namespace {
 struct arg_global
@@ -662,11 +663,14 @@ int main(int argc, char **argv)
                 { nullptr, 0, nullptr, 0, nullptr, 0 } // NOLINT
             };
 
-    const auto *doc = "\nCOMMANDS:\n"
-                      "\tlist        - list known containers\n"
-                      "\trun         - run a container\n"
-                      "\texec        - exec a command in a running container\n"
-                      "\tkill        - send a signal to the container init process\n";
+    const auto *doc = "\n"
+                      "A light OCI runtime implementation for desktop applications.\n"
+                      "\n"
+                      "COMMANDS:\n"
+                      "\tlist  - list known containers\n"
+                      "\trun   - run a container\n"
+                      "\texec  - exec a command in a running container\n"
+                      "\tkill  - send a signal to the container init process\n";
 
     struct argp global_argp = {
         options, // NOLINT
