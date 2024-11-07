@@ -1,7 +1,3 @@
-# SPDX-FileCopyrightText: 2024 UnionTech Software Technology Co., Ltd.
-#
-# SPDX-License-Identifier: LGPL-3.0-or-later
-
 cmake_minimum_required(VERSION 3.11.4) # for RHEL 8
 
 # Let's place extra cmake scripts in /cmake directory
