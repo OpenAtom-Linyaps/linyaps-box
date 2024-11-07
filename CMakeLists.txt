@@ -151,11 +151,11 @@ endif()
 enable_testing()
 
 set(linyaps-box_TESTS ll-box-tests)
-set(linyaps-box_TESTS_SOURCE ./tests/src/oci_test.cpp
-                             ./tests/src/seccomp_test.cpp)
+set(linyaps-box_TESTS_SOURCE ./tests/ll-box-tests/src/oci_test.cpp
+                             ./tests/ll-box-tests/src/seccomp_test.cpp)
 set(linyaps-box_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
 set(linyaps-box_TESTS_SOURCE_INCLUDE_DIRS
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/src")
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-tests/src")
 
 find_package(GTest REQUIRED)
 
@@ -177,4 +177,4 @@ set_property(TARGET "${linyaps-box_TESTS}" PROPERTY CXX_STANDARD_REQUIRED ON)
 include(GoogleTest)
 
 gtest_discover_tests("${linyaps-box_TESTS}"
-                     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+                     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-tests")

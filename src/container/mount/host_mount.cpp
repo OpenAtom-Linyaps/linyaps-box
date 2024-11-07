@@ -42,7 +42,9 @@ public:
     {
         int ret = -1;
 
-        struct stat source_stat{};
+        struct stat source_stat
+        {
+        };
 
         bool is_path = false;
         auto source = m.source;
@@ -294,7 +296,9 @@ public:
         }
 
         // retry remount
-        struct statfs sfs{};
+        struct statfs sfs
+        {
+        };
 
         ret = ::statfs(target.c_str(), &sfs);
         if (ret < 0) {
@@ -369,6 +373,6 @@ int HostMount::Setup(FilesystemDriver *driver)
     return dd_ptr->driver_->Setup();
 }
 
-HostMount::~HostMount() { };
+HostMount::~HostMount(){};
 
 } // namespace linglong

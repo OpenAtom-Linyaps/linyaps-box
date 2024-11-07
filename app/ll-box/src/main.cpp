@@ -412,7 +412,8 @@ int parse_exec(int key, char *arg, struct argp_state *state)
 
 int cmd_list(struct argp_state *state)
 {
-    struct arg_list list_arg{
+    struct arg_list list_arg
+    {
         reinterpret_cast<struct arg_global *>(state->input), // NOLINT
     };
 
@@ -452,7 +453,8 @@ int cmd_list(struct argp_state *state)
 
 int cmd_run(struct argp_state *state)
 {
-    struct arg_run run_arg{
+    struct arg_run run_arg
+    {
         reinterpret_cast<struct arg_global *>(state->input), // NOLINT
     };
 
@@ -509,7 +511,8 @@ int cmd_run(struct argp_state *state)
 
 int cmd_exec(struct argp_state *state)
 {
-    struct arg_exec exec_arg{
+    struct arg_exec exec_arg
+    {
         reinterpret_cast<struct arg_global *>(state->input), // NOLINT
     };
 

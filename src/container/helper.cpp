@@ -41,7 +41,7 @@ nlohmann::json readAllContainerJson() noexcept
 {
     nlohmann::json result = nlohmann::json::array();
     auto dir =
-      std::filesystem::path("/run") / "user" / std::to_string(getuid()) / "linglong" / "box";
+            std::filesystem::path("/run") / "user" / std::to_string(getuid()) / "linglong" / "box";
 
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);

@@ -19,7 +19,10 @@ TEST(OCI, Runtime)
     EXPECT_EQ(r.process.env[1], "TERM=xterm");
 
     EXPECT_EQ(r.mounts.has_value(), true);
-    EXPECT_EQ(r.mounts->at(1).data.at(1), "strictatime");
+    EXPECT_TRUE(std::find(r.mounts->at(1).data.begin(), r.mounts->at(1).data.end(), "mode=755")
+                != r.mounts->at(1).data.end());
+    EXPECT_TRUE(std::find(r.mounts->at(1).data.begin(), r.mounts->at(1).data.end(), "size=65536k")
+                != r.mounts->at(1).data.end());
 
     EXPECT_EQ(r.hooks, std::nullopt);
 

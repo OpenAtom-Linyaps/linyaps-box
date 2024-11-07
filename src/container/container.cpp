@@ -145,9 +145,9 @@ static int ConfigCgroupV2(const std::string &cgroupsPath,
         const auto memSwapMax = res.memory.swap - memMax;
         const auto memLow = res.memory.reservation;
         auto ret = writeConfig({
-          { subCgroupPath("memory.max"), util::format("%d", memMax) },
-          { subCgroupPath("memory.swap.max"), util::format("%d", memSwapMax) },
-          { subCgroupPath("memory.low"), util::format("%d", memLow) },
+                { subCgroupPath("memory.max"), util::format("%d", memMax) },
+                { subCgroupPath("memory.swap.max"), util::format("%d", memSwapMax) },
+                { subCgroupPath("memory.low"), util::format("%d", memLow) },
         });
 
         if (!ret) {
@@ -164,8 +164,8 @@ static int ConfigCgroupV2(const std::string &cgroupsPath,
 
     {
         auto ret = writeConfig({
-          { subCgroupPath("cpu.max"), util::format("%d %d", cpuMax, cpuPeriod) },
-          { subCgroupPath("cpu.weight"), util::format("%d", cpuWeight) },
+                { subCgroupPath("cpu.max"), util::format("%d %d", cpuMax, cpuPeriod) },
+                { subCgroupPath("cpu.weight"), util::format("%d", cpuWeight) },
         });
 
         if (!ret) {
@@ -177,7 +177,7 @@ static int ConfigCgroupV2(const std::string &cgroupsPath,
     // config pid
     {
         auto ret = writeConfig({
-          { subCgroupPath("cgroup.procs"), util::format("%d", initPid) },
+                { subCgroupPath("cgroup.procs"), util::format("%d", initPid) },
         });
 
         if (!ret) {
@@ -748,7 +748,7 @@ int Container::Start()
     auto ret = util::WaitAllUntil(entryPid);
 
     auto dir =
-      std::filesystem::path("/run") / "user" / std::to_string(getuid()) / "linglong" / "box";
+            std::filesystem::path("/run") / "user" / std::to_string(getuid()) / "linglong" / "box";
     if (!std::filesystem::remove(dir / (this->id + ".json"))) {
         logErr() << "remove" << dir / (this->id + ".json") << "failed";
     }
