@@ -32,10 +32,10 @@ std::vector<struct scmp_arg_cmp> toScmpArgCmpArray(const std::vector<linglong::S
     unsigned int index = 0;
     for (auto const &arg : args) {
         scmpArgs.push_back({
-                .arg = index,
-                .op = seccompArgOpMap.at(arg.op),
-                .datum_a = arg.value,
-                .datum_b = arg.valueTwo,
+                index,
+                seccompArgOpMap.at(arg.op),
+                arg.value,
+                arg.valueTwo,
         });
         ++index;
     }

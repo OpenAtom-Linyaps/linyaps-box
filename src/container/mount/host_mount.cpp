@@ -42,9 +42,7 @@ public:
     {
         int ret = -1;
 
-        struct stat source_stat
-        {
-        };
+        struct stat source_stat{};
 
         bool is_path = false;
         auto source = m.source;
@@ -147,7 +145,7 @@ public:
             // When doing a bind mount, data and fstype are ignored by kernel. We should set them by
             // remounting.
             real_data.clear();
-            ret = util::fs::do_mount_with_fd(root.c_str(),
+            ret = util::fs::do_mount_with_fd(root.string().c_str(),
                                              source.c_str(),
                                              host_dest_full_path.string().c_str(),
                                              nullptr,
@@ -166,7 +164,7 @@ public:
                 auto propagation = m.propagationFlags & all_propagations;
 
                 if (propagation != 0U) {
-                    ret = util::fs::do_mount_with_fd(root.c_str(),
+                    ret = util::fs::do_mount_with_fd(root.string().c_str(),
                                                      nullptr,
                                                      host_dest_full_path.string().c_str(),
                                                      nullptr,
@@ -201,11 +199,11 @@ public:
             }
             // When doing a remount, source and fstype are ignored by kernel.
             remountList.emplace_back(remountNode{
-                    .flags = real_flags,
-                    .extensionFlags = m.extensionFlags,
-                    .targetFd = newFd,
-                    .targetPath = util::format("/proc/self/fd/%d", newFd),
-                    .data = data,
+                    real_flags,
+                    m.extensionFlags,
+                    newFd,
+                    util::format("/proc/self/fd/%d", newFd),
+                    data,
             });
         } break;
         case Mount::Proc:
@@ -213,7 +211,7 @@ public:
         case Mount::Mqueue:
         case Mount::Tmpfs:
         case Mount::Sysfs: {
-            ret = util::fs::do_mount_with_fd(root.c_str(),
+            ret = util::fs::do_mount_with_fd(root.string().c_str(),
                                              source.c_str(),
                                              host_dest_full_path.string().c_str(),
                                              m.type.c_str(),
@@ -226,7 +224,7 @@ public:
                 if (m.fsType == Mount::Sysfs) {
                     real_flags = MS_BIND | MS_REC;
                     real_data = "";
-                    ret = util::fs::do_mount_with_fd(root.c_str(),
+                    ret = util::fs::do_mount_with_fd(root.string().c_str(),
                                                      "/sys",
                                                      host_dest_full_path.string().c_str(),
                                                      nullptr,
@@ -238,7 +236,7 @@ public:
                 } else if (m.fsType == Mount::Mqueue) {
                     real_flags = MS_BIND | MS_REC;
                     real_data = "";
-                    ret = util::fs::do_mount_with_fd(root.c_str(),
+                    ret = util::fs::do_mount_with_fd(root.string().c_str(),
                                                      "/dev/mqueue",
                                                      host_dest_full_path.string().c_str(),
                                                      nullptr,
@@ -249,7 +247,7 @@ public:
             break;
         }
         case Mount::Cgroup:
-            ret = util::fs::do_mount_with_fd(root.c_str(),
+            ret = util::fs::do_mount_with_fd(root.string().c_str(),
                                              source.c_str(),
                                              host_dest_full_path.string().c_str(),
                                              m.type.c_str(),
@@ -296,9 +294,7 @@ public:
         }
 
         // retry remount
-        struct statfs sfs
-        {
-        };
+        struct statfs sfs{};
 
         ret = ::statfs(target.c_str(), &sfs);
         if (ret < 0) {
@@ -373,6 +369,6 @@ int HostMount::Setup(FilesystemDriver *driver)
     return dd_ptr->driver_->Setup();
 }
 
-HostMount::~HostMount(){};
+HostMount::~HostMount() { };
 
 } // namespace linglong

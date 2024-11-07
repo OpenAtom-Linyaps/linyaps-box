@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <nlohmann/json.hpp>
+#include "json.h"
 
 namespace linglong {
 namespace util {

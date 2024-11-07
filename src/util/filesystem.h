@@ -21,7 +21,7 @@ namespace fs {
 
 bool exists(const std::string &s);
 
-class path : public std::basic_string<char>
+class path
 {
 public:
     explicit path(const std::string &s)
@@ -34,8 +34,6 @@ public:
         p = util::str_spilt(s, "/");
         return *this;
     }
-
-    path &operator=(const path &p1) = default;
 
     bool operator==(const path &s) const { return this->p == s.p; }
 
@@ -170,7 +168,7 @@ private:
 
 bool is_dir(const std::string &s);
 
-file_status status(const path &p, std::error_code &ec);
+file_status status(const path &p);
 
 path read_symlink(const path &p);
 

@@ -70,7 +70,7 @@ void containerJsonCleanUp()
 
         if (kill(boxPid, 0) != 0) {
             auto jsonPath = std::filesystem::path("/run") / "user" / std::to_string(getuid())
-              / "linglong" / "box" / (it->value("id", "unknown") + ".json");
+                    / "linglong" / "box" / (it->value("id", "unknown") + ".json");
 
             if (!std::filesystem::remove(jsonPath)) {
                 logErr() << "remove" << jsonPath << "failed";
@@ -412,9 +412,8 @@ int parse_exec(int key, char *arg, struct argp_state *state)
 
 int cmd_list(struct argp_state *state)
 {
-    struct arg_list list_arg
-    {
-        .global = reinterpret_cast<struct arg_global *>(state->input), // NOLINT
+    struct arg_list list_arg{
+        reinterpret_cast<struct arg_global *>(state->input), // NOLINT
     };
 
     int argc = state->argc - state->next + 1;
@@ -426,21 +425,22 @@ int cmd_list(struct argp_state *state)
     argv[0] = name.data(); // NOLINT
 
     struct argp_option list_opt[] = // NOLINT
-      {
-          {
-            .name = "format",
-            .key = 'f',
-            .arg = "FORMAT",
-            .flags = 0,
-            .doc = "select one of: table or json (default: \"table\")",
-            .group = 0,
-          },
-          { nullptr } // NOLINT
-      };
+            {
+                {
+                        "format",
+                        'f',
+                        "FORMAT",
+                        0,
+                        "select one of: table or json (default: \"table\")",
+                        0,
+                },
+                { nullptr, 0, nullptr, 0, nullptr, 0 } // NOLINT
+            };
 
-    struct argp list_argp = { .options = list_opt, // NOLINT
-                              .parser = parse_list,
-                              .doc = "OCI runtime" }; // NOLINT
+    struct argp list_argp = {
+        list_opt, // NOLINT
+        parse_list, "OCI runtime", nullptr, nullptr, nullptr, nullptr
+    }; // NOLINT
 
     argp_parse(&list_argp, argc, argv, ARGP_IN_ORDER, &argc, &list_arg); // NOLINT
     argv[0] = argv0;                                                     // NOLINT
@@ -452,9 +452,8 @@ int cmd_list(struct argp_state *state)
 
 int cmd_run(struct argp_state *state)
 {
-    struct arg_run run_arg
-    {
-        .global = reinterpret_cast<struct arg_global *>(state->input), // NOLINT
+    struct arg_run run_arg{
+        reinterpret_cast<struct arg_global *>(state->input), // NOLINT
     };
 
     int argc = state->argc - state->next + 1;
@@ -467,30 +466,30 @@ int cmd_run(struct argp_state *state)
     argv[0] = name.data(); // NOLINT
 
     struct argp_option run_opt[] = // NOLINT
-      {
-          {
-            .name = "bundle",
-            .key = 'b',
-            .arg = "DIR",
-            .flags = 0,
-            .doc = "container bundle (default \".\")",
-            .group = 0,
-          },
-          {
-            .name = "config",
-            .key = 'f',
-            .arg = "FILE",
-            .flags = 0,
-            .doc = "override the config file name",
-            .group = 0,
-          },
-          { nullptr } // NOLINT
-      };
+            {
+                {
+                        "bundle",
+                        'b',
+                        "DIR",
+                        0,
+                        "container bundle (default \".\")",
+                        0,
+                },
+                {
+                        "config",
+                        'f',
+                        "FILE",
+                        0,
+                        "override the config file name",
+                        0,
+                },
+                { nullptr, 0, nullptr, 0, nullptr, 0 } // NOLINT
+            };
 
-    struct argp run_argp = { .options = run_opt, // NOLINT
-                             .parser = parse_run,
-                             .args_doc = "CONTAINER",
-                             .doc = "OCI runtime" }; // NOLINT
+    struct argp run_argp = {
+        run_opt, // NOLINT
+        parse_run, "CONTAINER", "OCI runtime", nullptr, nullptr, nullptr
+    }; // NOLINT
 
     argp_parse(&run_argp, argc, argv, ARGP_IN_ORDER, &argc, &run_arg); // NOLINT
 
@@ -510,9 +509,8 @@ int cmd_run(struct argp_state *state)
 
 int cmd_exec(struct argp_state *state)
 {
-    struct arg_exec exec_arg
-    {
-        .global = reinterpret_cast<struct arg_global *>(state->input), // NOLINT
+    struct arg_exec exec_arg{
+        reinterpret_cast<struct arg_global *>(state->input), // NOLINT
     };
 
     int argc = state->argc - state->next + 1;
@@ -525,28 +523,23 @@ int cmd_exec(struct argp_state *state)
     argv[0] = name.data(); // NOLINT
 
     struct argp_option exec_opt[] = // NOLINT
-      {
-          {
-            .name = "user",
-            .key = 'u',
-            .arg = "USERSPEC",
-            .flags = 0,
-            .doc = "specify the user in the form UID[:GID]",
-            .group = 0,
-          },
-          { .name = "cwd",
-            .key = OPTION_CWD,
-            .arg = "CWD",
-            .flags = 0,
-            .doc = "current working directory",
-            .group = 0 },
-          { nullptr } // NOLINT
-      };
+            {
+                {
+                        "user",
+                        'u',
+                        "USERSPEC",
+                        0,
+                        "specify the user in the form UID[:GID]",
+                        0,
+                },
+                { "cwd", OPTION_CWD, "CWD", 0, "current working directory", 0 },
+                { nullptr, 0, nullptr, 0, nullptr, 0 } // NOLINT
+            };
 
-    struct argp exec_argp = { .options = exec_opt, // NOLINT
-                              .parser = parse_exec,
-                              .args_doc = "CONTAINER cmd",
-                              .doc = "OCI runtime" }; // NOLINT
+    struct argp exec_argp = {
+        exec_opt, // NOLINT
+        parse_exec, "CONTAINER cmd", "OCI runtime", nullptr, nullptr, nullptr
+    }; // NOLINT
 
     argp_parse(&exec_argp, argc, argv, ARGP_IN_ORDER, &argc, &exec_arg); // NOLINT
 
@@ -571,10 +564,8 @@ int cmd_kill(struct argp_state *state)
     std::string name = state->name;
     name += " kill";
 
-    struct argp kill_argp = { .options = nullptr,
-                              .parser = nullptr,
-                              .args_doc = "CONTAINER",
-                              .doc = "OCI runtime" }; // NOLINT
+    struct argp kill_argp = { nullptr, nullptr, "CONTAINER", "OCI runtime",
+                              nullptr, nullptr, nullptr }; // NOLINT
     // no option currently, just for doc
     argp_parse(&kill_argp, argc, argv, ARGP_IN_ORDER, &argc, nullptr); // NOLINT
     argv[0] = argv0;
@@ -656,17 +647,17 @@ int main(int argc, char **argv)
     // make sure that all containers status are valid
     containerJsonCleanUp();
     struct argp_option options[] = // NOLINT
-      {
-          {
-            .name = "cgroup-manager",
-            .key = OPTION_CGROUP_MANAGER,
-            .arg = "MANAGER",
-            .flags = 0,
-            .doc = "cgroup manager",
-            .group = 0,
-          },
-          { nullptr } // NOLINT
-      };
+            {
+                {
+                        "cgroup-manager",
+                        OPTION_CGROUP_MANAGER,
+                        "MANAGER",
+                        0,
+                        "cgroup manager",
+                        0,
+                },
+                { nullptr, 0, nullptr, 0, nullptr, 0 } // NOLINT
+            };
 
     const auto *doc = "\nCOMMANDS:\n"
                       "\tlist        - list known containers\n"
@@ -674,10 +665,10 @@ int main(int argc, char **argv)
                       "\texec        - exec a command in a running container\n"
                       "\tkill        - send a signal to the container init process\n";
 
-    struct argp global_argp = { .options = options, // NOLINT
-                                .parser = parse_global,
-                                .args_doc = "COMMAND [OPTION...]",
-                                .doc = doc }; // NOLINT
+    struct argp global_argp = {
+        options, // NOLINT
+        parse_global, "COMMAND [OPTION...]", doc, nullptr, nullptr, nullptr
+    }; // NOLINT
 
     struct arg_global global;
 
