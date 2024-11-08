@@ -46,10 +46,12 @@ endif()
 option(linyaps-box_ENABLE_TESTING "Enable testing." ${PROJECT_IS_TOP_LEVEL})
 option(linyaps-box_ENABLE_SMOKE_TESTS "Enable smoke testing." OFF)
 
-if(NOT linyaps-box_ENABLE_TESTING AND linyaps-box_ENABLE_SMOKE_TESTS)
+if((NOT linyaps-box_ENABLE_TESTING) AND linyaps-box_ENABLE_SMOKE_TESTS)
   message(
     WARNING "Smoke tests require testing to be enabled. Enabling testing.")
 endif()
+
+option(linyaps-box_ENABLE_COVERAGE "Enable coverage." OFF)
 
 option(linyaps-box_ENABLE_CPACK "Enable CPack." OFF)
 set(linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX
@@ -112,6 +114,21 @@ target_compile_features("${linyaps-box_LIBRARY}" PUBLIC cxx_std_17)
 if(linyaps-box_ENABLE_SECCOMP)
   target_compile_definitions("${linyaps-box_LIBRARY}"
                              PUBLIC LINYAPS_BOX_ENABLE_SECCOMP)
+endif()
+
+if(linyaps-box_ENABLE_COVERAGE)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options("${linyaps-box_LIBRARY}"
+                           PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options("${linyaps-box_LIBRARY}" PUBLIC
+                        -fprofile-instr-generate -fcoverage-mapping)
+  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options("${linyaps-box_LIBRARY}" PRIVATE --coverage)
+    target_link_options("${linyaps-box_LIBRARY}" PUBLIC --coverage)
+  else()
+    message(
+      FATAL_ERROR "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}.")
+  endif()
 endif()
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_STANDARD 17)
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_STANDARD_REQUIRED ON)
@@ -184,22 +201,78 @@ set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD_REQUIRED
 
 include(GoogleTest)
 
-gtest_discover_tests(
-  "${linyaps-box_UNIT_TESTS}"
-  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-ut")
+set(GTEST_DISCOVER_TESTS_ARGS "${linyaps-box_UNIT_TESTS}" WORKING_DIRECTORY
+                              "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-ut")
 
-if(NOT linyaps-box_ENABLE_SMOKE_TESTS)
-  return()
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  list(APPEND GTEST_DISCOVER_TESTS_ARGS PROPERTIES ENVIRONMENT
+       "LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/default.profraw")
 endif()
 
-set(linyaps-box_SMOKE_TESTS
-    ./tests/ll-box-st/01-run-whoami-with-debian-latest.json)
+gtest_discover_tests(${GTEST_DISCOVER_TESTS_ARGS})
 
-foreach(test ${linyaps-box_SMOKE_TESTS})
-  add_test(
-    NAME "${test}"
-    COMMAND
-      "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-st/ll-box-st"
-      "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}"
-      "${CMAKE_CURRENT_BINARY_DIR}/st-data" "${test}")
-endforeach()
+function(setup_linyaps_box_smoke_tests)
+  if(NOT linyaps-box_ENABLE_SMOKE_TESTS)
+    return()
+  endif()
+
+  set(linyaps-box_SMOKE_TESTS
+      ./tests/ll-box-st/01-run-whoami-with-debian-latest.json)
+
+  foreach(test ${linyaps-box_SMOKE_TESTS})
+    add_test(
+      NAME "${test}"
+      COMMAND
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-st/ll-box-st"
+        "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}"
+        "${CMAKE_CURRENT_BINARY_DIR}/st-data" "${test}")
+    list(APPEND linyaps-box_TESTS "${test}")
+  endforeach()
+endfunction()
+
+setup_linyaps_box_smoke_tests()
+
+function(setup_linyaps_box_coverage)
+  if(NOT linyaps-box_ENABLE_COVERAGE)
+    return()
+  endif()
+
+  set(COVERAGE_INFO "coverage.info")
+
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set_tests_properties(
+      ${linyaps-box_TESTS}
+      PROPERTIES ENVIRONMENT
+                 "LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/default.profraw"
+    )
+
+    find_program(LLVM_PROFDATA llvm-profdata REQUIRED)
+    find_program(LLVM_COV llvm-cov REQUIRED)
+    add_custom_command(
+      OUTPUT coverage.info
+      DEPENDS "${linyaps-box_LIBRARY}"
+      COMMAND "${LLVM_PROFDATA}" merge -sparse default.profraw -o
+              default.profdata
+      COMMAND
+        "${LLVM_COV}" show -instr-profile
+        "${CMAKE_CURRENT_BINARY_DIR}/default.profdata"
+        $<TARGET_FILE_NAME:${linyaps-box_LIBRARY}> > "${COVERAGE_INFO}")
+    add_custom_target(coverage DEPENDS coverage.info)
+  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    find_program(LCOV lcov REQUIRED)
+    find_program(SED sed REQUIRED)
+    add_custom_target(
+      coverage
+      COMMAND "${LCOV}" --capture --directory . --output-file coverage.info
+              --branch-coverage --rc geninfo_unexecuted_blocks=1
+      COMMAND "${LCOV}" --remove coverage.info '/usr/*' --output-file
+              coverage.info
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      DEPENDS "${linyaps-box_LIBRARY}" test)
+  else()
+    message(
+      FATAL_ERROR "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}.")
+  endif()
+endfunction()
+
+setup_linyaps_box_coverage()

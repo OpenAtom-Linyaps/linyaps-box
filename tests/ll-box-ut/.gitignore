@@ -1,0 +1,3 @@
+# `gtest_discover_tests` execute unit test binary in this directory
+# to discover tests which will produce an empty default.profraw file here.
+/default.profraw

@@ -20,6 +20,7 @@
                                 "CMAKE_C_FLAGS": "-Wall -Wextra -Wpedantic -Werror -O0 -g3 -fsanitize=address,undefined $env{CFLAGS}",
                                 "CMAKE_EXPORT_COMPILE_COMMANDS": true,
                                 "CMAKE_LINKER_TYPE": "$env{CMAKE_LINKER_TYPE}",
+                                "linyaps-box_ENABLE_COVERAGE": true,
                                 "linyaps-box_ENABLE_CPACK": true,
                                 "linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": "",
                                 "linyaps-box_ENABLE_SMOKE_TESTS": true
@@ -39,6 +40,22 @@
                                 "CMAKE_LINKER_TYPE": "$env{CMAKE_LINKER_TYPE}",
                                 "linyaps-box_ENABLE_CPACK": "ON"
                         }
+                },
+                {
+                        "name": "ci",
+                        "displayName": "The dev profile",
+                        "description": "The default configuration for developers",
+                        "binaryDir": "${sourceDir}/build-ci",
+                        "cacheVariables": {
+                                "CMAKE_COLOR_DIAGNOSTICS": true,
+                                "CMAKE_CXX_CLANG_TIDY": "$env{CMAKE_CXX_CLANG_TIDY}",
+                                "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined $env{CXXFLAGS}",
+                                "CMAKE_C_CLANG_TIDY": "$env{CMAKE_C_CLANG_TIDY}",
+                                "CMAKE_C_FLAGS": "-Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined $env{CFLAGS}",
+                                "CMAKE_LINKER_TYPE": "$env{CMAKE_LINKER_TYPE}",
+                                "linyaps-box_ENABLE_COVERAGE": true,
+                                "linyaps-box_ENABLE_SMOKE_TESTS": true
+                        }
                 }
         ],
         "buildPresets": [
@@ -49,6 +66,10 @@
                 {
                         "name": "release",
                         "configurePreset": "release"
+                },
+                {
+                        "name": "ci",
+                        "configurePreset": "ci"
                 }
         ],
         "testPresets": [
@@ -73,7 +94,19 @@
                                 "noTestsAction": "default",
                                 "stopOnFailure": true
                         }
+                },
+                {
+                        "name": "ci",
+                        "configurePreset": "ci",
+                        "output": {
+                                "verbosity": "verbose"
+                        },
+                        "execution": {
+                                "noTestsAction": "default",
+                                "stopOnFailure": false
+                        }
                 }
+
         ],
         "workflowPresets": [
                 {
@@ -111,6 +144,25 @@
                                 {
                                         "type": "test",
                                         "name": "release"
+                                }
+                        ]
+                },
+                {
+                        "name": "ci",
+                        "displayName": "The default workflow for ci",
+                        "description": "Configure, build then test with ci profile",
+                        "steps": [
+                                {
+                                        "type": "configure",
+                                        "name": "ci"
+                                },
+                                {
+                                        "type": "build",
+                                        "name": "ci"
+                                },
+                                {
+                                        "type": "test",
+                                        "name": "ci"
                                 }
                         ]
                 }
