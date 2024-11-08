@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# NOTE:
+# Use /usr/bin/env to find shell interpreter for better portability.
+# Reference: https://en.wikipedia.org/wiki/Shebang_%28Unix%29#Portability
+
+# NOTE:
+# Exit immediately if any commands (even in pipeline)
+# exits with a non-zero status.
+set -e
+set -o pipefail
+
+# WARNING:
+# This is not reliable when using POSIX sh
+# and current script file is sourced by `source` or `.`
+CURRENT_SOURCE_FILE_PATH="${BASH_SOURCE[0]:-$0}"
+CURRENT_SOURCE_FILE_NAME="$(basename -- "$CURRENT_SOURCE_FILE_PATH")"
+
+CURRENT_SOURCE_FILE_DIR="$(dirname -- "$CURRENT_SOURCE_FILE_PATH")"
+
+# shellcheck disable=SC2016
+USAGE="$CURRENT_SOURCE_FILE_NAME"'
+
+ll-box smoke tests
+
+'"
+Usage:
+  $CURRENT_SOURCE_FILE_NAME -h
+  $CURRENT_SOURCE_FILE_NAME <LL_BOX> <DATA_DIR> [<TEST_FILE>]
+
+Options:
+  -h	Show this screen."
+
+# This function log messages to stderr works like printf
+# with a prefix of the current script name.
+# Arguments:
+#   $1 - The format string.
+#   $@ - Arguments to the format string, just like printf.
+function log() {
+	local format="$1"
+	shift
+	# shellcheck disable=SC2059
+	printf "$CURRENT_SOURCE_FILE_NAME: $format\n" "$@" >&2 || true
+}
+
+JQ="${JQ:-jq}"
+UMOCI="${UMOCI:-umoci}"
+PODMAN="${PODMAN:-podman}"
+
+function main() {
+	while getopts ':h' option; do
+		case "$option" in
+		h)
+			echo "$USAGE"
+			exit
+			;;
+
+		\?)
+			log "[ERROR] Unknown option: -%s" "$OPTARG"
+			exit 1
+			;;
+		esac
+	done
+	shift $((OPTIND - 1))
+
+	if [ -z "$1" ]; then
+		log "[ERROR] Too few arguments, check \`$CURRENT_SOURCE_FILE_NAME -h\`"
+		exit 1
+	fi
+
+	local LL_BOX="$1"
+	shift 1
+
+	if ! command -v "$LL_BOX" &>/dev/null; then
+		log "[ERROR] %s is not an executable" "$LL_BOX"
+	fi
+
+	if [ -z "$1" ]; then
+		log "[ERROR] Too few arguments, check \`$CURRENT_SOURCE_FILE_NAME -h\`"
+		exit 1
+	fi
+
+	local DATA_DIR="$1"
+	shift 1
+
+	if [ -e "$DATA_DIR" ] && [ ! -d "$DATA_DIR" ]; then
+		log "[ERROR] %s is existed and it is not a directory" "$DATA_DIR"
+	fi
+
+	mkdir -p -- "$DATA_DIR"
+
+	check_requirements
+
+	if [ -e "$1" ]; then
+		run_test "$LL_BOX" "$DATA_DIR" "$TEST_FILE"
+		return
+	fi
+
+	log "[INFO] Running all tests in %s" "$CURRENT_SOURCE_FILE_DIR"
+
+	while read -r LINE; do
+		run_test "$LL_BOX" "$DATA_DIR" "$LINE"
+	done < <(find "$CURRENT_SOURCE_FILE_DIR" -maxdepth 1 -name "*.json")
+}
+
+function check_requirements() {
+	if ! command -v "$JQ" &>/dev/null; then
+		log "[ERROR] jq is not installed or not executable"
+		exit 1
+	fi
+
+	if ! command -v "$UMOCI" &>/dev/null; then
+		log "[ERROR] umoci is not installed or not executable"
+		exit 1
+	fi
+
+	if ! command -v "$PODMAN" &>/dev/null; then
+		log "[ERROR] podman is not installed or not executable"
+		exit 1
+	fi
+}
+
+function run_test() {
+	local LL_BOX="$1"
+	shift
+	local DATA_DIR="$1"
+	shift
+	local TEST_FILE="$1"
+	shift
+
+	local TEST_NAME
+	TEST_NAME="$("$JQ" -r '.name' "$TEST_FILE")"
+	log "[INFO] Running test: %s (%s)" "$TEST_FILE" "$TEST_NAME"
+
+	local TEST_FILE_NAME
+	TEST_FILE_NAME="$(basename -- "$TEST_FILE" .json)"
+
+	local TEST_DIR="$DATA_DIR/$TEST_FILE_NAME"
+	rm -rf -- "$TEST_DIR"
+	mkdir -p -- "$TEST_DIR"
+
+	local IMAGE
+	IMAGE="$("$JQ" -r '.image' "$TEST_FILE")"
+	local IMAGE_DIR="$TEST_DIR/image"
+
+	execute_command "$PODMAN" pull "$IMAGE"
+	execute_command "$PODMAN" save "$IMAGE" --format oci-dir --output "$IMAGE_DIR"
+
+	local BUNDLE
+	BUNDLE=$(realpath "$TEST_DIR/bundle")
+	"$UMOCI" unpack --rootless --image "$IMAGE_DIR":"$IMAGE" "$BUNDLE"
+
+	"$JQ" >"$BUNDLE/test_config.json" \
+		".process |= $("$JQ" -r '.process' "$TEST_FILE")" \
+		"$BUNDLE/config.json"
+
+	local CONTAINER_NAME
+	CONTAINER_NAME="$(basename -- "$TEST_FILE_NAME" .json)"
+
+	local TEST_COMMAND
+	TEST_COMMAND=("$LL_BOX" run -b "$BUNDLE" -f "$BUNDLE/test_config.json" "$CONTAINER_NAME")
+	log "[INFO] Running command: %s" "${TEST_COMMAND[*]}"
+
+	log "[INFO] ==== COMMAND OUTPUT START ===="
+	local REAL
+	REAL="$(
+		"${TEST_COMMAND[@]}" && :
+	)" && :
+	EXIT_CODE=$?
+	log "[INFO] ==== COMMAND OUTPUT END ======"
+
+	if [ $EXIT_CODE != 0 ]; then
+		log "[ERROR] OCI runtime exited with %d" "$EXIT_CODE"
+		log "[ERROR] Output:\n%s\n%s\n%s" \
+			"=====================================" \
+			"$REAL" \
+			"====================================="
+		exit 1
+	fi
+
+	local EXPECTED
+	EXPECTED="$("$JQ" -r '.expected' "$TEST_FILE")"
+
+	if [ "$REAL" == "$EXPECTED" ]; then
+		log "[INFO] Test %s passed" "$TEST_NAME"
+		return
+	fi
+
+	log "[ERROR] Test %s failed" "$TEST_NAME"
+	log "[ERROR] Expected:\n%s\n%s\n%s" \
+		"=====================================" \
+		"$EXPECTED" \
+		"====================================="
+	log "[ERROR] Got:\n%s\n%s\n%s" \
+		"=====================================" \
+		"$REAL" \
+		"====================================="
+	exit 1
+}
+
+function execute_command() {
+	log "[INFO] Running command: $*"
+	log "[INFO] ==== COMMAND OUTPUT START ===="
+	"$@"
+	log "[INFO] ==== COMMAND OUTPUT END ======"
+}
+
+main "$@"

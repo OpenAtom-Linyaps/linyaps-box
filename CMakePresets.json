@@ -20,8 +20,9 @@
                                 "CMAKE_C_FLAGS": "-Wall -Wextra -Wpedantic -Werror -O0 -g3 -fsanitize=address,undefined $env{CFLAGS}",
                                 "CMAKE_EXPORT_COMPILE_COMMANDS": true,
                                 "CMAKE_LINKER_TYPE": "$env{CMAKE_LINKER_TYPE}",
-                                "linyaps-box_ENABLE_CPACK": "ON",
-                                "linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": ""
+                                "linyaps-box_ENABLE_CPACK": true,
+                                "linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": "",
+                                "linyaps-box_ENABLE_SMOKE_TESTS": true
                         }
                 },
                 {
@@ -55,7 +56,7 @@
                         "name": "dev",
                         "configurePreset": "dev",
                         "output": {
-                                "outputOnFailure": true
+                                "verbosity": "verbose"
                         },
                         "execution": {
                                 "noTestsAction": "default",

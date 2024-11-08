@@ -44,6 +44,13 @@ if(CMAKE_VERSION VERSION_LESS 3.21)
 endif()
 
 option(linyaps-box_ENABLE_TESTING "Enable testing." ${PROJECT_IS_TOP_LEVEL})
+option(linyaps-box_ENABLE_SMOKE_TESTS "Enable smoke testing." OFF)
+
+if(NOT linyaps-box_ENABLE_TESTING AND linyaps-box_ENABLE_SMOKE_TESTS)
+  message(
+    WARNING "Smoke tests require testing to be enabled. Enabling testing.")
+endif()
+
 option(linyaps-box_ENABLE_CPACK "Enable CPack." OFF)
 set(linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX
     "/opt/org.openatom.linyaps-box"
@@ -121,7 +128,7 @@ add_executable("${linyaps-box_APP}" ${linyaps-box_APP_SOURCE})
 target_include_directories("${linyaps-box_APP}"
                            ${linyaps-box_APP_SOURCE_INCLUDE_DIRS})
 target_link_libraries("${linyaps-box_APP}" ${linyaps-box_APP_LINK_LIBRARIES})
-if (linyaps-box_STATIC)
+if(linyaps-box_STATIC)
   target_link_options("${linyaps-box_APP}" PRIVATE -static)
 endif()
 target_compile_features("${linyaps-box_APP}" PRIVATE cxx_std_17)
@@ -150,12 +157,12 @@ endif()
 
 enable_testing()
 
-set(linyaps-box_TESTS ll-box-tests)
-set(linyaps-box_TESTS_SOURCE ./tests/ll-box-tests/src/oci_test.cpp
-                             ./tests/ll-box-tests/src/seccomp_test.cpp)
-set(linyaps-box_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
-set(linyaps-box_TESTS_SOURCE_INCLUDE_DIRS
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-tests/src")
+set(linyaps-box_UNIT_TESTS ll-box-ut)
+set(linyaps-box_UNIT_TESTS_SOURCE ./tests/ll-box-ut/src/oci_test.cpp
+                                  ./tests/ll-box-ut/src/seccomp_test.cpp)
+set(linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
+set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-ut/src")
 
 find_package(GTest REQUIRED)
 
@@ -163,18 +170,36 @@ if(CMAKE_VERSION VERSION_LESS 3.21)
   add_library(GTest::gtest_main ALIAS GTest::Main)
 endif()
 
-list(APPEND linyaps-box_TESTS_LINK_LIBRARIES PRIVATE GTest::gtest_main)
+list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE GTest::gtest_main)
 
-add_executable("${linyaps-box_TESTS}" ${linyaps-box_TESTS_SOURCE})
-target_include_directories("${linyaps-box_TESTS}"
-                           ${linyaps-box_TESTS_SOURCE_INCLUDE_DIRS})
-target_link_libraries("${linyaps-box_TESTS}"
-                      ${linyaps-box_TESTS_LINK_LIBRARIES})
-target_compile_features("${linyaps-box_TESTS}" PRIVATE cxx_std_17)
-set_property(TARGET "${linyaps-box_TESTS}" PROPERTY CXX_STANDARD 17)
-set_property(TARGET "${linyaps-box_TESTS}" PROPERTY CXX_STANDARD_REQUIRED ON)
+add_executable("${linyaps-box_UNIT_TESTS}" ${linyaps-box_UNIT_TESTS_SOURCE})
+target_include_directories("${linyaps-box_UNIT_TESTS}"
+                           ${linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS})
+target_link_libraries("${linyaps-box_UNIT_TESTS}"
+                      ${linyaps-box_UNIT_TESTS_LINK_LIBRARIES})
+target_compile_features("${linyaps-box_UNIT_TESTS}" PRIVATE cxx_std_17)
+set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD 17)
+set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD_REQUIRED
+                                                         ON)
 
 include(GoogleTest)
 
-gtest_discover_tests("${linyaps-box_TESTS}"
-                     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-tests")
+gtest_discover_tests(
+  "${linyaps-box_UNIT_TESTS}"
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-ut")
+
+if(NOT linyaps-box_ENABLE_SMOKE_TESTS)
+  return()
+endif()
+
+set(linyaps-box_SMOKE_TESTS
+    ./tests/ll-box-st/01-run-whoami-with-debian-latest.json)
+
+foreach(test ${linyaps-box_SMOKE_TESTS})
+  add_test(
+    NAME "${test}"
+    COMMAND
+      "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-st/ll-box-st"
+      "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}"
+      "${CMAKE_CURRENT_BINARY_DIR}/st-data" "${test}")
+endforeach()
