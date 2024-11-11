@@ -71,36 +71,36 @@ public:
         switch (level) {
         case Debug:
             prefix = "[DBG |";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+            std::cerr << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
                       << ss.str() << std::endl;
             break;
         case Info:
             prefix = "[IFO |";
-            std::cout << "\033[1;96m";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+            std::cerr << "\033[1;96m";
+            std::cerr << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
                       << ss.str();
-            std::cout << "\033[0m" << std::endl;
+            std::cerr << "\033[0m" << std::endl;
             break;
         case Warning:
             prefix = "[WAN |";
-            std::cout << "\033[1;93m";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+            std::cerr << "\033[1;93m";
+            std::cerr << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
                       << ss.str();
-            std::cout << "\033[0m" << std::endl;
+            std::cerr << "\033[0m" << std::endl;
             break;
         case Error:
             prefix = "[ERR |";
-            std::cout << "\033[1;31m";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+            std::cerr << "\033[1;31m";
+            std::cerr << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
                       << ss.str();
-            std::cout << "\033[0m" << std::endl;
+            std::cerr << "\033[0m" << std::endl;
             break;
         case Fatal:
             prefix = "[FAL |";
-            std::cout << "\033[1;91m";
-            std::cout << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
+            std::cerr << "\033[1;91m";
+            std::cerr << prefix << " " << pid_ns << " | " << function << ":" << line << " ] "
                       << ss.str();
-            std::cout << "\033[0m" << std::endl;
+            std::cerr << "\033[0m" << std::endl;
             exit(-1);
             break;
         }
