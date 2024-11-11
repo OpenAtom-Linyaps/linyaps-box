@@ -62,6 +62,11 @@ int ConfigUserNamespace(const linglong::Linux &linux, int initPid)
     }
     uidMapFile.close();
 
+    if (not uidMapFile.good()) {
+        logErr() << "write uid map failed";
+        return -1;
+    }
+
     // write gid map
     auto setgroupsPath = util::format("/proc/%s/setgroups", pid.c_str());
     std::ofstream setgroupsFile(setgroupsPath);
