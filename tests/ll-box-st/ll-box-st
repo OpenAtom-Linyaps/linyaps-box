@@ -51,6 +51,9 @@ UMOCI="${UMOCI:-umoci}"
 PODMAN="${PODMAN:-podman}"
 
 function main() {
+	log "[DEBUG] ll-box-st called with arguments: $*"
+	log "[DEBUG] Working directory: $(pwd)"
+
 	while getopts ':h' option; do
 		case "$option" in
 		h)
@@ -95,6 +98,8 @@ function main() {
 	check_requirements
 
 	if [ -e "$1" ]; then
+		local TEST_FILE="$1"
+		shift 1
 		run_test "$LL_BOX" "$DATA_DIR" "$TEST_FILE"
 		return
 	fi
@@ -133,25 +138,34 @@ function run_test() {
 
 	local TEST_NAME
 	TEST_NAME="$("$JQ" -r '.name' "$TEST_FILE")"
-	log "[INFO] Running test: %s (%s)" "$TEST_FILE" "$TEST_NAME"
+	log "[INFO] Running test '%s' (%s)" "$TEST_NAME" "$TEST_FILE"
 
 	local TEST_FILE_NAME
 	TEST_FILE_NAME="$(basename -- "$TEST_FILE" .json)"
 
 	local TEST_DIR="$DATA_DIR/$TEST_FILE_NAME"
-	rm -rf -- "$TEST_DIR"
 	mkdir -p -- "$TEST_DIR"
 
 	local IMAGE
 	IMAGE="$("$JQ" -r '.image' "$TEST_FILE")"
 	local IMAGE_DIR="$TEST_DIR/image"
 
-	execute_command "$PODMAN" pull "$IMAGE"
-	execute_command "$PODMAN" save "$IMAGE" --format oci-dir --output "$IMAGE_DIR"
+	if ! "$PODMAN" image exists "$IMAGE"; then
+		execute_command "$PODMAN" pull "$IMAGE"
+	fi
+
+	if [ ! -d "$IMAGE_DIR" ]; then
+		execute_command "$PODMAN" save "$IMAGE" \
+			--format oci-dir --output "$IMAGE_DIR"
+	fi
 
 	local BUNDLE
 	BUNDLE=$(realpath "$TEST_DIR/bundle")
-	"$UMOCI" unpack --rootless --image "$IMAGE_DIR":"$IMAGE" "$BUNDLE"
+
+	if [ ! -d "$BUNDLE" ]; then
+		execute_command "$UMOCI" unpack \
+			--rootless --image "$IMAGE_DIR":"$IMAGE" "$BUNDLE"
+	fi
 
 	"$JQ" >"$BUNDLE/test_config.json" \
 		".process |= $("$JQ" -r '.process' "$TEST_FILE")" \
@@ -167,13 +181,13 @@ function run_test() {
 	log "[INFO] ==== COMMAND OUTPUT START ===="
 	local REAL
 	REAL="$(
-		"${TEST_COMMAND[@]}" && :
+		LINYAPS_BOX_LOG_FORCE_STDERR=1 "${TEST_COMMAND[@]}" && :
 	)" && :
 	EXIT_CODE=$?
 	log "[INFO] ==== COMMAND OUTPUT END ======"
 
 	if [ $EXIT_CODE != 0 ]; then
-		log "[ERROR] OCI runtime exited with %d" "$EXIT_CODE"
+		log "[ERROR] Test command  %s  exited with %d" "${TEST_COMMAND[*]}" "$EXIT_CODE"
 		log "[ERROR] Output:\n%s\n%s\n%s" \
 			"=====================================" \
 			"$REAL" \
@@ -181,15 +195,17 @@ function run_test() {
 		exit 1
 	fi
 
+	log "[INFO] Test command: %s" "${TEST_COMMAND[*]}"
+
 	local EXPECTED
 	EXPECTED="$("$JQ" -r '.expected' "$TEST_FILE")"
 
 	if [ "$REAL" == "$EXPECTED" ]; then
-		log "[INFO] Test %s passed" "$TEST_NAME"
+		log "[INFO] Test '%s' passed" "$TEST_NAME"
 		return
 	fi
 
-	log "[ERROR] Test %s failed" "$TEST_NAME"
+	log "[ERROR] Test '%s' failed" "$TEST_NAME"
 	log "[ERROR] Expected:\n%s\n%s\n%s" \
 		"=====================================" \
 		"$EXPECTED" \
