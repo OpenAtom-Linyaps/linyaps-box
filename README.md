@@ -1,79 +1,22 @@
-# 玲珑：沙箱
+# linyaps-box
 
-玲珑（Linglong） is the container application toolkit of deepin.
+\[ **en** | [zh_CN](./README.zh_CN.md) \]
 
-玲珑是玲珑塔的简称，既表示容器能对应用有管控作用，也表明了应用/运行时/系统向塔一样分层的思想。
+This project is a simple [OCI runtime] mainly used by [linyaps],
+which is a toolkit for Linux desktop application distributing.
 
-## Feature
+[OCI runtime]: https://github.com/opencontainers/runtime-spec
+[linyaps]: https://github.com/OpenAtom-Linyaps/linyaps
 
-- [x] Standard oci runtime
+## Build
 
-## Roadmap
-
-### Current
-
-- [ ] OCI Standard Box
-
-## Dependencies
+It is recommend to use [cmake-presets]:
 
 ```bash
-#For release based on debian
-sudo apt-get install cmake build-essential libyaml-cpp-dev nlohmann-json3-dev libgtest-dev
+cmake --workflow --preset=dev
 ```
 
-## Installation
-
-## Roadmap
-
-### Current
-
-- [ ] Configuration
-    - [x] Root
-    - [ ] Mount
-        - [ ] Cgroup
-    - [X] Hostname
-- [ ] Linux Container
-    - [x] Default Filesystems
-    - [X] Namespaces
-        - [x] Network
-    - [X] User namespace mappings
-    - [ ] Devices
-    - [ ] Default Devices
-    - [ ] Control groups
-    - [ ] IntelRdt
-    - [ ] Sysctl
-    - [ ] Seccomp
-    - [ ] Rootfs Mount Propagation
-    - [ ] Masked Paths
-    - [ ] Readonly Paths
-    - [ ] Mount Label
-- [ ] Extend
-    - [x] Container manager
-    - [x] Debug
-    - [ ] DBus proxy permission control
-    - [ ] Filesystem permission control base fuse
-    - [ ] X11&&Wayland security
-
-### TODO
-
-- [ ] full support of parse all seccomp arch and syscall
-
-## Getting help
-
-Any usage issues can ask for help via
-
-- [Gitter](https://gitter.im/orgs/linuxdeepin/rooms)
-- [IRC channel](https://webchat.freenode.net/?channels=deepin)
-- [Forum](https://bbs.deepin.org)
-- [WiKi](https://wiki.deepin.org/)
-
-## Getting involved
-
-We encourage you to report issues and contribute changes
-
-- [Contribution guide for developers](https://github.com/linuxdeepin/developer-center/wiki/Contribution-Guidelines-for-Developers-en)
-  . (English)
-- [开发者代码贡献指南](https://github.com/linuxdeepin/developer-center/wiki/Contribution-Guidelines-for-Developers) (中文)
+[cmake-presets]: https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html
 
 ## License
 
