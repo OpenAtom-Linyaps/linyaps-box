@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 #include "linyaps_box/utils/file_describer.h"
 
 linyaps_box::utils::file_descriptor_closed_exception::file_descriptor_closed_exception()
