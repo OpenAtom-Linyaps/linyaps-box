@@ -13,7 +13,7 @@ namespace linyaps_box::utils {
 
 inline struct stat fstat(const file_descriptor &fd)
 {
-    struct stat statbuf;
+    struct stat statbuf{};
     auto ret = ::fstatat(fd.get(), "", &statbuf, AT_EMPTY_PATH);
     if (ret == -1) {
         throw std::system_error(errno, std::generic_category(), "fstatat");
@@ -24,7 +24,7 @@ inline struct stat fstat(const file_descriptor &fd)
 
 inline struct stat lstat(const file_descriptor &fd)
 {
-    struct stat statbuf;
+    struct stat statbuf{};
     auto ret = ::fstatat(fd.get(), "", &statbuf, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
     if (ret == -1) {
         throw std::system_error(errno, std::generic_category(), "fstatat");

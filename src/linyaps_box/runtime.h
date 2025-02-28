@@ -9,14 +9,15 @@
 #include "linyaps_box/status_directory.h"
 
 #include <memory>
+#include <unordered_map>
 
 namespace linyaps_box {
 
 class runtime_t
 {
 public:
-    runtime_t(std::unique_ptr<status_directory> &&status_dir);
-    std::map<std::string, container_ref> containers();
+    explicit runtime_t(std::unique_ptr<status_directory> &&status_dir);
+    std::unordered_map<std::string, container_ref> containers();
 
     struct create_container_options_t
     {
@@ -28,7 +29,7 @@ public:
     container create_container(const create_container_options_t &options);
 
 private:
-    std::shared_ptr<status_directory> status_dir_;
+    std::shared_ptr<status_directory> status_dir;
 };
 
 } // namespace linyaps_box

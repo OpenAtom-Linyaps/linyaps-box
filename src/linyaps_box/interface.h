@@ -5,6 +5,8 @@
 #pragma once
 
 namespace linyaps_box {
+
+// prevent object slicing
 class interface
 {
 public:

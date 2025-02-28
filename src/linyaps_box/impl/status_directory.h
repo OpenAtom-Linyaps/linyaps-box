@@ -13,12 +13,12 @@ namespace linyaps_box::impl {
 class status_directory : public virtual linyaps_box::status_directory
 {
 public:
-    void write(const container_status_t &status);
-    container_status_t read(const std::string &id) const;
-    void remove(const std::string &id);
-    std::vector<std::string> list() const;
+    void write(const container_status_t &status) override;
+    [[nodiscard]] container_status_t read(const std::string &id) const override;
+    void remove(const std::string &id) override;
+    std::vector<std::string> list() const override;
 
-    status_directory(const std::filesystem::path &path);
+    explicit status_directory(const std::filesystem::path &path);
 
 private:
     std::filesystem::path path;

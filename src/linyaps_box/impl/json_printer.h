@@ -9,11 +9,11 @@
 
 namespace linyaps_box::impl {
 
-class json_printer : public virtual linyaps_box::printer
+class json_printer final : public virtual linyaps_box::printer
 {
 public:
-    void print_status(const container_status_t &status);
-    void print_statuses(const std::vector<container_status_t> &status);
+    void print_status(const container_status_t &status) final;
+    void print_statuses(const std::vector<container_status_t> &status) final;
 };
 
 static_assert(!std::is_abstract_v<json_printer>);

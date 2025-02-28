@@ -21,6 +21,10 @@ linyaps_box::container_status_t read_status(const std::filesystem::path &path)
     nlohmann::json j;
     {
         std::ifstream istrm(path);
+        if (istrm.fail()) {
+            throw std::runtime_error("failed to open status file:" + path.string());
+        }
+
         istrm >> j;
     }
     linyaps_box::container_status_t ret{};
@@ -28,7 +32,7 @@ linyaps_box::container_status_t read_status(const std::filesystem::path &path)
     ret.PID = j["pid"];
     ret.ID = j["id"];
     ret.status = j["status"];
-    if (kill(ret.PID, 0)) {
+    if (kill(ret.PID, 0) != 0) {
         ret.status = linyaps_box::container_status_t::runtime_status::STOPPED;
     }
     ret.bundle = std::string(j["bundle"]);
@@ -70,7 +74,7 @@ void linyaps_box::impl::status_directory::remove(const std::string &id)
 std::vector<std::string> linyaps_box::impl::status_directory::list() const
 {
     std::vector<std::string> ret;
-    for (const auto &entry : std::filesystem::directory_iterator(this->path))
+    for (const auto &entry : std::filesystem::directory_iterator(this->path)) {
         try {
             if (entry.is_regular_file() && entry.path().extension() != ".json") {
                 throw std::runtime_error("invalid extension");
@@ -81,15 +85,17 @@ std::vector<std::string> linyaps_box::impl::status_directory::list() const
             LINYAPS_BOX_WARNING() << "Skip " << entry.path() << ": " << e.what();
             continue;
         }
+    }
 
     return ret;
 }
 
 linyaps_box::impl::status_directory::status_directory(const std::filesystem::path &path)
+    : path(path)
 {
-    this->path = path;
     if (std::filesystem::is_directory(path) || std::filesystem::create_directories(path)) {
         return;
     }
+
     throw std::runtime_error("failed to create status directory");
 }

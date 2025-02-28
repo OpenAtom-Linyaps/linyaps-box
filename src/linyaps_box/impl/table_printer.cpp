@@ -33,26 +33,28 @@ void linyaps_box::impl::table_printer::print_statuses(const std::vector<containe
 
     std::cout << std::left << std::setw(max_length + 1) << "NAME" << std::setw(10) << "PID"
               << std::setw(9) << "STATUS" << std::setw(40) << "BUNDLE PATH" << std::setw(31)
-              << "CREATED" << std::setw(0) << "OWNER" << std::endl;
+              << "CREATED" << std::setw(0) << "OWNER" << '\n';
     for (const auto &s : status) {
         std::cout << std::left << std::setw(max_length) << s.ID << std::setw(10) << s.PID
                   << std::setw(9) << get_status_string(s.status) << std::setw(40) << s.bundle
-                  << std::setw(31) << s.created << std::setw(0) << s.owner << std::endl;
+                  << std::setw(31) << s.created << std::setw(0) << s.owner << '\n';
     }
-    return;
+
+    std::cout.flush();
 }
 
 void linyaps_box::impl::table_printer::print_status(const container_status_t &status)
 {
-    std::cout << "ID\t" << status.ID << std::endl;
-    std::cout << "PID\t" << status.PID << std::endl;
-    std::cout << "status\t" << get_status_string(status.status) << std::endl;
-    std::cout << "bundle\t" << status.bundle << std::endl;
-    std::cout << "created\t" << status.created << std::endl;
-    std::cout << "owner\t" << status.owner << std::endl;
-    std::cout << "annotations" << std::endl;
+    std::cout << "ID\t" << status.ID << '\n';
+    std::cout << "PID\t" << status.PID << '\n';
+    std::cout << "status\t" << get_status_string(status.status) << '\n';
+    std::cout << "bundle\t" << status.bundle << '\n';
+    std::cout << "created\t" << status.created << '\n';
+    std::cout << "owner\t" << status.owner << '\n';
+    std::cout << "annotations" << '\n';
     for (const auto &a : status.annotations) {
-        std::cout << "\t" << a.first << "\t" << a.second << std::endl;
+        std::cout << "\t" << a.first << "\t" << a.second << '\n';
     }
-    return;
+
+    std::cout.flush();
 }

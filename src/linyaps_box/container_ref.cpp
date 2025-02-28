@@ -4,25 +4,26 @@
 
 #include "linyaps_box/container_ref.h"
 
-#include <signal.h>
+#include <csignal>
+#include <utility>
 
 linyaps_box::container_ref::container_ref(std::shared_ptr<status_directory> status_dir,
-                                          const std::string &id)
-    : id_(id)
-    , status_dir_(status_dir)
+                                          std::string id)
+    : id(std::move(id))
+    , status_dir_(std::move(status_dir))
 {
 }
 
 linyaps_box::container_status_t linyaps_box::container_ref::status() const
 {
-    return this->status_dir_->read(this->id_);
+    return this->status_dir_->read(this->id);
 }
 
-void linyaps_box::container_ref::kill(int signal)
+void linyaps_box::container_ref::kill(int signal) const
 {
     auto pid = this->status().PID;
 
-    if (!::kill(pid, signal)) {
+    if (::kill(pid, signal) == 0) {
         return;
     }
 
@@ -88,4 +89,9 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
 linyaps_box::status_directory &linyaps_box::container_ref::status_dir() const
 {
     return *this->status_dir_;
+}
+
+const std::string &linyaps_box::container_ref::get_id() const
+{
+    return this->id;
 }

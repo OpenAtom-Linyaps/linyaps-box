@@ -12,10 +12,12 @@ namespace linyaps_box::command {
 
 struct list_options
 {
-    enum class output_format_t {
+    enum class output_format_t : std::uint8_t {
         table,
         json,
-    } output_format = output_format_t::table;
+    };
+
+    output_format_t output_format{ output_format_t::table };
 };
 
 struct exec_options
@@ -41,14 +43,15 @@ struct kill_options
 
 struct options
 {
-    enum class command_t {
+    enum class command_t : std::uint8_t {
         not_set,
         list,
         exec,
         run,
         kill,
-    } command;
+    };
 
+    command_t command{ command_t::not_set };
     std::filesystem::path root;
     std::optional<int> return_code;
 
@@ -60,6 +63,9 @@ struct options
 
 // This function parses the command line arguments.
 // It might print help or usage to stdout or stderr.
-options parse(int argc, char *argv[]) noexcept;
+options parse(int argc, char *argv[]) noexcept; // NOLINT
 
 } // namespace linyaps_box::command
+
+std::stringstream &operator<<(std::stringstream &ss,
+                              const linyaps_box::command::list_options::output_format_t &format);

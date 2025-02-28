@@ -10,4 +10,4 @@
 
 namespace linyaps_box::utils {
 void mknod(const file_descriptor &root, const std::filesystem::path &path, mode_t mode, dev_t dev);
-}
+} // namespace linyaps_box::utils

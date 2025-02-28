@@ -10,20 +10,21 @@
 
 #include <syslog.h>
 
+// TODO: maybe fmt with spdlog
 namespace linyaps_box::utils {
 
 bool force_log_to_stderr();
 bool stderr_is_a_tty();
 unsigned int get_current_log_level();
 std::string get_pid_namespace(int pid = 0);
-std::string get_current_commond();
+std::string get_current_command();
 
 template<unsigned int level>
 class Logger : public std::stringstream
 {
 public:
     using std::stringstream::stringstream;
-    ~Logger();
+    ~Logger() override;
 };
 
 extern template class Logger<LOG_EMERG>;
@@ -49,14 +50,14 @@ extern template class Logger<LOG_DEBUG>;
 
 #if LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
 #define LINYAPS_BOX_LOG_SOURCE_LOCATION \
-    << "SOURCE=" __FILE__ ":" LINYAPS_BOX_STRINGIZE(__LINE__) << std::endl << __PRETTY_FUNCTION__
+    << "SOURCE=" __FILE__ ":" LINYAPS_BOX_STRINGIZE(__LINE__) << '\n' << __PRETTY_FUNCTION__
 #else
 #define LINYAPS_BOX_LOG_SOURCE_LOCATION
 #endif
 
 #define LINYAPS_BOX_LOG(level)                                                           \
     if (__builtin_expect(level <= ::linyaps_box::utils::get_current_log_level(), false)) \
-    ::linyaps_box::utils::Logger<level>() LINYAPS_BOX_LOG_SOURCE_LOCATION << std::endl << std::endl
+    ::linyaps_box::utils::Logger<level>() LINYAPS_BOX_LOG_SOURCE_LOCATION << "\n\n"
 
 #ifndef LINYAPS_BOX_ACTIVE_LOG_LEVEL
 #define LINYAPS_BOX_ACTIVE_LOG_LEVEL LOG_DEBUG
