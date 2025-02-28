@@ -27,7 +27,7 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::mkdir(const file_descrip
     for (const auto &part : path) {
         LINYAPS_BOX_DEBUG() << "part=" << part << " mode=0" << std::oct << mode;
 
-        if (::mkdirat(current.get(), part.c_str(), mode)) {
+        if (::mkdirat(current.get(), part.c_str(), mode) != 0) {
             if (errno != EEXIST) {
                 throw std::system_error(errno, std::generic_category(), "mkdirat");
             }

@@ -59,7 +59,7 @@ if(linyaps-box_ENABLE_CPACK)
 endif()
 
 set(linyaps-box_CLONE_CHILD_STACK_SIZE
-    "(1 << 20)"
+    "(1U << 20)"
     CACHE
       STRING
       "DO NOT MODIFY THIS SETTINGS UNLESS YOU KNOW WHAT YOU ARE DOING. Size of child stack in bytes when using clone(2) to create container."

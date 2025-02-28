@@ -13,17 +13,18 @@ namespace linyaps_box {
 class container_ref
 {
 public:
-    container_ref(std::shared_ptr<status_directory> status_dir, const std::string &id);
+    container_ref(std::shared_ptr<status_directory> status_dir, std::string id);
 
-    container_status_t status() const;
-    void kill(int signal);
+    [[nodiscard]] container_status_t status() const;
+    void kill(int signal) const;
     [[noreturn]] void exec(const config::process_t &process);
 
 protected:
-    status_directory &status_dir() const;
-    std::string id_;
+    [[nodiscard]] status_directory &status_dir() const;
+    [[nodiscard]] const std::string &get_id() const;
 
 private:
+    std::string id;
     std::shared_ptr<status_directory> status_dir_;
 };
 

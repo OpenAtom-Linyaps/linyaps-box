@@ -4,6 +4,8 @@
 
 #include "linyaps_box/command/list.h"
 
+#include <memory>
+
 #include "linyaps_box/impl/json_printer.h"
 #include "linyaps_box/impl/status_directory.h"
 #include "linyaps_box/impl/table_printer.h"
@@ -12,12 +14,12 @@
 int linyaps_box::command::list(const std::filesystem::path &root,
                                const struct list_options &options)
 {
-    std::unique_ptr<status_directory> dir;
-    dir = std::make_unique<impl::status_directory>(root);
+    auto status_dir = std::make_unique<impl::status_directory>(root);
+    if (!status_dir) {
+        throw std::runtime_error("failed to create status directory");
+    }
 
-    runtime_t runtime(std::move(dir));
-
-    auto containers = runtime.containers();
+    runtime_t runtime(std::move(status_dir));
 
     std::unique_ptr<printer> printer;
     if (options.output_format == list_options::output_format_t::json) {
@@ -26,9 +28,11 @@ int linyaps_box::command::list(const std::filesystem::path &root,
         printer = std::make_unique<impl::table_printer>();
     }
 
+    auto containers = runtime.containers();
     std::vector<container_status_t> statuses;
-    for (const auto &container : containers) {
-        statuses.push_back(container.second.status());
+    statuses.reserve(containers.size());
+    for (const auto &[_, container] : containers) {
+        statuses.emplace_back(container.status());
     }
 
     printer->print_statuses(statuses);

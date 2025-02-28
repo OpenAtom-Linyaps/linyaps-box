@@ -4,9 +4,7 @@
 
 #pragma once
 
-#include <algorithm>
 #include <filesystem>
-#include <system_error>
 
 #include <unistd.h>
 
@@ -21,7 +19,7 @@ public:
 class file_descriptor
 {
 public:
-    file_descriptor(int fd = -1);
+    explicit file_descriptor(int fd = -1);
 
     ~file_descriptor();
 
@@ -32,7 +30,7 @@ public:
 
     file_descriptor &operator=(file_descriptor &&other) noexcept;
 
-    int get() const noexcept;
+    [[nodiscard]] int get() const noexcept;
 
     int release() && noexcept;
 
@@ -40,10 +38,10 @@ public:
 
     file_descriptor &operator>>(std::byte &byte);
 
-    std::filesystem::path proc_path() const;
+    [[nodiscard]] std::filesystem::path proc_path() const;
 
 private:
-    int fd = -1;
+    int fd{ -1 };
 };
 
 } // namespace linyaps_box::utils

@@ -10,17 +10,17 @@
 
 namespace {
 
-static std::tuple<unsigned long, unsigned long, std::string>
-parse_mount_options(const std::vector<std::string> options)
+std::tuple<unsigned long, unsigned long, std::string>
+parse_mount_options(const std::vector<std::string> &options)
 {
-    const static std::map<std::string, unsigned long> propagation_flags_map{
+    const static std::unordered_map<std::string, unsigned long> propagation_flags_map{
         { "rprivate", MS_PRIVATE | MS_REC },       { "private", MS_PRIVATE },
         { "rslave", MS_SLAVE | MS_REC },           { "slave", MS_SLAVE },
         { "rshared", MS_SHARED | MS_REC },         { "shared", MS_SHARED },
         { "runbindable", MS_UNBINDABLE | MS_REC }, { "unbindable", MS_UNBINDABLE },
     };
 
-    const static std::map<std::string, unsigned long> flags_map{
+    const static std::unordered_map<std::string, unsigned long> flags_map{
         { "bind", MS_BIND },
         { "defaults", 0 },
         { "dirsync", MS_DIRSYNC },
@@ -42,7 +42,7 @@ parse_mount_options(const std::vector<std::string> options)
         { "sync", MS_SYNCHRONOUS },
     };
 
-    const static std::map<std::string, unsigned long> unset_flags_map{
+    const static std::unordered_map<std::string, unsigned long> unset_flags_map{
         { "async", MS_SYNCHRONOUS },
         { "atime", MS_NOATIME },
         { "dev", MS_NODEV },
@@ -86,10 +86,10 @@ parse_mount_options(const std::vector<std::string> options)
     return { flags, propagation_flags, str };
 }
 
-const auto ptr = ""_json_pointer;
-
-static linyaps_box::config parse_1_2_0(const nlohmann::json &j)
+linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 {
+    static const auto ptr = ""_json_pointer;
+
     auto semver = linyaps_box::utils::semver(j[ptr / "ociVersion"].get<std::string>());
     if (!linyaps_box::utils::semver("1.2.0").is_compatible_with(semver)) {
         throw std::runtime_error("unsupported OCI version: " + semver.to_string());
@@ -199,7 +199,7 @@ static linyaps_box::config parse_1_2_0(const nlohmann::json &j)
     if (j.contains(ptr / "linux" / "gidMappings")) {
         std::vector<linyaps_box::config::id_mapping_t> gid_mappings;
         for (const auto &m : j[ptr / "linux" / "gidMappings"]) {
-            linyaps_box::config::id_mapping_t id_mapping;
+            linyaps_box::config::id_mapping_t id_mapping{};
             id_mapping.host_id = m["hostID"].get<uid_t>();
             id_mapping.container_id = m["containerID"].get<uid_t>();
             id_mapping.size = m["size"].get<size_t>();

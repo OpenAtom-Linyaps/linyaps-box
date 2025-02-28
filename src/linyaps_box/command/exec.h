@@ -8,6 +8,6 @@
 
 namespace linyaps_box::command {
 
-[[noreturn]] void exec(const std::filesystem::path &, const exec_options &options);
+[[noreturn]] void exec(const std::filesystem::path &root, const exec_options &options);
 
 } // namespace linyaps_box::command

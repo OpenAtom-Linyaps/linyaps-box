@@ -4,6 +4,10 @@
 
 #include "linyaps_box/utils/file_describer.h"
 
+#include "linyaps_box/utils/log.h"
+
+#include <cstring>
+
 linyaps_box::utils::file_descriptor_closed_exception::file_descriptor_closed_exception()
     : std::runtime_error("file descriptor is closed")
 {
@@ -12,9 +16,6 @@ linyaps_box::utils::file_descriptor_closed_exception::file_descriptor_closed_exc
 linyaps_box::utils::file_descriptor::file_descriptor(int fd)
     : fd(fd)
 {
-    if (fd == -1) {
-        return;
-    }
 }
 
 linyaps_box::utils::file_descriptor::~file_descriptor()
@@ -23,7 +24,9 @@ linyaps_box::utils::file_descriptor::~file_descriptor()
         return;
     }
 
-    close(fd);
+    if (close(fd) != 0) {
+        LINYAPS_BOX_ERR() << "close " << fd << " failed:" << ::strerror(errno);
+    }
 }
 
 linyaps_box::utils::file_descriptor::file_descriptor(file_descriptor &&other) noexcept

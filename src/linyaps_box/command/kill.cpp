@@ -4,7 +4,9 @@
 
 #include "linyaps_box/command/kill.h"
 
-int linyaps_box::command::kill(const std::filesystem::path &, const struct kill_options &)
+int linyaps_box::command::kill(const std::filesystem::path &root,
+                               const struct kill_options &options)
 {
+    // TODO: impl
     return 0;
 }

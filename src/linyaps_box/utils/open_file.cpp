@@ -18,7 +18,7 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::open(const std::filesyst
         throw std::system_error(errno, std::generic_category(), "open");
     }
 
-    return linyaps_box::utils::file_descriptor(fd);
+    return linyaps_box::utils::file_descriptor{ fd };
 }
 
 linyaps_box::utils::file_descriptor
@@ -29,7 +29,12 @@ linyaps_box::utils::open(const linyaps_box::utils::file_descriptor &root,
     LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " at FD=" << root.get() << " with "
                         << inspect_fcntl_or_open_flags(flag) << "\n\t" << inspect_fd(root.get());
 
-    int fd = ::openat(root.get(), path.c_str() + (path.is_absolute() ? 1 : 0), flag);
+    auto file_path = path;
+    if (file_path.is_absolute()) {
+        file_path = file_path.lexically_relative("/");
+    }
+
+    int fd = ::openat(root.get(), file_path.c_str(), flag);
     if (fd < 0) {
         auto code = errno;
         auto root_path = root.proc_path();
@@ -42,5 +47,5 @@ linyaps_box::utils::open(const linyaps_box::utils::file_descriptor &root,
         throw std::system_error(code, std::generic_category(), "openat");
     }
 
-    return linyaps_box::utils::file_descriptor(fd);
+    return linyaps_box::utils::file_descriptor{ fd };
 }

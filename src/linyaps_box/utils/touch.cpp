@@ -13,5 +13,6 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::touch(const file_descrip
     if (fd == -1) {
         throw std::system_error(errno, std::system_category(), "openat");
     }
-    return fd;
+
+    return linyaps_box::utils::file_descriptor{ fd };
 }

@@ -5,6 +5,7 @@
 #include "linyaps_box/utils/semver.h"
 
 #include <stdexcept>
+#include <utility>
 
 linyaps_box::utils::semver::semver(const std::string &str)
 {
@@ -31,16 +32,16 @@ linyaps_box::utils::semver::semver(const std::string &str)
     auto patch = std::stoi(str.substr(begin, end));
 
     if (end == std::string::npos) {
-        this->major = major;
-        this->minor = minor;
-        this->patch = patch;
+        this->major_ = major;
+        this->minor_ = minor;
+        this->patch_ = patch;
         return;
     }
 
     if (str[end] == '+') {
-        this->major = major;
-        this->minor = minor;
-        this->patch = patch;
+        this->major_ = major;
+        this->minor_ = minor;
+        this->patch_ = patch;
         this->build_ = str.substr(end + 1);
         return;
     }
@@ -51,32 +52,31 @@ linyaps_box::utils::semver::semver(const std::string &str)
     auto prerelease = str.substr(begin, end);
 
     if (end == std::string::npos) {
-        this->major = major;
-        this->minor = minor;
-        this->patch = patch;
+        this->major_ = major;
+        this->minor_ = minor;
+        this->patch_ = patch;
         this->prerelease_ = prerelease;
         return;
     }
 
     auto build = str.substr(end + 1);
-    this->major = major;
-    this->minor = minor;
-    this->patch = patch;
+    this->major_ = major;
+    this->minor_ = minor;
+    this->patch_ = patch;
     this->prerelease_ = prerelease;
     this->build_ = build;
-    return;
 }
 
 linyaps_box::utils::semver::semver(unsigned int major,
                                    unsigned int minor,
                                    unsigned int patch,
-                                   const std::string &prerelease,
-                                   const std::string &build)
-    : major(major)
-    , minor(minor)
-    , patch(patch)
-    , prerelease_(prerelease)
-    , build_(build)
+                                   std::string prerelease,
+                                   std::string build)
+    : major_(major)
+    , minor_(minor)
+    , patch_(patch)
+    , prerelease_(std::move(prerelease))
+    , build_(std::move(build))
 {
 }
 
@@ -92,34 +92,49 @@ const std::string &linyaps_box::utils::semver::build() const
 
 std::string linyaps_box::utils::semver::to_string() const
 {
-    return std::to_string(this->major) + "." + std::to_string(this->minor) + "."
-            + std::to_string(this->patch) + (this->prerelease_.empty() ? "" : "-")
+    return std::to_string(this->major_) + "." + std::to_string(this->minor_) + "."
+            + std::to_string(this->patch_) + (this->prerelease_.empty() ? "" : "-")
             + this->prerelease_ + (this->build_.empty() ? "" : "+") + this->build_;
 }
 
 bool linyaps_box::utils::semver::is_compatible_with(const semver &other) const
 {
-    if (this->major != other.major) {
+    if (this->major_ != other.major_) {
         return false;
     }
 
-    if (this->minor < other.minor) {
+    if (this->minor_ < other.minor_) {
         return false;
     }
 
-    if (this->minor > other.minor) {
+    if (this->minor_ > other.minor_) {
         return true;
     }
 
-    if (this->patch < other.patch) {
+    if (this->patch_ < other.patch_) {
         return false;
     }
 
-    if (this->patch > other.patch) {
+    if (this->patch_ > other.patch_) {
         return true;
     }
 
     // FIXME: handle prerelease
 
     return true;
+}
+
+[[nodiscard]] unsigned int linyaps_box::utils::semver::major() const
+{
+    return this->major_;
+}
+
+[[nodiscard]] unsigned int linyaps_box::utils::semver::minor() const
+{
+    return this->minor_;
+}
+
+[[nodiscard]] unsigned int linyaps_box::utils::semver::patch() const
+{
+    return this->patch_;
 }

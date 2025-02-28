@@ -6,6 +6,8 @@
 
 #include <linux/limits.h>
 
+#include <array>
+#include <chrono>
 #include <cstring>
 #include <iostream>
 
@@ -25,6 +27,7 @@ Logger<level>::~Logger()
         return;
     }
 
+    flush();
     auto str = this->str();
 
     syslog(level, "%s", str.c_str());
@@ -43,18 +46,18 @@ Logger<level>::~Logger()
         std::cerr << "\033[0m";
     }
 
-    timeval tv;
-    gettimeofday(&tv, nullptr);
-
-    std::cerr << "TIME=" << tv.tv_sec << "." << tv.tv_usec << " "
+    auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch());
+    std::cerr << "TIME=" << now.count() << " "
 #if LINYAPS_BOX_LOG_ENABLE_CONTEXT_PIDNS
               << "PIDNS=" << get_pid_namespace() << " "
 #endif
-              << str << "\033[0m" << std::endl
+              << str << "\033[0m" << '\n'
 #if LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-              << std::endl
+              << '\n'
 #endif
             ;
+    std::cerr.flush();
 }
 
 template class Logger<LOG_EMERG>;
@@ -68,25 +71,25 @@ template class Logger<LOG_DEBUG>;
 
 bool force_log_to_stderr()
 {
-    static auto result = getenv("LINYAPS_BOX_LOG_FORCE_STDERR");
-    return result;
+    static auto *result = getenv("LINYAPS_BOX_LOG_FORCE_STDERR");
+    return result != nullptr;
 }
 
 bool stderr_is_a_tty()
 {
-    static bool result = isatty(fileno(stderr));
+    static bool result = isatty(fileno(stderr)) != 0;
     return result;
 }
 
 namespace {
-static unsigned int get_current_log_level_from_env()
+unsigned int get_current_log_level_from_env()
 {
-    auto env = getenv("LINYAPS_BOX_LOG_LEVEL");
-    if (!env) {
+    auto *env = getenv("LINYAPS_BOX_LOG_LEVEL");
+    if (env == nullptr) {
         return LINYAPS_BOX_LOG_DEFAULT_LEVEL;
     }
 
-    auto level = atoi(env);
+    auto level = std::stoi(env);
     if (level < 0) {
         return LOG_ALERT;
     }
@@ -107,17 +110,15 @@ unsigned int get_current_log_level()
 
 std::string get_pid_namespace(int pid)
 {
-    std::string pidns_path = "/proc/" + (pid ? std::to_string(pid) : "self") + "/ns/pid";
+    std::string pidns_path = "/proc/" + ((pid != 0) ? std::to_string(pid) : "self") + "/ns/pid";
 
-    char buf[PATH_MAX + 1];
-    auto length = readlink(pidns_path.c_str(), buf, PATH_MAX);
+    std::array<char, PATH_MAX + 1> buf{};
+    auto length = ::readlink(pidns_path.c_str(), buf.data(), PATH_MAX);
     if (length < 0) {
         return "not available";
     }
-    buf[length] = '\0';
 
-    std::string result = buf;
-
+    std::string result{ buf.begin(), buf.begin() + length };
     if (result.rfind("pid:[", 0) != 0) {
         std::abort();
     }

@@ -8,7 +8,7 @@
 
 namespace linyaps_box::utils {
 
-std::string inspect_fcntl_or_open_flags(int flags);
+std::string inspect_fcntl_or_open_flags(size_t flags);
 std::string inspect_fd(int fd);
 std::string inspect_fds();
 

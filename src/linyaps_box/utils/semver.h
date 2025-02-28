@@ -14,22 +14,25 @@ public:
     semver(unsigned int major,
            unsigned int minor,
            unsigned int patch,
-           const std::string &prerelease = "",
-           const std::string &build = "");
+           std::string prerelease = "",
+           std::string build = "");
 
-    semver(const std::string &str);
+    explicit semver(const std::string &str);
 
-    unsigned int major;
-    unsigned int minor;
-    unsigned int patch;
+    [[nodiscard]] unsigned int major() const;
+    [[nodiscard]] unsigned int minor() const;
+    [[nodiscard]] unsigned int patch() const;
+    [[nodiscard]] const std::string &prerelease() const;
+    [[nodiscard]] const std::string &build() const;
 
-    const std::string &prerelease() const;
-    const std::string &build() const;
-
-    std::string to_string() const;
-    bool is_compatible_with(const semver &other) const;
+    [[nodiscard]] std::string to_string() const;
+    [[nodiscard]] bool is_compatible_with(const semver &other) const;
 
 private:
+    unsigned int major_;
+    unsigned int minor_;
+    unsigned int patch_;
+
     std::string prerelease_;
     std::string build_;
 };

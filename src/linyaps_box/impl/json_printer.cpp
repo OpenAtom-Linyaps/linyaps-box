@@ -9,7 +9,7 @@
 #include <iostream>
 
 namespace {
-static std::string status_to_string(linyaps_box::container_status_t::runtime_status status)
+std::string status_to_string(linyaps_box::container_status_t::runtime_status status)
 {
     switch (status) {
     case linyaps_box::container_status_t::runtime_status::CREATING:
@@ -25,7 +25,7 @@ static std::string status_to_string(linyaps_box::container_status_t::runtime_sta
     throw std::logic_error("unknown status");
 }
 
-static nlohmann::json status_to_json(const linyaps_box::container_status_t &status)
+nlohmann::json status_to_json(const linyaps_box::container_status_t &status)
 {
     return nlohmann::json::object({
             { "id", status.ID },
@@ -41,18 +41,16 @@ static nlohmann::json status_to_json(const linyaps_box::container_status_t &stat
 
 void linyaps_box::impl::json_printer::print_statuses(const std::vector<container_status_t> &status)
 {
-    nlohmann::json j = nlohmann::json::array();
+    auto j = nlohmann::json::array();
     for (const auto &s : status) {
         j += status_to_json(s);
     }
 
     std::cout << j.dump(4) << std::endl;
-    return;
 }
 
 void linyaps_box::impl::json_printer::print_status(const container_status_t &status)
 {
-    nlohmann::json j = status_to_json(status);
+    auto j = status_to_json(status);
     std::cout << j.dump(4) << std::endl;
-    return;
 }

@@ -16,7 +16,7 @@ void linyaps_box::utils::mknod(const file_descriptor &root,
 {
     LINYAPS_BOX_DEBUG() << "Create device " << path.string() << " with mode " << mode << " and dev "
                         << dev;
-    if (!::mknodat(root.get(), path.c_str(), mode, dev)) {
+    if (::mknodat(root.get(), path.c_str(), mode, dev) == 0) {
         return;
     }
     throw std::system_error(errno, std::system_category(), "mknodat");
