@@ -4,24 +4,48 @@
 
 #pragma once
 
+#include <linyaps_box/cgroup_manager.h>
+
 #include <filesystem>
 #include <optional>
 #include <vector>
 
 namespace linyaps_box::command {
 
+struct global_options
+{
+    enum class command_t : std::uint8_t { not_set, list, exec, run, kill };
+
+    command_t command{ command_t::not_set };
+    cgroup_manager_t manager{ cgroup_manager_t::cgroupfs };
+    std::filesystem::path root;
+    std::optional<int> return_code;
+};
+
 struct list_options
 {
-    enum class output_format_t : std::uint8_t {
-        table,
-        json,
-    };
+    // FIXME: if the underlying type of enum class is std::uint8_t,
+    //  the mapping message of CLI11 transformer is incorrect
+    //  use std::uint16_t for now
+    enum class output_format_t : std::uint16_t { table, json };
 
+    explicit list_options(const global_options &global)
+        : global(global)
+    {
+    }
+
+    const global_options &global;
     output_format_t output_format{ output_format_t::table };
 };
 
 struct exec_options
 {
+    explicit exec_options(const global_options &global)
+        : global(global)
+    {
+    }
+
+    const global_options &global;
     std::string user;
     std::string cwd;
     std::string ID;
@@ -30,6 +54,12 @@ struct exec_options
 
 struct run_options
 {
+    explicit run_options(const global_options &global)
+        : global(global)
+    {
+    }
+
+    const global_options &global;
     std::string ID;
     std::string bundle;
     std::string config;
@@ -37,24 +67,28 @@ struct run_options
 
 struct kill_options
 {
+    explicit kill_options(const global_options &global)
+        : global(global)
+    {
+    }
+
+    const global_options &global;
     std::string container;
-    int signal;
+    int signal{ -1 };
 };
 
 struct options
 {
-    enum class command_t : std::uint8_t {
-        not_set,
-        list,
-        exec,
-        run,
-        kill,
-    };
+    options()
+        : global()
+        , list(global)
+        , exec(global)
+        , run(global)
+        , kill(global)
+    {
+    }
 
-    command_t command{ command_t::not_set };
-    std::filesystem::path root;
-    std::optional<int> return_code;
-
+    global_options global;
     list_options list;
     exec_options exec;
     run_options run;
@@ -66,6 +100,3 @@ struct options
 options parse(int argc, char *argv[]) noexcept; // NOLINT
 
 } // namespace linyaps_box::command
-
-std::stringstream &operator<<(std::stringstream &ss,
-                              const linyaps_box::command::list_options::output_format_t &format);

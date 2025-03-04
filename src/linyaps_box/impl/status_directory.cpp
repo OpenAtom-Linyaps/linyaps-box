@@ -68,7 +68,11 @@ linyaps_box::impl::status_directory::read(const std::string &id) const
 
 void linyaps_box::impl::status_directory::remove(const std::string &id)
 {
-    std::filesystem::remove(this->path / (id + ".json"));
+    auto path = this->path / (id + ".json");
+    LINYAPS_BOX_DEBUG() << "Remove " << path;
+    if (!std::filesystem::remove(path)) {
+        LINYAPS_BOX_WARNING() << "Failed to remove " << path;
+    }
 }
 
 std::vector<std::string> linyaps_box::impl::status_directory::list() const

@@ -25,20 +25,29 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
         default_root = std::filesystem::path{ getenv("XDG_RUNTIME_DIR") } / "linglong" / "box";
     }
 
-    app.add_option("--root", options.root, "Root directory for storage of container state")
+    app.add_option("--root", options.global.root, "Root directory for storage of container state")
             ->default_val(default_root);
+    app.add_option("--cgroup-manager", options.global.manager, "Cgroup manager to use")
+            ->type_name("MANAGER")
+            ->transform(
+                    CLI::CheckedTransformer(std::unordered_map<std::string_view, cgroup_manager_t>{
+                            { "cgroupfs", cgroup_manager_t::cgroupfs },
+                            { "systemd", cgroup_manager_t::systemd },
+                            { "disabled", cgroup_manager_t::disabled },
+                    }))
+            ->default_val(cgroup_manager_t::cgroupfs);
 
     app.require_subcommand();
 
     auto *cmd_list = app.add_subcommand("list", "List know containers");
     cmd_list->add_option("-f,--format", options.list.output_format, "Specify the output format")
-            ->default_str("table")
             ->type_name("FORMAT")
-            ->transform(
-                    CLI::CheckedTransformer(std::map<std::string, list_options::output_format_t>{
-                            { "table", list_options::output_format_t::table },
+            ->transform(CLI::CheckedTransformer(
+                    std::unordered_map<std::string_view, list_options::output_format_t>{
                             { "json", list_options::output_format_t::json },
-                    }));
+                            { "table", list_options::output_format_t::table },
+                    }))
+            ->default_val(list_options::output_format_t::table);
 
     auto *cmd_run = app.add_subcommand("run", "Create and immediately start a container");
     cmd_run->add_option("CONTAINER", options.run.ID, "The container ID")->required();
@@ -64,7 +73,7 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
             ->type_name("SIGNAL")
             ->default_val(SIGTERM)
             ->default_str("TERM")
-            ->transform(CLI::CheckedTransformer(std::map<std::string, int>{
+            ->transform(CLI::CheckedTransformer(std::unordered_map<std::string_view, int>{
                     { "TERM", SIGTERM },
                     { "STOP", SIGSTOP },
             }));
@@ -73,33 +82,18 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError &e) {
-        options.return_code = app.exit(e);
+        options.global.return_code = app.exit(e);
     }
 
     if (cmd_list->parsed()) {
-        options.command = options::command_t::list;
+        options.global.command = global_options::command_t::list;
     } else if (cmd_run->parsed()) {
-        options.command = options::command_t::run;
+        options.global.command = global_options::command_t::run;
     } else if (cmd_exec->parsed()) {
-        options.command = options::command_t::exec;
+        options.global.command = global_options::command_t::exec;
     } else if (cmd_kill->parsed()) {
-        options.command = options::command_t::kill;
+        options.global.command = global_options::command_t::kill;
     }
 
     return options;
-}
-
-std::stringstream &operator<<(std::stringstream &ss,
-                              const linyaps_box::command::list_options::output_format_t &format)
-{
-    switch (format) {
-    case linyaps_box::command::list_options::output_format_t::table: {
-        ss << "table";
-    } break;
-    case linyaps_box::command::list_options::output_format_t::json: {
-        ss << "json";
-    } break;
-    }
-
-    return ss;
 }

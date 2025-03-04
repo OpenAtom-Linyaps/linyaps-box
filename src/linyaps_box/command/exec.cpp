@@ -8,10 +8,10 @@
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory.h"
 
-void linyaps_box::command::exec(const std::filesystem::path &root,
-                                const struct exec_options &options)
+void linyaps_box::command::exec(const struct exec_options &options)
 {
-    std::unique_ptr<status_directory> dir = std::make_unique<impl::status_directory>(root);
+    std::unique_ptr<status_directory> dir =
+            std::make_unique<impl::status_directory>(options.global.root);
     runtime_t runtime(std::move(dir));
 
     auto container_refs = runtime.containers();
