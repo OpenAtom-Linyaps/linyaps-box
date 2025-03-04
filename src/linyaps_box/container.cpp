@@ -976,9 +976,9 @@ namespace runtime_ns {
         return result.str();
     }();
 
-    uint16_t flag = SIGCHLD;
+    uint32_t flag = SIGCHLD;
     LINYAPS_BOX_DEBUG() << "Add SIGCHLD, flag=0x" << std::hex << flag;
-    uint16_t setted_namespaces = 0;
+    uint32_t setted_namespaces = 0;
 
     for (const auto &ns : namespaces) {
         switch (ns.type) {
