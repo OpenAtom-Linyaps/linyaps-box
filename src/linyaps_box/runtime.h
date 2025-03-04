@@ -24,6 +24,7 @@ public:
         std::filesystem::path bundle;
         std::filesystem::path config;
         std::string ID;
+        cgroup_manager_t manager;
     };
 
     container create_container(const create_container_options_t &options);

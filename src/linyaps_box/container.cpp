@@ -4,6 +4,8 @@
 
 #include "linyaps_box/container.h"
 
+#include "linyaps_box/impl/disabled_cgroup_manager.h"
+#include "linyaps_box/utils/cgroups.h"
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/fstat.h"
 #include "linyaps_box/utils/inspect.h"
@@ -22,6 +24,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <csignal>
 #include <fstream>
 #include <iostream>
 #include <set>
@@ -30,7 +33,6 @@
 
 #include <dirent.h>
 #include <grp.h>
-#include <signal.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
@@ -38,7 +40,7 @@
 
 namespace {
 
-enum class sync_message : uint8_t {
+enum class sync_message : std::uint8_t {
     REQUEST_CONFIGURE_NAMESPACE,
     NAMESPACE_CONFIGURED,
     REQUEST_CREATERUNTIME_HOOKS,
@@ -173,11 +175,11 @@ void configure_container_namespaces(linyaps_box::utils::file_descriptor &socket)
     LINYAPS_BOX_DEBUG() << "Container namespaces configured from runtime namespace";
 }
 
-static void system_call_mount(const char *_special_file,
-                              const char *_dir,
-                              const char *_fstype,
-                              unsigned long int _rwflag,
-                              const void *_data)
+void system_call_mount(const char *_special_file,
+                       const char *_dir,
+                       const char *_fstype,
+                       unsigned long int _rwflag,
+                       const void *_data)
 {
     LINYAPS_BOX_DEBUG() << "mount\n"
                         << "\t_special_file = " << [=]() -> std::string {
@@ -1129,7 +1131,6 @@ void execute_user_namespace_helper(const std::vector<std::string> &args)
 
     if (pid == 0) {
         std::vector<const char *> c_args;
-
         c_args.reserve(args.size());
         for (const auto &arg : args) {
             c_args.push_back(arg.c_str());
@@ -1176,7 +1177,7 @@ void configure_gid_mapping(pid_t pid,
     }
 
     std::vector<std::string> args;
-    args.push_back("newgidmap");
+    args.emplace_back("newgidmap");
     args.push_back(std::to_string(pid));
     for (const auto &mapping : gid_mappings) {
         args.push_back(std::to_string(mapping.container_id));
@@ -1198,7 +1199,7 @@ void configure_uid_mapping(pid_t pid,
     }
 
     std::vector<std::string> args;
-    args.push_back("newuidmap");
+    args.emplace_back("newuidmap");
     args.push_back(std::to_string(pid));
     for (const auto &mapping : uid_mappings) {
         args.push_back(std::to_string(mapping.container_id));
@@ -1213,6 +1214,8 @@ void configure_container_cgroup([[maybe_unused]] const linyaps_box::container &c
 {
     LINYAPS_BOX_DEBUG() << "Configure container cgroup";
     // TODO: impl
+    // enter cgroup -> wait container ready -> enter finalize ->
+    // do some other settings -> configuration done
 }
 
 void configure_container_namespaces(const linyaps_box::container &container,
@@ -1395,11 +1398,17 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
                                   const std::string &id,
                                   const std::filesystem::path &bundle,
-                                  const std::filesystem::path &config)
+                                  std::filesystem::path config,
+                                  cgroup_manager_t manager)
     : container_ref(std::move(status_dir), id)
     , bundle(bundle)
 {
+    if (config.is_relative()) {
+        config = std::filesystem::canonical(bundle / config);
+    }
+
     std::ifstream ifs(config);
+    LINYAPS_BOX_DEBUG() << "load config from " << config;
     this->config = linyaps_box::config::parse(ifs);
 
     {
@@ -1411,6 +1420,15 @@ linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
         status.created = ""; // FIXME
         status.owner = getuid();
         this->status_dir().write(status);
+    }
+
+    switch (manager) {
+    case cgroup_manager_t::disabled: {
+        this->manager = std::make_unique<disabled_cgroup_manager>();
+    } break;
+    case cgroup_manager_t::systemd:
+    case cgroup_manager_t::cgroupfs:
+        throw std::runtime_error("unsupported cgroup manager");
     }
 }
 
@@ -1424,36 +1442,63 @@ const std::filesystem::path &linyaps_box::container::get_bundle() const
     return this->bundle;
 }
 
+// maybe we need a internal run function?
 int linyaps_box::container::run(const config::process_t &process)
 {
-    auto [child_pid, socket] = runtime_ns::start_container_process(*this, process);
+    int container_process_exit_code{ -1 };
+    try {
+        // TODO: there are some thing that should be done before starting the container process
+        // e.g. do something before creating cgroup by selecting manager, selinux label, seccomp
+        // setup, etc.
 
-    {
-        auto status = this->status();
-        assert(status.status == container_status_t::runtime_status::CREATING);
-        status.PID = child_pid;
-        status.status = container_status_t::runtime_status::CREATED;
-        this->status_dir().write(status);
+        // TODO: cgroup preenter
+        auto [child_pid, socket] = runtime_ns::start_container_process(*this, process);
+
+        {
+            auto status = this->status();
+            assert(status.status == container_status_t::runtime_status::CREATING);
+            status.PID = child_pid;
+            status.status = container_status_t::runtime_status::CREATED;
+            this->status_dir().write(status);
+        }
+
+        runtime_ns::configure_container_namespaces(*this, socket);
+        runtime_ns::prestart_hooks(*this);
+        runtime_ns::create_runtime_hooks(*this, socket);
+        runtime_ns::wait_create_container_result(*this, socket);
+        runtime_ns::wait_socket_close(socket);
+        runtime_ns::poststart_hooks(*this);
+
+        // TODO: support detach from the parent's process
+        // Now we wait for the container process to exit
+        container_process_exit_code = runtime_ns::wait_container_process(this->status().PID);
+
+        {
+            auto status = this->status();
+            assert(status.status == container_status_t::runtime_status::STOPPED);
+            status.PID = child_pid;
+            this->status_dir().write(status);
+        }
+
+        runtime_ns::poststop_hooks(*this);
+    } catch (const std::exception &e) {
+        LINYAPS_BOX_ERR() << "failed to run a container: " << e.what();
     }
-
-    runtime_ns::configure_container_namespaces(*this, socket);
-    runtime_ns::prestart_hooks(*this);
-    runtime_ns::create_runtime_hooks(*this, socket);
-    runtime_ns::wait_create_container_result(*this, socket);
-    runtime_ns::wait_socket_close(socket);
-    runtime_ns::poststart_hooks(*this);
-    auto container_process_exit_code = runtime_ns::wait_container_process(this->status().PID);
-
-    {
-        auto status = this->status();
-        assert(status.status == container_status_t::runtime_status::STOPPED);
-        status.PID = child_pid;
-        this->status_dir().write(status);
-    }
-
-    runtime_ns::poststop_hooks(*this);
 
     this->status_dir().remove(this->get_id());
 
+    // TODO: cleanup cgroup
+
     return container_process_exit_code;
+}
+
+void linyaps_box::container::cgroup_preenter(const cgroup_options &options,
+                                             utils::file_descriptor &dirfd)
+{
+    auto type = utils::get_cgroup_type();
+    if (type != utils::cgroup_t::unified) {
+        return;
+    }
+
+    this->manager->precreate_cgroup(options, dirfd);
 }

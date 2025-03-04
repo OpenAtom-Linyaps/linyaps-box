@@ -40,28 +40,27 @@ try {
         return result.str();
     }();
 
-    command::options options;
-    options = command::parse(argc, argv);
+    command::options options = command::parse(argc, argv);
 
-    if (options.return_code) {
-        return *options.return_code;
+    if (options.global.return_code) {
+        return *options.global.return_code;
     }
 
-    switch (options.command) {
-    case command::options::command_t::list: {
-        return command::list(options.root, options.list);
+    switch (options.global.command) {
+    case command::global_options::command_t::list: {
+        return command::list(options.list);
     }
-    case command::options::command_t::run: {
-        return command::run(options.root, options.run);
+    case command::global_options::command_t::run: {
+        return command::run(options.run);
     }
-    case command::options::command_t::exec: {
-        command::exec(options.root, options.exec);
+    case command::global_options::command_t::exec: {
+        command::exec(options.exec);
         throw std::logic_error("unreachable");
     }
-    case command::options::command_t::kill: {
-        return command::kill(options.root, options.kill);
+    case command::global_options::command_t::kill: {
+        return command::kill(options.kill);
     }
-    case command::options::command_t::not_set:
+    case command::global_options::command_t::not_set:
     default: {
         throw std::logic_error("unreachable");
     }

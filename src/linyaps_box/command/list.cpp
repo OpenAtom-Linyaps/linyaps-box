@@ -4,17 +4,16 @@
 
 #include "linyaps_box/command/list.h"
 
-#include <memory>
-
 #include "linyaps_box/impl/json_printer.h"
 #include "linyaps_box/impl/status_directory.h"
 #include "linyaps_box/impl/table_printer.h"
 #include "linyaps_box/runtime.h"
 
-int linyaps_box::command::list(const std::filesystem::path &root,
-                               const struct list_options &options)
+#include <memory>
+
+int linyaps_box::command::list(const struct list_options &options)
 {
-    auto status_dir = std::make_unique<impl::status_directory>(root);
+    auto status_dir = std::make_unique<impl::status_directory>(options.global.root);
     if (!status_dir) {
         throw std::runtime_error("failed to create status directory");
     }

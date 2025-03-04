@@ -8,9 +8,10 @@
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory.h"
 
-int linyaps_box::command::run(const std::filesystem::path &root, const struct run_options &options)
+int linyaps_box::command::run(const struct run_options &options)
 {
-    std::unique_ptr<status_directory> dir = std::make_unique<impl::status_directory>(root);
+    std::unique_ptr<status_directory> dir =
+            std::make_unique<impl::status_directory>(options.global.root);
     runtime_t runtime(std::move(dir));
     runtime_t::create_container_options_t create_container_options;
     create_container_options.bundle = options.bundle;
@@ -18,5 +19,6 @@ int linyaps_box::command::run(const std::filesystem::path &root, const struct ru
     create_container_options.ID = options.ID;
 
     auto container = runtime.create_container(create_container_options);
+
     return container.run(container.get_config().process);
 }

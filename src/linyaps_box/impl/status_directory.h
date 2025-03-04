@@ -16,7 +16,7 @@ public:
     void write(const container_status_t &status) override;
     [[nodiscard]] container_status_t read(const std::string &id) const override;
     void remove(const std::string &id) override;
-    std::vector<std::string> list() const override;
+    [[nodiscard]] std::vector<std::string> list() const override;
 
     explicit status_directory(const std::filesystem::path &path);
 
