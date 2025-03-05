@@ -4,6 +4,7 @@
 
 #include "linyaps_box/utils/mkdir.h"
 
+#include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/log.h"
 
 #include <fcntl.h>
@@ -12,32 +13,55 @@
 #include <unistd.h>
 
 linyaps_box::utils::file_descriptor linyaps_box::utils::mkdir(const file_descriptor &root,
-                                                              const std::filesystem::path &path,
+                                                              std::filesystem::path path,
                                                               mode_t mode)
 {
-    LINYAPS_BOX_DEBUG() << "mkdir " << path << " at " << root.proc_path();
+    LINYAPS_BOX_DEBUG() << "mkdir " << path << " at " << inspect_fd(root.get());
 
     int fd = ::dup(root.get());
     if (fd == -1) {
         throw std::system_error(errno, std::generic_category(), "dup");
     }
 
-    file_descriptor current(fd);
+    if (path.empty()) {
+        // do nothing
+        return file_descriptor{ fd };
+    }
 
+    if (path.is_absolute()) {
+        path = path.lexically_relative("/");
+    }
+
+    if (path.filename().empty()) {
+        path = path.parent_path();
+    }
+
+    file_descriptor current(fd);
+    int depth{ 0 };
     for (const auto &part : path) {
         LINYAPS_BOX_DEBUG() << "part=" << part << " mode=0" << std::oct << mode;
 
-        if (::mkdirat(current.get(), part.c_str(), mode) != 0) {
-            if (errno != EEXIST) {
-                throw std::system_error(errno, std::generic_category(), "mkdirat");
-            }
+        if (part == "..") {
+            --depth;
         }
+
+        if (depth < 0) {
+            return current;
+        }
+
+        if (::mkdirat(current.get(), part.c_str(), mode) != 0 && errno != EEXIST) {
+            LINYAPS_BOX_DEBUG() << "current path: " << utils::inspect_path(current.get())
+                                << " perm:" << utils::inspect_permissions(current.get());
+            throw std::system_error(errno, std::generic_category(), "mkdirat");
+        }
+
         fd = ::openat(current.get(), part.c_str(), O_PATH);
         if (fd == -1) {
             throw std::system_error(errno, std::generic_category(), "openat");
         }
 
         current = file_descriptor(fd);
+        ++depth;
     }
 
     return current;

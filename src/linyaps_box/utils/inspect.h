@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <string>
 
 namespace linyaps_box::utils {
@@ -11,5 +12,7 @@ namespace linyaps_box::utils {
 std::string inspect_fcntl_or_open_flags(size_t flags);
 std::string inspect_fd(int fd);
 std::string inspect_fds();
+std::string inspect_permissions(int fd);
+std::filesystem::path inspect_path(int fd);
 
 } // namespace linyaps_box::utils

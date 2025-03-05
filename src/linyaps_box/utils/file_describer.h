@@ -40,6 +40,8 @@ public:
 
     [[nodiscard]] std::filesystem::path proc_path() const;
 
+    [[nodiscard]] std::filesystem::path current_path() const;
+
 private:
     int fd{ -1 };
 };

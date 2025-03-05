@@ -52,6 +52,10 @@ endif()
 
 option(linyaps-box_ENABLE_CPACK "Enable CPack." OFF)
 
+include(CheckIncludeFileCXX)
+
+check_include_file_cxx("linux/openat2.h" LINYAPS_HAVE_OPENAT2_H)
+
 if(linyaps-box_ENABLE_CPACK)
   set(linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX
       "/opt/org.openatom.linyaps-box"
@@ -154,8 +158,13 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/socketpair.h
     src/linyaps_box/utils/touch.cpp
     src/linyaps_box/utils/touch.h)
+
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/linyaps_box/configuration.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/src/linyaps_box/configuration.h @ONLY)
 set(linyaps-box_LIBRARY_LINK_LIBRARIES)
-set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
+                                     "${CMAKE_CURRENT_BINARY_DIR}/src")
 
 if(linyaps-box_ENABLE_SECCOMP)
   find_package(PkgConfig REQUIRED)
@@ -305,8 +314,7 @@ function(setup_linyaps_box_smoke_tests)
   set(linyaps-box_SMOKE_TESTS
       ./tests/ll-box-st/01-run-whoami-with-debian-latest.json
       ./tests/ll-box-st/02-check-procfs-with-ubuntu-latest.json
-      ./tests/ll-box-st/03-check-mounts-with-debian-latest.json
-    )
+      ./tests/ll-box-st/03-check-mounts-with-debian-latest.json)
 
   foreach(test ${linyaps-box_SMOKE_TESTS})
     add_test(
