@@ -7,3 +7,4 @@
 /debian/linglong-box.debhelper.log
 /debian/files
 /debian/linglong-box.substvars
+.vscode/

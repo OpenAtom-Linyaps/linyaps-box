@@ -4,6 +4,8 @@
 
 #include "linyaps_box/utils/inspect.h"
 
+#include "linyaps_box/utils/log.h"
+
 #include <cassert>
 #include <cstdlib>
 #include <filesystem>
@@ -11,21 +13,17 @@
 #include <sstream>
 
 #include <fcntl.h>
-
-namespace linyaps_box::utils {
+#include <sys/stat.h>
 
 namespace {
-std::string inspect_fd(const std::filesystem::path &fdinfo_path)
+
+std::string inspect_fdinfo(const std::filesystem::path &fdinfoPath)
 {
-    std::stringstream ss;
-
-    ss << std::filesystem::read_symlink("/proc/self/fd/" + fdinfo_path.stem().string());
-
-    std::ifstream fdinfo(fdinfo_path);
+    std::ifstream fdinfo(fdinfoPath);
     assert(fdinfo.is_open());
 
+    std::stringstream ss;
     std::string key;
-
     while (fdinfo >> key) {
         ss << " " << key << " ";
         if (key != "flags:") {
@@ -43,7 +41,18 @@ std::string inspect_fd(const std::filesystem::path &fdinfo_path)
 
     return ss.str();
 }
+
+std::string inspect_fdinfo(int fd)
+{
+    std::stringstream ss;
+    ss << linyaps_box::utils::inspect_path(fd) << " ";
+    ss << inspect_fdinfo(std::filesystem::path("/proc/self/fdinfo/" + std::to_string(fd)));
+    return ss.str();
+}
+
 } // namespace
+
+namespace linyaps_box::utils {
 
 std::string inspect_fcntl_or_open_flags(size_t flags)
 {
@@ -119,7 +128,7 @@ std::string inspect_fcntl_or_open_flags(size_t flags)
 
 std::string inspect_fd(int fd)
 {
-    return inspect_fd("/proc/self/fdinfo/" + std::to_string(fd));
+    return inspect_fdinfo(fd);
 }
 
 std::string inspect_fds()
@@ -137,10 +146,89 @@ std::string inspect_fds()
             ss << '\n';
         }
         first_line = false;
-        ss << entry.path() << " " << inspect_fd(entry.path());
+        ss << entry.path() << " " << inspect_fdinfo(entry.path());
     }
 
     return ss.str();
+}
+
+std::string inspect_permissions(int fd)
+{
+    std::stringstream ss;
+    struct stat buf{};
+
+    if (fstat(fd, &buf) == -1) {
+        throw std::system_error(errno, std::generic_category(), "fstat");
+    }
+
+    ss << buf.st_uid << ":" << buf.st_gid << " ";
+
+    if (S_IRUSR & buf.st_mode) {
+        ss << "r";
+    } else {
+        ss << "-";
+    }
+
+    if (S_IWUSR & buf.st_mode) {
+        ss << "w";
+    } else {
+        ss << "-";
+    }
+
+    if (S_IXUSR & buf.st_mode) {
+        ss << "x";
+    } else {
+        ss << "-";
+    }
+
+    if (S_IRGRP & buf.st_mode) {
+        ss << "r";
+    } else {
+        ss << "-";
+    }
+
+    if (S_IWGRP & buf.st_mode) {
+        ss << "w";
+    } else {
+        ss << "-";
+    }
+
+    if (S_IXGRP & buf.st_mode) {
+        ss << "x";
+    } else {
+        ss << "-";
+    }
+
+    if (S_IROTH & buf.st_mode) {
+        ss << "r";
+    } else {
+        ss << "-";
+    }
+
+    if (S_IWOTH & buf.st_mode) {
+        ss << "w";
+    } else {
+        ss << "-";
+    }
+
+    if (S_IXOTH & buf.st_mode) {
+        ss << "x";
+    } else {
+        ss << "-";
+    }
+
+    return ss.str();
+}
+
+std::filesystem::path inspect_path(int fd)
+{
+    std::error_code ec;
+    auto ret = std::filesystem::read_symlink("/proc/self/fd/" + std::to_string(fd), ec);
+    if (ec) {
+        LINYAPS_BOX_WARNING() << "failed to inspect path for fd " << fd << ":" << ec.message();
+    }
+
+    return ret;
 }
 
 } // namespace linyaps_box::utils

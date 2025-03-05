@@ -330,6 +330,8 @@ void do_delay_readonly_mount(const delay_readonly_mount_t &mount)
 [[nodiscard]] linyaps_box::utils::file_descriptor create_destination_file(
         const linyaps_box::utils::file_descriptor &root, const std::filesystem::path &destination)
 {
+    LINYAPS_BOX_DEBUG() << "Creating file " << destination.string() << " under "
+                        << linyaps_box::utils::inspect_path(root.get());
     const auto &parent = linyaps_box::utils::mkdir(root, destination.parent_path());
     return linyaps_box::utils::touch(parent, destination.filename());
 }
@@ -337,36 +339,40 @@ void do_delay_readonly_mount(const delay_readonly_mount_t &mount)
 [[nodiscard]] linyaps_box::utils::file_descriptor create_destination_directory(
         const linyaps_box::utils::file_descriptor &root, const std::filesystem::path &destination)
 {
+    LINYAPS_BOX_DEBUG() << "Creating directory " << destination.string() << " under "
+                        << linyaps_box::utils::inspect_path(root.get());
     return linyaps_box::utils::mkdir(root, destination);
 }
 
-template<bool file = false>
-[[nodiscard]] linyaps_box::utils::file_descriptor ensure_mount_destination(
-        const linyaps_box::utils::file_descriptor &root, const linyaps_box::config::mount_t &mount)
+[[nodiscard]] linyaps_box::utils::file_descriptor
+ensure_mount_destination(bool isDir,
+                         const linyaps_box::utils::file_descriptor &root,
+                         const linyaps_box::config::mount_t &mount)
 try {
     assert(mount.destination.has_value());
-    auto open_flag = O_PATH;
+    auto open_flag = O_PATH | O_CLOEXEC;
     if (mount.flags | MS_NOSYMFOLLOW) {
         open_flag |= O_NOFOLLOW;
     }
-    return linyaps_box::utils::open(root, mount.destination.value(), open_flag);
+
+    return linyaps_box::utils::open_at(root, mount.destination.value(), open_flag);
 } catch (const std::system_error &e) {
     if (e.code().value() != ENOENT) {
-        throw;
+        throw e;
     }
 
-    LINYAPS_BOX_DEBUG() << "Destination " << mount.destination.value()
-                        << " not exists: " << e.what();
+    auto path = mount.destination.value();
+    LINYAPS_BOX_DEBUG() << "Destination " << path << " not exists: " << e.what();
 
     // NOTE: Automatically create destination is not a part of the OCI runtime
-    // spec, as it requires implementation to follow the behivor of mount(8).
+    // spec, as it requires implementation to follow the behavior of mount(8).
     // But both crun and runc does this.
 
-    if constexpr (file) {
-        return create_destination_file(root, mount.destination.value());
-    } else {
-        return create_destination_directory(root, mount.destination.value());
+    if (isDir) {
+        return create_destination_directory(root, path);
     }
+
+    return create_destination_file(root, path);
 }
 
 void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination,
@@ -399,29 +405,18 @@ void do_bind_mount(const linyaps_box::utils::file_descriptor &root,
     auto source_stat = linyaps_box::utils::lstat(source_fd);
 
     linyaps_box::utils::file_descriptor destination_fd;
-
-    if (S_ISDIR(source_stat.st_mode)) {
-        destination_fd = ensure_mount_destination(root, mount);
-    } else {
-        destination_fd = ensure_mount_destination<true>(root, mount);
-    }
+    auto sourceIsDir = S_ISDIR(source_stat.st_mode);
+    destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
 
     auto bind_flags = mount.flags & (MS_BIND | MS_REC);
-
     system_call_mount(source_fd.proc_path().c_str(),
                       destination_fd.proc_path().c_str(),
                       nullptr,
                       bind_flags,
                       nullptr);
 
-    if (S_ISDIR(source_stat.st_mode)) {
-        destination_fd = ensure_mount_destination(root, mount);
-    } else {
-        destination_fd = ensure_mount_destination<true>(root, mount);
-    }
-
+    destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
     bind_flags = mount.flags | MS_REMOUNT;
-
     system_call_mount(nullptr, destination_fd.proc_path().c_str(), nullptr, bind_flags, nullptr);
 
     if (mount.propagation_flags == 0) {
@@ -449,7 +444,8 @@ do_mount(const linyaps_box::utils::file_descriptor &root, const linyaps_box::con
     }() << " to "
         << mount.destination.value().string();
 
-    linyaps_box::utils::file_descriptor destination_fd = ensure_mount_destination(root, mount);
+    linyaps_box::utils::file_descriptor destination_fd =
+            ensure_mount_destination(true, root, mount);
 
     auto mount_flags = mount.flags;
 
@@ -508,7 +504,7 @@ private:
     void configure_default_filesystems()
     {
         do {
-            auto proc = linyaps_box::utils::open(root, "proc");
+            auto proc = linyaps_box::utils::open_at(root, "proc");
             struct statfs buf{};
             int ret = ::statfs(proc.proc_path().c_str(), &buf);
             if (ret != 0) {
@@ -527,10 +523,9 @@ private:
         } while (false);
 
         do {
-            auto sys = linyaps_box::utils::open(root, "sys");
-            struct statfs buf;
-            int ret = ::statfs(sys.proc_path().c_str(), &buf);
-            if (ret) {
+            auto sys = linyaps_box::utils::open_at(root, "sys");
+            struct statfs buf{};
+            if (::statfs(sys.proc_path().c_str(), &buf) != 0) {
                 throw std::system_error(errno, std::generic_category(), "statfs");
             }
 
@@ -560,7 +555,7 @@ private:
         } while (false);
 
         do {
-            auto dev = linyaps_box::utils::open(root, "dev");
+            auto dev = linyaps_box::utils::open_at(root, "dev");
             struct statfs buf{};
             int ret = ::statfs(dev.proc_path().c_str(), &buf);
             if (ret != 0) {
@@ -586,7 +581,7 @@ private:
 
         do {
             try {
-                auto pts = linyaps_box::utils::open(root, "dev/pts");
+                auto pts = linyaps_box::utils::open_at(root, "dev/pts");
                 break;
             } catch (const std::system_error &e) {
                 if (e.code().value() != ENOENT) {
@@ -605,7 +600,7 @@ private:
 
         do {
             try {
-                auto shm = linyaps_box::utils::open(root, "dev/shm");
+                auto shm = linyaps_box::utils::open_at(root, "dev/shm");
                 break;
             } catch (const std::system_error &e) {
                 if (e.code().value() != ENOENT) {
@@ -629,7 +624,7 @@ private:
 
         std::optional<linyaps_box::utils::file_descriptor> destination_fd;
         try {
-            destination_fd = linyaps_box::utils::open(root, destination.relative_path(), O_PATH);
+            destination_fd = linyaps_box::utils::open_at(root, destination.relative_path(), O_PATH);
         } catch (const std::system_error &e) {
             if (e.code().value() != ENOENT) {
                 throw;
@@ -690,8 +685,12 @@ void configure_mounts(const linyaps_box::container &container)
     {
         auto bundle = linyaps_box::utils::open(container.get_bundle(), O_PATH);
         m = std::make_unique<mounter>(
-                linyaps_box::utils::open(bundle, container.get_config().root.path, O_PATH));
+                linyaps_box::utils::open_at(bundle, container.get_config().root.path, O_PATH));
     }
+
+    // TODO: if root is read only, add it to remount list
+
+    LINYAPS_BOX_DEBUG() << "Processing mount points";
 
     for (const auto &mount : container.get_config().mounts) {
         m->mount(mount);

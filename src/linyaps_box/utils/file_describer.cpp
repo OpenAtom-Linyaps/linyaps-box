@@ -92,3 +92,8 @@ std::filesystem::path linyaps_box::utils::file_descriptor::proc_path() const
     return std::filesystem::current_path().root_path() / "proc" / "self" / "fd"
             / std::to_string(fd);
 }
+
+std::filesystem::path linyaps_box::utils::file_descriptor::current_path() const
+{
+    return std::filesystem::read_symlink(proc_path());
+}
