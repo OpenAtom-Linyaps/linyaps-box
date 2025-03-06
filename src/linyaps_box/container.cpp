@@ -236,7 +236,7 @@ void system_call_mount(const char *_special_file,
                 if (_rwflag & MS_DIRSYNC) {
                     ss << "MS_DIRSYNC ";
                 }
-                if (_rwflag & MS_NOSYMFOLLOW) {
+                if (_rwflag & LINGYAPS_MS_NOSYMFOLLOW) {
                     ss << "MS_NOSYMFOLLOW ";
                 }
                 if (_rwflag & MS_NOATIME) {
@@ -345,13 +345,52 @@ void do_delay_readonly_mount(const delay_readonly_mount_t &mount)
 }
 
 [[nodiscard]] linyaps_box::utils::file_descriptor
+create_destination_symlink(const linyaps_box::utils::file_descriptor &root,
+                           const std::filesystem::path &source,
+                           std::filesystem::path destination)
+{
+    auto ret = std::filesystem::read_symlink(source);
+    auto parent = linyaps_box::utils::mkdir(root, destination.parent_path());
+
+    LINYAPS_BOX_DEBUG() << "Creating symlink " << destination.string() << " under "
+                        << linyaps_box::utils::inspect_path(root.get()) << " point to " << ret;
+
+    if (destination.is_absolute()) {
+        destination = destination.lexically_relative("/");
+    }
+
+    if (symlinkat(ret.c_str(), root.get(), destination.c_str()) != -1) {
+        return linyaps_box::utils::open_at(root, destination, O_PATH | O_NOFOLLOW | O_CLOEXEC);
+    }
+
+    if (errno == EEXIST) {
+        std::array<char, PATH_MAX + 1> buf{};
+        auto to = ::readlinkat(root.get(), destination.c_str(), buf.data(), buf.size());
+        if (to == -1) {
+            throw std::system_error(errno, std::system_category(), "readlinkat");
+        }
+
+        if (std::string_view{ buf.data(), static_cast<size_t>(to) } == ret) {
+            return linyaps_box::utils::open_at(root, destination, O_PATH | O_NOFOLLOW | O_CLOEXEC);
+        }
+
+        throw std::system_error(errno,
+                                std::system_category(),
+                                "symlink " + destination.string()
+                                        + " already exists with a different content");
+    }
+
+    throw std::system_error(errno, std::system_category(), "symlinkat");
+}
+
+[[nodiscard]] linyaps_box::utils::file_descriptor
 ensure_mount_destination(bool isDir,
                          const linyaps_box::utils::file_descriptor &root,
                          const linyaps_box::config::mount_t &mount)
 try {
     assert(mount.destination.has_value());
     auto open_flag = O_PATH | O_CLOEXEC;
-    if (mount.flags | MS_NOSYMFOLLOW) {
+    if (mount.flags | LINGYAPS_MS_NOSYMFOLLOW) {
         open_flag |= O_NOFOLLOW;
     }
 
@@ -397,8 +436,14 @@ void do_bind_mount(const linyaps_box::utils::file_descriptor &root,
     LINYAPS_BOX_DEBUG() << "Bind mount host " << mount.source.value() << " to container "
                         << mount.destination.value().string();
 
+    if ((mount.extra_flags & linyaps_box::config::mount_t::COPY_SYMLINK) != 0) {
+        auto ret =
+                create_destination_symlink(root, mount.source.value(), mount.destination.value());
+        return;
+    }
+
     auto open_flag = O_PATH;
-    if ((mount.flags & MS_NOSYMFOLLOW) != 0) {
+    if ((mount.flags & LINGYAPS_MS_NOSYMFOLLOW) != 0) {
         open_flag |= O_NOFOLLOW;
     }
     auto source_fd = linyaps_box::utils::open(mount.source.value(), open_flag);

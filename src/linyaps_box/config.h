@@ -14,6 +14,13 @@
 #include <sys/resource.h>
 #include <sys/types.h>
 
+// Compatible with linux kernel which is under 5.10
+#ifndef MS_NOSYMFOLLOW
+#define LINGYAPS_MS_NOSYMFOLLOW 256
+#else
+#define LINGYAPS_MS_NOSYMFOLLOW MS_NOSYMFOLLOW
+#endif
+
 namespace linyaps_box {
 
 struct config
@@ -132,11 +139,14 @@ struct config
 
     struct mount_t
     {
+        enum extension : std::uint8_t { COPY_SYMLINK = 1 };
+
         std::optional<std::string> source;
         std::optional<std::filesystem::path> destination;
         std::string type;
-        unsigned long flags;
-        unsigned long propagation_flags;
+        std::uint8_t extra_flags{ 0 };
+        unsigned long flags{ 0 };
+        unsigned long propagation_flags{ 0 };
         std::string data;
     };
 

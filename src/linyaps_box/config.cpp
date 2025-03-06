@@ -10,17 +10,17 @@
 
 namespace {
 
-std::tuple<unsigned long, unsigned long, std::string>
+std::tuple<unsigned long, unsigned long, std::uint8_t, std::string>
 parse_mount_options(const std::vector<std::string> &options)
 {
-    const static std::unordered_map<std::string, unsigned long> propagation_flags_map{
+    const static std::unordered_map<std::string_view, unsigned long> propagation_flags_map{
         { "rprivate", MS_PRIVATE | MS_REC },       { "private", MS_PRIVATE },
         { "rslave", MS_SLAVE | MS_REC },           { "slave", MS_SLAVE },
         { "rshared", MS_SHARED | MS_REC },         { "shared", MS_SHARED },
         { "runbindable", MS_UNBINDABLE | MS_REC }, { "unbindable", MS_UNBINDABLE },
     };
 
-    const static std::unordered_map<std::string, unsigned long> flags_map{
+    const static std::unordered_map<std::string_view, unsigned long> flags_map{
         { "bind", MS_BIND },
         { "defaults", 0 },
         { "dirsync", MS_DIRSYNC },
@@ -32,7 +32,7 @@ parse_mount_options(const std::vector<std::string> &options)
         { "nodiratime", MS_NODIRATIME },
         { "noexec", MS_NOEXEC },
         { "nosuid", MS_NOSUID },
-        { "nosymfollow", MS_NOSYMFOLLOW },
+        { "nosymfollow", LINGYAPS_MS_NOSYMFOLLOW },
         { "rbind", MS_BIND | MS_REC },
         { "relatime", MS_RELATIME },
         { "remount", MS_REMOUNT },
@@ -42,7 +42,7 @@ parse_mount_options(const std::vector<std::string> &options)
         { "sync", MS_SYNCHRONOUS },
     };
 
-    const static std::unordered_map<std::string, unsigned long> unset_flags_map{
+    const static std::unordered_map<std::string_view, unsigned long> unset_flags_map{
         { "async", MS_SYNCHRONOUS },
         { "atime", MS_NOATIME },
         { "dev", MS_NODEV },
@@ -56,10 +56,15 @@ parse_mount_options(const std::vector<std::string> &options)
         { "nostrictatime", MS_STRICTATIME },
         { "rw", MS_RDONLY },
         { "suid", MS_NOSUID },
-        { "symfollow", MS_NOSYMFOLLOW },
+        { "symfollow", LINGYAPS_MS_NOSYMFOLLOW },
+    };
+
+    const static std::unordered_map<std::string_view, std::uint8_t> extra_flags_map{
+        { "copy-symlink", linyaps_box::config::mount_t::COPY_SYMLINK }
     };
 
     unsigned long flags = 0;
+    std::uint8_t extra_flags = 0;
     unsigned long propagation_flags = 0;
     std::stringstream data;
 
@@ -76,6 +81,12 @@ parse_mount_options(const std::vector<std::string> &options)
             propagation_flags &= it->second;
             continue;
         }
+
+        if (auto it = extra_flags_map.find(opt); it != extra_flags_map.end()) {
+            extra_flags |= it->second;
+            continue;
+        }
+
         data << "," << opt;
     }
     auto str = data.str();
@@ -83,7 +94,7 @@ parse_mount_options(const std::vector<std::string> &options)
         str = str.substr(1);
     }
 
-    return { flags, propagation_flags, str };
+    return { flags, propagation_flags, extra_flags, str };
 }
 
 linyaps_box::config parse_1_2_0(const nlohmann::json &j)
@@ -264,7 +275,7 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
             const auto it = m.find("options");
             if (it != m.end()) {
                 auto options = it->get<std::vector<std::string>>();
-                std::tie(mount.flags, mount.propagation_flags, mount.data) =
+                std::tie(mount.flags, mount.propagation_flags, mount.extra_flags, mount.data) =
                         parse_mount_options(options);
             }
 
