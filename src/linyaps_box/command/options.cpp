@@ -21,8 +21,8 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     auto default_root = std::filesystem::current_path().root_path() / "run" / "user"
             / std::to_string(geteuid()) / "linglong" / "box";
 
-    if (getenv("XDG_RUNTIME_DIR") == nullptr) {
-        default_root = std::filesystem::path{ getenv("XDG_RUNTIME_DIR") } / "linglong" / "box";
+    if (auto *env = getenv("XDG_RUNTIME_DIR"); env != nullptr) {
+        default_root = std::filesystem::path{ env } / "linglong" / "box";
     }
 
     app.add_option("--root", options.global.root, "Root directory for storage of container state")
