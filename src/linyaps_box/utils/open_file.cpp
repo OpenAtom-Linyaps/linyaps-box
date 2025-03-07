@@ -85,6 +85,8 @@ linyaps_box::utils::open_at_fallback(const linyaps_box::utils::file_descriptor &
                                      int flag,
                                      int mode)
 {
+    LINYAPS_BOX_DEBUG() << "fallback openat " << path.c_str() << " at FD=" << root.get() << " with "
+                        << inspect_fcntl_or_open_flags(flag) << "\n\t" << inspect_fd(root.get());
     // TODO: we need implement a compatible fallback
     // currently we just use openat and do some simple check
     auto file_path = path;

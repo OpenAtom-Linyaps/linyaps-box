@@ -78,6 +78,95 @@ std::stringstream &&operator<<(std::stringstream &&os, sync_message message)
     return std::move(os);
 }
 
+std::string dump_mount_flags(uint flags) noexcept
+{
+    std::stringstream ss;
+    ss << "[ ";
+    if ((flags & MS_RDONLY) != 0) {
+        ss << "MS_RDONLY ";
+    }
+    if ((flags & MS_NOSUID) != 0) {
+        ss << "MS_NOSUID ";
+    }
+    if ((flags & MS_NODEV) != 0) {
+        ss << "MS_NODEV ";
+    }
+    if ((flags & MS_NOEXEC) != 0) {
+        ss << "MS_NOEXEC ";
+    }
+    if ((flags & MS_SYNCHRONOUS) != 0) {
+        ss << "MS_SYNCHRONOUS ";
+    }
+    if ((flags & MS_REMOUNT) != 0) {
+        ss << "MS_REMOUNT ";
+    }
+    if ((flags & MS_MANDLOCK) != 0) {
+        ss << "MS_MANDLOCK ";
+    }
+    if ((flags & MS_DIRSYNC) != 0) {
+        ss << "MS_DIRSYNC ";
+    }
+    if ((flags & LINGYAPS_MS_NOSYMFOLLOW) != 0) {
+        ss << "MS_NOSYMFOLLOW ";
+    }
+    if ((flags & MS_NOATIME) != 0) {
+        ss << "MS_NOATIME ";
+    }
+    if ((flags & MS_NODIRATIME) != 0) {
+        ss << "MS_NODIRATIME ";
+    }
+    if ((flags & MS_BIND) != 0) {
+        ss << "MS_BIND ";
+    }
+    if ((flags & MS_MOVE) != 0) {
+        ss << "MS_MOVE ";
+    }
+    if ((flags & MS_REC) != 0) {
+        ss << "MS_REC ";
+    }
+    if ((flags & MS_SILENT) != 0) {
+        ss << "MS_SILENT ";
+    }
+    if ((flags & MS_POSIXACL) != 0) {
+        ss << "MS_POSIXACL ";
+    }
+    if ((flags & MS_UNBINDABLE) != 0) {
+        ss << "MS_UNBINDABLE ";
+    }
+    if ((flags & MS_PRIVATE) != 0) {
+        ss << "MS_PRIVATE ";
+    }
+    if ((flags & MS_SLAVE) != 0) {
+        ss << "MS_SLAVE ";
+    }
+    if ((flags & MS_SHARED) != 0) {
+        ss << "MS_SHARED ";
+    }
+    if ((flags & MS_RELATIME) != 0) {
+        ss << "MS_RELATIME ";
+    }
+    if ((flags & MS_KERNMOUNT) != 0) {
+        ss << "MS_KERNMOUNT ";
+    }
+    if ((flags & MS_I_VERSION) != 0) {
+        ss << "MS_I_VERSION ";
+    }
+    if ((flags & MS_STRICTATIME) != 0) {
+        ss << "MS_STRICTATIME ";
+    }
+    if ((flags & MS_LAZYTIME) != 0) {
+        ss << "MS_LAZYTIME ";
+    }
+    if ((flags & MS_ACTIVE) != 0) {
+        ss << "MS_ACTIVE ";
+    }
+    if ((flags & MS_NOUSER) != 0) {
+        ss << "MS_NOUSER ";
+    }
+    ss << "]";
+    return ss.str();
+}
+
 class unexpected_sync_message : public std::logic_error
 {
 public:
@@ -181,122 +270,34 @@ void system_call_mount(const char *_special_file,
                        unsigned long int _rwflag,
                        const void *_data)
 {
+    constexpr decltype(auto) fd_prefix = "/proc/self/fd/";
     LINYAPS_BOX_DEBUG() << "mount\n"
-                        << "\t_special_file = " << [=]() -> std::string {
+                        << "\t_special_file = " << [_special_file]() -> std::string {
         if (_special_file == nullptr) {
             return "nullptr";
         }
-        if (strncmp("/proc/self/fd/", _special_file, sizeof("/proc/self/fd/") - 1) == 0) {
-            return linyaps_box::utils::inspect_fd(
-                    atoi(_special_file + sizeof("/proc/self/fd/") - 1));
+        if (auto str = std::string_view{ _special_file }; str.rfind(fd_prefix, 0) == 0) {
+            return linyaps_box::utils::inspect_fd(std::stoi(str.data() + sizeof(fd_prefix) - 1));
         }
         return _special_file;
     }() << "\n\t_dir = "
-        << [=]() -> std::string {
+        << [_dir]() -> std::string {
         if (_dir == nullptr) {
             return "nullptr";
         }
-        if (strncmp("/proc/self/fd/", _dir, sizeof("/proc/self/fd/") - 1) == 0) {
-            return linyaps_box::utils::inspect_fd(atoi(_dir + sizeof("/proc/self/fd/") - 1));
+        if (auto str = std::string_view{ _dir }; str.rfind(fd_prefix, 0) == 0) {
+            return linyaps_box::utils::inspect_fd(std::stoi(str.data() + sizeof(fd_prefix) - 1));
         }
         return _dir;
     }() << "\n\t_fstype = "
         <<
-            [=]() {
+            [_fstype]() {
                 if (_fstype == nullptr) {
                     return "nullptr";
                 }
                 return _fstype;
             }()
-        << "\n\t__rwflag = " <<
-            [=]() {
-                std::stringstream ss;
-                ss << "[ ";
-                if (_rwflag & MS_RDONLY) {
-                    ss << "MS_RDONLY ";
-                }
-                if (_rwflag & MS_NOSUID) {
-                    ss << "MS_NOSUID ";
-                }
-                if (_rwflag & MS_NODEV) {
-                    ss << "MS_NODEV ";
-                }
-                if (_rwflag & MS_NOEXEC) {
-                    ss << "MS_NOEXEC ";
-                }
-                if (_rwflag & MS_SYNCHRONOUS) {
-                    ss << "MS_SYNCHRONOUS ";
-                }
-                if (_rwflag & MS_REMOUNT) {
-                    ss << "MS_REMOUNT ";
-                }
-                if (_rwflag & MS_MANDLOCK) {
-                    ss << "MS_MANDLOCK ";
-                }
-                if (_rwflag & MS_DIRSYNC) {
-                    ss << "MS_DIRSYNC ";
-                }
-                if (_rwflag & LINGYAPS_MS_NOSYMFOLLOW) {
-                    ss << "MS_NOSYMFOLLOW ";
-                }
-                if (_rwflag & MS_NOATIME) {
-                    ss << "MS_NOATIME ";
-                }
-                if (_rwflag & MS_NODIRATIME) {
-                    ss << "MS_NODIRATIME ";
-                }
-                if (_rwflag & MS_BIND) {
-                    ss << "MS_BIND ";
-                }
-                if (_rwflag & MS_MOVE) {
-                    ss << "MS_MOVE ";
-                }
-                if (_rwflag & MS_REC) {
-                    ss << "MS_REC ";
-                }
-                if (_rwflag & MS_SILENT) {
-                    ss << "MS_SILENT ";
-                }
-                if (_rwflag & MS_POSIXACL) {
-                    ss << "MS_POSIXACL ";
-                }
-                if (_rwflag & MS_UNBINDABLE) {
-                    ss << "MS_UNBINDABLE ";
-                }
-                if (_rwflag & MS_PRIVATE) {
-                    ss << "MS_PRIVATE ";
-                }
-                if (_rwflag & MS_SLAVE) {
-                    ss << "MS_SLAVE ";
-                }
-                if (_rwflag & MS_SHARED) {
-                    ss << "MS_SHARED ";
-                }
-                if (_rwflag & MS_RELATIME) {
-                    ss << "MS_RELATIME ";
-                }
-                if (_rwflag & MS_KERNMOUNT) {
-                    ss << "MS_KERNMOUNT ";
-                }
-                if (_rwflag & MS_I_VERSION) {
-                    ss << "MS_I_VERSION ";
-                }
-                if (_rwflag & MS_STRICTATIME) {
-                    ss << "MS_STRICTATIME ";
-                }
-                if (_rwflag & MS_LAZYTIME) {
-                    ss << "MS_LAZYTIME ";
-                }
-                if (_rwflag & MS_ACTIVE) {
-                    ss << "MS_ACTIVE ";
-                }
-                if (_rwflag & MS_NOUSER) {
-                    ss << "MS_NOUSER ";
-                }
-                ss << "]";
-                return ss.str();
-            }()
-        << "\n\t__data = " << [=]() {
+        << "\n\t_rwflag = " << dump_mount_flags(_rwflag) << "\n\t_data = " << [_data]() {
                if (_data == nullptr) {
                    return "nullptr";
                }
@@ -309,22 +310,52 @@ void system_call_mount(const char *_special_file,
     }
 }
 
-struct delay_readonly_mount_t
+struct remount_t
 {
     linyaps_box::utils::file_descriptor destination_fd;
     unsigned long flags;
+    std::string data;
 };
 
-void do_delay_readonly_mount(const delay_readonly_mount_t &mount)
+void do_remount(const remount_t &mount)
 {
     assert(mount.destination_fd.get() != -1);
     assert(mount.flags & (MS_BIND | MS_REMOUNT | MS_RDONLY));
 
-    system_call_mount(nullptr,
-                      mount.destination_fd.proc_path().c_str(),
-                      nullptr,
-                      mount.flags,
-                      nullptr);
+    auto destination = mount.destination_fd.proc_path();
+    const auto *data_ptr = mount.data.empty() ? nullptr : mount.data.c_str();
+    try {
+        system_call_mount(nullptr, destination.c_str(), nullptr, mount.flags, data_ptr);
+        return;
+    } catch (const std::system_error &e) {
+        LINYAPS_BOX_DEBUG() << "Failed to remount "
+                            << linyaps_box::utils::inspect_path(mount.destination_fd.get())
+                            << "with flags " << dump_mount_flags(mount.flags) << ": " << e.what()
+                            << ", retrying";
+    }
+
+    auto state = linyaps_box::utils::statfs(mount.destination_fd);
+    uint remount_flags = (state.f_flags & (MS_NOSUID | MS_NODEV | MS_NOEXEC));
+    if ((remount_flags | mount.flags) != mount.flags) {
+        try {
+            system_call_mount(nullptr,
+                              destination.c_str(),
+                              nullptr,
+                              remount_flags | mount.flags,
+                              data_ptr);
+            return;
+        } catch (const std::system_error &e) {
+            LINYAPS_BOX_DEBUG() << "Failed to remount "
+                                << linyaps_box::utils::inspect_path(mount.destination_fd.get())
+                                << "with flags " << dump_mount_flags(remount_flags | mount.flags)
+                                << ": " << e.what() << ", retrying";
+        }
+    }
+
+    if ((state.f_flags & MS_RDONLY) != 0) {
+        remount_flags |= MS_RDONLY;
+        system_call_mount(nullptr, destination.c_str(), nullptr, remount_flags, data_ptr);
+    }
 }
 
 [[nodiscard]] linyaps_box::utils::file_descriptor create_destination_file(
@@ -389,8 +420,8 @@ ensure_mount_destination(bool isDir,
                          const linyaps_box::config::mount_t &mount)
 try {
     assert(mount.destination.has_value());
-    auto open_flag = O_PATH | O_CLOEXEC;
-    if (mount.flags | LINGYAPS_MS_NOSYMFOLLOW) {
+    auto open_flag = O_PATH;
+    if ((mount.flags & LINGYAPS_MS_NOSYMFOLLOW) != 0) {
         open_flag |= O_NOFOLLOW;
     }
 
@@ -401,7 +432,8 @@ try {
     }
 
     auto path = mount.destination.value();
-    LINYAPS_BOX_DEBUG() << "Destination " << path << " not exists: " << e.what();
+    LINYAPS_BOX_DEBUG() << "Destination " << (isDir ? "directory " : "file ") << path
+                        << " not exists: " << e.what();
 
     // NOTE: Automatically create destination is not a part of the OCI runtime
     // spec, as it requires implementation to follow the behavior of mount(8).
@@ -426,21 +458,12 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
     system_call_mount(nullptr, destination.proc_path().c_str(), nullptr, flags, nullptr);
 }
 
-void do_bind_mount(const linyaps_box::utils::file_descriptor &root,
-                   const linyaps_box::config::mount_t &mount)
+[[nodiscard]] linyaps_box::utils::file_descriptor do_bind_mount(
+        const linyaps_box::utils::file_descriptor &root, const linyaps_box::config::mount_t &mount)
 {
     assert(mount.flags & MS_BIND);
     assert(mount.source.has_value());
     assert(mount.destination.has_value());
-
-    LINYAPS_BOX_DEBUG() << "Bind mount host " << mount.source.value() << " to container "
-                        << mount.destination.value().string();
-
-    if ((mount.extra_flags & linyaps_box::config::mount_t::COPY_SYMLINK) != 0) {
-        auto ret =
-                create_destination_symlink(root, mount.source.value(), mount.destination.value());
-        return;
-    }
 
     auto open_flag = O_PATH;
     if ((mount.flags & LINGYAPS_MS_NOSYMFOLLOW) != 0) {
@@ -449,35 +472,40 @@ void do_bind_mount(const linyaps_box::utils::file_descriptor &root,
     auto source_fd = linyaps_box::utils::open(mount.source.value(), open_flag);
     auto source_stat = linyaps_box::utils::lstat(source_fd);
 
-    linyaps_box::utils::file_descriptor destination_fd;
     auto sourceIsDir = S_ISDIR(source_stat.st_mode);
-    destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
+    auto destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
+    auto bind_flags = mount.flags & ~MS_RDONLY;
 
-    auto bind_flags = mount.flags & (MS_BIND | MS_REC);
-    system_call_mount(source_fd.proc_path().c_str(),
-                      destination_fd.proc_path().c_str(),
-                      nullptr,
-                      bind_flags,
-                      nullptr);
-
-    destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
-    bind_flags = mount.flags | MS_REMOUNT;
-    system_call_mount(nullptr, destination_fd.proc_path().c_str(), nullptr, bind_flags, nullptr);
-
-    if (mount.propagation_flags == 0) {
-        return;
+    try {
+        // bind mount will ignore fstype and data
+        system_call_mount(source_fd.proc_path().c_str(),
+                          destination_fd.proc_path().c_str(),
+                          nullptr,
+                          bind_flags,
+                          nullptr);
+    } catch (const std::system_error &e) {
+        // mounting sysfs with rootless/userns container will fail with EPERM
+        // TODO: try to bind mount /sys
+        throw;
     }
 
-    do_propagation_mount(destination_fd, mount.propagation_flags);
+    return ensure_mount_destination(sourceIsDir, root, mount);
 }
 
-[[nodiscard]] std::optional<delay_readonly_mount_t>
-do_mount(const linyaps_box::utils::file_descriptor &root, const linyaps_box::config::mount_t &mount)
+void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor &root,
+                     [[maybe_unused]] const linyaps_box::config::mount_t &mount,
+                     [[maybe_unused]] std::string_view unified_cgroup_path)
 {
-    if ((mount.flags & MS_BIND) != 0) {
-        do_bind_mount(root, mount);
-        return std::nullopt;
-    }
+    // TODO: implement
+    throw std::runtime_error("mount cgroup: Not implemented");
+}
+
+[[nodiscard]] std::optional<remount_t> do_mount(const linyaps_box::container &container,
+                                                const linyaps_box::utils::file_descriptor &root,
+                                                const linyaps_box::config::mount_t &mount)
+{
+    // FIXME: this is a workaround, it should be fixed in the future
+    static auto is_sys_rbind{ false };
 
     LINYAPS_BOX_DEBUG() << "Mount " << [&]() -> std::string {
         std::stringstream result;
@@ -489,27 +517,71 @@ do_mount(const linyaps_box::utils::file_descriptor &root, const linyaps_box::con
     }() << " to "
         << mount.destination.value().string();
 
-    linyaps_box::utils::file_descriptor destination_fd =
-            ensure_mount_destination(true, root, mount);
+    if (mount.type.rfind("cgroup", 0) != std::string::npos) {
+        // if /sys is bind mount recursively, then skip /sys/fs/cgroup
+        const auto &namespaces = container.get_config().namespaces;
+        auto unshared_cgroup_ns =
+                std::find_if(namespaces.cbegin(),
+                             namespaces.cend(),
+                             [](const linyaps_box::config::namespace_t &ns) -> bool {
+                                 return ns.type == linyaps_box::config::namespace_t::CGROUP;
+                             });
+        if (mount.destination == "/sys/fs/cgroup" && is_sys_rbind) {
+            if (unshared_cgroup_ns != namespaces.cend()) {
+                throw std::runtime_error("unshared cgroup namespace is not supported");
+            }
 
-    auto mount_flags = mount.flags;
+            return std::nullopt;
+        }
 
-    std::optional<delay_readonly_mount_t> delay_readonly_mount;
-
-    if (mount.type == "tmpfs" && ((mount.flags & MS_RDONLY) != 0)) {
-        delay_readonly_mount =
-                delay_readonly_mount_t{ std::move(destination_fd),
-                                        mount_flags | MS_RDONLY | MS_REMOUNT | MS_BIND };
-        mount_flags &= ~MS_RDONLY;
+        do_cgroup_mount(root, mount, "");
+        return std::nullopt;
     }
 
-    system_call_mount(mount.source ? mount.source.value().c_str() : nullptr,
-                      destination_fd.proc_path().c_str(),
-                      mount.type.c_str(),
-                      mount_flags,
-                      mount.data.c_str());
+    // TODO: fstype == sysfs and it's fallback
+    linyaps_box::utils::file_descriptor destination_fd;
+    if ((mount.flags & MS_BIND) != 0) {
+        destination_fd = do_bind_mount(root, mount);
+        if (!is_sys_rbind && mount.destination == "/sys" && (mount.flags & MS_REC) != 0) {
+            is_sys_rbind = true;
+        }
+    } else {
+        // mount other types
+        destination_fd = ensure_mount_destination(true, root, mount);
+        system_call_mount(mount.source ? mount.source.value().c_str() : nullptr,
+                          destination_fd.proc_path().c_str(),
+                          mount.type.c_str(),
+                          mount.flags,
+                          mount.data.c_str());
+    }
 
     do_propagation_mount(destination_fd, mount.propagation_flags);
+
+    bool need_remount{ false };
+    if ((mount.flags & (MS_RDONLY | MS_BIND)) != 0) {
+        need_remount = true;
+    }
+
+    if (!mount.data.empty() && mount.type == "proc") {
+        need_remount = true;
+    }
+
+    if (!need_remount) {
+        return std::nullopt;
+    }
+
+    auto remount_flags = mount.flags | MS_REMOUNT;
+    if (mount.type != "proc") {
+        remount_flags |= MS_BIND;
+    }
+
+    auto delay_readonly_mount = remount_t{ std::move(destination_fd), remount_flags, mount.data };
+    if ((remount_flags & MS_RDONLY) == 0) {
+        // if not readonly mount, just remount directly
+        LINYAPS_BOX_DEBUG() << "remount " << mount.destination.value() << " directly";
+        do_remount(delay_readonly_mount);
+        return std::nullopt;
+    }
 
     return delay_readonly_mount;
 }
@@ -517,14 +589,30 @@ do_mount(const linyaps_box::utils::file_descriptor &root, const linyaps_box::con
 class mounter
 {
 public:
-    explicit mounter(linyaps_box::utils::file_descriptor root)
-        : root(std::move(root))
+    explicit mounter(const linyaps_box::utils::file_descriptor &bundle,
+                     const linyaps_box::container &container)
+        : container(container)
+        , root(linyaps_box::utils::open_at(bundle, container.get_config().root.path, O_PATH))
     {
+    }
+
+    void do_mounts()
+    {
+        for (const auto &mount : container.get_config().mounts) {
+            this->mount(mount);
+        }
     }
 
     void mount(const linyaps_box::config::mount_t &mount)
     {
-        auto delay_mount = do_mount(root, mount);
+        if ((mount.extra_flags & linyaps_box::config::mount_t::COPY_SYMLINK) != 0) {
+            auto ret = create_destination_symlink(root,
+                                                  mount.source.value(),
+                                                  mount.destination.value());
+            return;
+        }
+
+        auto delay_mount = do_mount(container, root, mount);
         if (!delay_mount.has_value()) {
             return;
         }
@@ -537,20 +625,23 @@ public:
         this->configure_default_filesystems();
         this->configure_default_devices();
         for (const auto &remount : remounts) {
-            do_delay_readonly_mount(remount);
+            do_remount(remount);
         }
     }
 
 private:
+    const linyaps_box::container &container;
     linyaps_box::utils::file_descriptor root;
-    std::vector<delay_readonly_mount_t> remounts;
+    std::vector<remount_t> remounts;
 
     // https://github.com/opencontainers/runtime-spec/blob/09fcb39bb7185b46dfb206bc8f3fea914c674779/config-linux.md#default-filesystems
     void configure_default_filesystems()
     {
         do {
             auto proc = linyaps_box::utils::open_at(root, "proc");
+
             struct statfs buf{};
+
             int ret = ::statfs(proc.proc_path().c_str(), &buf);
             if (ret != 0) {
                 throw std::system_error(errno, std::generic_category(), "statfs");
@@ -569,7 +660,9 @@ private:
 
         do {
             auto sys = linyaps_box::utils::open_at(root, "sys");
+
             struct statfs buf{};
+
             if (::statfs(sys.proc_path().c_str(), &buf) != 0) {
                 throw std::system_error(errno, std::generic_category(), "statfs");
             }
@@ -601,7 +694,9 @@ private:
 
         do {
             auto dev = linyaps_box::utils::open_at(root, "dev");
+
             struct statfs buf{};
+
             int ret = ::statfs(dev.proc_path().c_str(), &buf);
             if (ret != 0) {
                 throw std::system_error(errno, std::generic_category(), "statfs");
@@ -729,18 +824,14 @@ void configure_mounts(const linyaps_box::container &container)
 
     {
         auto bundle = linyaps_box::utils::open(container.get_bundle(), O_PATH);
-        m = std::make_unique<mounter>(
-                linyaps_box::utils::open_at(bundle, container.get_config().root.path, O_PATH));
+        m = std::make_unique<mounter>(bundle, container);
     }
 
     // TODO: if root is read only, add it to remount list
 
     LINYAPS_BOX_DEBUG() << "Processing mount points";
 
-    for (const auto &mount : container.get_config().mounts) {
-        m->mount(mount);
-    }
-
+    m->do_mounts();
     m->finalize();
 
     LINYAPS_BOX_DEBUG() << "Mounts configured";
@@ -1290,6 +1381,7 @@ void configure_container_namespaces(const linyaps_box::container &container,
 
         auto pid = container.status().PID;
 
+        // TODO: if not mapping a range of uid/gid, we could set uid/gid in the container process
         configure_gid_mapping(pid, config.gid_mappings);
         configure_uid_mapping(pid, config.uid_mappings);
     }
