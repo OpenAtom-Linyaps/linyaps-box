@@ -6,6 +6,8 @@
 
 #include "linyaps_box/utils/file_describer.h"
 
+#include <sys/statfs.h>
+
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -28,6 +30,17 @@ inline struct stat lstat(const file_descriptor &fd)
     auto ret = ::fstatat(fd.get(), "", &statbuf, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
     if (ret == -1) {
         throw std::system_error(errno, std::generic_category(), "fstatat");
+    }
+
+    return statbuf;
+}
+
+inline struct statfs statfs(const file_descriptor &fd)
+{
+    struct statfs statbuf{};
+    auto ret = ::statfs(fd.proc_path().c_str(), &statbuf);
+    if (ret == -1) {
+        throw std::system_error(errno, std::generic_category(), "statfs");
     }
 
     return statbuf;
