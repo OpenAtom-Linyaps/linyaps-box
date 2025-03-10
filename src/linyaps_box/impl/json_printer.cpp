@@ -33,7 +33,7 @@ nlohmann::json status_to_json(const linyaps_box::container_status_t &status)
             { "status", status_to_string(status.status) },
             { "bundle", status.bundle.string() },
             { "created", status.created },
-            { "owner", status.owner },
+            { "owner", std::to_string(status.owner) },
             { "annotations", status.annotations },
     });
 }
