@@ -4,6 +4,7 @@
 
 #include "linyaps_box/container.h"
 
+#include "linyaps_box/configuration.h"
 #include "linyaps_box/impl/disabled_cgroup_manager.h"
 #include "linyaps_box/utils/cgroups.h"
 #include "linyaps_box/utils/file_describer.h"
@@ -33,6 +34,7 @@
 
 #include <dirent.h>
 #include <grp.h>
+#include <pwd.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
@@ -1547,14 +1549,22 @@ linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
     LINYAPS_BOX_DEBUG() << "load config from " << config;
     this->config = linyaps_box::config::parse(ifs);
 
+    auto *pw = getpwuid(geteuid());
+    if (pw == nullptr) {
+        throw std::system_error(errno, std::generic_category(), "getpwuid");
+    }
+
     {
         container_status_t status;
+        status.oci_version = oci_version;
         status.ID = id;
         status.PID = getpid();
         status.status = container_status_t::runtime_status::CREATING;
         status.bundle = bundle;
-        status.created = ""; // FIXME
-        status.owner = getuid();
+        status.created = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                                std::chrono::system_clock::now().time_since_epoch())
+                                                .count());
+        status.owner = pw->pw_name;
         this->status_dir().write(status);
     }
 
@@ -1603,6 +1613,15 @@ int linyaps_box::container::run(const config::process_t &process)
         runtime_ns::create_runtime_hooks(*this, socket);
         runtime_ns::wait_create_container_result(*this, socket);
         runtime_ns::wait_socket_close(socket);
+
+        {
+            auto status = this->status();
+            assert(status.status == container_status_t::runtime_status::CREATED);
+            status.PID = child_pid;
+            status.status = container_status_t::runtime_status::RUNNING;
+            this->status_dir().write(status);
+        }
+
         runtime_ns::poststart_hooks(*this);
 
         // TODO: support detach from the parent's process

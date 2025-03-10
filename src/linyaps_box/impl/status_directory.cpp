@@ -4,6 +4,7 @@
 
 #include "linyaps_box/impl/status_directory.h"
 
+#include "linyaps_box/container_status.h"
 #include "linyaps_box/utils/atomic_write.h"
 #include "linyaps_box/utils/log.h"
 #include "nlohmann/json.hpp"
@@ -29,9 +30,10 @@ linyaps_box::container_status_t read_status(const std::filesystem::path &path)
     }
     linyaps_box::container_status_t ret{};
 
+    ret.oci_version = j["ociVersion"];
     ret.PID = j["pid"];
     ret.ID = j["id"];
-    ret.status = j["status"];
+    ret.status = linyaps_box::from_string(j["status"].get<std::string>());
     if (kill(ret.PID, 0) != 0) {
         ret.status = linyaps_box::container_status_t::runtime_status::STOPPED;
     }
@@ -47,15 +49,14 @@ linyaps_box::container_status_t read_status(const std::filesystem::path &path)
 
 void linyaps_box::impl::status_directory::write(const container_status_t &status)
 {
-    nlohmann::json j = nlohmann::json::object({
-            { "id", status.ID },
-            { "pid", status.PID },
-            { "status", status.status },
-            { "bundle", status.bundle },
-            { "created", status.created },
-            { "owner", status.owner },
-            { "annotations", status.annotations },
-    });
+    nlohmann::json j = nlohmann::json::object({ { "id", status.ID },
+                                                { "pid", status.PID },
+                                                { "status", to_string(status.status) },
+                                                { "bundle", status.bundle },
+                                                { "created", status.created },
+                                                { "owner", status.owner },
+                                                { "annotations", status.annotations },
+                                                { "ociVersion", status.oci_version } });
 
     utils::atomic_write(this->path / (status.ID + ".json"), j.dump());
 }

@@ -45,6 +45,7 @@ void linyaps_box::impl::table_printer::print_statuses(const std::vector<containe
 
 void linyaps_box::impl::table_printer::print_status(const container_status_t &status)
 {
+    std::cout << "ociVersion\t" << status.oci_version << '\n';
     std::cout << "ID\t" << status.ID << '\n';
     std::cout << "PID\t" << status.PID << '\n';
     std::cout << "status\t" << get_status_string(status.status) << '\n';
