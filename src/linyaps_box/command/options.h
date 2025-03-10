@@ -74,7 +74,7 @@ struct kill_options
 
     const global_options &global;
     std::string container;
-    int signal{ -1 };
+    std::string signal;
 };
 
 struct options

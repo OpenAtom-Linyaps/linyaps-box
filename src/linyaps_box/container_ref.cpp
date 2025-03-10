@@ -4,6 +4,8 @@
 
 #include "linyaps_box/container_ref.h"
 
+#include "linyaps_box/utils/log.h"
+
 #include <csignal>
 #include <utility>
 
@@ -23,6 +25,7 @@ void linyaps_box::container_ref::kill(int signal) const
 {
     auto pid = this->status().PID;
 
+    LINYAPS_BOX_DEBUG() << "kill process " << pid << " with signal " << signal;
     if (::kill(pid, signal) == 0) {
         return;
     }

@@ -69,15 +69,8 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
 
     auto *cmd_kill =
             app.add_subcommand("kill", "Send the specified signal to the container init process");
-    cmd_kill->add_option("--signal", options.kill.signal)
-            ->type_name("SIGNAL")
-            ->default_val(SIGTERM)
-            ->default_str("TERM")
-            ->transform(CLI::CheckedTransformer(std::unordered_map<std::string_view, int>{
-                    { "TERM", SIGTERM },
-                    { "STOP", SIGSTOP },
-            }));
     cmd_kill->add_option("CONTAINER", options.kill.container, "The container ID")->required();
+    cmd_kill->add_option("SIGNAL", options.kill.signal, "Signal to send")->default_val("SIGTERM");
 
     try {
         app.parse(argc, argv);

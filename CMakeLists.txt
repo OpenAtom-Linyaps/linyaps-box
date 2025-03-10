@@ -152,6 +152,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/mknod.h
     src/linyaps_box/utils/open_file.cpp
     src/linyaps_box/utils/open_file.h
+    src/linyaps_box/utils/platform.cpp
+    src/linyaps_box/utils/platform.h
     src/linyaps_box/utils/semver.cpp
     src/linyaps_box/utils/semver.h
     src/linyaps_box/utils/socketpair.cpp
