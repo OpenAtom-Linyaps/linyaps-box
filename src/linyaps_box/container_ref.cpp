@@ -47,21 +47,32 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
         "--user",
         "--mount",
         "--pid",
-
         // FIXME:
         // Old nsenter command do not support --wdns,
         // so we have to implement nsenter by ourself in the future.
         "--wdns",
         wd.c_str(),
-
         "--preserve-credentials",
-        "--",
     };
 
     for (const auto &arg : process.args) {
         argv.push_back(arg.c_str());
     }
     argv.push_back(nullptr);
+
+    LINYAPS_BOX_DEBUG() << [&argv]() {
+        auto result = std::accumulate(argv.cbegin(),
+                                      argv.cend() - 1,
+                                      std::string{ "args:[" },
+                                      [](std::string init, const std::string &val) {
+                                          init += val;
+                                          init.push_back(' ');
+                                          return init;
+                                      });
+        result.push_back(']');
+        result.insert(0, "execvp nsenter with arguments: ");
+        return result;
+    }();
 
     // FIXME:
     // We only handle the command arguments for now

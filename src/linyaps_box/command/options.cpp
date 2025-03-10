@@ -56,7 +56,8 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     cmd_run->add_option("-f,--config", options.run.config, "Override the configuration file to use")
             ->default_val("config.json");
 
-    auto *cmd_exec = app.add_subcommand("exec", "Exec a command in a running container");
+    auto *cmd_exec = app.add_subcommand("exec", "Exec a command in a running container")
+                             ->positionals_at_end();
     cmd_exec->add_option("-u,--user",
                          options.exec.user,
                          "Specify the user, "

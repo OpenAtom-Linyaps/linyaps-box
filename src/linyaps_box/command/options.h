@@ -47,7 +47,7 @@ struct exec_options
 
     const global_options &global;
     std::string user;
-    std::string cwd;
+    std::optional<std::string> cwd;
     std::string ID;
     std::vector<std::string> command;
 };

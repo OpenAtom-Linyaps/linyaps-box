@@ -21,9 +21,11 @@ void linyaps_box::command::exec(const struct exec_options &options)
     }
 
     config::process_t proc;
-    proc.cwd = options.cwd;
+    proc.cwd = options.cwd.value_or("/");
     proc.args = options.command;
-    // TODO: impl
+    proc.terminal = isatty(STDIN_FILENO) == 1 && isatty(STDOUT_FILENO) == 1;
+
+    // TODO: support exec fully
 
     container->second.exec(proc);
 }
