@@ -84,7 +84,7 @@ set(linyaps-box_DEFAULT_LOG_LEVEL
 )
 
 set(linyaps-box_ACTIVE_LOG_LEVEL
-    LOG_DEBUG
+    LOG_WARNING
     CACHE
       STRING
       "The active syslog priority. This is used to filter log messages at compile time."

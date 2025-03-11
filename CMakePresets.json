@@ -1,207 +1,207 @@
 {
-        "version": 6,
-        "cmakeMinimumRequired": {
-                "major": 3,
-                "minor": 25,
-                "patch": 0
-        },
-        "configurePresets": [
-                {
-                        "name": "dev",
-                        "displayName": "The developer profile",
-                        "description": "The default configuration for developers",
-                        "binaryDir": "${sourceDir}/build",
-                        "cacheVariables": {
-                                "CMAKE_BUILD_TYPE": "Debug",
-                                "CMAKE_COLOR_DIAGNOSTICS": true,
-                                "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -O0 -g -gdwarf64 -ggdb3 -fsanitize=address,undefined $env{CXXFLAGS}",
-                                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-                                "linyaps-box_ENABLE_COVERAGE": true,
-                                "linyaps-box_ENABLE_CPACK": true,
-                                "linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": "",
-                                "linyaps-box_ENABLE_SMOKE_TESTS": true,
-                                "linyaps-box_DEFAULT_LOG_LEVEL": "7",
-                                "linyaps-box_ACTIVE_LOG_LEVEL": "7"
-                        }
-                },
-                {
-                        "name": "release",
-                        "displayName": "The release profile",
-                        "description": "The default configuration for release",
-                        "binaryDir": "${sourceDir}/build-release",
-                        "cacheVariables": {
-                                "CMAKE_BUILD_TYPE": "RelWithDbgInfo",
-                                "CMAKE_COLOR_DIAGNOSTICS": true,
-                                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-                                "linyaps-box_ENABLE_CPACK": "ON"
-                        }
-                },
-                {
-                        "name": "static",
-                        "displayName": "The static build profile",
-                        "description": "The default configuration for produce static binary",
-                        "binaryDir": "${sourceDir}/build-static",
-                        "cacheVariables": {
-                                "CMAKE_BUILD_TYPE": "RelWithDbgInfo",
-                                "CMAKE_COLOR_DIAGNOSTICS": true,
-                                "CMAKE_CXX_FLAGS": "-fno-asynchronous-unwind-tables -fdata-sections -ffunction-sections -flto=auto $env{CXXFLAGS}",
-                                "CMAKE_EXE_LINKER_FLAGS_INIT": "-Wl,--gc-sections,--strip-all,--exclude-libs,ALL -flto=auto",
-                                "linyaps-box_STATIC": true
-                        }
-                },
-                {
-                        "name": "ci",
-                        "displayName": "The CI profile",
-                        "description": "The default configuration for CI",
-                        "binaryDir": "${sourceDir}/build-ci",
-                        "cacheVariables": {
-                                "CMAKE_COLOR_DIAGNOSTICS": true,
-                                "CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined $env{CXXFLAGS}",
-                                "linyaps-box_ENABLE_COVERAGE": true,
-                                "linyaps-box_ENABLE_SMOKE_TESTS": true
-                        }
-                }
-        ],
-        "buildPresets": [
-                {
-                        "name": "dev",
-                        "configurePreset": "dev"
-                },
-                {
-                        "name": "release",
-                        "configurePreset": "release"
-                },
-                {
-                        "name": "ci",
-                        "configurePreset": "ci"
-                },
-                {
-                        "name": "static",
-                        "configurePreset": "static"
-                }
-        ],
-        "testPresets": [
-                {
-                        "name": "dev",
-                        "configurePreset": "dev",
-                        "output": {
-                                "outputOnFailure": true
-                        },
-                        "execution": {
-                                "noTestsAction": "default",
-                                "stopOnFailure": true
-                        }
-                },
-                {
-                        "name": "release",
-                        "configurePreset": "release",
-                        "output": {
-                                "outputOnFailure": true
-                        },
-                        "execution": {
-                                "noTestsAction": "default",
-                                "stopOnFailure": true
-                        }
-                },
-                {
-                        "name": "ci",
-                        "configurePreset": "ci",
-                        "output": {
-                                "verbosity": "verbose"
-                        },
-                        "execution": {
-                                "noTestsAction": "default",
-                                "stopOnFailure": false
-                        }
-                },
-                {
-                        "name": "static",
-                        "configurePreset": "static",
-                        "output": {
-                                "verbosity": "verbose"
-                        },
-                        "execution": {
-                                "noTestsAction": "default",
-                                "stopOnFailure": true
-                        }
-                }
-        ],
-        "workflowPresets": [
-                {
-                        "name": "dev",
-                        "displayName": "The default workflow for developers",
-                        "description": "Configure, build then test with dev profile",
-                        "steps": [
-                                {
-                                        "type": "configure",
-                                        "name": "dev"
-                                },
-                                {
-                                        "type": "build",
-                                        "name": "dev"
-                                },
-                                {
-                                        "type": "test",
-                                        "name": "dev"
-                                }
-                        ]
-                },
-                {
-                        "name": "release",
-                        "displayName": "The default workflow for release",
-                        "description": "Configure, build then test with release profile",
-                        "steps": [
-                                {
-                                        "type": "configure",
-                                        "name": "release"
-                                },
-                                {
-                                        "type": "build",
-                                        "name": "release"
-                                },
-                                {
-                                        "type": "test",
-                                        "name": "release"
-                                }
-                        ]
-                },
-                {
-                        "name": "ci",
-                        "displayName": "The default workflow for CI",
-                        "description": "Configure, build then test with CI profile",
-                        "steps": [
-                                {
-                                        "type": "configure",
-                                        "name": "ci"
-                                },
-                                {
-                                        "type": "build",
-                                        "name": "ci"
-                                },
-                                {
-                                        "type": "test",
-                                        "name": "ci"
-                                }
-                        ]
-                },
-                {
-                        "name": "static",
-                        "displayName": "The default workflow for static build",
-                        "description": "Configure, build then test with static profile",
-                        "steps": [
-                                {
-                                        "type": "configure",
-                                        "name": "static"
-                                },
-                                {
-                                        "type": "build",
-                                        "name": "static"
-                                },
-                                {
-                                        "type": "test",
-                                        "name": "static"
-                                }
-                        ]
-                }
-        ]
+	"version": 6,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 25,
+		"patch": 0
+	},
+	"configurePresets": [
+		{
+			"name": "dev",
+			"displayName": "The developer profile",
+			"description": "The default configuration for developers",
+			"binaryDir": "${sourceDir}/build-dev",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_COLOR_DIAGNOSTICS": true,
+				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -O0 -g -gdwarf64 -ggdb3 -fsanitize=address,undefined $env{CXXFLAGS}",
+				"CMAKE_EXPORT_COMPILE_COMMANDS": true,
+				"linyaps-box_ENABLE_COVERAGE": true,
+				"linyaps-box_ENABLE_CPACK": true,
+				"linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": "",
+				"linyaps-box_ENABLE_SMOKE_TESTS": true,
+				"linyaps-box_DEFAULT_LOG_LEVEL": "7",
+				"linyaps-box_ACTIVE_LOG_LEVEL": "7"
+			}
+		},
+		{
+			"name": "release",
+			"displayName": "The release profile",
+			"description": "The default configuration for release",
+			"binaryDir": "${sourceDir}/build-release",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDbgInfo",
+				"CMAKE_COLOR_DIAGNOSTICS": true,
+				"CMAKE_EXPORT_COMPILE_COMMANDS": true,
+				"linyaps-box_ENABLE_CPACK": "ON"
+			}
+		},
+		{
+			"name": "static",
+			"displayName": "The static build profile",
+			"description": "The default configuration for produce static binary",
+			"binaryDir": "${sourceDir}/build-static",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDbgInfo",
+				"CMAKE_COLOR_DIAGNOSTICS": true,
+				"CMAKE_CXX_FLAGS": "-fno-asynchronous-unwind-tables -fdata-sections -ffunction-sections -flto=auto $env{CXXFLAGS}",
+				"CMAKE_EXE_LINKER_FLAGS_INIT": "-Wl,--gc-sections,--strip-all,--exclude-libs,ALL -flto=auto",
+				"linyaps-box_STATIC": true
+			}
+		},
+		{
+			"name": "ci",
+			"displayName": "The CI profile",
+			"description": "The default configuration for CI",
+			"binaryDir": "${sourceDir}/build-ci",
+			"cacheVariables": {
+				"CMAKE_COLOR_DIAGNOSTICS": true,
+				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined $env{CXXFLAGS}",
+				"linyaps-box_ENABLE_COVERAGE": true,
+				"linyaps-box_ENABLE_SMOKE_TESTS": true
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "dev",
+			"configurePreset": "dev"
+		},
+		{
+			"name": "release",
+			"configurePreset": "release"
+		},
+		{
+			"name": "ci",
+			"configurePreset": "ci"
+		},
+		{
+			"name": "static",
+			"configurePreset": "static"
+		}
+	],
+	"testPresets": [
+		{
+			"name": "dev",
+			"configurePreset": "dev",
+			"output": {
+				"outputOnFailure": true
+			},
+			"execution": {
+				"noTestsAction": "default",
+				"stopOnFailure": true
+			}
+		},
+		{
+			"name": "release",
+			"configurePreset": "release",
+			"output": {
+				"outputOnFailure": true
+			},
+			"execution": {
+				"noTestsAction": "default",
+				"stopOnFailure": true
+			}
+		},
+		{
+			"name": "ci",
+			"configurePreset": "ci",
+			"output": {
+				"verbosity": "verbose"
+			},
+			"execution": {
+				"noTestsAction": "default",
+				"stopOnFailure": false
+			}
+		},
+		{
+			"name": "static",
+			"configurePreset": "static",
+			"output": {
+				"verbosity": "verbose"
+			},
+			"execution": {
+				"noTestsAction": "default",
+				"stopOnFailure": true
+			}
+		}
+	],
+	"workflowPresets": [
+		{
+			"name": "dev",
+			"displayName": "The default workflow for developers",
+			"description": "Configure, build then test with dev profile",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "dev"
+				},
+				{
+					"type": "build",
+					"name": "dev"
+				},
+				{
+					"type": "test",
+					"name": "dev"
+				}
+			]
+		},
+		{
+			"name": "release",
+			"displayName": "The default workflow for release",
+			"description": "Configure, build then test with release profile",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "release"
+				},
+				{
+					"type": "build",
+					"name": "release"
+				},
+				{
+					"type": "test",
+					"name": "release"
+				}
+			]
+		},
+		{
+			"name": "ci",
+			"displayName": "The default workflow for CI",
+			"description": "Configure, build then test with CI profile",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "ci"
+				},
+				{
+					"type": "build",
+					"name": "ci"
+				},
+				{
+					"type": "test",
+					"name": "ci"
+				}
+			]
+		},
+		{
+			"name": "static",
+			"displayName": "The default workflow for static build",
+			"description": "Configure, build then test with static profile",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "static"
+				},
+				{
+					"type": "build",
+					"name": "static"
+				},
+				{
+					"type": "test",
+					"name": "static"
+				}
+			]
+		}
+	]
 }
