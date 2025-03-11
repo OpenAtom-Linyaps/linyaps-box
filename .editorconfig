@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: None
+#
+# SPDX-License-Identifier: CC0-1.0
+
+[*.json]
+indent_style = tab
+indent_size = 2
+trim_trailing_whitespace = true
+charset = utf-8

@@ -66,47 +66,63 @@ extern template class Logger<LOG_DEBUG>;
 #if LINYAPS_BOX_ACTIVE_LOG_LEVEL >= LOG_EMERG
 #define LINYAPS_BOX_EMERG() LINYAPS_BOX_LOG(LOG_EMERG)
 #else
-#define LINYAPS_BOX_EMERG() if constexpr (false)
+#define LINYAPS_BOX_EMERG() \
+    if constexpr (false)    \
+        std::stringstream { }
 #endif
 
 #if LINYAPS_BOX_ACTIVE_LOG_LEVEL >= LOG_ALERT
 #define LINYAPS_BOX_ALERT() LINYAPS_BOX_LOG(LOG_ALERT)
 #else
-#define LINYAPS_BOX_ALERT() if constexpr (false)
+#define LINYAPS_BOX_ALERT() \
+    if constexpr (false)    \
+        std::stringstream { }
 #endif
 
 #if LINYAPS_BOX_ACTIVE_LOG_LEVEL >= LOG_CRIT
 #define LINYAPS_BOX_CRIT() LINYAPS_BOX_LOG(LOG_CRIT)
 #else
-#define LINYAPS_BOX_CRIT() if constexpr (false)
+#define LINYAPS_BOX_CRIT() \
+    if constexpr (false)   \
+        std::stringstream { }
 #endif
 
 #if LINYAPS_BOX_ACTIVE_LOG_LEVEL >= LOG_ERR
 #define LINYAPS_BOX_ERR() LINYAPS_BOX_LOG(LOG_ERR)
 #else
-#define LINYAPS_BOX_ERR() if constexpr (false)
+#define LINYAPS_BOX_ERR() \
+    if constexpr (false)  \
+        std::stringstream { }
 #endif
 
 #if LINYAPS_BOX_ACTIVE_LOG_LEVEL >= LOG_WARNING
 #define LINYAPS_BOX_WARNING() LINYAPS_BOX_LOG(LOG_WARNING)
 #else
-#define LINYAPS_BOX_WARNING() if constexpr (false)
+#define LINYAPS_BOX_WARNING() \
+    if constexpr (false)      \
+        std::stringstream { }
 #endif
 
 #if LINYAPS_BOX_ACTIVE_LOG_LEVEL >= LOG_NOTICE
 #define LINYAPS_BOX_NOTICE() LINYAPS_BOX_LOG(LOG_NOTICE)
 #else
-#define LINYAPS_BOX_NOTICE() if constexpr (false)
+#define LINYAPS_BOX_NOTICE() \
+    if constexpr (false)     \
+        std::stringstream { }
 #endif
 
 #if LINYAPS_BOX_ACTIVE_LOG_LEVEL >= LOG_INFO
 #define LINYAPS_BOX_INFO() LINYAPS_BOX_LOG(LOG_INFO)
 #else
-#define LINYAPS_BOX_INFO() if constexpr (false)
+#define LINYAPS_BOX_INFO() \
+    if constexpr (false)   \
+        std::stringstream { }
 #endif
 
 #if LINYAPS_BOX_ACTIVE_LOG_LEVEL >= LOG_DEBUG
 #define LINYAPS_BOX_DEBUG() LINYAPS_BOX_LOG(LOG_DEBUG)
 #else
-#define LINYAPS_BOX_DEBUG() if constexpr (false)
+#define LINYAPS_BOX_DEBUG() \
+    if constexpr (false)    \
+        std::stringstream { }
 #endif
