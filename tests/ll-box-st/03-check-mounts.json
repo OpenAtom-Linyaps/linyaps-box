@@ -1,12 +1,12 @@
 {
-	"name": "Check procfs with `ubuntu:latest`",
-	"image": "docker.io/library/ubuntu:latest",
+	"name": "Check necessary mounts with `linyaps-box-st:stable-slim`",
+	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
 	"process": {
 		"user": {
 			"uid": 0,
 			"gid": 0
 		},
-		"args": ["ps", "a", "-o", "cmd", "--no-headers"],
+		"args": ["/bin/env", "sh", "-c", "mount | grep /proc -q"],
 		"env": [
 			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 			"TERM=xterm",
@@ -29,5 +29,5 @@
 		],
 		"noNewPrivileges": true
 	},
-	"expected": "ps a -o cmd --no-headers"
+	"expected": ""
 }

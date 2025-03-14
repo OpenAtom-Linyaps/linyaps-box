@@ -1,12 +1,12 @@
 {
-	"name": "Execute `whoami` with `debian:latest`",
-	"image": "docker.io/library/debian:latest",
+	"name": "Check procfs with `linyaps-box-st:stable-slim`",
+	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
 	"process": {
 		"user": {
 			"uid": 0,
 			"gid": 0
 		},
-		"args": ["/bin/whoami"],
+		"args": ["ps", "a", "-o", "cmd", "--no-headers"],
 		"env": [
 			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 			"TERM=xterm",
@@ -29,5 +29,5 @@
 		],
 		"noNewPrivileges": true
 	},
-	"expected": "root"
+	"expected": "ps a -o cmd --no-headers"
 }

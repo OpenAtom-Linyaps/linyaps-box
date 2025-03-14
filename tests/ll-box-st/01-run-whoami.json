@@ -1,12 +1,12 @@
 {
-	"name": "Check necessary mounts with `debian:latest`",
-	"image": "docker.io/library/debian:latest",
+	"name": "Execute `whoami` with `linyaps-box-st:stable-slim`",
+	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
 	"process": {
 		"user": {
 			"uid": 0,
 			"gid": 0
 		},
-		"args": ["/bin/env", "sh", "-c", "mount | grep /proc -q"],
+		"args": ["/bin/whoami"],
 		"env": [
 			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 			"TERM=xterm",
@@ -29,5 +29,5 @@
 		],
 		"noNewPrivileges": true
 	},
-	"expected": ""
+	"expected": "root"
 }

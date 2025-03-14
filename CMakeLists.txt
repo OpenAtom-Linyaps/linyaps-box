@@ -327,10 +327,10 @@ function(setup_linyaps_box_smoke_tests)
   endif()
 
   set(linyaps-box_SMOKE_TESTS
-      ./tests/ll-box-st/01-run-whoami-with-debian-latest.json
-      ./tests/ll-box-st/02-check-procfs-with-ubuntu-latest.json
-      ./tests/ll-box-st/03-check-mounts-with-debian-latest.json
-      ./tests/ll-box-st/04-check-noNewPrivs-with-debian-latest.json)
+      ./tests/ll-box-st/01-run-whoami.json
+      ./tests/ll-box-st/02-check-procfs.json
+      ./tests/ll-box-st/03-check-mounts.json
+      ./tests/ll-box-st/04-check-noNewPrivs.json)
 
   foreach(test ${linyaps-box_SMOKE_TESTS})
     add_test(
