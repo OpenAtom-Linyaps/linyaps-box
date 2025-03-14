@@ -19,6 +19,7 @@
 
 #include <linux/magic.h>
 #include <sys/mount.h>
+#include <sys/prctl.h>
 #include <sys/statfs.h>
 #include <sys/syscall.h> /* Definition of SYS_* constants */
 #include <sys/sysmacros.h>
@@ -40,6 +41,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifdef LINYAPS_BOX_ENABLE_CAP
+#include <sys/capability.h>
+#endif
+
 namespace {
 
 enum class sync_message : std::uint8_t {
@@ -49,6 +54,11 @@ enum class sync_message : std::uint8_t {
     CREATE_RUNTIME_HOOKS_EXECUTED,
     CREATE_CONTAINER_HOOKS_EXECUTED,
     START_CONTAINER_HOOKS_EXECUTED,
+};
+
+struct security_status
+{
+    int cap{ -1 };
 };
 
 std::stringstream &&operator<<(std::stringstream &&os, sync_message message)
@@ -999,6 +1009,127 @@ void do_pivot_root(const linyaps_box::container &container)
     }
 }
 
+security_status get_runtime_security_status()
+{
+    // TODO: selinux/apparmor
+    auto cap = cap_max_bits();
+    return { cap };
+}
+
+void set_capabilities(const linyaps_box::container &container, int last_cap)
+{
+    if constexpr (LINYAPS_BOX_ENABLE_CAP) {
+        LINYAPS_BOX_DEBUG() << "Set capabilities";
+        const auto &capabilities = container.get_config().process.capabilities;
+
+        if (last_cap <= 0) {
+            throw std::runtime_error("kernel does not support capabilities");
+        }
+
+        const auto &bounding_set = capabilities.bounding;
+        for (int cap = 0; cap < last_cap; ++cap) {
+            if (std::find_if(bounding_set.cbegin(),
+                             bounding_set.cend(),
+                             [cap](int c) {
+                                 return c == cap;
+                             })
+                == bounding_set.cend()) {
+                if (cap_drop_bound(cap) < 0) {
+                    throw std::system_error(errno, std::generic_category(), "cap_drop_bound");
+                }
+            }
+        }
+
+        std::unique_ptr<_cap_struct, decltype(&cap_free)> caps(cap_init(), cap_free);
+        int ret{ -1 };
+        const auto &effective_set = capabilities.effective;
+        if (!effective_set.empty()) {
+            ret = cap_set_flag(caps.get(),
+                               CAP_EFFECTIVE,
+                               capabilities.effective.size(),
+                               capabilities.effective.data(),
+                               CAP_SET);
+            if (ret < 0) {
+                throw std::system_error(errno,
+                                        std::generic_category(),
+                                        "failed to set effective capabilities");
+            }
+        }
+
+        const auto &permitted_set = capabilities.permitted;
+        if (!permitted_set.empty()) {
+            ret = cap_set_flag(caps.get(),
+                               CAP_PERMITTED,
+                               capabilities.permitted.size(),
+                               capabilities.permitted.data(),
+                               CAP_SET);
+            if (ret < 0) {
+                throw std::system_error(errno,
+                                        std::generic_category(),
+                                        "failed to set permitted capabilities");
+            }
+        }
+
+        const auto &inheritable_set = capabilities.inheritable;
+        if (!inheritable_set.empty()) {
+            ret = cap_set_flag(caps.get(),
+                               CAP_INHERITABLE,
+                               capabilities.inheritable.size(),
+                               capabilities.inheritable.data(),
+                               CAP_SET);
+            if (ret < 0) {
+                throw std::system_error(errno,
+                                        std::generic_category(),
+                                        "failed to set inheritable capabilities");
+            }
+        }
+
+        // keep current capabilities, we need these caps on later
+        ret = prctl(PR_SET_KEEPCAPS, 1);
+        if (ret < 0) {
+            throw std::system_error(errno, std::generic_category(), "keep current capabilities");
+        }
+
+        const auto &process = container.get_config().process;
+        ret = setresuid(process.uid, process.uid, process.uid);
+        if (ret < 0) {
+            throw std::system_error(errno, std::generic_category(), "setresuid");
+        }
+
+        ret = setresgid(process.gid, process.gid, process.gid);
+        if (ret < 0) {
+            throw std::system_error(errno, std::generic_category(), "setresgid");
+        }
+
+        ret = cap_set_proc(caps.get());
+        if (ret < 0) {
+            throw std::system_error(errno, std::generic_category(), "cap_set_proc");
+        }
+
+        if (CAP_AMBIENT_SUPPORTED()) {
+            ret = cap_reset_ambient();
+            if (ret < 0) {
+                throw std::system_error(errno, std::generic_category(), "cap_reset_ambient");
+            }
+
+            std::for_each(capabilities.ambient.cend(),
+                          capabilities.ambient.cend(),
+                          [](cap_value_t cap) {
+                              cap_set_ambient(cap, CAP_SET);
+                          });
+        } else {
+            LINYAPS_BOX_INFO() << "Kernel does not support ambient capabilities, ignoring.";
+        }
+    }
+
+    if (container.get_config().process.no_new_privileges) {
+        LINYAPS_BOX_DEBUG() << "Set no new privileges";
+        if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0) {
+            throw std::system_error(errno, std::generic_category(), "prctl");
+        }
+    }
+}
+
 void start_container_hooks(const linyaps_box::container &container,
                            linyaps_box::utils::file_descriptor &socket)
 {
@@ -1084,10 +1215,12 @@ try {
     auto &socket = args.socket;
 
     configure_container_namespaces(socket);
+    auto [runtime_cap] = get_runtime_security_status(); // get runtime status before pivot root
     configure_mounts(container);
     wait_create_runtime_result(container, socket);
     create_container_hooks(container, socket);
     do_pivot_root(container);
+    set_capabilities(container, runtime_cap);
     start_container_hooks(container, socket);
     execute_process(process);
 } catch (const std::exception &e) {

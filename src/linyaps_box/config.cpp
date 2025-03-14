@@ -4,6 +4,7 @@
 
 #include "linyaps_box/config.h"
 
+#include "linyaps_box/configuration.h"
 #include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/semver.h"
 #include "nlohmann/json.hpp"
@@ -97,12 +98,49 @@ parse_mount_options(const std::vector<std::string> &options)
     return { flags, propagation_flags, extra_flags, str };
 }
 
+linyaps_box::config::process_t::capabilities_t
+parse_capability(const nlohmann::json &obj, const nlohmann::json::json_pointer &ptr)
+{
+    if constexpr (LINYAPS_BOX_ENABLE_CAP) {
+        auto parse_cap_set = [&obj, &ptr](const char *set_name) {
+            const auto set = ptr / set_name;
+            std::vector<cap_value_t> cap_list;
+            if (!obj.contains(set)) {
+                return cap_list;
+            }
+
+            const auto vec = obj[set].get<std::vector<std::string>>();
+            std::for_each(vec.cbegin(), vec.cend(), [&cap_list](const std::string &cap) {
+                cap_value_t val{ 0 };
+                if (cap_from_name(cap.c_str(), &val) < 0) {
+                    throw std::runtime_error("unknown capability: " + cap);
+                }
+
+                cap_list.push_back(val);
+            });
+
+            return cap_list;
+        };
+
+        linyaps_box::config::process_t::capabilities_t cap{};
+        cap.effective = parse_cap_set("effective");
+        cap.ambient = parse_cap_set("ambient");
+        cap.bounding = parse_cap_set("bounding");
+        cap.inheritable = parse_cap_set("inheritable");
+        cap.permitted = parse_cap_set("permitted");
+
+        return cap;
+    } else {
+        return {};
+    }
+}
+
 linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 {
     static const auto ptr = ""_json_pointer;
 
     auto semver = linyaps_box::utils::semver(j[ptr / "ociVersion"].get<std::string>());
-    if (!linyaps_box::utils::semver("1.2.0").is_compatible_with(semver)) {
+    if (!linyaps_box::utils::semver(oci_version).is_compatible_with(semver)) {
         throw std::runtime_error("unsupported OCI version: " + semver.to_string());
     }
 
@@ -138,6 +176,10 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 
         // TODO: apparmorProfile
 
+        if (auto cap = ptr / "process" / "capabilities"; j.contains(cap)) {
+            cfg.process.capabilities = parse_capability(j, cap);
+        }
+
         if (j.contains(ptr / "process" / "noNewPrivileges")) {
             cfg.process.no_new_privileges = j[ptr / "process" / "noNewPrivileges"].get<bool>();
         }
@@ -148,9 +190,11 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 
         cfg.process.uid = j[ptr / "process" / "user" / "uid"].get<uid_t>();
         cfg.process.gid = j[ptr / "process" / "user" / "gid"].get<gid_t>();
+
         if (j.contains(ptr / "process" / "user" / "umask")) {
             cfg.process.umask = j[ptr / "process" / "user" / "umask"].get<mode_t>();
         }
+
         if (j.contains(ptr / "process" / "user" / "additionalGids")) {
             cfg.process.additional_gids =
                     j[ptr / "process" / "user" / "additionalGids"].get<std::vector<gid_t>>();
@@ -196,7 +240,7 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
     if (j.contains(ptr / "linux" / "uidMappings")) {
         std::vector<linyaps_box::config::id_mapping_t> uid_mappings;
         for (const auto &m : j[ptr / "linux" / "uidMappings"]) {
-            linyaps_box::config::id_mapping_t id_mapping;
+            linyaps_box::config::id_mapping_t id_mapping{};
             id_mapping.host_id = m["hostID"].get<uid_t>();
             id_mapping.container_id = m["containerID"].get<uid_t>();
             id_mapping.size = m["size"].get<size_t>();

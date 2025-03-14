@@ -7,4 +7,4 @@
 #define HAVE_LINUX_OPENAT2_H "@LINYAPS_HAVE_OPENAT2_H@"
 
 //TODO: use code gen
-constexpr auto oci_version = "1.2.1";
+constexpr auto oci_version = "1.2.0";
