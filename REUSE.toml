@@ -4,7 +4,14 @@ SPDX-PackageSupplier = "UnionTech Software Technology Co., Ltd. <>"
 SPDX-PackageDownloadLocation = "https://github.com/linuxdeepin/linglong-box"
 
 [[annotations]]
-path = [".github/**", ".gitlab-ci.yml", "tests/ll-box-st/**.json", "tests/ll-box-st/*.txt", "tests/ll-box-ut/data/**", ".obs/workflows.yml"]
+path = [
+    ".github/**",
+    ".gitlab-ci.yml",
+    "tests/ll-box-st/**.json",
+    "tests/ll-box-st/*.txt",
+    "tests/ll-box-ut/data/**",
+    ".obs/workflows.yml",
+]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
@@ -16,7 +23,15 @@ SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = ["README.md", "README.zh_CN.md", "INSTALL.md", "CHANGELOG.md", "doc/**.md", "src/**.md", "docs/**.md"]
+path = [
+    "README.md",
+    "README.zh_CN.md",
+    "INSTALL.md",
+    "CHANGELOG.md",
+    "doc/**.md",
+    "src/**.md",
+    "docs/**.md",
+]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
 SPDX-License-Identifier = "CC-BY-4.0"
@@ -28,7 +43,13 @@ SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
 SPDX-License-Identifier = "LGPL-3.0-or-later"
 
 [[annotations]]
-path = ["plugins/**.png", "plugins/**.svg", "frame/**.svg", "tests/**.png", "tests/**.svg"]
+path = [
+    "plugins/**.png",
+    "plugins/**.svg",
+    "frame/**.svg",
+    "tests/**.png",
+    "tests/**.svg",
+]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
 SPDX-License-Identifier = "LGPL-3.0-or-later"
@@ -40,7 +61,15 @@ SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = ["CMakePresets.json", "CMakeLists.txt", ".gitignore", "tests/ll-box-ut/.gitignore", "src/CMakeLists.txt", "test/CMakeLists.txt", "test/protype/CMakeLists.txt"]
+path = [
+    "CMakePresets.json",
+    "CMakeLists.txt",
+    ".gitignore",
+    "tests/ll-box-ut/.gitignore",
+    "src/CMakeLists.txt",
+    "test/CMakeLists.txt",
+    "test/protype/CMakeLists.txt",
+]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
@@ -58,7 +87,18 @@ SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = ["gschema/**.xml", "plugins/**.xml", "frame/**.xml", ".clog.toml", "plugins/**.json", "configs/**.json", ".packit.yaml", ".tx/config", "test/data/demo/**.json", "src/service/resource/**.json"]
+path = [
+    "gschema/**.xml",
+    "plugins/**.xml",
+    "frame/**.xml",
+    ".clog.toml",
+    "plugins/**.json",
+    "configs/**.json",
+    ".packit.yaml",
+    ".tx/config",
+    "test/data/demo/**.json",
+    "src/service/resource/**.json",
+]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
@@ -70,13 +110,28 @@ SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = ["gen_report.sh", "lupdate.sh", "plugins/dcc-dock-plugin/translate_generation.sh", "tests/test-recoverage.sh", "translate_generation.sh", "scripts/**"]
+path = [
+    "gen_report.sh",
+    "lupdate.sh",
+    "plugins/dcc-dock-plugin/translate_generation.sh",
+    "tests/test-recoverage.sh",
+    "translate_generation.sh",
+    "scripts/**",
+]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = ["frame/dbus/**", "plugins/disk-mount/dbus/dbusdiskmount.**", "plugins/power/dbus/dbuspower.**", "plugins/shutdown/dbus/dbuspowermanager.**", "plugins/tray/dbus/dbustraymanager.**", "src/module/dbus_ipc/**", "src/module/dbus_ipc/**"]
+path = [
+    "frame/dbus/**",
+    "plugins/disk-mount/dbus/dbusdiskmount.**",
+    "plugins/power/dbus/dbuspower.**",
+    "plugins/shutdown/dbus/dbuspowermanager.**",
+    "plugins/tray/dbus/dbustraymanager.**",
+    "src/module/dbus_ipc/**",
+    "src/module/dbus_ipc/**",
+]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "The Qt Company Ltd."
 SPDX-License-Identifier = "CC0-1.0"
