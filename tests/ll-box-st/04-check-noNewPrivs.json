@@ -1,6 +1,6 @@
 {
-	"name": "Check NoNewPrivs with `debian:latest`",
-	"image": "docker.io/library/debian:latest",
+	"name": "Check NoNewPrivs with `linyaps-box-st:stable-slim`",
+	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
 	"process": {
 		"user": {
 			"uid": 0,
