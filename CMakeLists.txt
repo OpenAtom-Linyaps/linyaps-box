@@ -32,6 +32,8 @@ option(linyaps-box_STATIC "Build linyaps-box as statically-linked binary." OFF)
 
 option(linyaps-box_ENABLE_SECCOMP "Build linyaps-box with seccomp support." OFF)
 
+option(linyaps-box_ENABLE_CAP "Build linyaps-box with capability support" ON)
+
 option(linyaps-box_ENABLE_UNIT_TESTS "Enable unit tests."
        ${linyaps-box_IS_TOP_LEVEL})
 
@@ -168,10 +170,16 @@ set(linyaps-box_LIBRARY_LINK_LIBRARIES)
 set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
                                      "${CMAKE_CURRENT_BINARY_DIR}/src")
 
+find_package(PkgConfig REQUIRED)
+
 if(linyaps-box_ENABLE_SECCOMP)
-  find_package(PkgConfig REQUIRED)
   pkg_check_modules(libseccomp REQUIRED IMPORTED_TARGET libseccomp)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libseccomp)
+endif()
+
+if(linyaps-box_ENABLE_CAP)
+  pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap)
+  list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
 endif()
 
 find_package(nlohmann_json 3.5.0 REQUIRED)
@@ -204,6 +212,11 @@ target_compile_options("${linyaps-box_LIBRARY}"
 if(linyaps-box_ENABLE_SECCOMP)
   target_compile_definitions("${linyaps-box_LIBRARY}"
                              PUBLIC LINYAPS_BOX_ENABLE_SECCOMP)
+endif()
+
+if(linyaps-box_ENABLE_CAP)
+  target_compile_definitions("${linyaps-box_LIBRARY}"
+                             PUBLIC LINYAPS_BOX_ENABLE_CAP)
 endif()
 
 if(linyaps-box_ENABLE_COVERAGE)
@@ -316,7 +329,8 @@ function(setup_linyaps_box_smoke_tests)
   set(linyaps-box_SMOKE_TESTS
       ./tests/ll-box-st/01-run-whoami-with-debian-latest.json
       ./tests/ll-box-st/02-check-procfs-with-ubuntu-latest.json
-      ./tests/ll-box-st/03-check-mounts-with-debian-latest.json)
+      ./tests/ll-box-st/03-check-mounts-with-debian-latest.json
+      ./tests/ll-box-st/04-check-noNewPrivs-with-debian-latest.json)
 
   foreach(test ${linyaps-box_SMOKE_TESTS})
     add_test(

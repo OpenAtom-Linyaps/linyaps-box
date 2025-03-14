@@ -6,6 +6,7 @@
 
 #include <sys/mount.h>
 
+#include <array>
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -13,6 +14,10 @@
 
 #include <sys/resource.h>
 #include <sys/types.h>
+
+#ifdef LINYAPS_BOX_ENABLE_CAP
+#include <sys/capability.h>
+#endif
 
 // Compatible with linux kernel which is under 5.10
 #ifndef MS_NOSYMFOLLOW
@@ -68,11 +73,11 @@ struct config
 
         struct capabilities_t
         {
-            std::optional<int> effective;
-            std::optional<int> bounding;
-            std::optional<int> inheritable;
-            std::optional<int> permitted;
-            std::optional<int> ambient;
+            std::vector<cap_value_t> effective;
+            std::vector<cap_value_t> bounding;
+            std::vector<cap_value_t> inheritable;
+            std::vector<cap_value_t> permitted;
+            std::vector<cap_value_t> ambient;
         };
 
         capabilities_t capabilities;
