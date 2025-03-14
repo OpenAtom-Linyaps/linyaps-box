@@ -65,6 +65,21 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                          "or `1000:1000` for UID=1000 and GID=1000")
             ->type_name("UID[:GID]");
     cmd_exec->add_option("--cwd", options.exec.cwd, "Current working directory.");
+    // TODO: enable capabilities and no_new_privs support after rewrite exec,
+    //      cmd_exec->add_option("-c,--cap", options.exec.caps, "Set capabilities")
+    //              ->check(
+    //                      [](const std::string &val) -> std::string {
+    //                          if (val.rfind("CAP_", 0) != std::string::npos) {
+    //                              return "";
+    //                          }
+
+    //                         return "invalid argument, capability must start with CAP_";
+    //                     },
+    //                     "cap_check");
+    //     cmd_exec->add_flag("--no-new-privs",
+    //                        options.exec.no_new_privs,
+    //                        "Set the no new privileges value for the process")
+    //             ->default_val(false);
     cmd_exec->add_option("CONTAINER", options.exec.ID, "Container ID")->required();
     cmd_exec->add_option("COMMAND", options.exec.command, "Command to execute")->required();
 

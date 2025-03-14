@@ -46,8 +46,10 @@ struct exec_options
     }
 
     const global_options &global;
+    bool no_new_privs;
     std::string user;
     std::optional<std::string> cwd;
+    std::optional<std::vector<std::string>> caps;
     std::string ID;
     std::vector<std::string> command;
 };
