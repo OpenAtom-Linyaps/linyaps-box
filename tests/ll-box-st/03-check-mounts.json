@@ -1,6 +1,5 @@
 {
-	"name": "Check necessary mounts with `linyaps-box-st:stable-slim`",
-	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
+	"name": "Check necessary mounts",
 	"process": {
 		"user": {
 			"uid": 0,

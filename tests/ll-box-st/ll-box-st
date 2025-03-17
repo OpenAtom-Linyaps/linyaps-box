@@ -17,19 +17,19 @@ set -o pipefail
 # This is not reliable when using POSIX sh
 # and current script file is sourced by `source` or `.`
 CURRENT_SOURCE_FILE_PATH="${BASH_SOURCE[0]:-$0}"
-CURRENT_SOURCE_FILE_NAME="$(basename -- "$CURRENT_SOURCE_FILE_PATH")"
-
-CURRENT_SOURCE_FILE_DIR="$(dirname -- "$CURRENT_SOURCE_FILE_PATH")"
+CURRENT_SOURCE_FILE_NAME="$(basename -- "${CURRENT_SOURCE_FILE_PATH}")"
+CURRENT_SOURCE_FILE_DIR="$(dirname -- "${CURRENT_SOURCE_FILE_PATH}")"
+declare -r OCI_IMAGE="docker.io/comixhe1895/linyaps-box-st:stable-slim"
 
 # shellcheck disable=SC2016
-USAGE="$CURRENT_SOURCE_FILE_NAME"'
+USAGE="${CURRENT_SOURCE_FILE_NAME}"'
 
 ll-box smoke tests
 
 '"
 Usage:
-  $CURRENT_SOURCE_FILE_NAME -h
-  $CURRENT_SOURCE_FILE_NAME <LL_BOX> <DATA_DIR> [<TEST_FILE>]
+  ${CURRENT_SOURCE_FILE_NAME} -h
+  ${CURRENT_SOURCE_FILE_NAME} <LL_BOX> <DATA_DIR> [<TEST_FILE>]
 
 Options:
   -h	Show this screen."
@@ -43,7 +43,7 @@ function log() {
 	local format="$1"
 	shift
 	# shellcheck disable=SC2059
-	printf "$CURRENT_SOURCE_FILE_NAME: $format\n" "$@" >&2 || true
+	printf "${CURRENT_SOURCE_FILE_NAME}: ${format}\n" "$@" >&2 || true
 }
 
 JQ="${JQ:-jq}"
@@ -52,80 +52,108 @@ PODMAN="${PODMAN:-podman}"
 
 function main() {
 	log "[DEBUG] ll-box-st called with arguments: $*"
-	log "[DEBUG] Working directory: $(pwd)"
+	log "[DEBUG] Working directory: $(pwd || true)"
 
 	while getopts ':h' option; do
-		case "$option" in
+		case "${option}" in
 		h)
-			echo "$USAGE"
+			echo "${USAGE}"
 			exit
 			;;
-
-		\?)
-			log "[ERROR] Unknown option: -%s" "$OPTARG"
+		*)
+			log "[ERROR] Unknown option: %s" "${option}"
 			exit 1
 			;;
 		esac
 	done
 	shift $((OPTIND - 1))
 
-	if [ -z "$1" ]; then
-		log "[ERROR] Too few arguments, check \`$CURRENT_SOURCE_FILE_NAME -h\`"
+	if [[ -z $1 ]]; then
+		log "[ERROR] Too few arguments, check \`${CURRENT_SOURCE_FILE_NAME} -h\`"
 		exit 1
 	fi
 
 	local LL_BOX="$1"
 	shift 1
 
-	if ! command -v "$LL_BOX" &>/dev/null; then
-		log "[ERROR] %s is not an executable" "$LL_BOX"
+	if ! command -v "${LL_BOX}" &>/dev/null; then
+		log "[ERROR] %s is not an executable" "${LL_BOX}"
 	fi
 
-	if [ -z "$1" ]; then
-		log "[ERROR] Too few arguments, check \`$CURRENT_SOURCE_FILE_NAME -h\`"
+	if [[ -z $1 ]]; then
+		log "[ERROR] Too few arguments, check \`${CURRENT_SOURCE_FILE_NAME} -h\`"
 		exit 1
 	fi
 
 	local DATA_DIR="$1"
 	shift 1
 
-	if [ -e "$DATA_DIR" ] && [ ! -d "$DATA_DIR" ]; then
-		log "[ERROR] %s is existed and it is not a directory" "$DATA_DIR"
+	if [[ -e ${DATA_DIR} ]] && [[ ! -d ${DATA_DIR} ]]; then
+		log "[ERROR] %s is existed and it is not a directory" "${DATA_DIR}"
 	fi
 
-	mkdir -p -- "$DATA_DIR"
+	mkdir -p -- "${DATA_DIR}"
 
 	check_requirements
 
-	if [ -e "$1" ]; then
+	prepare_bundle "${DATA_DIR}"
+
+	if [[ -e $1 ]]; then
 		local TEST_FILE="$1"
 		shift 1
-		run_test "$LL_BOX" "$DATA_DIR" "$TEST_FILE"
+		run_test "${LL_BOX}" "${DATA_DIR}" "${TEST_FILE}"
 		return
 	fi
 
-	log "[INFO] Running all tests in %s" "$CURRENT_SOURCE_FILE_DIR"
+	log "[INFO] Running all tests in %s" "${CURRENT_SOURCE_FILE_DIR}"
 
 	while read -r LINE; do
-		run_test "$LL_BOX" "$DATA_DIR" "$LINE"
-	done < <(find "$CURRENT_SOURCE_FILE_DIR" -maxdepth 1 -name "*.json")
+		run_test "${LL_BOX}" "${DATA_DIR}" "${LINE}"
+	done < <(find "${CURRENT_SOURCE_FILE_DIR}" -maxdepth 1 -name "*.json" || true)
 }
 
 function check_requirements() {
-	if ! command -v "$JQ" &>/dev/null; then
+	if ! command -v "${JQ}" &>/dev/null; then
 		log "[ERROR] jq is not installed or not executable"
 		exit 1
 	fi
 
-	if ! command -v "$UMOCI" &>/dev/null; then
+	if ! command -v "${UMOCI}" &>/dev/null; then
 		log "[ERROR] umoci is not installed or not executable"
 		exit 1
 	fi
 
-	if ! command -v "$PODMAN" &>/dev/null; then
+	if ! command -v "${PODMAN}" &>/dev/null; then
 		log "[ERROR] podman is not installed or not executable"
 		exit 1
 	fi
+}
+
+declare -g BUNDLE_DIR
+
+function prepare_bundle() {
+	local DATA_DIR="$1"
+	shift
+
+	if ! "${PODMAN}" image exists "${OCI_IMAGE}"; then
+		execute_command "${PODMAN}" pull "${OCI_IMAGE}"
+	fi
+
+	local IMAGE_DIR="${DATA_DIR}/image"
+	if [[ ! -d ${IMAGE_DIR} ]]; then
+		execute_command "${PODMAN}" save "${OCI_IMAGE}" \
+			--format oci-dir --output "${IMAGE_DIR}"
+	fi
+
+	local BUNDLE
+	BUNDLE=$(realpath "${DATA_DIR}/bundle")
+
+	if [[ ! -d ${BUNDLE} ]]; then
+		execute_command "${UMOCI}" unpack \
+			--rootless --image "${IMAGE_DIR}":"${OCI_IMAGE}" "${BUNDLE}"
+	fi
+
+	BUNDLE_DIR="${BUNDLE}"
 }
 
 function run_test() {
@@ -137,45 +165,25 @@ function run_test() {
 	shift
 
 	local TEST_NAME
-	TEST_NAME="$("$JQ" -r '.name' "$TEST_FILE")"
-	log "[INFO] Running test '%s' (%s)" "$TEST_NAME" "$TEST_FILE"
+	TEST_NAME="$("${JQ}" -r '.name' "${TEST_FILE}")"
+	log "[INFO] Running test '%s' (%s)" "${TEST_NAME}" "${TEST_FILE}"
 
 	local TEST_FILE_NAME
-	TEST_FILE_NAME="$(basename -- "$TEST_FILE" .json)"
+	TEST_FILE_NAME="$(basename -- "${TEST_FILE}" .json)"
 
-	local TEST_DIR="$DATA_DIR/$TEST_FILE_NAME"
-	mkdir -p -- "$TEST_DIR"
+	local TEST_DIR="${DATA_DIR}/${TEST_FILE_NAME}"
+	mkdir -p -- "${TEST_DIR}"
 
-	local IMAGE
-	IMAGE="$("$JQ" -r '.image' "$TEST_FILE")"
-	local IMAGE_DIR="$TEST_DIR/image"
-
-	if ! "$PODMAN" image exists "$IMAGE"; then
-		execute_command "$PODMAN" pull "$IMAGE"
-	fi
-
-	if [ ! -d "$IMAGE_DIR" ]; then
-		execute_command "$PODMAN" save "$IMAGE" \
-			--format oci-dir --output "$IMAGE_DIR"
-	fi
-
-	local BUNDLE
-	BUNDLE=$(realpath "$TEST_DIR/bundle")
-
-	if [ ! -d "$BUNDLE" ]; then
-		execute_command "$UMOCI" unpack \
-			--rootless --image "$IMAGE_DIR":"$IMAGE" "$BUNDLE"
-	fi
-
-	"$JQ" >"$BUNDLE/test_config.json" \
-		".process |= $("$JQ" -r '.process' "$TEST_FILE")" \
-		"$BUNDLE/config.json"
+	local TEST_CONFIG="${TEST_DIR}/test_config.json"
+	"${JQ}" >"${TEST_CONFIG}" \
+		".process |= $("${JQ}" -r '.process' "${TEST_FILE}" || true)" \
+		"${BUNDLE_DIR}/config.json"
 
 	local CONTAINER_NAME
-	CONTAINER_NAME="$(basename -- "$TEST_FILE_NAME" .json)"
+	CONTAINER_NAME="$(basename -- "${TEST_FILE_NAME}" .json)"
 
 	local TEST_COMMAND
-	TEST_COMMAND=("$LL_BOX" run -b "$BUNDLE" -f "$BUNDLE/test_config.json" "$CONTAINER_NAME")
+	TEST_COMMAND=("${LL_BOX}" run -b "${BUNDLE_DIR}" -f "${TEST_CONFIG}" "${CONTAINER_NAME}")
 	log "[INFO] Running command: %s" "${TEST_COMMAND[*]}"
 
 	log "[INFO] ==== COMMAND OUTPUT START ===="
@@ -186,11 +194,11 @@ function run_test() {
 	EXIT_CODE=$?
 	log "[INFO] ==== COMMAND OUTPUT END ======"
 
-	if [ $EXIT_CODE != 0 ]; then
-		log "[ERROR] Test command  %s  exited with %d" "${TEST_COMMAND[*]}" "$EXIT_CODE"
+	if [[ ${EXIT_CODE} != 0 ]]; then
+		log "[ERROR] Test command  %s  exited with %d" "${TEST_COMMAND[*]}" "${EXIT_CODE}"
 		log "[ERROR] Output:\n%s\n%s\n%s" \
 			"=====================================" \
-			"$REAL" \
+			"${REAL}" \
 			"====================================="
 		exit 1
 	fi
@@ -198,21 +206,21 @@ function run_test() {
 	log "[INFO] Test command: %s" "${TEST_COMMAND[*]}"
 
 	local EXPECTED
-	EXPECTED="$("$JQ" -r '.expected' "$TEST_FILE")"
+	EXPECTED="$("${JQ}" -r '.expected' "${TEST_FILE}")"
 
-	if [ "$REAL" == "$EXPECTED" ]; then
-		log "[INFO] Test '%s' passed" "$TEST_NAME"
+	if [[ ${REAL} == "${EXPECTED}" ]]; then
+		log "[INFO] Test '%s' passed" "${TEST_NAME}"
 		return
 	fi
 
-	log "[ERROR] Test '%s' failed" "$TEST_NAME"
+	log "[ERROR] Test '%s' failed" "${TEST_NAME}"
 	log "[ERROR] Expected:\n%s\n%s\n%s" \
 		"=====================================" \
-		"$EXPECTED" \
+		"${EXPECTED}" \
 		"====================================="
 	log "[ERROR] Got:\n%s\n%s\n%s" \
 		"=====================================" \
-		"$REAL" \
+		"${REAL}" \
 		"====================================="
 	exit 1
 }

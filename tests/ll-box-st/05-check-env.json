@@ -1,6 +1,5 @@
 {
-	"name": "Check environment with `linyaps-box-st:stable-slim`",
-	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
+	"name": "Check environment",
 	"process": {
 		"user": {
 			"uid": 0,
