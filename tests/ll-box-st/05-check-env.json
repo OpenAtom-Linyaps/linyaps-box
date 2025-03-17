@@ -1,18 +1,19 @@
 {
-	"name": "Check necessary mounts with `linyaps-box-st:stable-slim`",
+	"name": "Check environment with `linyaps-box-st:stable-slim`",
 	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
 	"process": {
 		"user": {
 			"uid": 0,
 			"gid": 0
 		},
-		"args": ["/bin/env", "sh", "-c", "mount | grep /proc -q"],
+		"args": ["/bin/env", "bash", "-c", "env | grep TESTENV | cut -d'=' -f2"],
 		"env": [
 			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 			"TERM=xterm",
-			"HOME=/root"
+			"HOME=/root",
+			"TESTENV=1"
 		],
 		"cwd": "/"
 	},
-	"expected": ""
+	"expected": "1"
 }
