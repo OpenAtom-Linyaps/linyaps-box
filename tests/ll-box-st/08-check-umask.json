@@ -1,0 +1,19 @@
+{
+	"name": "Check umask with `linyaps-box-st:stable-slim`",
+	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
+	"process": {
+		"user": {
+			"uid": 0,
+			"gid": 0,
+			"umask": 63
+		},
+		"args": ["/bin/env", "bash", "-c", "umask"],
+		"env": [
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"TERM=xterm",
+			"HOME=/root"
+		],
+		"cwd": "/"
+	},
+	"expected": "0077"
+}

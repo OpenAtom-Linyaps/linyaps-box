@@ -188,15 +188,15 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
             cfg.process.oom_score_adj = j[ptr / "process" / "oomScoreAdj"].get<int>();
         }
 
-        cfg.process.uid = j[ptr / "process" / "user" / "uid"].get<uid_t>();
-        cfg.process.gid = j[ptr / "process" / "user" / "gid"].get<gid_t>();
+        cfg.process.user.uid = j[ptr / "process" / "user" / "uid"].get<uid_t>();
+        cfg.process.user.gid = j[ptr / "process" / "user" / "gid"].get<gid_t>();
 
         if (j.contains(ptr / "process" / "user" / "umask")) {
-            cfg.process.umask = j[ptr / "process" / "user" / "umask"].get<mode_t>();
+            cfg.process.user.umask = j[ptr / "process" / "user" / "umask"].get<mode_t>();
         }
 
         if (j.contains(ptr / "process" / "user" / "additionalGids")) {
-            cfg.process.additional_gids =
+            cfg.process.user.additional_gids =
                     j[ptr / "process" / "user" / "additionalGids"].get<std::vector<gid_t>>();
         }
     }

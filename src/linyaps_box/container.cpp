@@ -875,19 +875,19 @@ void configure_mounts(const linyaps_box::container &container)
         throw std::system_error(errno, std::generic_category(), "chdir");
     }
 
-    ret = setgid(process.uid);
+    ret = setgid(process.user.gid);
     if (ret != 0) {
         throw std::system_error(errno, std::generic_category(), "setgid");
     }
 
-    if (process.additional_gids) {
-        ret = setgroups(process.additional_gids->size(), process.additional_gids->data());
+    if (process.user.additional_gids) {
+        ret = setgroups(process.user.additional_gids->size(), process.user.additional_gids->data());
         if (ret != 0) {
             throw std::system_error(errno, std::generic_category(), "setgroups");
         }
     }
 
-    ret = setuid(process.uid);
+    ret = setuid(process.user.uid);
     if (ret != 0) {
         throw std::system_error(errno, std::generic_category(), "setuid");
     }
@@ -1009,6 +1009,17 @@ void do_pivot_root(const linyaps_box::container &container)
     }
 }
 
+void set_umask(const std::optional<mode_t> &mask)
+{
+    if (!mask) {
+        LINYAPS_BOX_DEBUG() << "Skip set umask";
+        return;
+    }
+
+    LINYAPS_BOX_DEBUG() << "Set umask: " << std::oct << mask.value();
+    umask(mask.value());
+}
+
 security_status get_runtime_security_status()
 {
     // TODO: selinux/apparmor
@@ -1091,12 +1102,12 @@ void set_capabilities(const linyaps_box::container &container, int last_cap)
         }
 
         const auto &process = container.get_config().process;
-        ret = setresuid(process.uid, process.uid, process.uid);
+        ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
         if (ret < 0) {
             throw std::system_error(errno, std::generic_category(), "setresuid");
         }
 
-        ret = setresgid(process.gid, process.gid, process.gid);
+        ret = setresgid(process.user.gid, process.user.gid, process.user.gid);
         if (ret < 0) {
             throw std::system_error(errno, std::generic_category(), "setresgid");
         }
@@ -1219,7 +1230,9 @@ try {
     configure_mounts(container);
     wait_create_runtime_result(container, socket);
     create_container_hooks(container, socket);
+    // TODO: selinux label/apparmor profile
     do_pivot_root(container);
+    set_umask(container.get_config().process.user.umask);
     set_capabilities(container, runtime_cap);
     start_container_hooks(container, socket);
     execute_process(process);
