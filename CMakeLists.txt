@@ -330,7 +330,10 @@ function(setup_linyaps_box_smoke_tests)
       ./tests/ll-box-st/01-run-whoami.json
       ./tests/ll-box-st/02-check-procfs.json
       ./tests/ll-box-st/03-check-mounts.json
-      ./tests/ll-box-st/04-check-noNewPrivs.json)
+      ./tests/ll-box-st/04-check-noNewPrivs.json
+      ./tests/ll-box-st/05-check-env.json
+      ./tests/ll-box-st/06-check-cwd.json
+      ./tests/ll-box-st/07-check-capability.json)
 
   foreach(test ${linyaps-box_SMOKE_TESTS})
     add_test(
