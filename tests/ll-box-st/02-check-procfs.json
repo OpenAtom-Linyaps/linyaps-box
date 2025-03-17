@@ -1,6 +1,5 @@
 {
-	"name": "Check procfs with `linyaps-box-st:stable-slim`",
-	"image": "docker.io/comixhe1895/linyaps-box-st:stable-slim",
+	"name": "Check procfs",
 	"process": {
 		"user": {
 			"uid": 0,
