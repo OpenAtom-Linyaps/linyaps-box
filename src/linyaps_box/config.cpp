@@ -9,6 +9,8 @@
 #include "linyaps_box/utils/semver.h"
 #include "nlohmann/json.hpp"
 
+#include <sys/resource.h>
+
 namespace {
 
 std::tuple<unsigned long, unsigned long, std::uint8_t, std::string>
@@ -135,6 +137,35 @@ parse_capability(const nlohmann::json &obj, const nlohmann::json::json_pointer &
     }
 }
 
+linyaps_box::config::process_t::rlimits_t parse_rlimits(const nlohmann::json &obj,
+                                                        const nlohmann::json::json_pointer &ptr)
+{
+    const auto &vec = obj[ptr];
+    if (!vec.is_array()) {
+        throw std::runtime_error("rlimits must be an array");
+    }
+
+    linyaps_box::config::process_t::rlimits_t ret{};
+    std::transform(
+            vec.cbegin(),
+            vec.cend(),
+            std::back_inserter(ret),
+            [](const nlohmann::json &json) {
+                if (!json.is_object()) {
+                    throw std::runtime_error("rlimit must be an object");
+                }
+
+                if (!json.contains("type")) {
+                    throw std::runtime_error("rlimit must contain type");
+                }
+
+                return linyaps_box::config::process_t::rlimit_t{ json["type"].get<std::string>(),
+                                                                 json["soft"].get<uint64_t>(),
+                                                                 json["hard"].get<uint64_t>() };
+            });
+    return ret;
+}
+
 linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 {
     static const auto ptr = ""_json_pointer;
@@ -172,7 +203,9 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 
         cfg.process.args = j[ptr / "process" / "args"].get<std::vector<std::string>>();
 
-        // TODO: rlimits
+        if (auto rlimits = ptr / "process" / "rlimits"; j.contains(rlimits)) {
+            cfg.process.rlimits = parse_rlimits(j, rlimits);
+        }
 
         // TODO: apparmorProfile
 

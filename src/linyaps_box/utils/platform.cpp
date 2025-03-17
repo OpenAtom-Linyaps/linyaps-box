@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <unordered_map>
 
+#include <sys/resource.h>
+
 namespace linyaps_box::utils {
 int str_to_signal(std::string_view str)
 {
@@ -30,6 +32,34 @@ int str_to_signal(std::string_view str)
     auto it = sigMap.find(str);
     if (it == sigMap.end()) {
         throw std::invalid_argument("invalid signal name: " + std::string{ str });
+    }
+
+    return it->second;
+}
+
+int str_to_rlimit(std::string_view str)
+{
+    const static std::unordered_map<std::string_view, int> resources{
+        { "RLIMIT_AS", RLIMIT_AS },
+        { "RLIMIT_CORE", RLIMIT_CORE },
+        { "RLIMIT_CPU", RLIMIT_CPU },
+        { "RLIMIT_DATA", RLIMIT_DATA },
+        { "RLIMIT_FSIZE", RLIMIT_FSIZE },
+        { "RLIMIT_MEMLOCK", RLIMIT_MEMLOCK },
+        { "RLIMIT_MSGQUEUE", RLIMIT_MSGQUEUE },
+        { "RLIMIT_NICE", RLIMIT_NICE },
+        { "RLIMIT_NOFILE", RLIMIT_NOFILE },
+        { "RLIMIT_NPROC", RLIMIT_NPROC },
+        { "RLIMIT_RSS", RLIMIT_RSS },
+        { "RLIMIT_RTPRIO", RLIMIT_RTPRIO },
+        { "RLIMIT_RTTIME", RLIMIT_RTTIME },
+        { "RLIMIT_SIGPENDING", RLIMIT_SIGPENDING },
+        { "RLIMIT_STACK", RLIMIT_STACK },
+    };
+
+    auto it = resources.find(str);
+    if (it == resources.end()) {
+        throw std::invalid_argument("invalid resource name: " + std::string{ str });
     }
 
     return it->second;
