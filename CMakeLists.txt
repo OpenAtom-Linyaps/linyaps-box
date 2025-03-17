@@ -335,7 +335,8 @@ function(setup_linyaps_box_smoke_tests)
       ./tests/ll-box-st/06-check-cwd.json
       ./tests/ll-box-st/07-check-capability.json
       ./tests/ll-box-st/08-check-umask.json
-      ./tests/ll-box-st/09-check-rlimit.json)
+      ./tests/ll-box-st/09-check-rlimit.json
+      ./tests/ll-box-st/10-check-oom.json)
 
   foreach(test ${linyaps-box_SMOKE_TESTS})
     add_test(

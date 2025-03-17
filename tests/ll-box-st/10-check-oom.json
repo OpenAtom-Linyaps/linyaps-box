@@ -1,0 +1,23 @@
+{
+	"name": "Check oom",
+	"process": {
+		"user": {
+			"uid": 0,
+			"gid": 0
+		},
+		"args": [
+			"/bin/env",
+			"bash",
+			"-c",
+			"cat /proc/self/oom_score_adj"
+		],
+		"env": [
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"TERM=xterm",
+			"HOME=/root"
+		],
+		"cwd": "/",
+    "oomScoreAdj": 500
+	},
+	"expected": "500"
+}

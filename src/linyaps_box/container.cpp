@@ -262,7 +262,8 @@ struct clone_fn_args
 // NOTE: All function in this namespace are running in the container namespace.
 namespace container_ns {
 
-void configure_container_namespaces(linyaps_box::utils::file_descriptor &socket)
+void initialize_container(const linyaps_box::config &config,
+                          linyaps_box::utils::file_descriptor &socket)
 {
     LINYAPS_BOX_DEBUG() << "Request OCI runtime in runtime namespace to configure namespace";
 
@@ -275,6 +276,18 @@ void configure_container_namespaces(linyaps_box::utils::file_descriptor &socket)
     }
 
     LINYAPS_BOX_DEBUG() << "Container namespaces configured from runtime namespace";
+
+    if (config.process.oom_score_adj) {
+        auto score = std::to_string(config.process.oom_score_adj.value());
+        LINYAPS_BOX_DEBUG() << "Set oom score to " << score;
+
+        std::ofstream ofs("/proc/self/oom_score_adj");
+        if (!ofs) {
+            throw std::runtime_error("failed to open /proc/self/oom_score_adj");
+        }
+
+        ofs << score;
+    }
 }
 
 void system_call_mount(const char *_special_file,
@@ -1226,7 +1239,7 @@ try {
     const auto &process = *args.process;
     auto &socket = args.socket;
 
-    configure_container_namespaces(socket);
+    initialize_container(container.get_config(), socket);
     auto [runtime_cap] = get_runtime_security_status(); // get runtime status before pivot root
     configure_mounts(container);
     wait_create_runtime_result(container, socket);
