@@ -85,10 +85,15 @@ struct config
         bool no_new_privileges = false;
         std::optional<int> oom_score_adj;
 
-        uid_t uid;
-        gid_t gid;
-        std::optional<mode_t> umask;
-        std::optional<std::vector<gid_t>> additional_gids;
+        struct user_t
+        {
+            uid_t uid;
+            gid_t gid;
+            std::optional<mode_t> umask;
+            std::optional<std::vector<gid_t>> additional_gids;
+        };
+
+        user_t user;
     };
 
     process_t process;
