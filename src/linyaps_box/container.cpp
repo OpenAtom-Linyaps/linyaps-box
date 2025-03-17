@@ -14,6 +14,7 @@
 #include "linyaps_box/utils/mkdir.h"
 #include "linyaps_box/utils/mknod.h"
 #include "linyaps_box/utils/open_file.h"
+#include "linyaps_box/utils/platform.h"
 #include "linyaps_box/utils/socketpair.h"
 #include "linyaps_box/utils/touch.h"
 
@@ -1355,6 +1356,21 @@ private:
     void *stack_low;
 };
 
+void set_rlimits(const linyaps_box::config::process_t::rlimits_t &rlimits)
+{
+    std::for_each(rlimits.begin(),
+                  rlimits.end(),
+                  [](const linyaps_box::config::process_t::rlimit_t &rlimit) {
+                      struct rlimit rl{ rlimit.soft, rlimit.hard };
+                      auto resource = linyaps_box::utils::str_to_rlimit(rlimit.type);
+                      LINYAPS_BOX_DEBUG() << "Set rlimit " << rlimit.type
+                                          << ": Soft=" << rlimit.soft << ", Hard=" << rlimit.hard;
+                      if (setrlimit(resource, &rl) == -1) {
+                          throw std::system_error(errno, std::generic_category(), "setrlimit");
+                      }
+                  });
+}
+
 std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
         const linyaps_box::container &container, const linyaps_box::config::process_t &process)
 {
@@ -1364,8 +1380,12 @@ std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
     LINYAPS_BOX_DEBUG() << "All opened file describers after socketpair:\n"
                         << linyaps_box::utils::inspect_fds();
 
-    int clone_flag = runtime_ns::generate_clone_flag(container.get_config().namespaces);
+    // config rlimits before we enter new user namespace
+    if (const auto &rlimits = container.get_config().process.rlimits; rlimits) {
+        set_rlimits(rlimits.value());
+    }
 
+    int clone_flag = runtime_ns::generate_clone_flag(container.get_config().namespaces);
     clone_fn_args args = { &container, &process, std::move(sockets.second) };
 
     LINYAPS_BOX_DEBUG() << "OCI runtime in runtime namespace: PID=" << getpid()
