@@ -454,7 +454,7 @@ try {
     return linyaps_box::utils::open_at(root, mount.destination.value(), open_flag);
 } catch (const std::system_error &e) {
     if (e.code().value() != ENOENT) {
-        throw e;
+        throw;
     }
 
     auto path = mount.destination.value();
@@ -545,19 +545,22 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
 
     if (mount.type.rfind("cgroup", 0) != std::string::npos) {
         // if /sys is bind mount recursively, then skip /sys/fs/cgroup
-        const auto &namespaces = container.get_config().namespaces;
-        auto unshared_cgroup_ns =
-                std::find_if(namespaces.cbegin(),
-                             namespaces.cend(),
-                             [](const linyaps_box::config::namespace_t &ns) -> bool {
-                                 return ns.type == linyaps_box::config::namespace_t::CGROUP;
-                             });
-        if (mount.destination == "/sys/fs/cgroup" && is_sys_rbind) {
-            if (unshared_cgroup_ns != namespaces.cend()) {
-                throw std::runtime_error("unshared cgroup namespace is not supported");
-            }
+        const auto &linux = container.get_config().linux;
+        if (linux && linux->namespaces) {
+            const auto &namespaces = linux->namespaces;
+            auto unshared_cgroup_ns = std::find_if(
+                    namespaces->cbegin(),
+                    namespaces->cend(),
+                    [](const linyaps_box::config::linux_t::namespace_t &ns) -> bool {
+                        return ns.type == linyaps_box::config::linux_t::namespace_t::type_t::CGROUP;
+                    });
+            if (mount.destination == "/sys/fs/cgroup" && is_sys_rbind) {
+                if (unshared_cgroup_ns != namespaces->cend()) {
+                    throw std::runtime_error("unshared cgroup namespace is not supported");
+                }
 
-            return std::nullopt;
+                return std::nullopt;
+            }
         }
 
         do_cgroup_mount(root, mount, "");
@@ -576,9 +579,9 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
         destination_fd = ensure_mount_destination(true, root, mount);
         system_call_mount(mount.source ? mount.source.value().c_str() : nullptr,
                           destination_fd.proc_path().c_str(),
-                          mount.type.c_str(),
+                          mount.type.empty() ? nullptr : mount.type.c_str(),
                           mount.flags,
-                          mount.data.c_str());
+                          mount.data.empty() ? nullptr : mount.data.c_str());
     }
 
     do_propagation_mount(destination_fd, mount.propagation_flags);
@@ -588,11 +591,16 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
         need_remount = true;
     }
 
+    // procfs mount option only working with remount (e.g. hidepid=2)
+    // this limitation is no longer required after kernel 5.7
+    // we do this for compatible with older kernel
+    // https://web.git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=69879c01a0c3f70e0887cfb4d9ff439814361e46
     if (!mount.data.empty() && mount.type == "proc") {
         need_remount = true;
     }
 
     if (!need_remount) {
+        LINYAPS_BOX_DEBUG() << "no need to remount";
         return std::nullopt;
     }
 
@@ -601,6 +609,7 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
         remount_flags |= MS_BIND;
     }
 
+    LINYAPS_BOX_DEBUG() << "remount " << mount.destination.value() << " with " << mount.flags;
     auto delay_readonly_mount = remount_t{ std::move(destination_fd), remount_flags, mount.data };
     if ((remount_flags & MS_RDONLY) == 0) {
         // if not readonly mount, just remount directly
@@ -644,6 +653,57 @@ public:
         }
 
         remounts.push_back(std::move(delay_mount).value());
+    }
+
+    void make_path_readonly()
+    {
+        const auto &linux = container.get_config().linux;
+        if (!linux || !linux->readonly_paths) {
+            LINYAPS_BOX_DEBUG() << "no readonly paths";
+            return;
+        }
+
+        for (const auto &path : *linux->readonly_paths) {
+            linyaps_box::utils::file_descriptor dst;
+            try {
+                dst = linyaps_box::utils::open_at(root, path);
+            } catch (const std::system_error &e) {
+                if (auto err = e.code().value(); err == ENOENT || err == EACCES) {
+                    continue;
+                }
+
+                throw;
+            }
+
+            auto mount_flag = MS_BIND | MS_PRIVATE | MS_RDONLY | MS_REC;
+
+            // readonly path is an absolute path within the container,
+            // the path is already exists in the container when making it readonly
+            // so we should inherit the mount flags to keep it as same as the original
+            auto ret = linyaps_box::utils::statfs(dst);
+            mount_flag |= ret.f_flags;
+
+            // parent mount flags may contain MS_REMOUNT, we should remove it due to the readonly
+            // path is not mounted yet
+            mount_flag &= ~MS_REMOUNT;
+
+            linyaps_box::config::mount_t mount{};
+            mount.destination = path;
+            mount.source = dst.proc_path();
+            mount.flags = mount_flag;
+
+            LINYAPS_BOX_DEBUG() << "make readonly path " << path << " with "
+                                << dump_mount_flags(mount.flags);
+            auto delay_mount = do_mount(container, root, mount);
+            // we do rbind for this path, so remount will be done after finalize
+            assert(delay_mount);
+            remounts.push_back(std::move(delay_mount).value());
+        }
+    }
+
+    void make_path_masked()
+    {
+        // TODO
     }
 
     void finalize()
@@ -858,6 +918,8 @@ void configure_mounts(const linyaps_box::container &container)
     LINYAPS_BOX_DEBUG() << "Processing mount points";
 
     m->do_mounts();
+    m->make_path_masked();
+    m->make_path_readonly();
     m->finalize();
 
     LINYAPS_BOX_DEBUG() << "Mounts configured";
@@ -1263,49 +1325,45 @@ try {
 // NOTE: All function in this namespace are running in the runtime namespace.
 namespace runtime_ns {
 
-[[nodiscard]] int generate_clone_flag(std::vector<linyaps_box::config::namespace_t> namespaces)
+[[nodiscard]] int generate_clone_flag(
+        const std::optional<std::vector<linyaps_box::config::linux_t::namespace_t>> &namespaces)
 {
-    LINYAPS_BOX_DEBUG() << "Generate clone flag from namespaces " << [&]() {
-        std::stringstream result;
-        result << "[ ";
-        for (const auto &ns : namespaces) {
-            result << ns.type << " ";
-        }
-        result << "]";
-        return result.str();
-    }();
+    LINYAPS_BOX_DEBUG() << "Generate clone flags";
 
-    uint32_t flag = SIGCHLD;
+    int flag = SIGCHLD;
     LINYAPS_BOX_DEBUG() << "Add SIGCHLD, flag=0x" << std::hex << flag;
-    uint32_t setted_namespaces = 0;
+    if (!namespaces) {
+        return flag;
+    }
 
-    for (const auto &ns : namespaces) {
+    uint32_t setted_namespaces = 0;
+    for (const auto &ns : *namespaces) {
         switch (ns.type) {
-        case linyaps_box::config::namespace_t::IPC: {
+        case linyaps_box::config::linux_t::namespace_t::IPC: {
             flag |= CLONE_NEWIPC;
             LINYAPS_BOX_DEBUG() << "Add CLONE_NEWIPC, flag=0x" << std::hex << flag;
         } break;
-        case linyaps_box::config::namespace_t::UTS: {
+        case linyaps_box::config::linux_t::namespace_t::UTS: {
             flag |= CLONE_NEWUTS;
             LINYAPS_BOX_DEBUG() << "Add CLONE_NEWUTS, flag=0x" << std::hex << flag;
         } break;
-        case linyaps_box::config::namespace_t::MOUNT: {
+        case linyaps_box::config::linux_t::namespace_t::MOUNT: {
             flag |= CLONE_NEWNS;
             LINYAPS_BOX_DEBUG() << "Add CLONE_NEWNS, flag=0x" << std::hex << flag;
         } break;
-        case linyaps_box::config::namespace_t::PID: {
+        case linyaps_box::config::linux_t::namespace_t::PID: {
             flag |= CLONE_NEWPID;
             LINYAPS_BOX_DEBUG() << "Add CLONE_NEWPID, flag=0x" << std::hex << flag;
         } break;
-        case linyaps_box::config::namespace_t::NET: {
+        case linyaps_box::config::linux_t::namespace_t::NET: {
             flag |= CLONE_NEWNET;
             LINYAPS_BOX_DEBUG() << "Add CLONE_NEWNET, flag=0x" << std::hex << flag;
         } break;
-        case linyaps_box::config::namespace_t::USER: {
+        case linyaps_box::config::linux_t::namespace_t::USER: {
             flag |= CLONE_NEWUSER;
             LINYAPS_BOX_DEBUG() << "Add CLONE_NEWUSER, flag=0x" << std::hex << flag;
         } break;
-        case linyaps_box::config::namespace_t::CGROUP: {
+        case linyaps_box::config::linux_t::namespace_t::CGROUP: {
             flag |= CLONE_NEWCGROUP;
             LINYAPS_BOX_DEBUG() << "Add CLONE_NEWCGROUP, flag=0x" << std::hex << flag;
         } break;
@@ -1317,6 +1375,7 @@ namespace runtime_ns {
         if ((setted_namespaces & ns.type) != 0) {
             throw std::invalid_argument("duplicate namespace");
         }
+
         setted_namespaces |= ns.type;
     }
 
@@ -1392,13 +1451,19 @@ std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
     auto sockets = linyaps_box::utils::socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
     LINYAPS_BOX_DEBUG() << "All opened file describers after socketpair:\n"
                         << linyaps_box::utils::inspect_fds();
+    const auto &config = container.get_config();
 
     // config rlimits before we enter new user namespace
-    if (const auto &rlimits = container.get_config().process.rlimits; rlimits) {
+    if (const auto &rlimits = config.process.rlimits; rlimits) {
         set_rlimits(rlimits.value());
     }
 
-    int clone_flag = runtime_ns::generate_clone_flag(container.get_config().namespaces);
+    std::optional<std::vector<linyaps_box::config::linux_t::namespace_t>> namespaces;
+    if (config.linux && config.linux->namespaces) {
+        namespaces = config.linux->namespaces;
+    }
+
+    int clone_flag = runtime_ns::generate_clone_flag(namespaces);
     clone_fn_args args = { &container, &process, std::move(sockets.second) };
 
     LINYAPS_BOX_DEBUG() << "OCI runtime in runtime namespace: PID=" << getpid()
@@ -1482,8 +1547,8 @@ void execute_user_namespace_helper(const std::vector<std::string> &args)
     throw std::runtime_error("user_namespace helper exited abnormally");
 }
 
-void configure_gid_mapping(pid_t pid,
-                           const std::vector<linyaps_box::config::id_mapping_t> &gid_mappings)
+void configure_gid_mapping(
+        pid_t pid, const std::vector<linyaps_box::config::linux_t::id_mapping_t> &gid_mappings)
 {
     LINYAPS_BOX_DEBUG() << "Configure GID mappings";
 
@@ -1504,8 +1569,8 @@ void configure_gid_mapping(pid_t pid,
     execute_user_namespace_helper(args);
 }
 
-void configure_uid_mapping(pid_t pid,
-                           const std::vector<linyaps_box::config::id_mapping_t> &uid_mappings)
+void configure_uid_mapping(
+        pid_t pid, const std::vector<linyaps_box::config::linux_t::id_mapping_t> &uid_mappings)
 {
     LINYAPS_BOX_DEBUG() << "Configure UID mappings";
 
@@ -1551,20 +1616,29 @@ void configure_container_namespaces(const linyaps_box::container &container,
 
     LINYAPS_BOX_DEBUG() << "Start configure namespaces";
 
-    const auto &config = container.get_config();
+    const auto &linux = container.get_config().linux;
+    if (linux) {
+        const auto &namespaces = linux->namespaces;
+        if (namespaces) {
+            if (std::find_if(namespaces->cbegin(),
+                             namespaces->cend(),
+                             [](const linyaps_box::config::linux_t::namespace_t &ns) -> bool {
+                                 return ns.type == linyaps_box::config::linux_t::namespace_t::USER;
+                             })
+                != namespaces->end()) {
+                auto pid = container.status().PID;
 
-    if (std::find_if(config.namespaces.cbegin(),
-                     config.namespaces.cend(),
-                     [](const linyaps_box::config::namespace_t &ns) -> bool {
-                         return ns.type == linyaps_box::config::namespace_t::USER;
-                     })
-        != config.namespaces.end()) {
+                // TODO: if not mapping a range of uid/gid, we could set uid/gid in the container
+                // process
+                if (const auto &gid_mappings = linux->gid_mappings; gid_mappings) {
+                    configure_gid_mapping(pid, gid_mappings.value());
+                }
 
-        auto pid = container.status().PID;
-
-        // TODO: if not mapping a range of uid/gid, we could set uid/gid in the container process
-        configure_gid_mapping(pid, config.gid_mappings);
-        configure_uid_mapping(pid, config.uid_mappings);
+                if (const auto &uid_mappings = linux->uid_mappings; uid_mappings) {
+                    configure_uid_mapping(pid, uid_mappings.value());
+                }
+            }
+        }
     }
 
     configure_container_cgroup(container);
@@ -1715,16 +1789,16 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
                                   const std::string &id,
                                   const std::filesystem::path &bundle,
-                                  std::filesystem::path config,
+                                  const std::filesystem::path &config,
                                   cgroup_manager_t manager)
     : container_ref(std::move(status_dir), id)
     , bundle(bundle)
 {
-    if (config.is_relative()) {
-        config = std::filesystem::canonical(bundle / config);
+    std::ifstream ifs(config);
+    if (!ifs) {
+        throw std::runtime_error("Can't open config file" + config.string());
     }
 
-    std::ifstream ifs(config);
     LINYAPS_BOX_DEBUG() << "load config from " << config;
     this->config = linyaps_box::config::parse(ifs);
 
