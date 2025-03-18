@@ -350,6 +350,14 @@ void do_remount(const remount_t &mount)
 
     auto destination = mount.destination_fd.proc_path();
     const auto *data_ptr = mount.data.empty() ? nullptr : mount.data.c_str();
+
+    // for old kernel
+    if ((mount.flags & (MS_REMOUNT | MS_RDONLY)) != 0) {
+        data_ptr = nullptr;
+    }
+
+    LINYAPS_BOX_DEBUG() << "Remount " << destination << " with flags "
+                        << dump_mount_flags(mount.flags);
     try {
         system_call_mount(nullptr, destination.c_str(), nullptr, mount.flags, data_ptr);
         return;
@@ -361,7 +369,7 @@ void do_remount(const remount_t &mount)
     }
 
     auto state = linyaps_box::utils::statfs(mount.destination_fd);
-    uint remount_flags = (state.f_flags & (MS_NOSUID | MS_NODEV | MS_NOEXEC));
+    auto remount_flags = state.f_flags & (MS_NOSUID | MS_NODEV | MS_NOEXEC);
     if ((remount_flags | mount.flags) != mount.flags) {
         try {
             system_call_mount(nullptr,
@@ -379,8 +387,12 @@ void do_remount(const remount_t &mount)
     }
 
     if ((state.f_flags & MS_RDONLY) != 0) {
-        remount_flags |= MS_RDONLY;
-        system_call_mount(nullptr, destination.c_str(), nullptr, remount_flags, data_ptr);
+        remount_flags = state.f_flags & (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RDONLY);
+        system_call_mount(nullptr,
+                          destination.c_str(),
+                          nullptr,
+                          mount.flags | remount_flags,
+                          data_ptr);
     }
 }
 
@@ -609,7 +621,6 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
         remount_flags |= MS_BIND;
     }
 
-    LINYAPS_BOX_DEBUG() << "remount " << mount.destination.value() << " with " << mount.flags;
     auto delay_readonly_mount = remount_t{ std::move(destination_fd), remount_flags, mount.data };
     if ((remount_flags & MS_RDONLY) == 0) {
         // if not readonly mount, just remount directly
@@ -618,6 +629,7 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
         return std::nullopt;
     }
 
+    LINYAPS_BOX_DEBUG() << "remount delayed";
     return delay_readonly_mount;
 }
 
@@ -697,22 +709,69 @@ public:
             auto delay_mount = do_mount(container, root, mount);
             // we do rbind for this path, so remount will be done after finalize
             assert(delay_mount);
-            remounts.push_back(std::move(delay_mount).value());
+            remounts.emplace_back(std::move(delay_mount).value());
         }
     }
 
     void make_path_masked()
     {
-        // TODO
+        const auto &linux = container.get_config().linux;
+        if (!linux || !linux->masked_paths) {
+            LINYAPS_BOX_DEBUG() << "no masked paths";
+            return;
+        }
+
+        for (const auto &path : *linux->masked_paths) {
+            linyaps_box::utils::file_descriptor dst;
+            try {
+                dst = linyaps_box::utils::open_at(root, path);
+            } catch (const std::system_error &e) {
+                if (auto err = e.code().value(); err == ENOENT || err == EACCES) {
+                    continue;
+                }
+
+                throw;
+            }
+
+            auto ret = linyaps_box::utils::fstat(dst);
+            auto mount = linyaps_box::config::mount_t{};
+
+            mount.destination = path;
+            mount.flags = MS_RDONLY;
+
+            if (S_ISDIR(ret.st_mode)) {
+                mount.source = "tmpfs";
+                mount.type = "tmpfs";
+                mount.data = "size=0k";
+
+                LINYAPS_BOX_DEBUG() << "mask directory " << path;
+                auto delay_mount = do_mount(container, root, mount);
+                assert(delay_mount);
+                remounts.emplace_back(std::move(delay_mount).value());
+                continue;
+            }
+
+            mount.source = "/dev/null";
+            mount.flags |= MS_BIND;
+
+            LINYAPS_BOX_DEBUG() << "mask file " << path;
+            auto delay_mount = do_mount(container, root, mount);
+            assert(delay_mount);
+            remounts.emplace_back(std::move(delay_mount).value());
+        }
     }
 
     void finalize()
     {
         this->configure_default_filesystems();
         this->configure_default_devices();
-        for (const auto &remount : remounts) {
+
+        LINYAPS_BOX_DEBUG() << "finalize " << remounts.size() << " remounts";
+        // our mount process has to do with the order
+        // the last mount should be the last remount
+        std::for_each(remounts.crbegin(), remounts.crend(), [](const auto &remount) {
             do_remount(remount);
-        }
+        });
     }
 
 private:
@@ -723,6 +782,8 @@ private:
     // https://github.com/opencontainers/runtime-spec/blob/09fcb39bb7185b46dfb206bc8f3fea914c674779/config-linux.md#default-filesystems
     void configure_default_filesystems()
     {
+        LINYAPS_BOX_DEBUG() << "configure default filesystems";
+
         do {
             auto proc = linyaps_box::utils::open_at(root, "proc");
 
@@ -884,6 +945,8 @@ private:
 
     void configure_default_devices()
     {
+        LINYAPS_BOX_DEBUG() << "Configure default devices";
+
         this->configure_deivce("/dev/null", 0666, makedev(1, 3));
         this->configure_deivce("/dev/zero", 0666, makedev(1, 5));
         this->configure_deivce("/dev/full", 0666, makedev(1, 7));
