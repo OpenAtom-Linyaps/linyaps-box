@@ -1852,14 +1852,18 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
                                   const std::string &id,
                                   const std::filesystem::path &bundle,
-                                  const std::filesystem::path &config,
+                                  std::filesystem::path config,
                                   cgroup_manager_t manager)
     : container_ref(std::move(status_dir), id)
     , bundle(bundle)
 {
+    if (config.is_relative()) {
+        config = bundle / config;
+    }
+
     std::ifstream ifs(config);
     if (!ifs) {
-        throw std::runtime_error("Can't open config file" + config.string());
+        throw std::runtime_error("Can't open config file " + config.string());
     }
 
     LINYAPS_BOX_DEBUG() << "load config from " << config;
