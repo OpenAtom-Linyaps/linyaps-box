@@ -5,7 +5,6 @@
 #include "linyaps_box/config.h"
 
 #include "linyaps_box/configuration.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/semver.h"
 #include "nlohmann/json.hpp"
 
@@ -166,6 +165,109 @@ linyaps_box::config::process_t::rlimits_t parse_rlimits(const nlohmann::json &ob
     return ret;
 }
 
+linyaps_box::config::linux_t parse_linux(const nlohmann::json &obj,
+                                         const nlohmann::json::json_pointer &ptr)
+{
+    auto linux = linyaps_box::config::linux_t{};
+    if (auto uid_ptr = ptr / "uidMappings"; obj.contains(uid_ptr)) {
+        const auto &vec = obj[uid_ptr];
+        std::vector<linyaps_box::config::linux_t::id_mapping_t> uid_mappings;
+        std::transform(vec.cbegin(),
+                       vec.cend(),
+                       std::back_inserter(uid_mappings),
+                       [](const nlohmann::json &json) {
+                           return linyaps_box::config::linux_t::id_mapping_t{
+                               json["hostID"].get<uid_t>(),
+                               json["containerID"].get<uid_t>(),
+                               json["size"].get<size_t>(),
+                           };
+                       });
+        linux.uid_mappings = std::move(uid_mappings);
+    }
+
+    if (auto gid_ptr = ptr / "gidMappings"; obj.contains(gid_ptr)) {
+        const auto &vec = obj[gid_ptr];
+        std::vector<linyaps_box::config::linux_t::id_mapping_t> gid_mappings;
+        std::transform(vec.cbegin(),
+                       vec.cend(),
+                       std::back_inserter(gid_mappings),
+                       [](const nlohmann::json &json) {
+                           return linyaps_box::config::linux_t::id_mapping_t{
+                               json["hostID"].get<uid_t>(),
+                               json["containerID"].get<uid_t>(),
+                               json["size"].get<size_t>(),
+                           };
+                       });
+        linux.gid_mappings = std::move(gid_mappings);
+    }
+
+    if (auto namespace_ptr = ptr / "namespaces"; obj.contains(namespace_ptr)) {
+        auto map_fn = [](const nlohmann::json &json) {
+            if (!json.contains("type")) {
+                throw std::runtime_error("property `type` is REQUIRED for linux namespaces");
+            }
+
+            linyaps_box::config::linux_t::namespace_t n;
+            auto type = json["type"].get<std::string>();
+            if (type == "pid") {
+                n.type = linyaps_box::config::linux_t::namespace_t::type_t::PID;
+            } else if (type == "network") {
+                n.type = linyaps_box::config::linux_t::namespace_t::type_t::NET;
+            } else if (type == "ipc") {
+                n.type = linyaps_box::config::linux_t::namespace_t::type_t::IPC;
+            } else if (type == "uts") {
+                n.type = linyaps_box::config::linux_t::namespace_t::type_t::UTS;
+            } else if (type == "mount") {
+                n.type = linyaps_box::config::linux_t::namespace_t::type_t::MOUNT;
+            } else if (type == "user") {
+                n.type = linyaps_box::config::linux_t::namespace_t::type_t::USER;
+            } else if (type == "cgroup") {
+                n.type = linyaps_box::config::linux_t::namespace_t::type_t::CGROUP;
+            } else {
+                throw std::runtime_error("unsupported namespace type: " + type);
+            }
+
+            if (json.contains("path")) {
+                n.path = json["path"].get<std::string>();
+            }
+
+            return n;
+        };
+
+        const auto &vec = obj[namespace_ptr];
+        std::vector<linyaps_box::config::linux_t::namespace_t> ns;
+        std::transform(vec.cbegin(), vec.cend(), std::back_inserter(ns), map_fn);
+
+        linux.namespaces = std::move(ns);
+    }
+
+    if (auto masked_path = ptr / "maskedPaths"; obj.contains(masked_path)) {
+        const auto &vec = obj[masked_path];
+        std::vector<std::filesystem::path> masked_paths;
+        std::transform(vec.cbegin(),
+                       vec.cend(),
+                       std::back_inserter(masked_paths),
+                       [](const nlohmann::json &json) {
+                           return json.get<std::string>();
+                       });
+        linux.masked_paths = std::move(masked_paths);
+    }
+
+    if (auto readonly_path = ptr / "readonlyPaths"; obj.contains(readonly_path)) {
+        const auto &vec = obj[readonly_path];
+        std::vector<std::filesystem::path> readonly_paths;
+        std::transform(vec.cbegin(),
+                       vec.cend(),
+                       std::back_inserter(readonly_paths),
+                       [](const nlohmann::json &json) {
+                           return json.get<std::string>();
+                       });
+        linux.readonly_paths = std::move(readonly_paths);
+    }
+
+    return linux;
+}
+
 linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 {
     static const auto ptr = ""_json_pointer;
@@ -234,68 +336,8 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
         }
     }
 
-    if (j.contains(ptr / "linux" / "namespaces")) {
-        for (const auto &ns : j[ptr / "linux" / "namespaces"]) {
-            linyaps_box::config::namespace_t n;
-            if (!ns.contains("type")) {
-                throw std::runtime_error("property `type` is REQUIRED for linux namespaces");
-            }
-
-            auto type = ns["type"].get<std::string>();
-            if (type == "pid") {
-                n.type = linyaps_box::config::namespace_t::type_t::PID;
-            } else if (type == "network") {
-                n.type = linyaps_box::config::namespace_t::type_t::NET;
-            } else if (type == "ipc") {
-                n.type = linyaps_box::config::namespace_t::type_t::IPC;
-            } else if (type == "uts") {
-                n.type = linyaps_box::config::namespace_t::type_t::UTS;
-            } else if (type == "mount") {
-                n.type = linyaps_box::config::namespace_t::type_t::MOUNT;
-            } else if (type == "user") {
-                n.type = linyaps_box::config::namespace_t::type_t::USER;
-            } else if (type == "cgroup") {
-                n.type = linyaps_box::config::namespace_t::type_t::CGROUP;
-            } else {
-                throw std::runtime_error("unsupported namespace type: " + type);
-            }
-
-            if (ns.contains("path")) {
-                n.path = ns["path"].get<std::string>();
-            }
-
-            cfg.namespaces.push_back(n);
-        }
-    } else {
-        LINYAPS_BOX_WARNING() << "No namespaces found";
-    }
-
-    if (j.contains(ptr / "linux" / "uidMappings")) {
-        std::vector<linyaps_box::config::id_mapping_t> uid_mappings;
-        for (const auto &m : j[ptr / "linux" / "uidMappings"]) {
-            linyaps_box::config::id_mapping_t id_mapping{};
-            id_mapping.host_id = m["hostID"].get<uid_t>();
-            id_mapping.container_id = m["containerID"].get<uid_t>();
-            id_mapping.size = m["size"].get<size_t>();
-            uid_mappings.push_back(id_mapping);
-        }
-        cfg.uid_mappings = uid_mappings;
-    } else {
-        LINYAPS_BOX_WARNING() << "No uidMappings found";
-    }
-
-    if (j.contains(ptr / "linux" / "gidMappings")) {
-        std::vector<linyaps_box::config::id_mapping_t> gid_mappings;
-        for (const auto &m : j[ptr / "linux" / "gidMappings"]) {
-            linyaps_box::config::id_mapping_t id_mapping{};
-            id_mapping.host_id = m["hostID"].get<uid_t>();
-            id_mapping.container_id = m["containerID"].get<uid_t>();
-            id_mapping.size = m["size"].get<size_t>();
-            gid_mappings.push_back(id_mapping);
-        }
-        cfg.gid_mappings = gid_mappings;
-    } else {
-        LINYAPS_BOX_WARNING() << "No gidMappings found";
+    if (auto linux_ptr = ptr / "linux"; j.contains(linux_ptr)) {
+        cfg.linux = parse_linux(j, linux_ptr);
     }
 
     if (j.contains(ptr / "hooks")) {

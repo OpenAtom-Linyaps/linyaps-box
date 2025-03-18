@@ -17,7 +17,7 @@ public:
     container(std::shared_ptr<status_directory> status_dir,
               const std::string &id,
               const std::filesystem::path &bundle,
-              std::filesystem::path config,
+              const std::filesystem::path &config,
               cgroup_manager_t manager);
 
     [[nodiscard]] const linyaps_box::config &get_config() const;

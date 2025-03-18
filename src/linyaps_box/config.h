@@ -6,7 +6,6 @@
 
 #include <sys/mount.h>
 
-#include <array>
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -88,34 +87,40 @@ struct config
 
     process_t process;
 
-    struct namespace_t
+    struct linux_t
     {
-        enum type_t {
-            INVALID = 0,
-            IPC = CLONE_NEWIPC,
-            UTS = CLONE_NEWUTS,
-            MOUNT = CLONE_NEWNS,
-            PID = CLONE_NEWPID,
-            NET = CLONE_NEWNET,
-            USER = CLONE_NEWUSER,
-            CGROUP = CLONE_NEWCGROUP,
+        struct id_mapping_t
+        {
+            uid_t host_id;
+            uid_t container_id;
+            size_t size;
         };
 
-        type_t type;
-        std::filesystem::path path;
+        struct namespace_t
+        {
+            enum type_t {
+                INVALID = 0,
+                IPC = CLONE_NEWIPC,
+                UTS = CLONE_NEWUTS,
+                MOUNT = CLONE_NEWNS,
+                PID = CLONE_NEWPID,
+                NET = CLONE_NEWNET,
+                USER = CLONE_NEWUSER,
+                CGROUP = CLONE_NEWCGROUP,
+            };
+
+            type_t type{ type_t::INVALID };
+            std::optional<std::filesystem::path> path;
+        };
+
+        std::optional<std::vector<namespace_t>> namespaces;
+        std::optional<std::vector<id_mapping_t>> uid_mappings;
+        std::optional<std::vector<id_mapping_t>> gid_mappings;
+        std::optional<std::vector<std::filesystem::path>> masked_paths;
+        std::optional<std::vector<std::filesystem::path>> readonly_paths;
     };
 
-    std::vector<namespace_t> namespaces;
-
-    struct id_mapping_t
-    {
-        uid_t host_id;
-        uid_t container_id;
-        size_t size;
-    };
-
-    std::vector<id_mapping_t> uid_mappings;
-    std::vector<id_mapping_t> gid_mappings;
+    std::optional<linux_t> linux;
 
     struct hooks_t
     {
