@@ -432,24 +432,32 @@ create_destination_symlink(const linyaps_box::utils::file_descriptor &root,
         return linyaps_box::utils::open_at(root, destination, O_PATH | O_NOFOLLOW | O_CLOEXEC);
     }
 
-    if (errno == EEXIST) {
-        std::array<char, PATH_MAX + 1> buf{};
-        auto to = ::readlinkat(root.get(), destination.c_str(), buf.data(), buf.size());
-        if (to == -1) {
-            throw std::system_error(errno, std::system_category(), "readlinkat");
-        }
-
-        if (std::string_view{ buf.data(), static_cast<size_t>(to) } == ret) {
-            return linyaps_box::utils::open_at(root, destination, O_PATH | O_NOFOLLOW | O_CLOEXEC);
-        }
-
-        throw std::system_error(errno,
-                                std::system_category(),
-                                "symlink " + destination.string()
-                                        + " already exists with a different content");
+    if (errno != EEXIST) {
+        throw std::system_error(errno, std::system_category(), "symlinkat");
     }
 
-    throw std::system_error(errno, std::system_category(), "symlinkat");
+    auto stat = linyaps_box::utils::lstatat(root, destination);
+    if (!S_ISLNK(stat.st_mode)) {
+        throw std::system_error(errno,
+                                std::system_category(),
+                                "destination " + destination.string()
+                                        + " already exists and is not a symlink");
+    }
+
+    std::array<char, PATH_MAX + 1> buf{};
+    auto to = ::readlinkat(root.get(), destination.c_str(), buf.data(), buf.size());
+    if (to == -1) {
+        throw std::system_error(errno, std::system_category(), "readlinkat");
+    }
+
+    if (std::string_view{ buf.data(), static_cast<size_t>(to) } == ret) {
+        return linyaps_box::utils::open_at(root, destination, O_PATH | O_NOFOLLOW | O_CLOEXEC);
+    }
+
+    throw std::system_error(errno,
+                            std::system_category(),
+                            "symlink " + destination.string()
+                                    + " already exists with a different content");
 }
 
 [[nodiscard]] linyaps_box::utils::file_descriptor
@@ -508,7 +516,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
         open_flag |= O_NOFOLLOW;
     }
     auto source_fd = linyaps_box::utils::open(mount.source.value(), open_flag);
-    auto source_stat = linyaps_box::utils::lstat(source_fd);
+    auto source_stat = linyaps_box::utils::lstatat(source_fd);
 
     auto sourceIsDir = S_ISDIR(source_stat.st_mode);
     auto destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
@@ -733,7 +741,7 @@ public:
                 throw;
             }
 
-            auto ret = linyaps_box::utils::fstat(dst);
+            auto ret = linyaps_box::utils::fstatat(dst);
             auto mount = linyaps_box::config::mount_t{};
 
             mount.destination = path;
@@ -928,7 +936,7 @@ private:
             }
         }
 
-        auto stat = linyaps_box::utils::lstat(*destination_fd);
+        auto stat = linyaps_box::utils::lstatat(*destination_fd);
         if (S_ISCHR(stat.st_mode) && major(stat.st_dev) == 1 && minor(stat.st_dev) == 3) {
             return;
         }

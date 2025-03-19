@@ -13,10 +13,14 @@
 
 namespace linyaps_box::utils {
 
-inline struct stat fstat(const file_descriptor &fd)
+inline struct stat fstatat(const file_descriptor &fd, std::filesystem::path path, int flag = 0)
 {
+    if (!path.empty() && path.is_absolute()) {
+        path = path.lexically_relative("/");
+    }
+
     struct stat statbuf{};
-    auto ret = ::fstatat(fd.get(), "", &statbuf, AT_EMPTY_PATH);
+    auto ret = ::fstatat(fd.get(), path.c_str(), &statbuf, flag);
     if (ret == -1) {
         throw std::system_error(errno, std::generic_category(), "fstatat");
     }
@@ -24,15 +28,14 @@ inline struct stat fstat(const file_descriptor &fd)
     return statbuf;
 }
 
-inline struct stat lstat(const file_descriptor &fd)
+inline struct stat fstatat(const file_descriptor &fd, const std::filesystem::path &path = "")
 {
-    struct stat statbuf{};
-    auto ret = ::fstatat(fd.get(), "", &statbuf, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
-    if (ret == -1) {
-        throw std::system_error(errno, std::generic_category(), "fstatat");
-    }
+    return linyaps_box::utils::fstatat(fd, path, AT_EMPTY_PATH);
+}
 
-    return statbuf;
+inline struct stat lstatat(const file_descriptor &fd, const std::filesystem::path &path = "")
+{
+    return linyaps_box::utils::fstatat(fd, path, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
 }
 
 inline struct statfs statfs(const file_descriptor &fd)
