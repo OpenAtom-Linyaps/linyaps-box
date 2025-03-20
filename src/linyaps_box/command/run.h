@@ -8,6 +8,6 @@
 
 namespace linyaps_box::command {
 
-int run(const run_options &options);
+[[nodiscard]] int run(const run_options &options);
 
 } // namespace linyaps_box::command

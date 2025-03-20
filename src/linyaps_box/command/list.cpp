@@ -11,9 +11,9 @@
 
 #include <memory>
 
-int linyaps_box::command::list(const struct list_options &options)
+void linyaps_box::command::list(const struct list_options &options)
 {
-    auto status_dir = std::make_unique<impl::status_directory>(options.global.root);
+    auto status_dir = std::make_unique<impl::status_directory>(options.global.get().root);
     if (!status_dir) {
         throw std::runtime_error("failed to create status directory");
     }
@@ -35,5 +35,4 @@ int linyaps_box::command::list(const struct list_options &options)
     }
 
     printer->print_statuses(statuses);
-    return 0;
 }

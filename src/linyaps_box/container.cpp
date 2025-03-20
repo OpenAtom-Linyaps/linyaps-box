@@ -647,7 +647,8 @@ public:
     explicit mounter(const linyaps_box::utils::file_descriptor &bundle,
                      const linyaps_box::container &container)
         : container(container)
-        , root(linyaps_box::utils::open_at(bundle, container.get_config().root.path, O_PATH))
+        , root(linyaps_box::utils::open_at(
+                  bundle, container.get_config().root.path, O_PATH | O_DIRECTORY | O_CLOEXEC))
     {
     }
 
@@ -913,7 +914,7 @@ private:
         } while (false);
     }
 
-    void configure_deivce(const std::filesystem::path &destination, mode_t mode, dev_t dev)
+    void configure_device(const std::filesystem::path &destination, mode_t mode, dev_t dev)
     {
         assert(destination.is_absolute());
 
@@ -955,12 +956,13 @@ private:
     {
         LINYAPS_BOX_DEBUG() << "Configure default devices";
 
-        this->configure_deivce("/dev/null", 0666, makedev(1, 3));
-        this->configure_deivce("/dev/zero", 0666, makedev(1, 5));
-        this->configure_deivce("/dev/full", 0666, makedev(1, 7));
-        this->configure_deivce("/dev/random", 0666, makedev(1, 8));
-        this->configure_deivce("/dev/urandom", 0666, makedev(1, 9));
-        this->configure_deivce("/dev/tty", 0666, makedev(5, 0));
+        constexpr auto default_type = 0666 | S_IFCHR;
+        this->configure_device("/dev/null", default_type, makedev(1, 3));
+        this->configure_device("/dev/zero", default_type, makedev(1, 5));
+        this->configure_device("/dev/full", default_type, makedev(1, 7));
+        this->configure_device("/dev/random", default_type, makedev(1, 8));
+        this->configure_device("/dev/urandom", default_type, makedev(1, 9));
+        this->configure_device("/dev/tty", default_type, makedev(5, 0));
 
         // TODO Handle `/dev/console`;
 
