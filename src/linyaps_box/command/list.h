@@ -8,6 +8,6 @@
 
 namespace linyaps_box::command {
 
-[[nodiscard]] int list(const list_options &options);
+void list(const list_options &options);
 
 } // namespace linyaps_box::command

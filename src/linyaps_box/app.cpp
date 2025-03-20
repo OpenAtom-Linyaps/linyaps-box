@@ -13,6 +13,19 @@
 #include <iostream>
 #include <stdexcept>
 
+namespace {
+
+template<typename... T>
+struct subCommand : T...
+{
+    using T::operator()...;
+};
+
+template<typename... T>
+subCommand(T...) -> subCommand<T...>;
+
+} // namespace
+
 namespace linyaps_box {
 
 // The main function of the ll-box,
@@ -41,30 +54,28 @@ try {
     }();
 
     command::options options = command::parse(argc, argv);
-
-    if (options.global.return_code) {
-        return *options.global.return_code;
+    if (options.global.return_code != 0) {
+        return options.global.return_code;
     }
 
-    switch (options.global.command) {
-    case command::global_options::command_t::list: {
-        return command::list(options.list);
-    }
-    case command::global_options::command_t::run: {
-        return command::run(options.run);
-    }
-    case command::global_options::command_t::exec: {
-        command::exec(options.exec);
-        throw std::logic_error("unreachable");
-    }
-    case command::global_options::command_t::kill: {
-        return command::kill(options.kill);
-    }
-    case command::global_options::command_t::not_set:
-    default: {
-        throw std::logic_error("unreachable");
-    }
-    }
+    std::visit(subCommand{ [](const command::list_options &options) {
+                              command::list(options);
+                          },
+                           [](const command::exec_options &options) {
+                               command::exec(options);
+                           },
+                           [](const command::kill_options &options) {
+                               command::kill(options);
+                           },
+                           [](const command::run_options &options) {
+                               options.global.get().return_code = command::run(options);
+                           },
+                           [](const std::monostate &) {
+                               throw std::runtime_error("unknown subcommand");
+                           } },
+               options.subcommand_opt);
+
+    return options.global.return_code;
 } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << std::endl;
     return -1;

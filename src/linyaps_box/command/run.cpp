@@ -11,7 +11,7 @@
 int linyaps_box::command::run(const struct run_options &options)
 {
     std::unique_ptr<status_directory> dir =
-            std::make_unique<impl::status_directory>(options.global.root);
+            std::make_unique<impl::status_directory>(options.global.get().root);
     runtime_t runtime(std::move(dir));
     runtime_t::create_container_options_t create_container_options;
     create_container_options.bundle = options.bundle;

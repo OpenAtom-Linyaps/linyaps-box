@@ -10,7 +10,7 @@
 
 #include <unistd.h>
 
-linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]) noexcept // NOLINT
+linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]) // NOLINT
 {
     CLI::App app{ "A simple OCI runtime implementation focused on desktop applications.",
                   "ll-box" };
@@ -39,8 +39,9 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
 
     app.require_subcommand();
 
+    list_options list_opt{ options.global };
     auto *cmd_list = app.add_subcommand("list", "List know containers");
-    cmd_list->add_option("-f,--format", options.list.output_format, "Specify the output format")
+    cmd_list->add_option("-f,--format", list_opt.output_format, "Specify the output format")
             ->type_name("FORMAT")
             ->transform(CLI::CheckedTransformer(
                     std::unordered_map<std::string_view, list_options::output_format_t>{
@@ -49,22 +50,23 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                     }))
             ->default_val(list_options::output_format_t::table);
 
+    run_options run_opt{ options.global };
     auto *cmd_run = app.add_subcommand("run", "Create and immediately start a container");
-    cmd_run->add_option("CONTAINER", options.run.ID, "The container ID")->required();
-    cmd_run->add_option("-b,--bundle", options.run.bundle, "Path to the OCI bundle")
-            ->default_val(".");
-    cmd_run->add_option("-f,--config", options.run.config, "Override the configuration file to use")
+    cmd_run->add_option("CONTAINER", run_opt.ID, "The container ID")->required();
+    cmd_run->add_option("-b,--bundle", run_opt.bundle, "Path to the OCI bundle")->default_val(".");
+    cmd_run->add_option("-f,--config", run_opt.config, "Override the configuration file to use")
             ->default_val("config.json");
 
+    exec_options exec_opt{ options.global };
     auto *cmd_exec = app.add_subcommand("exec", "Exec a command in a running container")
                              ->positionals_at_end();
     cmd_exec->add_option("-u,--user",
-                         options.exec.user,
+                         exec_opt.user,
                          "Specify the user, "
                          "for example `1000` for UID=1000 "
                          "or `1000:1000` for UID=1000 and GID=1000")
             ->type_name("UID[:GID]");
-    cmd_exec->add_option("--cwd", options.exec.cwd, "Current working directory.");
+    cmd_exec->add_option("--cwd", exec_opt.cwd, "Current working directory.");
     // TODO: enable capabilities and no_new_privs support after rewrite exec,
     //      cmd_exec->add_option("-c,--cap", options.exec.caps, "Set capabilities")
     //              ->check(
@@ -80,13 +82,14 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     //                        options.exec.no_new_privs,
     //                        "Set the no new privileges value for the process")
     //             ->default_val(false);
-    cmd_exec->add_option("CONTAINER", options.exec.ID, "Container ID")->required();
-    cmd_exec->add_option("COMMAND", options.exec.command, "Command to execute")->required();
+    cmd_exec->add_option("CONTAINER", exec_opt.ID, "Container ID")->required();
+    cmd_exec->add_option("COMMAND", exec_opt.command, "Command to execute")->required();
 
+    kill_options kill_opt{ options.global };
     auto *cmd_kill =
             app.add_subcommand("kill", "Send the specified signal to the container init process");
-    cmd_kill->add_option("CONTAINER", options.kill.container, "The container ID")->required();
-    cmd_kill->add_option("SIGNAL", options.kill.signal, "Signal to send")->default_val("SIGTERM");
+    cmd_kill->add_option("CONTAINER", kill_opt.container, "The container ID")->required();
+    cmd_kill->add_option("SIGNAL", kill_opt.signal, "Signal to send")->default_val("SIGTERM");
 
     try {
         app.parse(argc, argv);
@@ -95,13 +98,13 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     }
 
     if (cmd_list->parsed()) {
-        options.global.command = global_options::command_t::list;
+        options.subcommand_opt = list_opt;
     } else if (cmd_run->parsed()) {
-        options.global.command = global_options::command_t::run;
+        options.subcommand_opt = run_opt;
     } else if (cmd_exec->parsed()) {
-        options.global.command = global_options::command_t::exec;
+        options.subcommand_opt = exec_opt;
     } else if (cmd_kill->parsed()) {
-        options.global.command = global_options::command_t::kill;
+        options.subcommand_opt = kill_opt;
     }
 
     return options;

@@ -8,6 +8,6 @@
 
 namespace linyaps_box::command {
 
-int kill(const kill_options &options);
+void kill(const kill_options &options);
 
 } // namespace linyaps_box::command

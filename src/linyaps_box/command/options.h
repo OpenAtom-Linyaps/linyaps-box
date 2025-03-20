@@ -8,18 +8,16 @@
 
 #include <filesystem>
 #include <optional>
+#include <variant>
 #include <vector>
 
 namespace linyaps_box::command {
 
 struct global_options
 {
-    enum class command_t : std::uint8_t { not_set, list, exec, run, kill };
-
-    command_t command{ command_t::not_set };
     cgroup_manager_t manager{ cgroup_manager_t::cgroupfs };
     std::filesystem::path root;
-    std::optional<int> return_code;
+    int return_code{ 0 };
 };
 
 struct list_options
@@ -29,24 +27,24 @@ struct list_options
     //  use std::uint16_t for now
     enum class output_format_t : std::uint16_t { table, json };
 
-    explicit list_options(const global_options &global)
+    explicit list_options(global_options &global)
         : global(global)
     {
     }
 
-    const global_options &global;
+    std::reference_wrapper<global_options> global;
     output_format_t output_format{ output_format_t::table };
 };
 
 struct exec_options
 {
-    explicit exec_options(const global_options &global)
+    explicit exec_options(global_options &global)
         : global(global)
     {
     }
 
-    const global_options &global;
-    bool no_new_privs;
+    std::reference_wrapper<global_options> global;
+    bool no_new_privs{};
     std::string user;
     std::optional<std::string> cwd;
     std::optional<std::vector<std::string>> caps;
@@ -56,12 +54,12 @@ struct exec_options
 
 struct run_options
 {
-    explicit run_options(const global_options &global)
+    explicit run_options(global_options &global)
         : global(global)
     {
     }
 
-    const global_options &global;
+    std::reference_wrapper<global_options> global;
     std::string ID;
     std::string bundle;
     std::string config;
@@ -69,12 +67,12 @@ struct run_options
 
 struct kill_options
 {
-    explicit kill_options(const global_options &global)
+    explicit kill_options(global_options &global)
         : global(global)
     {
     }
 
-    const global_options &global;
+    std::reference_wrapper<global_options> global;
     std::string container;
     std::string signal;
 };
@@ -83,22 +81,18 @@ struct options
 {
     options()
         : global()
-        , list(global)
-        , exec(global)
-        , run(global)
-        , kill(global)
     {
     }
 
+    using subcommand_opt_t =
+            std::variant<std::monostate, list_options, exec_options, run_options, kill_options>;
+
     global_options global;
-    list_options list;
-    exec_options exec;
-    run_options run;
-    kill_options kill;
+    subcommand_opt_t subcommand_opt;
 };
 
 // This function parses the command line arguments.
 // It might print help or usage to stdout or stderr.
-options parse(int argc, char *argv[]) noexcept; // NOLINT
+options parse(int argc, char *argv[]); // NOLINT
 
 } // namespace linyaps_box::command
