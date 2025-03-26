@@ -160,7 +160,7 @@ struct config
     struct root_t
     {
         std::filesystem::path path;
-        bool readonly = false;
+        bool readonly{ false };
     };
 
     root_t root;

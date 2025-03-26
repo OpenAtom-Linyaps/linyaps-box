@@ -34,6 +34,8 @@ public:
 
     int release() && noexcept;
 
+    [[nodiscard]] file_descriptor duplicate() const;
+
     file_descriptor &operator<<(const std::byte &byte);
 
     file_descriptor &operator>>(std::byte &byte);
