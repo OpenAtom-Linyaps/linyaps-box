@@ -170,6 +170,10 @@ set(linyaps-box_LIBRARY_LINK_LIBRARIES)
 set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
                                      "${CMAKE_CURRENT_BINARY_DIR}/src")
 
+if(linyaps-box_STATIC)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+endif()
+
 find_package(PkgConfig REQUIRED)
 
 if(linyaps-box_ENABLE_SECCOMP)
@@ -247,7 +251,8 @@ target_include_directories("${linyaps-box_APP}"
                            ${linyaps-box_APP_SOURCE_INCLUDE_DIRS})
 target_link_libraries("${linyaps-box_APP}" ${linyaps-box_APP_LINK_LIBRARIES})
 if(linyaps-box_STATIC)
-  target_link_options("${linyaps-box_APP}" PRIVATE -static)
+  target_link_options("${linyaps-box_APP}" PRIVATE -static -static-libgcc
+                      -static-libstdc++)
 endif()
 target_compile_features("${linyaps-box_APP}" PRIVATE cxx_std_17)
 set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD 17)
