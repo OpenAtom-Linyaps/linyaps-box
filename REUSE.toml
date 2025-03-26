@@ -17,48 +17,13 @@ SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = ["rpm/**", "debian/**", "archlinux/**"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "None"
-SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
 path = [
     "README.md",
     "README.zh_CN.md",
-    "INSTALL.md",
-    "CHANGELOG.md",
-    "doc/**.md",
-    "src/**.md",
-    "docs/**.md",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
 SPDX-License-Identifier = "CC-BY-4.0"
-
-[[annotations]]
-path = ["translations/**", "plugins/**.ts"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
-SPDX-License-Identifier = "LGPL-3.0-or-later"
-
-[[annotations]]
-path = [
-    "plugins/**.png",
-    "plugins/**.svg",
-    "frame/**.svg",
-    "tests/**.png",
-    "tests/**.svg",
-]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
-SPDX-License-Identifier = "LGPL-3.0-or-later"
-
-[[annotations]]
-path = ["plugins/**.qrc", "frame/**.qrc", "tests/**.qrc"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "None"
-SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
 path = [
@@ -66,72 +31,19 @@ path = [
     "CMakeLists.txt",
     ".gitignore",
     "tests/ll-box-ut/.gitignore",
-    "src/CMakeLists.txt",
-    "test/CMakeLists.txt",
-    "test/protype/CMakeLists.txt",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "None"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = "3party/nlohmann/json.hpp"
+path = [".clang-format", ".cmake-format.py"]
 precedence = "aggregate"
-SPDX-FileCopyrightText = "Niels Lohmann"
+SPDX-FileCopyrightText = "None"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = ["cmake/CPM.cmake"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2019-2023 Lars Melchior and contributors"
 SPDX-License-Identifier = "MIT"
-
-[[annotations]]
-path = "3party/optional/optional.hpp"
-precedence = "aggregate"
-SPDX-FileCopyrightText = "None"
-SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
-path = [
-    "gschema/**.xml",
-    "plugins/**.xml",
-    "frame/**.xml",
-    ".clog.toml",
-    "plugins/**.json",
-    "configs/**.json",
-    ".packit.yaml",
-    ".tx/config",
-    "test/data/demo/**.json",
-    "src/service/resource/**.json",
-]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "None"
-SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
-path = [".clang-format", "3party/.clang-format", ".cmake-format.py"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "None"
-SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
-path = [
-    "gen_report.sh",
-    "lupdate.sh",
-    "plugins/dcc-dock-plugin/translate_generation.sh",
-    "tests/test-recoverage.sh",
-    "translate_generation.sh",
-    "scripts/**",
-]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "None"
-SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
-path = [
-    "frame/dbus/**",
-    "plugins/disk-mount/dbus/dbusdiskmount.**",
-    "plugins/power/dbus/dbuspower.**",
-    "plugins/shutdown/dbus/dbuspowermanager.**",
-    "plugins/tray/dbus/dbustraymanager.**",
-    "src/module/dbus_ipc/**",
-    "src/module/dbus_ipc/**",
-]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "The Qt Company Ltd."
-SPDX-License-Identifier = "CC0-1.0"
