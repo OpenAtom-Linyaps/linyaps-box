@@ -54,10 +54,6 @@ endif()
 
 option(linyaps-box_ENABLE_CPACK "Enable CPack." OFF)
 
-include(CheckIncludeFileCXX)
-
-check_include_file_cxx("linux/openat2.h" LINYAPS_HAVE_OPENAT2_H)
-
 if(linyaps-box_ENABLE_CPACK)
   set(linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX
       "/opt/org.openatom.linyaps-box"
@@ -92,7 +88,14 @@ set(linyaps-box_ACTIVE_LOG_LEVEL
       "The active syslog priority. This is used to filter log messages at compile time."
 )
 
+set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
+    OFF
+    CACHE BOOL "use local packages only")
+
 # ==============================================================================
+
+include(CheckIncludeFileCXX)
+check_include_file_cxx("linux/openat2.h" LINYAPS_HAVE_OPENAT2_H)
 
 set(linyaps-box_LIBRARY linyaps-box)
 set(linyaps-box_LIBRARY_SOURCE
@@ -186,11 +189,31 @@ if(linyaps-box_ENABLE_CAP)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
 endif()
 
-find_package(nlohmann_json 3.5.0 REQUIRED)
+if(NOT linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+  include(CPM)
+
+  CPMFindPackage(
+    NAME nlohmann_json
+    VERSION 3.11.3
+    GITHUB_REPOSITORY nlohmann/json
+    GIT_TAG v3.11.3
+    EXCLUDE_FROM_ALL ON
+    OPTIONS "JSON_BuildTests OFF")
+  CPMFindPackage(
+    NAME CLI11
+    VERSION 2.5.0
+    GITHUB_REPOSITORY CLIUtils/CLI11
+    GIT_TAG v2.5.0
+    EXCLUDE_FROM_ALL ON
+    OPTIONS "CLI11_BUILD_TESTS OFF")
+endif()
+
+find_package(nlohmann_json 3.11.3 REQUIRED)
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
      nlohmann_json::nlohmann_json)
 
-find_package(CLI11 REQUIRED)
+find_package(CLI11 2.5.0 REQUIRED)
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
 
 add_library("${linyaps-box_LIBRARY}" ${linyaps-box_LIBRARY_SOURCE})
