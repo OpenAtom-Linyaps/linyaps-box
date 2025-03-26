@@ -18,14 +18,10 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::mkdir(const file_descrip
 {
     LINYAPS_BOX_DEBUG() << "mkdir " << path << " at " << inspect_fd(root.get());
 
-    int fd = ::dup(root.get());
-    if (fd == -1) {
-        throw std::system_error(errno, std::generic_category(), "dup");
-    }
-
+    auto current = root.duplicate();
     if (path.empty()) {
         // do nothing
-        return file_descriptor{ fd };
+        return current;
     }
 
     if (path.is_absolute()) {
@@ -36,7 +32,7 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::mkdir(const file_descrip
         path = path.parent_path();
     }
 
-    file_descriptor current(fd);
+    int fd{ -1 };
     int depth{ 0 };
     for (const auto &part : path) {
         LINYAPS_BOX_DEBUG() << "part=" << part << " mode=0" << std::oct << mode;

@@ -8,6 +8,8 @@
 
 #include <cstring>
 
+#include <fcntl.h>
+
 linyaps_box::utils::file_descriptor_closed_exception::file_descriptor_closed_exception()
     : std::runtime_error("file descriptor is closed")
 {
@@ -45,6 +47,20 @@ int linyaps_box::utils::file_descriptor::release() && noexcept
 int linyaps_box::utils::file_descriptor::get() const noexcept
 {
     return fd;
+}
+
+linyaps_box::utils::file_descriptor linyaps_box::utils::file_descriptor::duplicate() const
+{
+    if (fd == -1) {
+        throw file_descriptor_closed_exception();
+    }
+
+    auto ret = fcntl(fd, F_DUPFD_CLOEXEC);
+    if (ret < 0) {
+        throw std::system_error(errno, std::generic_category(), "fcntl");
+    }
+
+    return file_descriptor{ ret };
 }
 
 linyaps_box::utils::file_descriptor &

@@ -142,11 +142,19 @@ std::string inspect_fds()
             || entry.path() == "/proc/self/fdinfo/2") {
             continue;
         }
+
+        auto fd = entry.path().filename();
+        auto realpath = inspect_path(std::stoi(fd.c_str()));
+        if (realpath.filename() == "fdinfo") {
+            continue;
+        }
+
         if (!first_line) {
             ss << '\n';
         }
         first_line = false;
-        ss << entry.path() << " " << inspect_fdinfo(entry.path());
+
+        ss << entry.path() << " -> " << realpath << ":" << inspect_fdinfo(entry.path());
     }
 
     return ss.str();

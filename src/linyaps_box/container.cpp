@@ -46,6 +46,8 @@
 #include <sys/capability.h>
 #endif
 
+constexpr auto propagations_flag = (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE);
+
 namespace {
 
 enum class sync_message : std::uint8_t {
@@ -520,7 +522,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
 
     auto sourceIsDir = S_ISDIR(source_stat.st_mode);
     auto destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
-    auto bind_flags = mount.flags & ~MS_RDONLY;
+    auto bind_flags = mount.flags & ~(propagations_flag | MS_RDONLY);
 
     try {
         // bind mount will ignore fstype and data
@@ -535,7 +537,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
         throw;
     }
 
-    return ensure_mount_destination(sourceIsDir, root, mount);
+    return linyaps_box::utils::open_at(root, mount.destination.value(), open_flag);
 }
 
 void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor &root,
@@ -643,13 +645,85 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
 
 class mounter
 {
+    void make_rootfs_private()
+    {
+        auto rootfsfd = root.duplicate();
+        const auto &rootfs = rootfsfd.current_path();
+        for (auto it = std::cbegin(rootfs); it != std::cend(rootfs); ++it) {
+            LINYAPS_BOX_DEBUG() << "make " << rootfsfd.current_path() << " private";
+
+            try {
+                do_propagation_mount(rootfsfd, MS_PRIVATE);
+                return;
+            } catch (const std::system_error &e) {
+                auto parent_fd = ::openat(rootfsfd.get(), "..", O_PATH | O_CLOEXEC);
+                if (parent_fd < 0) {
+                    throw std::system_error(errno, std::generic_category(), "openat");
+                }
+
+                rootfsfd = linyaps_box::utils::file_descriptor(parent_fd);
+            }
+        }
+
+        throw std::runtime_error("make rootfs private failed");
+    }
+
 public:
-    explicit mounter(const linyaps_box::utils::file_descriptor &bundle,
+    explicit mounter(linyaps_box::utils::file_descriptor root,
                      const linyaps_box::container &container)
         : container(container)
-        , root(linyaps_box::utils::open_at(
-                  bundle, container.get_config().root.path, O_PATH | O_DIRECTORY | O_CLOEXEC))
+        , root(std::move(root))
     {
+    }
+
+    void configure_rootfs()
+    {
+        const auto &config = container.get_config();
+
+        if (!config.linux || !config.linux->namespaces) {
+            return;
+        }
+
+        auto unshared_mount_ns =
+                std::find_if(std::cbegin(*(config.linux->namespaces)),
+                             std::cend(*(config.linux->namespaces)),
+                             [](const linyaps_box::config::linux_t::namespace_t &ns) -> bool {
+                                 return ns.type == linyaps_box::config::linux_t::namespace_t::MOUNT;
+                             });
+        if (unshared_mount_ns == std::cend(*(config.linux->namespaces))) {
+            LINYAPS_BOX_DEBUG() << "no unshared mount namespace";
+            return;
+        }
+
+        // we will pivot root later
+        LINYAPS_BOX_DEBUG() << "configure rootfs";
+        do_propagation_mount(linyaps_box::utils::open("/", O_PATH | O_CLOEXEC | O_DIRECTORY),
+                             MS_REC | MS_PRIVATE);
+
+        // make sure the parent mount of rootfs is private
+        // pivot root will fail if it has shared propagation type
+        make_rootfs_private();
+
+        LINYAPS_BOX_DEBUG() << "rebind container rootfs";
+
+        linyaps_box::config::mount_t mount;
+        mount.source = root.current_path();
+        mount.destination = ".";
+        mount.flags = MS_BIND | MS_REC;
+        // mount.propagation_flags = MS_PRIVATE | MS_REC;
+        auto ret = do_mount(container, root, mount);
+        assert(!ret);
+
+        // reopen rootfs after mount
+        root = linyaps_box::utils::open(root.current_path(), O_PATH | O_CLOEXEC | O_DIRECTORY);
+
+        if (config.root.readonly) {
+            LINYAPS_BOX_DEBUG() << "remount bind rootfs to readonly";
+            remount_t mount;
+            mount.destination_fd = root.duplicate();
+            mount.flags = MS_RDONLY | MS_BIND | MS_REMOUNT;
+            remounts.push_back(std::move(mount));
+        }
     }
 
     void do_mounts()
@@ -704,8 +778,8 @@ public:
             auto ret = linyaps_box::utils::statfs(dst);
             mount_flag |= ret.f_flags;
 
-            // parent mount flags may contain MS_REMOUNT, we should remove it due to the readonly
-            // path is not mounted yet
+            // parent mount flags may contain MS_REMOUNT, we should remove it due to the
+            // readonly path is not mounted yet
             mount_flag &= ~MS_REMOUNT;
 
             linyaps_box::config::mount_t mount{};
@@ -970,26 +1044,26 @@ private:
     }
 };
 
-void configure_mounts(const linyaps_box::container &container)
+void configure_mounts(const linyaps_box::container &container, const std::filesystem::path &rootfs)
 {
     LINYAPS_BOX_DEBUG() << "Configure mounts";
 
-    if (container.get_config().mounts.empty()) {
+    const auto &config = container.get_config();
+
+    if (config.mounts.empty()) {
         LINYAPS_BOX_DEBUG() << "Nothing to do";
         return;
     }
 
-    std::unique_ptr<mounter> m;
-
-    {
-        auto bundle = linyaps_box::utils::open(container.get_bundle(), O_PATH);
-        m = std::make_unique<mounter>(bundle, container);
-    }
+    auto m = std::make_unique<mounter>(
+            linyaps_box::utils::open(rootfs, O_PATH | O_DIRECTORY | O_CLOEXEC),
+            container);
 
     // TODO: if root is read only, add it to remount list
 
     LINYAPS_BOX_DEBUG() << "Processing mount points";
 
+    m->configure_rootfs();
     m->do_mounts();
     m->make_path_masked();
     m->make_path_readonly();
@@ -1041,9 +1115,16 @@ void configure_mounts(const linyaps_box::container &container)
         throw std::system_error(errno, std::generic_category(), "setuid");
     }
 
-    LINYAPS_BOX_DEBUG() << "All opened file describers:\n" << linyaps_box::utils::inspect_fds();
+    // LINYAPS_BOX_DEBUG() << "All opened file describers:\n" << linyaps_box::utils::inspect_fds();
 
-    LINYAPS_BOX_DEBUG() << "Execute container process";
+    LINYAPS_BOX_DEBUG() << "Execute container process:" << [&process] {
+        std::stringstream ss;
+        ss << " " << process.args[0];
+        for (size_t i = 1; i < process.args.size(); ++i) {
+            ss << " " << process.args[i];
+        }
+        return ss.str();
+    }();
 
     execvpe(c_args[0],
             const_cast<char *const *>(c_args.data()),
@@ -1098,41 +1179,27 @@ void create_container_hooks(const linyaps_box::container &container,
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
 
-void do_pivot_root(const linyaps_box::container &container)
+void do_pivot_root(const std::filesystem::path &rootfs)
 {
-    const auto &config = container.get_config();
-
+    LINYAPS_BOX_DEBUG() << "start pivot root";
+    LINYAPS_BOX_DEBUG() << linyaps_box::utils::inspect_fds();
     auto old_root = linyaps_box::utils::open("/", O_DIRECTORY | O_PATH | O_CLOEXEC);
-    auto new_root = linyaps_box::utils::open((container.get_bundle() / config.root.path).c_str(),
-                                             O_DIRECTORY | O_PATH | O_CLOEXEC);
+    auto new_root = linyaps_box::utils::open(rootfs.c_str(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
 
-    long ret{ -1 };
-    ret = mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr);
-    if (ret < 0) {
-        throw std::system_error(errno, std::generic_category(), "mount");
-    }
+    auto old_root_stat = linyaps_box::utils::statfs(old_root);
+    LINYAPS_BOX_DEBUG() << "Pivot root old root: " << dump_mount_flags(old_root_stat.f_flags);
 
-    ret = mount(new_root.proc_path().c_str(),
-                new_root.proc_path().c_str(),
-                nullptr,
-                MS_BIND | MS_REC,
-                nullptr);
-    if (ret < 0) {
-        throw std::system_error(errno, std::generic_category(), "mount");
-    }
+    auto new_root_stat = linyaps_box::utils::statfs(new_root);
+    LINYAPS_BOX_DEBUG() << "Pivot root new root: " << dump_mount_flags(new_root_stat.f_flags);
 
-    new_root = linyaps_box::utils::open((container.get_bundle() / config.root.path).c_str(),
-                                        O_DIRECTORY | O_PATH | O_CLOEXEC);
-
-    ret = fchdir(new_root.get());
+    auto ret = fchdir(new_root.get());
     if (ret < 0) {
         throw std::system_error(errno, std::generic_category(), "fchdir");
     }
 
     LINYAPS_BOX_DEBUG() << "Pivot root new root: "
                         << linyaps_box::utils::inspect_fd(new_root.get());
-
-    ret = syscall(SYS_pivot_root, ".", ".");
+    ret = syscall(__NR_pivot_root, ".", ".");
     if (ret < 0) {
         throw std::system_error(errno, std::generic_category(), "pivot_root");
     }
@@ -1374,13 +1441,18 @@ try {
     const auto &process = *args.process;
     auto &socket = args.socket;
 
+    auto rootfs = container.get_config().root.path;
+    if (rootfs.is_relative()) {
+        rootfs = std::filesystem::canonical(container.get_bundle() / rootfs);
+    }
+
     initialize_container(container.get_config(), socket);
     auto [runtime_cap] = get_runtime_security_status(); // get runtime status before pivot root
-    configure_mounts(container);
+    configure_mounts(container, rootfs);
     wait_create_runtime_result(container, socket);
     create_container_hooks(container, socket);
     // TODO: selinux label/apparmor profile
-    do_pivot_root(container);
+    do_pivot_root(rootfs);
     set_umask(container.get_config().process.user.umask);
     set_capabilities(container, runtime_cap);
     start_container_hooks(container, socket);
@@ -1701,8 +1773,8 @@ void configure_container_namespaces(const linyaps_box::container &container,
                 != namespaces->end()) {
                 auto pid = container.status().PID;
 
-                // TODO: if not mapping a range of uid/gid, we could set uid/gid in the container
-                // process
+                // TODO: if not mapping a range of uid/gid, we could set uid/gid in the
+                // container process
                 if (const auto &gid_mappings = linux->gid_mappings; gid_mappings) {
                     configure_gid_mapping(pid, gid_mappings.value());
                 }

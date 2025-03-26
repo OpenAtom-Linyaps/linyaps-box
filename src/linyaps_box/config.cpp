@@ -403,10 +403,18 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
         cfg.mounts = mounts;
     }
 
-    cfg.root.path = j[ptr / "root" / "path"].get<std::string>();
+    auto root = ptr / "root";
+    if (!j.contains(root)) {
+        throw std::runtime_error("root must be specified");
+    }
 
-    if (j.contains(ptr / "root" / "readonly")) {
-        cfg.root.readonly = j[ptr / "root" / "readonly"].get<bool>();
+    if (!j.contains(root / "path")) {
+        throw std::runtime_error("root.path must be specified");
+    }
+    cfg.root.path = j[root / "path"].get<std::filesystem::path>();
+
+    if (j.contains(root / "readonly")) {
+        cfg.root.readonly = j[root / "readonly"].get<bool>();
     }
 
     return cfg;
