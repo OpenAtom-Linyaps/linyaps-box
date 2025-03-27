@@ -64,7 +64,7 @@ struct security_status
     int cap{ -1 };
 };
 
-std::stringstream &&operator<<(std::stringstream &&os, sync_message message)
+std::ostream &operator<<(std::ostream &os, const sync_message message)
 {
     switch (message) {
     case sync_message::REQUEST_CONFIGURE_NAMESPACE: {
@@ -90,7 +90,7 @@ std::stringstream &&operator<<(std::stringstream &&os, sync_message message)
         os << "UNKNOWN " << (uint8_t)message;
     } break;
     }
-    return std::move(os);
+    return os;
 }
 
 std::string dump_mount_flags(uint flags) noexcept
@@ -186,9 +186,11 @@ class unexpected_sync_message : public std::logic_error
 {
 public:
     unexpected_sync_message(sync_message excepted, sync_message actual)
-        : std::logic_error((std::stringstream() << "unexpected sync message: expected " << excepted
-                                                << " got " << actual)
-                                   .str())
+        : std::logic_error([excepted, actual] {
+            std::stringstream stream;
+            stream << "unexpected sync message: expected " << excepted << " got " << actual;
+            return std::move(stream).str();
+        }())
     {
     }
 };
@@ -240,18 +242,17 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook)
         if (errno == EINTR && errno == EAGAIN) {
             continue;
         }
-        throw std::system_error(errno,
-                                std::generic_category(),
-                                (std::stringstream() << "waitpid " << pid).str());
+
+        throw std::system_error(errno, std::generic_category(), "waitpid " + std::to_string(pid));
     }
 
     if (WIFEXITED(status)) {
         return;
     }
 
-    throw std::runtime_error((std::stringstream() << "hook terminated by signal" << WTERMSIG(status)
-                                                  << " with " << WEXITSTATUS(status))
-                                     .str());
+    std::stringstream stream;
+    stream << "hook terminated by signal" << WTERMSIG(status) << " with " << WEXITSTATUS(status);
+    throw std::runtime_error(std::move(stream).str());
 }
 
 struct clone_fn_args
