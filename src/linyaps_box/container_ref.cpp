@@ -30,9 +30,9 @@ void linyaps_box::container_ref::kill(int signal) const
         return;
     }
 
-    throw std::system_error(errno,
-                            std::generic_category(),
-                            (std::stringstream() << "kill " << signal << " " << pid).str());
+    std::stringstream ss;
+    ss << "failed to kill process " << pid << " with signal " << signal;
+    throw std::system_error(errno, std::generic_category(), std::move(ss).str());
 }
 
 void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &process)
@@ -90,7 +90,6 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
     ::execvp("nsenter", const_cast<char **>(argv.data()));
 
     std::stringstream ss;
-
     ss << "execvp nsenter with arguments:";
     for (const auto &arg : argv) {
         ss << " " << arg;
