@@ -13,7 +13,7 @@
 
 namespace linyaps_box::utils {
 
-inline struct stat fstatat(const file_descriptor &fd, std::filesystem::path path, int flag = 0)
+inline struct stat fstatat(const file_descriptor &fd, std::filesystem::path path, int flag)
 {
     if (!path.empty() && path.is_absolute()) {
         path = path.lexically_relative("/");
@@ -28,12 +28,12 @@ inline struct stat fstatat(const file_descriptor &fd, std::filesystem::path path
     return statbuf;
 }
 
-inline struct stat fstatat(const file_descriptor &fd, const std::filesystem::path &path = "")
+inline struct stat fstatat(const file_descriptor &fd, const std::filesystem::path &path)
 {
     return linyaps_box::utils::fstatat(fd, path, AT_EMPTY_PATH);
 }
 
-inline struct stat lstatat(const file_descriptor &fd, const std::filesystem::path &path = "")
+inline struct stat lstatat(const file_descriptor &fd, const std::filesystem::path &path)
 {
     return linyaps_box::utils::fstatat(fd, path, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
 }
