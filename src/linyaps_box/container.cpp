@@ -519,7 +519,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
         open_flag |= O_NOFOLLOW;
     }
     auto source_fd = linyaps_box::utils::open(mount.source.value(), open_flag);
-    auto source_stat = linyaps_box::utils::lstatat(source_fd);
+    auto source_stat = linyaps_box::utils::lstatat(source_fd, "");
 
     auto sourceIsDir = S_ISDIR(source_stat.st_mode);
     auto destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
@@ -817,7 +817,7 @@ public:
                 throw;
             }
 
-            auto ret = linyaps_box::utils::fstatat(dst);
+            auto ret = linyaps_box::utils::fstatat(dst, "");
             auto mount = linyaps_box::config::mount_t{};
 
             mount.destination = path;
@@ -1012,7 +1012,7 @@ private:
             }
         }
 
-        auto stat = linyaps_box::utils::lstatat(*destination_fd);
+        auto stat = linyaps_box::utils::lstatat(*destination_fd, "");
         if (S_ISCHR(stat.st_mode) && major(stat.st_dev) == 1 && minor(stat.st_dev) == 3) {
             return;
         }

@@ -9,6 +9,8 @@
 #include <csignal>
 #include <utility>
 
+#include <unistd.h>
+
 linyaps_box::container_ref::container_ref(std::shared_ptr<status_directory> status_dir,
                                           std::string id)
     : id(std::move(id))

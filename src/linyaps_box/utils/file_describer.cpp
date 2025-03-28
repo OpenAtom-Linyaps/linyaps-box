@@ -4,6 +4,7 @@
 
 #include "linyaps_box/utils/file_describer.h"
 
+#include "linyaps_box/utils/fstat.h"
 #include "linyaps_box/utils/log.h"
 
 #include <cstring>
@@ -55,8 +56,19 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::file_descriptor::duplica
         throw file_descriptor_closed_exception();
     }
 
-    auto ret = fcntl(fd, F_DUPFD_CLOEXEC);
+    auto ret = dup(fd);
     if (ret < 0) {
+        throw std::system_error(errno, std::generic_category(), "fcntl");
+    }
+
+    // dup will lost the close-on-exec flag
+    // and we don't want to use FD_DUPFD_CLOEXEC due to it require a specific fd number
+    auto flag = fcntl(fd, F_GETFD);
+    if (flag < 0) {
+        throw std::system_error(errno, std::generic_category(), "fcntl");
+    }
+
+    if (fcntl(ret, F_SETFD, flag) < 0) {
         throw std::system_error(errno, std::generic_category(), "fcntl");
     }
 
