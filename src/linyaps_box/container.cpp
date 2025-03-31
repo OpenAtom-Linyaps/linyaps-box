@@ -22,7 +22,6 @@
 #include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/statfs.h>
-#include <sys/syscall.h> /* Definition of SYS_* constants */
 #include <sys/sysmacros.h>
 
 #include <algorithm>
@@ -293,11 +292,11 @@ void initialize_container(const linyaps_box::config &config,
     }
 }
 
-void system_call_mount(const char *_special_file,
-                       const char *_dir,
-                       const char *_fstype,
-                       unsigned long int _rwflag,
-                       const void *_data)
+void syscall_mount(const char *_special_file,
+                   const char *_dir,
+                   const char *_fstype,
+                   unsigned long int _rwflag,
+                   const void *_data)
 {
     constexpr decltype(auto) fd_prefix = "/proc/self/fd/";
     LINYAPS_BOX_DEBUG() << "mount\n"
@@ -362,7 +361,7 @@ void do_remount(const remount_t &mount)
     LINYAPS_BOX_DEBUG() << "Remount " << destination << " with flags "
                         << dump_mount_flags(mount.flags);
     try {
-        system_call_mount(nullptr, destination.c_str(), nullptr, mount.flags, data_ptr);
+        syscall_mount(nullptr, destination.c_str(), nullptr, mount.flags, data_ptr);
         return;
     } catch (const std::system_error &e) {
         LINYAPS_BOX_DEBUG() << "Failed to remount "
@@ -375,11 +374,11 @@ void do_remount(const remount_t &mount)
     auto remount_flags = state.f_flags & (MS_NOSUID | MS_NODEV | MS_NOEXEC);
     if ((remount_flags | mount.flags) != mount.flags) {
         try {
-            system_call_mount(nullptr,
-                              destination.c_str(),
-                              nullptr,
-                              remount_flags | mount.flags,
-                              data_ptr);
+            syscall_mount(nullptr,
+                          destination.c_str(),
+                          nullptr,
+                          remount_flags | mount.flags,
+                          data_ptr);
             return;
         } catch (const std::system_error &e) {
             LINYAPS_BOX_DEBUG() << "Failed to remount "
@@ -391,11 +390,7 @@ void do_remount(const remount_t &mount)
 
     if ((state.f_flags & MS_RDONLY) != 0) {
         remount_flags = state.f_flags & (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RDONLY);
-        system_call_mount(nullptr,
-                          destination.c_str(),
-                          nullptr,
-                          mount.flags | remount_flags,
-                          data_ptr);
+        syscall_mount(nullptr, destination.c_str(), nullptr, mount.flags | remount_flags, data_ptr);
     }
 }
 
@@ -504,7 +499,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
         return;
     }
 
-    system_call_mount(nullptr, destination.proc_path().c_str(), nullptr, flags, nullptr);
+    syscall_mount(nullptr, destination.proc_path().c_str(), nullptr, flags, nullptr);
 }
 
 [[nodiscard]] linyaps_box::utils::file_descriptor do_bind_mount(
@@ -527,11 +522,11 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
 
     try {
         // bind mount will ignore fstype and data
-        system_call_mount(source_fd.proc_path().c_str(),
-                          destination_fd.proc_path().c_str(),
-                          nullptr,
-                          bind_flags,
-                          nullptr);
+        syscall_mount(source_fd.proc_path().c_str(),
+                      destination_fd.proc_path().c_str(),
+                      nullptr,
+                      bind_flags,
+                      nullptr);
     } catch (const std::system_error &e) {
         // mounting sysfs with rootless/userns container will fail with EPERM
         // TODO: try to bind mount /sys
@@ -600,11 +595,11 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
     } else {
         // mount other types
         destination_fd = ensure_mount_destination(true, root, mount);
-        system_call_mount(mount.source ? mount.source.value().c_str() : nullptr,
-                          destination_fd.proc_path().c_str(),
-                          mount.type.empty() ? nullptr : mount.type.c_str(),
-                          mount.flags,
-                          mount.data.empty() ? nullptr : mount.data.c_str());
+        syscall_mount(mount.source ? mount.source.value().c_str() : nullptr,
+                      destination_fd.proc_path().c_str(),
+                      mount.type.empty() ? nullptr : mount.type.c_str(),
+                      mount.flags,
+                      mount.data.empty() ? nullptr : mount.data.c_str());
     }
 
     do_propagation_mount(destination_fd, mount.propagation_flags);
@@ -1116,7 +1111,7 @@ void configure_mounts(const linyaps_box::container &container, const std::filesy
         throw std::system_error(errno, std::generic_category(), "setuid");
     }
 
-    // LINYAPS_BOX_DEBUG() << "All opened file describers:\n" << linyaps_box::utils::inspect_fds();
+    LINYAPS_BOX_DEBUG() << "All opened file describers:\n" << linyaps_box::utils::inspect_fds();
 
     LINYAPS_BOX_DEBUG() << "Execute container process:" << [&process] {
         std::stringstream ss;
