@@ -143,6 +143,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/atomic_write.h
     src/linyaps_box/utils/cgroups.cpp
     src/linyaps_box/utils/cgroups.h
+    src/linyaps_box/utils/close_range.cpp
+    src/linyaps_box/utils/close_range.h
     src/linyaps_box/utils/file_describer.cpp
     src/linyaps_box/utils/file_describer.h
     src/linyaps_box/utils/fstat.cpp

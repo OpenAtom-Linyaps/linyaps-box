@@ -7,6 +7,7 @@
 #include "linyaps_box/configuration.h"
 #include "linyaps_box/impl/disabled_cgroup_manager.h"
 #include "linyaps_box/utils/cgroups.h"
+#include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/fstat.h"
 #include "linyaps_box/utils/inspect.h"
@@ -1373,30 +1374,27 @@ void start_container_hooks(const linyaps_box::container &container,
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
 
-void close_other_fds(const std::set<unsigned int> &except_fds)
+void close_other_fds(std::set<uint> except_fds)
 {
     LINYAPS_BOX_DEBUG() << "Close all fds excepts " << [&]() {
         std::stringstream ss;
-        for (const auto &fd : except_fds) {
+        for (auto fd : except_fds) {
             ss << fd << " ";
         }
         return ss.str();
     }();
 
-    auto tmp = except_fds;
-    tmp.insert(0);
-    tmp.insert(~0U);
-    for (auto fd = tmp.begin(); std::next(fd) != tmp.end(); fd++) {
+    except_fds.insert(0);
+    except_fds.insert(std::numeric_limits<uint>::max());
+
+    for (auto fd = except_fds.begin(); std::next(fd) != except_fds.end(); ++fd) {
         auto low = *fd + 1;
         auto high = *std::next(fd) - 1;
         if (low >= high) {
             continue;
         }
-        LINYAPS_BOX_DEBUG() << "close_range [" << low << ", " << high << "]";
-        auto ret = close_range(low, high, 0);
-        if (ret != 0) {
-            throw std::system_error(errno, std::generic_category(), "close_range");
-        }
+
+        linyaps_box::utils::close_range(low, high, 0);
     }
 }
 
