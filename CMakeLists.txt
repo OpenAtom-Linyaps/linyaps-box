@@ -30,10 +30,6 @@ endif()
 
 option(linyaps-box_STATIC "Build linyaps-box as statically-linked binary." OFF)
 
-option(linyaps-box_ENABLE_SECCOMP "Build linyaps-box with seccomp support." OFF)
-
-option(linyaps-box_ENABLE_CAP "Build linyaps-box with capability support" ON)
-
 option(linyaps-box_ENABLE_UNIT_TESTS "Enable unit tests."
        ${linyaps-box_IS_TOP_LEVEL})
 
@@ -91,6 +87,14 @@ set(linyaps-box_ACTIVE_LOG_LEVEL
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     OFF
     CACHE BOOL "use local packages only")
+
+set(linyaps-box_ENABLE_CAP
+    true
+    CACHE BOOL "Build linyaps-box with capability support")
+
+set(linyaps-box_ENABLE_SECCOMP
+    true
+    CACHE BOOL "Build linyaps-box with seccomp support")
 
 # ==============================================================================
 
@@ -238,15 +242,9 @@ target_compile_definitions(
 target_compile_options("${linyaps-box_LIBRARY}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 
-if(linyaps-box_ENABLE_SECCOMP)
-  target_compile_definitions("${linyaps-box_LIBRARY}"
-                             PUBLIC LINYAPS_BOX_ENABLE_SECCOMP)
-endif()
-
-if(linyaps-box_ENABLE_CAP)
-  target_compile_definitions("${linyaps-box_LIBRARY}"
-                             PUBLIC LINYAPS_BOX_ENABLE_CAP)
-endif()
+target_compile_definitions("${linyaps-box_LIBRARY}"
+                             PUBLIC LINYAPS_BOX_ENABLE_CAP=${linyaps-box_ENABLE_CAP}
+                             PUBLIC LINYAPS_BOX_ENABLE_SECCOMP=${linyaps-box_ENABLE_SECCOMP})
 
 if(linyaps-box_ENABLE_COVERAGE)
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

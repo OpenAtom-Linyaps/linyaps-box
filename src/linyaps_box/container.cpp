@@ -1236,8 +1236,12 @@ void set_umask(const std::optional<mode_t> &mask)
 security_status get_runtime_security_status()
 {
     // TODO: selinux/apparmor
-    auto cap = cap_max_bits();
-    return { cap };
+    security_status status;
+    if constexpr (LINYAPS_BOX_ENABLE_CAP) {
+        status.cap = cap_max_bits();
+    }
+
+    return status;
 }
 
 void set_capabilities(const linyaps_box::container &container, int last_cap)

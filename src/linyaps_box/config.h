@@ -60,6 +60,8 @@ struct config
         std::optional<rlimits_t> rlimits;
         std::optional<std::string> apparmor_profile;
 
+        // TODO: not use cap_value_t directly
+#ifdef LINYAPS_BOX_ENABLE_CAP
         struct capabilities_t
         {
             std::vector<cap_value_t> effective;
@@ -70,6 +72,7 @@ struct config
         };
 
         capabilities_t capabilities;
+#endif
 
         bool no_new_privileges = false;
         std::optional<int> oom_score_adj;
