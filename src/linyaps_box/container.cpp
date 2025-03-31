@@ -1237,118 +1237,119 @@ security_status get_runtime_security_status()
 {
     // TODO: selinux/apparmor
     security_status status;
-    if constexpr (LINYAPS_BOX_ENABLE_CAP) {
-        status.cap = cap_max_bits();
-    }
+
+#ifdef LINYAPS_BOX_ENABLE_CAP
+    status.cap = cap_max_bits();
+#endif
 
     return status;
 }
 
 void set_capabilities(const linyaps_box::container &container, int last_cap)
 {
-    if constexpr (LINYAPS_BOX_ENABLE_CAP) {
-        LINYAPS_BOX_DEBUG() << "Set capabilities";
-        const auto &capabilities = container.get_config().process.capabilities;
+#ifdef LINYAPS_BOX_ENABLE_CAP
+    LINYAPS_BOX_DEBUG() << "Set capabilities";
+    const auto &capabilities = container.get_config().process.capabilities;
 
-        if (last_cap <= 0) {
-            throw std::runtime_error("kernel does not support capabilities");
-        }
+    if (last_cap <= 0) {
+        throw std::runtime_error("kernel does not support capabilities");
+    }
 
-        const auto &bounding_set = capabilities.bounding;
-        for (int cap = 0; cap < last_cap; ++cap) {
-            if (std::find_if(bounding_set.cbegin(),
-                             bounding_set.cend(),
-                             [cap](int c) {
-                                 return c == cap;
-                             })
-                == bounding_set.cend()) {
-                if (cap_drop_bound(cap) < 0) {
-                    throw std::system_error(errno, std::generic_category(), "cap_drop_bound");
-                }
+    const auto &bounding_set = capabilities.bounding;
+    for (int cap = 0; cap < last_cap; ++cap) {
+        if (std::find_if(bounding_set.cbegin(),
+                         bounding_set.cend(),
+                         [cap](int c) {
+                             return c == cap;
+                         })
+            == bounding_set.cend()) {
+            if (cap_drop_bound(cap) < 0) {
+                throw std::system_error(errno, std::generic_category(), "cap_drop_bound");
             }
-        }
-
-        std::unique_ptr<_cap_struct, decltype(&cap_free)> caps(cap_init(), cap_free);
-        int ret{ -1 };
-        const auto &effective_set = capabilities.effective;
-        if (!effective_set.empty()) {
-            ret = cap_set_flag(caps.get(),
-                               CAP_EFFECTIVE,
-                               capabilities.effective.size(),
-                               capabilities.effective.data(),
-                               CAP_SET);
-            if (ret < 0) {
-                throw std::system_error(errno,
-                                        std::generic_category(),
-                                        "failed to set effective capabilities");
-            }
-        }
-
-        const auto &permitted_set = capabilities.permitted;
-        if (!permitted_set.empty()) {
-            ret = cap_set_flag(caps.get(),
-                               CAP_PERMITTED,
-                               capabilities.permitted.size(),
-                               capabilities.permitted.data(),
-                               CAP_SET);
-            if (ret < 0) {
-                throw std::system_error(errno,
-                                        std::generic_category(),
-                                        "failed to set permitted capabilities");
-            }
-        }
-
-        const auto &inheritable_set = capabilities.inheritable;
-        if (!inheritable_set.empty()) {
-            ret = cap_set_flag(caps.get(),
-                               CAP_INHERITABLE,
-                               capabilities.inheritable.size(),
-                               capabilities.inheritable.data(),
-                               CAP_SET);
-            if (ret < 0) {
-                throw std::system_error(errno,
-                                        std::generic_category(),
-                                        "failed to set inheritable capabilities");
-            }
-        }
-
-        // keep current capabilities, we need these caps on later
-        ret = prctl(PR_SET_KEEPCAPS, 1);
-        if (ret < 0) {
-            throw std::system_error(errno, std::generic_category(), "keep current capabilities");
-        }
-
-        const auto &process = container.get_config().process;
-        ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
-        if (ret < 0) {
-            throw std::system_error(errno, std::generic_category(), "setresuid");
-        }
-
-        ret = setresgid(process.user.gid, process.user.gid, process.user.gid);
-        if (ret < 0) {
-            throw std::system_error(errno, std::generic_category(), "setresgid");
-        }
-
-        ret = cap_set_proc(caps.get());
-        if (ret < 0) {
-            throw std::system_error(errno, std::generic_category(), "cap_set_proc");
-        }
-
-        if (CAP_AMBIENT_SUPPORTED()) {
-            ret = cap_reset_ambient();
-            if (ret < 0) {
-                throw std::system_error(errno, std::generic_category(), "cap_reset_ambient");
-            }
-
-            std::for_each(capabilities.ambient.cend(),
-                          capabilities.ambient.cend(),
-                          [](cap_value_t cap) {
-                              cap_set_ambient(cap, CAP_SET);
-                          });
-        } else {
-            LINYAPS_BOX_INFO() << "Kernel does not support ambient capabilities, ignoring.";
         }
     }
+
+    std::unique_ptr<_cap_struct, decltype(&cap_free)> caps(cap_init(), cap_free);
+    int ret{ -1 };
+    const auto &effective_set = capabilities.effective;
+    if (!effective_set.empty()) {
+        ret = cap_set_flag(caps.get(),
+                           CAP_EFFECTIVE,
+                           capabilities.effective.size(),
+                           capabilities.effective.data(),
+                           CAP_SET);
+        if (ret < 0) {
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "failed to set effective capabilities");
+        }
+    }
+
+    const auto &permitted_set = capabilities.permitted;
+    if (!permitted_set.empty()) {
+        ret = cap_set_flag(caps.get(),
+                           CAP_PERMITTED,
+                           capabilities.permitted.size(),
+                           capabilities.permitted.data(),
+                           CAP_SET);
+        if (ret < 0) {
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "failed to set permitted capabilities");
+        }
+    }
+
+    const auto &inheritable_set = capabilities.inheritable;
+    if (!inheritable_set.empty()) {
+        ret = cap_set_flag(caps.get(),
+                           CAP_INHERITABLE,
+                           capabilities.inheritable.size(),
+                           capabilities.inheritable.data(),
+                           CAP_SET);
+        if (ret < 0) {
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "failed to set inheritable capabilities");
+        }
+    }
+
+    // keep current capabilities, we need these caps on later
+    ret = prctl(PR_SET_KEEPCAPS, 1);
+    if (ret < 0) {
+        throw std::system_error(errno, std::generic_category(), "keep current capabilities");
+    }
+
+    const auto &process = container.get_config().process;
+    ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
+    if (ret < 0) {
+        throw std::system_error(errno, std::generic_category(), "setresuid");
+    }
+
+    ret = setresgid(process.user.gid, process.user.gid, process.user.gid);
+    if (ret < 0) {
+        throw std::system_error(errno, std::generic_category(), "setresgid");
+    }
+
+    ret = cap_set_proc(caps.get());
+    if (ret < 0) {
+        throw std::system_error(errno, std::generic_category(), "cap_set_proc");
+    }
+
+    if (CAP_AMBIENT_SUPPORTED()) {
+        ret = cap_reset_ambient();
+        if (ret < 0) {
+            throw std::system_error(errno, std::generic_category(), "cap_reset_ambient");
+        }
+
+        std::for_each(capabilities.ambient.cend(),
+                      capabilities.ambient.cend(),
+                      [](cap_value_t cap) {
+                          cap_set_ambient(cap, CAP_SET);
+                      });
+    } else {
+        LINYAPS_BOX_INFO() << "Kernel does not support ambient capabilities, ignoring.";
+    }
+#endif
 
     if (container.get_config().process.no_new_privileges) {
         LINYAPS_BOX_DEBUG() << "Set no new privileges";

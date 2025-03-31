@@ -26,33 +26,31 @@ void linyaps_box::command::exec(const struct exec_options &options)
     proc.terminal = isatty(STDIN_FILENO) == 1 && isatty(STDOUT_FILENO) == 1;
     proc.no_new_privileges = options.no_new_privs;
 
-    if constexpr (LINYAPS_BOX_ENABLE_CAP) {
-        if (options.caps) {
-            const auto &caps = options.caps.value();
-            auto transform_cap = [&caps](std::vector<cap_value_t> &cap_set) {
-                std::transform(caps.cbegin(),
-                               caps.cend(),
-                               std::back_inserter(cap_set),
-                               [](const std::string &cap) {
-                                   cap_value_t val{ 0 };
-                                   if (cap_from_name(cap.c_str(), &val) < 0) {
-                                       throw std::system_error(errno,
-                                                               std::generic_category(),
-                                                               "cap_from_name");
-                                   }
+#ifdef LINYAPS_BOX_ENABLE_CAP
+    if (options.caps) {
+        const auto &caps = options.caps.value();
+        auto transform_cap = [&caps](std::vector<cap_value_t> &cap_set) {
+            std::transform(caps.cbegin(),
+                           caps.cend(),
+                           std::back_inserter(cap_set),
+                           [](const std::string &cap) {
+                               cap_value_t val{ 0 };
+                               if (cap_from_name(cap.c_str(), &val) < 0) {
+                                   throw std::system_error(errno,
+                                                           std::generic_category(),
+                                                           "cap_from_name");
+                               }
 
-                                   return val;
-                               });
-            };
+                               return val;
+                           });
+        };
 
-            transform_cap(proc.capabilities.effective);
-            transform_cap(proc.capabilities.ambient);
-            transform_cap(proc.capabilities.bounding);
-            transform_cap(proc.capabilities.permitted);
-        }
-    } else {
-        throw std::runtime_error("ll-box build without capabilities support");
+        transform_cap(proc.capabilities.effective);
+        transform_cap(proc.capabilities.ambient);
+        transform_cap(proc.capabilities.bounding);
+        transform_cap(proc.capabilities.permitted);
     }
+#endif
 
     // TODO: support exec fully
 
