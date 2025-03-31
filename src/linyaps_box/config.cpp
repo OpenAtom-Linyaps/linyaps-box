@@ -99,42 +99,40 @@ parse_mount_options(const std::vector<std::string> &options)
     return { flags, propagation_flags, extra_flags, str };
 }
 
+#ifdef LINYAPS_BOX_ENABLE_CAP
 linyaps_box::config::process_t::capabilities_t
 parse_capability(const nlohmann::json &obj, const nlohmann::json::json_pointer &ptr)
 {
-    if constexpr (LINYAPS_BOX_ENABLE_CAP) {
-        auto parse_cap_set = [&obj, &ptr](const char *set_name) {
-            const auto set = ptr / set_name;
-            std::vector<cap_value_t> cap_list;
-            if (!obj.contains(set)) {
-                return cap_list;
+    auto parse_cap_set = [&obj, &ptr](const char *set_name) {
+        const auto set = ptr / set_name;
+        std::vector<cap_value_t> cap_list;
+        if (!obj.contains(set)) {
+            return cap_list;
+        }
+
+        const auto vec = obj[set].get<std::vector<std::string>>();
+        std::for_each(vec.cbegin(), vec.cend(), [&cap_list](const std::string &cap) {
+            cap_value_t val{ 0 };
+            if (cap_from_name(cap.c_str(), &val) < 0) {
+                throw std::runtime_error("unknown capability: " + cap);
             }
 
-            const auto vec = obj[set].get<std::vector<std::string>>();
-            std::for_each(vec.cbegin(), vec.cend(), [&cap_list](const std::string &cap) {
-                cap_value_t val{ 0 };
-                if (cap_from_name(cap.c_str(), &val) < 0) {
-                    throw std::runtime_error("unknown capability: " + cap);
-                }
+            cap_list.push_back(val);
+        });
 
-                cap_list.push_back(val);
-            });
+        return cap_list;
+    };
 
-            return cap_list;
-        };
+    linyaps_box::config::process_t::capabilities_t cap{};
+    cap.effective = parse_cap_set("effective");
+    cap.ambient = parse_cap_set("ambient");
+    cap.bounding = parse_cap_set("bounding");
+    cap.inheritable = parse_cap_set("inheritable");
+    cap.permitted = parse_cap_set("permitted");
 
-        linyaps_box::config::process_t::capabilities_t cap{};
-        cap.effective = parse_cap_set("effective");
-        cap.ambient = parse_cap_set("ambient");
-        cap.bounding = parse_cap_set("bounding");
-        cap.inheritable = parse_cap_set("inheritable");
-        cap.permitted = parse_cap_set("permitted");
-
-        return cap;
-    } else {
-        return {};
-    }
+    return cap;
 }
+#endif
 
 linyaps_box::config::process_t::rlimits_t parse_rlimits(const nlohmann::json &obj,
                                                         const nlohmann::json::json_pointer &ptr)
@@ -310,10 +308,11 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
         }
 
         // TODO: apparmorProfile
-
+#ifdef LINYAPS_BOX_ENABLE_CAP
         if (auto cap = ptr / "process" / "capabilities"; j.contains(cap)) {
             cfg.process.capabilities = parse_capability(j, cap);
         }
+#endif
 
         if (j.contains(ptr / "process" / "noNewPrivileges")) {
             cfg.process.no_new_privileges = j[ptr / "process" / "noNewPrivileges"].get<bool>();
