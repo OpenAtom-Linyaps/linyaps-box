@@ -4,7 +4,7 @@
 
 #include "linyaps_box/command/options.h"
 
-#include "CLI/CLI.hpp"
+#include <CLI/CLI.hpp>
 
 #include <csignal>
 

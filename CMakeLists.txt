@@ -88,9 +88,21 @@ set(linyaps-box_ACTIVE_LOG_LEVEL
       "The active syslog priority. This is used to filter log messages at compile time."
 )
 
+set(linyaps-box_ENABLE_CPM ON CACHE BOOL "enable CPM")
+
+if(CMAKE_VERSION VERSION_LESS "3.14")
+  set(linyaps-box_ENABLE_CPM OFF)
+  message(
+    STATUS "cmake version ${CMAKE_VERSION} not compatible with CPM.cmake.")
+endif()
+
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     OFF
     CACHE BOOL "use local packages only")
+
+if (linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
+  set(linyaps-box_ENABLE_CPM OFF)
+endif()
 
 # ==============================================================================
 
@@ -191,7 +203,7 @@ if(linyaps-box_ENABLE_CAP)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
 endif()
 
-if(NOT linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
+if(linyaps-box_ENABLE_CPM)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
   include(CPM)
 
@@ -211,11 +223,23 @@ if(NOT linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
     OPTIONS "CLI11_BUILD_TESTS OFF")
 endif()
 
-find_package(nlohmann_json 3.11.3 REQUIRED)
+find_package(nlohmann_json 3.11.3 QUIET)
+if (NOT nlohmann_json_FOUND)
+  add_subdirectory(external/nlohmann_json)
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/nlohmann_json")
+  find_package(nlohmann_json 3.11.3 REQUIRED)
+endif()
+
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
      nlohmann_json::nlohmann_json)
 
-find_package(CLI11 2.5.0 REQUIRED)
+find_package(CLI11 2.5.0 QUIET)
+if (NOT CLI11_FOUND)
+  add_subdirectory(external/CLI11)
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
+  find_package(CLI11 2.5.0 REQUIRED)
+endif()
+
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
 
 add_library("${linyaps-box_LIBRARY}" ${linyaps-box_LIBRARY_SOURCE})
