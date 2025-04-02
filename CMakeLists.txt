@@ -106,9 +106,6 @@ endif()
 
 # ==============================================================================
 
-include(CheckIncludeFileCXX)
-check_include_file_cxx("linux/openat2.h" LINYAPS_HAVE_OPENAT2_H)
-
 set(linyaps-box_LIBRARY linyaps-box)
 set(linyaps-box_LIBRARY_SOURCE
     # find -regex '\./src/.+\.[ch]\(pp\)?' -type f -printf '%P\n'| sort
@@ -180,12 +177,9 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/touch.cpp
     src/linyaps_box/utils/touch.h)
 
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/linyaps_box/configuration.h.in
-  ${CMAKE_CURRENT_BINARY_DIR}/src/linyaps_box/configuration.h @ONLY)
-set(linyaps-box_LIBRARY_LINK_LIBRARIES)
-set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
-                                     "${CMAKE_CURRENT_BINARY_DIR}/src")
+# for gcc 8
+set(linyaps-box_LIBRARY_LINK_LIBRARIES "stdc++fs")
+set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 if(linyaps-box_STATIC)
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
@@ -245,12 +239,19 @@ list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
 add_library("${linyaps-box_LIBRARY}" ${linyaps-box_LIBRARY_SOURCE})
 target_include_directories("${linyaps-box_LIBRARY}"
                            ${linyaps-box_LIBRARY_INCLUDE_DIRS})
-target_link_libraries("${linyaps-box_LIBRARY}"
+target_link_libraries("${linyaps-box_LIBRARY}" PRIVATE
                       ${linyaps-box_LIBRARY_LINK_LIBRARIES})
 target_compile_features("${linyaps-box_LIBRARY}" PUBLIC cxx_std_17)
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_STANDARD 17)
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_EXTENSIONS OFF)
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_STANDARD_REQUIRED ON)
+
+include(CheckIncludeFileCXX)
+check_include_file_cxx("linux/openat2.h" LINYAPS_BOX_HAVE_OPENAT2_H)
+
+if(${LINYAPS_BOX_HAVE_OPENAT2_H})
+  target_compile_definitions("${linyaps-box_LIBRARY}" PRIVATE "LINYAPS_BOX_HAVE_OPENAT2_H")
+endif()
 
 target_compile_definitions(
   "${linyaps-box_LIBRARY}"
@@ -317,7 +318,14 @@ target_compile_options("${linyaps-box_APP}"
 # ==============================================================================
 
 include(GNUInstallDirs)
-install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}" TYPE BIN)
+
+# parameter TYPE was added in CMake 3.14
+if (CMAKE_VERSION VERSION_LESS "3.14")
+  install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}" DESTINATION
+          "${CMAKE_INSTALL_BINDIR}")
+else()
+  install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}" TYPE BIN)
+endif()
 
 if(linyaps-box_ENABLE_CPACK)
   set(CPACK_PACKAGING_INSTALL_PREFIX

@@ -4,7 +4,6 @@
 
 #include "linyaps_box/container.h"
 
-#include "linyaps_box/configuration.h"
 #include "linyaps_box/impl/disabled_cgroup_manager.h"
 #include "linyaps_box/utils/cgroups.h"
 #include "linyaps_box/utils/close_range.h"
@@ -1957,7 +1956,7 @@ linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
 
     {
         container_status_t status;
-        status.oci_version = oci_version;
+        status.oci_version = linyaps_box::config::oci_version;
         status.ID = id;
         status.PID = getpid();
         status.status = container_status_t::runtime_status::CREATING;
