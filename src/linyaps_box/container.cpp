@@ -60,7 +60,7 @@ enum class sync_message : std::uint8_t {
 
 struct security_status
 {
-    int cap{ -1 };
+    unsigned long cap{ 0 };
 };
 
 std::ostream &operator<<(std::ostream &os, const sync_message message)
@@ -1232,13 +1232,26 @@ void set_umask(const std::optional<mode_t> &mask)
     umask(mask.value());
 }
 
+unsigned long get_last_cap()
+{
+    const auto *file = "/proc/sys/kernel/cap_last_cap";
+    std::ifstream ifs(file);
+    if (!ifs) {
+        throw std::runtime_error("Can't open " + std::string(file));
+    }
+
+    unsigned long last_cap{ 0 };
+    ifs >> last_cap;
+    return last_cap;
+}
+
 security_status get_runtime_security_status()
 {
     // TODO: selinux/apparmor
     security_status status;
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
-    status.cap = cap_max_bits();
+    status.cap = get_last_cap();
 #endif
 
     return status;
@@ -1334,20 +1347,20 @@ void set_capabilities(const linyaps_box::container &container, int last_cap)
         throw std::system_error(errno, std::generic_category(), "cap_set_proc");
     }
 
-    if (CAP_AMBIENT_SUPPORTED()) {
-        ret = cap_reset_ambient();
-        if (ret < 0) {
-            throw std::system_error(errno, std::generic_category(), "cap_reset_ambient");
-        }
-
-        std::for_each(capabilities.ambient.cend(),
-                      capabilities.ambient.cend(),
-                      [](cap_value_t cap) {
-                          cap_set_ambient(cap, CAP_SET);
-                      });
-    } else {
-        LINYAPS_BOX_INFO() << "Kernel does not support ambient capabilities, ignoring.";
+#ifdef PR_CAP_AMBIENT
+    ret = prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L);
+    if (ret < 0) {
+        throw std::system_error(errno, std::generic_category(), "cap_ambient_clear_all");
     }
+
+    std::for_each(capabilities.ambient.cend(), capabilities.ambient.cend(), [](cap_value_t cap) {
+        auto ret = prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap, 0L, 0L);
+        if (ret < 0) {
+            throw std::system_error(errno, std::generic_category(), "cap_ambient_raise");
+        }
+    });
+#endif
+
 #endif
 
     if (container.get_config().process.no_new_privileges) {
