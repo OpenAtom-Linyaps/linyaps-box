@@ -188,12 +188,12 @@ endif()
 find_package(PkgConfig REQUIRED)
 
 if(linyaps-box_ENABLE_SECCOMP)
-  pkg_check_modules(libseccomp REQUIRED IMPORTED_TARGET libseccomp)
+  pkg_check_modules(libseccomp REQUIRED IMPORTED_TARGET libseccomp>=2.3.3)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libseccomp)
 endif()
 
 if(linyaps-box_ENABLE_CAP)
-  pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap)
+  pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap>=2.25)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
 endif()
 
