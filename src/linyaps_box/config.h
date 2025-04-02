@@ -29,6 +29,8 @@ namespace linyaps_box {
 
 struct config
 {
+    static constexpr auto oci_version = "1.2.0";
+
     static config parse(std::istream &is);
 
     struct process_t

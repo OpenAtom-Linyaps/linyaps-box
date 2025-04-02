@@ -4,13 +4,12 @@
 
 #include "linyaps_box/utils/open_file.h"
 
-#include "linyaps_box/configuration.h"
 #include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/log.h"
 
 #include <asm/unistd.h>
 
-#ifdef HAVE_LINUX_OPENAT2_H
+#ifdef LINYAPS_BOX_HAVE_OPENAT2_H
 #include <linux/openat2.h>
 #endif
 

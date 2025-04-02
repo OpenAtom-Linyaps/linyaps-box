@@ -4,7 +4,6 @@
 
 #include "linyaps_box/config.h"
 
-#include "linyaps_box/configuration.h"
 #include "linyaps_box/utils/semver.h"
 #include "nlohmann/json.hpp"
 
@@ -271,7 +270,7 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
     static const auto ptr = ""_json_pointer;
 
     auto semver = linyaps_box::utils::semver(j[ptr / "ociVersion"].get<std::string>());
-    if (!linyaps_box::utils::semver(oci_version).is_compatible_with(semver)) {
+    if (!linyaps_box::utils::semver(linyaps_box::config::oci_version).is_compatible_with(semver)) {
         throw std::runtime_error("unsupported OCI version: " + semver.to_string());
     }
 
