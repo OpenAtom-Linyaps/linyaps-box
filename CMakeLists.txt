@@ -346,8 +346,9 @@ set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
 
 find_package(GTest REQUIRED)
 
-if(CMAKE_VERSION VERSION_LESS 3.21)
-  add_library(GTest::gtest_main ALIAS GTest::Main)
+if(CMAKE_VERSION VERSION_LESS 3.20)
+  add_library(GTest::gtest_main INTERFACE IMPORTED)
+  target_link_libraries(GTest::gtest_main INTERFACE GTest::Main)
 endif()
 
 list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE GTest::gtest_main)
