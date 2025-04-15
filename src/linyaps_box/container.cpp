@@ -848,9 +848,7 @@ public:
         LINYAPS_BOX_DEBUG() << "finalize " << remounts.size() << " remounts";
         // our mount process has to do with the order
         // the last mount should be the last remount
-        std::for_each(remounts.crbegin(), remounts.crend(), [](const auto &remount) {
-            do_remount(remount);
-        });
+        std::for_each(remounts.crbegin(), remounts.crend(), do_remount);
     }
 
 private:
@@ -984,9 +982,18 @@ private:
         } while (false);
     }
 
-    void configure_device(const std::filesystem::path &destination, mode_t mode, dev_t dev)
+    void configure_device(const std::filesystem::path &destination,
+                          mode_t mode,
+                          int type,
+                          dev_t dev,
+                          uid_t uid,
+                          gid_t gid)
     {
         assert(destination.is_absolute());
+
+        if (type != S_IFCHR && type != S_IFBLK && type != S_IFIFO) {
+            throw std::runtime_error("unsupported device type");
+        }
 
         std::optional<linyaps_box::utils::file_descriptor> destination_fd;
         try {
@@ -997,28 +1004,85 @@ private:
             }
         }
 
-        if (!destination_fd.has_value()) {
-            try {
-                linyaps_box::utils::mknod(root, destination.relative_path(), mode, dev);
-            } catch (const std::system_error &e) {
-                if (e.code().value() != EPERM) {
-                    throw;
-                }
+        if (destination_fd.has_value()) {
+            // if already exists, check if it is a required device
+            auto stat = linyaps_box::utils::lstatat(*destination_fd, "");
+            bool satisfied{ true };
+            if (__S_ISTYPE(stat.st_mode, type)) {
+                auto dump_mode = [](mode_t mode) {
+                    if (S_ISCHR(mode)) {
+                        return "Character";
+                    }
+
+                    if (S_ISBLK(mode)) {
+                        return "Block";
+                    }
+
+                    if (S_ISFIFO(mode)) {
+                        return "FIFO";
+                    }
+
+                    return "unknown";
+                };
+
+                LINYAPS_BOX_DEBUG()
+                        << "the type of existing device: " << destination << " is not required\n"
+                        << "expect " << dump_mode(mode) << ", got " << dump_mode(stat.st_mode);
+                satisfied = false;
             }
+
+            if (major(stat.st_dev) != major(dev) || minor(stat.st_dev) != minor(dev)) {
+                LINYAPS_BOX_DEBUG()
+                        << "the kind of existing device: " << destination << " is not required\n"
+                        << "expect " << major(dev) << ":" << minor(dev) << ", got "
+                        << major(stat.st_dev) << ":" << minor(stat.st_dev);
+                satisfied = false;
+            }
+
+            if (stat.st_uid != uid || stat.st_gid != gid) {
+                LINYAPS_BOX_DEBUG()
+                        << "the owner of existing device: " << destination << " is not required\n"
+                        << "expect " << uid << ":" << gid << ", got " << stat.st_uid << ":"
+                        << stat.st_gid;
+                satisfied = false;
+            }
+
+            if (satisfied) {
+                return;
+            }
+
+            throw std::runtime_error(destination.string()
+                                     + " already exists but it's not satisfied with requirement");
         }
 
-        auto stat = linyaps_box::utils::lstatat(*destination_fd, "");
-        if (S_ISCHR(stat.st_mode) && major(stat.st_dev) == 1 && minor(stat.st_dev) == 3) {
-            return;
-        }
+        // FIXME: couldn't open created device due to permission denied
+        // not existing, try to create it
+        // try {
+        //     auto path = destination.relative_path();
+        //     linyaps_box::utils::mknodat(root, path, mode | type, dev);
+
+        //     auto new_dev = linyaps_box::utils::open_at(root, path, O_PATH);
+        //     path = new_dev.proc_path();
+        //     if (chmod(path.c_str(), mode) < 0) {
+        //         throw std::system_error(errno, std::generic_category(), "chmod");
+        //     }
+
+        //     if (chown(path.c_str(), uid, gid) < 0) {
+        //         throw std::system_error(errno, std::generic_category(), "chown");
+        //     }
+        // } catch (const std::system_error &e) {
+        //     if (e.code().value() != EPERM) {
+        //         throw;
+        //     }
+        // }
 
         // NOTE: fallback to bind mount host device into container
-
+        LINYAPS_BOX_DEBUG() << "fallback to bind mount device";
         linyaps_box::config::mount_t mount;
         mount.source = destination;
         mount.destination = destination;
         mount.type = "bind";
-        mount.flags = MS_BIND | MS_REC | MS_NOSUID | MS_NOEXEC | MS_NODEV;
+        mount.flags = MS_BIND | MS_PRIVATE | MS_NOEXEC | MS_NOSUID;
         this->mount(mount);
     }
 
@@ -1026,13 +1090,15 @@ private:
     {
         LINYAPS_BOX_DEBUG() << "Configure default devices";
 
-        constexpr auto default_type = 0666 | S_IFCHR;
-        this->configure_device("/dev/null", default_type, makedev(1, 3));
-        this->configure_device("/dev/zero", default_type, makedev(1, 5));
-        this->configure_device("/dev/full", default_type, makedev(1, 7));
-        this->configure_device("/dev/random", default_type, makedev(1, 8));
-        this->configure_device("/dev/urandom", default_type, makedev(1, 9));
-        this->configure_device("/dev/tty", default_type, makedev(5, 0));
+        constexpr auto default_mode = 0666;
+        auto uid = container.get_config().process.user.uid;
+        auto gid = container.get_config().process.user.gid;
+        this->configure_device("/dev/null", default_mode, S_IFCHR, makedev(1, 3), uid, gid);
+        this->configure_device("/dev/zero", default_mode, S_IFCHR, makedev(1, 5), uid, gid);
+        this->configure_device("/dev/full", default_mode, S_IFCHR, makedev(1, 7), uid, gid);
+        this->configure_device("/dev/random", default_mode, S_IFCHR, makedev(1, 8), uid, gid);
+        this->configure_device("/dev/urandom", default_mode, S_IFCHR, makedev(1, 9), uid, gid);
+        this->configure_device("/dev/tty", default_mode, S_IFCHR, makedev(5, 0), uid, gid);
 
         // TODO Handle `/dev/console`;
 

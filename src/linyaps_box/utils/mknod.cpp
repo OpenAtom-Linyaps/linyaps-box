@@ -9,10 +9,10 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-void linyaps_box::utils::mknod(const file_descriptor &root,
-                               const std::filesystem::path &path,
-                               mode_t mode,
-                               dev_t dev)
+void linyaps_box::utils::mknodat(const file_descriptor &root,
+                                 const std::filesystem::path &path,
+                                 mode_t mode,
+                                 dev_t dev)
 {
     LINYAPS_BOX_DEBUG() << "Create device " << path.string() << " with mode " << mode << " and dev "
                         << dev;
