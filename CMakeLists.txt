@@ -96,6 +96,8 @@ if(CMAKE_VERSION VERSION_LESS "3.14")
     STATUS "cmake version ${CMAKE_VERSION} not compatible with CPM.cmake.")
 endif()
 
+# if just want to try local packages at first
+# set CPM_USE_LOCAL_PACKAGES ON
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     OFF
     CACHE BOOL "use local packages only")
@@ -205,12 +207,12 @@ if(linyaps-box_ENABLE_CPM)
     NAME nlohmann_json
     VERSION 3.11.3
     GITHUB_REPOSITORY nlohmann/json
-    GIT_TAG v3.11.3
+    GIT_TAG v3.12.0
     EXCLUDE_FROM_ALL ON
     OPTIONS "JSON_BuildTests OFF")
   CPMFindPackage(
     NAME CLI11
-    VERSION 2.5.0
+    VERSION 2.4.1
     GITHUB_REPOSITORY CLIUtils/CLI11
     GIT_TAG v2.5.0
     EXCLUDE_FROM_ALL ON
@@ -227,11 +229,11 @@ endif()
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
      nlohmann_json::nlohmann_json)
 
-find_package(CLI11 2.5.0 QUIET)
+find_package(CLI11 2.4.1 QUIET)
 if (NOT CLI11_FOUND)
   add_subdirectory(external/CLI11)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
-  find_package(CLI11 2.5.0 REQUIRED)
+  find_package(CLI11 2.4.1 REQUIRED)
 endif()
 
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
