@@ -340,13 +340,13 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 
     if (j.contains(ptr / "hooks")) {
         auto hooks = j[ptr / "hooks"];
-        auto get_hooks =
-                [&](const std::string &key) -> std::vector<linyaps_box::config::hooks_t::hook_t> {
-            std::vector<linyaps_box::config::hooks_t::hook_t> result;
+        auto get_hooks = [&](const std::string &key)
+                -> std::optional<std::vector<linyaps_box::config::hooks_t::hook_t>> {
             if (!hooks.contains(key)) {
-                return result;
+                return std::nullopt;
             }
 
+            std::vector<linyaps_box::config::hooks_t::hook_t> result;
             for (const auto &h : hooks[key]) {
                 linyaps_box::config::hooks_t::hook_t hook;
                 hook.path = h["path"].get<std::string>();

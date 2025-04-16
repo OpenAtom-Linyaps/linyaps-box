@@ -137,12 +137,12 @@ struct config
             std::optional<int> timeout;
         };
 
-        std::vector<hook_t> prestart;
-        std::vector<hook_t> create_runtime;
-        std::vector<hook_t> create_container;
-        std::vector<hook_t> start_container;
-        std::vector<hook_t> poststart;
-        std::vector<hook_t> poststop;
+        std::optional<std::vector<hook_t>> prestart;
+        std::optional<std::vector<hook_t>> create_runtime;
+        std::optional<std::vector<hook_t>> create_container;
+        std::optional<std::vector<hook_t>> start_container;
+        std::optional<std::vector<hook_t>> poststart;
+        std::optional<std::vector<hook_t>> poststop;
     };
 
     hooks_t hooks;
