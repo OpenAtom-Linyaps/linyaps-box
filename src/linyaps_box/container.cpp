@@ -12,7 +12,6 @@
 #include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/mkdir.h"
-#include "linyaps_box/utils/mknod.h"
 #include "linyaps_box/utils/open_file.h"
 #include "linyaps_box/utils/platform.h"
 #include "linyaps_box/utils/socketpair.h"
@@ -52,10 +51,12 @@ namespace {
 enum class sync_message : std::uint8_t {
     REQUEST_CONFIGURE_NAMESPACE,
     NAMESPACE_CONFIGURED,
+    REQUEST_PRESTART_HOOKS,
+    PRESTART_HOOKS_EXECUTED,
     REQUEST_CREATERUNTIME_HOOKS,
-    CREATE_RUNTIME_HOOKS_EXECUTED,
-    CREATE_CONTAINER_HOOKS_EXECUTED,
-    START_CONTAINER_HOOKS_EXECUTED,
+    CREATERUNTIME_HOOKS_EXECUTED,
+    CREATECONTAINER_HOOKS_EXECUTED,
+    STARTCONTAINER_HOOKS_EXECUTED,
 };
 
 struct security_status
@@ -72,16 +73,22 @@ std::ostream &operator<<(std::ostream &os, const sync_message message)
     case sync_message::NAMESPACE_CONFIGURED: {
         os << "NAMESPACE_CONFIGURED";
     } break;
+    case sync_message::REQUEST_PRESTART_HOOKS: {
+        os << "REQUEST_PRESTART_HOOKS";
+    } break;
+    case sync_message::PRESTART_HOOKS_EXECUTED: {
+        os << "PRESTART_HOOKS_EXECUTED";
+    } break;
     case sync_message::REQUEST_CREATERUNTIME_HOOKS: {
         os << "REQUEST_PRESTART_AND_CREATERUNTIME_HOOKS";
     } break;
-    case sync_message::CREATE_RUNTIME_HOOKS_EXECUTED: {
+    case sync_message::CREATERUNTIME_HOOKS_EXECUTED: {
         os << "CREATE_RUNTIME_HOOKS_EXECUTED";
     } break;
-    case sync_message::CREATE_CONTAINER_HOOKS_EXECUTED: {
+    case sync_message::CREATECONTAINER_HOOKS_EXECUTED: {
         os << "CREATE_CONTAINER_HOOKS_EXECUTED";
     } break;
-    case sync_message::START_CONTAINER_HOOKS_EXECUTED: {
+    case sync_message::STARTCONTAINER_HOOKS_EXECUTED: {
         os << "START_CONTAINER_HOOKS_EXECUTED";
     } break;
     default: {
@@ -1203,11 +1210,36 @@ void configure_mounts(const linyaps_box::container &container, const std::filesy
     throw std::system_error(errno, std::generic_category(), "execvpe");
 }
 
+void wait_prestart_hooks_result(const linyaps_box::container &container,
+                                linyaps_box::utils::file_descriptor &socket)
+{
+    if (!container.get_config().hooks.prestart) {
+        return;
+    }
+
+    LINYAPS_BOX_DEBUG() << "Request execute prestart hooks";
+
+    socket << std::byte(sync_message::REQUEST_PRESTART_HOOKS);
+
+    LINYAPS_BOX_DEBUG() << "Sync message sent";
+
+    LINYAPS_BOX_DEBUG() << "Wait prestart runtime result";
+
+    std::byte byte{};
+    socket >> byte;
+    auto message = sync_message(byte);
+    if (message == sync_message::PRESTART_HOOKS_EXECUTED) {
+        LINYAPS_BOX_DEBUG() << "Prestart hooks executed";
+        return;
+    }
+
+    throw unexpected_sync_message(sync_message::PRESTART_HOOKS_EXECUTED, message);
+}
+
 void wait_create_runtime_result(const linyaps_box::container &container,
                                 linyaps_box::utils::file_descriptor &socket)
 {
-    if (container.get_config().hooks.prestart.empty()
-        && container.get_config().hooks.create_runtime.empty()) {
+    if (!container.get_config().hooks.create_runtime) {
         return;
     }
 
@@ -1222,29 +1254,30 @@ void wait_create_runtime_result(const linyaps_box::container &container,
     std::byte byte{};
     socket >> byte;
     auto message = sync_message(byte);
-    if (message == sync_message::CREATE_RUNTIME_HOOKS_EXECUTED) {
+    if (message == sync_message::CREATERUNTIME_HOOKS_EXECUTED) {
         LINYAPS_BOX_DEBUG() << "Create runtime hooks executed";
         return;
     }
-    throw unexpected_sync_message(sync_message::CREATE_RUNTIME_HOOKS_EXECUTED, message);
+
+    throw unexpected_sync_message(sync_message::CREATERUNTIME_HOOKS_EXECUTED, message);
 }
 
 void create_container_hooks(const linyaps_box::container &container,
                             linyaps_box::utils::file_descriptor &socket)
 {
-    if (container.get_config().hooks.create_container.empty()) {
+    if (!container.get_config().hooks.create_container) {
         return;
     }
 
     LINYAPS_BOX_DEBUG() << "Execute create container hooks";
 
-    for (const auto &hook : container.get_config().hooks.create_container) {
+    for (const auto &hook : container.get_config().hooks.create_container.value()) {
         execute_hook(hook);
     }
 
     LINYAPS_BOX_DEBUG() << "Create container hooks executed";
 
-    socket << std::byte(sync_message::CREATE_CONTAINER_HOOKS_EXECUTED);
+    socket << std::byte(sync_message::CREATECONTAINER_HOOKS_EXECUTED);
 
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
@@ -1448,19 +1481,19 @@ void set_capabilities(const linyaps_box::container &container, int last_cap)
 void start_container_hooks(const linyaps_box::container &container,
                            linyaps_box::utils::file_descriptor &socket)
 {
-    if (container.get_config().hooks.start_container.empty()) {
+    if (!container.get_config().hooks.start_container) {
         return;
     }
 
     LINYAPS_BOX_DEBUG() << "Execute start container hooks";
 
-    for (const auto &hook : container.get_config().hooks.start_container) {
+    for (const auto &hook : container.get_config().hooks.start_container.value()) {
         execute_hook(hook);
     }
 
     LINYAPS_BOX_DEBUG() << "Start container hooks executed";
 
-    socket << std::byte(sync_message::START_CONTAINER_HOOKS_EXECUTED);
+    socket << std::byte(sync_message::STARTCONTAINER_HOOKS_EXECUTED);
 
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
@@ -1534,6 +1567,7 @@ try {
     initialize_container(container.get_config(), socket);
     auto [runtime_cap] = get_runtime_security_status(); // get runtime status before pivot root
     configure_mounts(container, rootfs);
+    wait_prestart_hooks_result(container, socket);
     wait_create_runtime_result(container, socket);
     create_container_hooks(container, socket);
     // TODO: selinux label/apparmor profile
@@ -1881,26 +1915,39 @@ void configure_container_namespaces(const linyaps_box::container &container,
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
 
-void prestart_hooks(const linyaps_box::container &container)
+void prestart_hooks(const linyaps_box::container &container,
+                    linyaps_box::utils::file_descriptor &socket)
 {
-    if (container.get_config().hooks.prestart.empty()) {
+    if (!container.get_config().hooks.prestart) {
         return;
+    }
+
+    LINYAPS_BOX_DEBUG() << "Waiting request to execute prestart hooks";
+
+    std::byte byte{};
+    socket >> byte;
+    auto message = sync_message(byte);
+    if (message != sync_message::REQUEST_PRESTART_HOOKS) {
+        throw unexpected_sync_message(sync_message::REQUEST_PRESTART_HOOKS, message);
     }
 
     LINYAPS_BOX_DEBUG() << "Execute prestart hooks";
 
-    for (const auto &hook : container.get_config().hooks.prestart) {
+    for (const auto &hook : container.get_config().hooks.prestart.value()) {
         execute_hook(hook);
     }
 
     LINYAPS_BOX_DEBUG() << "Prestart hooks executed";
+
+    socket << std::byte(sync_message::PRESTART_HOOKS_EXECUTED);
+
+    LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
 
 void create_runtime_hooks(const linyaps_box::container &container,
                           linyaps_box::utils::file_descriptor &socket)
 {
-    if (container.get_config().hooks.prestart.empty()
-        && container.get_config().hooks.create_runtime.empty()) {
+    if (!container.get_config().hooks.create_runtime) {
         return;
     }
 
@@ -1913,23 +1960,15 @@ void create_runtime_hooks(const linyaps_box::container &container,
         throw unexpected_sync_message(sync_message::REQUEST_CREATERUNTIME_HOOKS, message);
     }
 
-    LINYAPS_BOX_DEBUG() << "Execute prestart hooks";
-
-    for (const auto &hook : container.get_config().hooks.prestart) {
-        execute_hook(hook);
-    }
-
-    LINYAPS_BOX_DEBUG() << "Prestart hooks executed";
-
     LINYAPS_BOX_DEBUG() << "Execute create runtime hooks";
 
-    for (const auto &hook : container.get_config().hooks.create_runtime) {
+    for (const auto &hook : container.get_config().hooks.create_runtime.value()) {
         execute_hook(hook);
     }
 
     LINYAPS_BOX_DEBUG() << "Create runtime hooks executed";
 
-    socket << std::byte(sync_message::CREATE_RUNTIME_HOOKS_EXECUTED);
+    socket << std::byte(sync_message::CREATERUNTIME_HOOKS_EXECUTED);
 
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
@@ -1937,21 +1976,21 @@ void create_runtime_hooks(const linyaps_box::container &container,
 void wait_create_container_result(const linyaps_box::container &container,
                                   linyaps_box::utils::file_descriptor &socket)
 {
-    if (container.get_config().hooks.create_container.empty()) {
+    if (!container.get_config().hooks.create_container) {
         return;
     }
 
     LINYAPS_BOX_DEBUG()
             << "Waiting OCI runtime in container namespace send create container hooks result";
 
-    std::byte byte;
+    std::byte byte{};
     socket >> byte;
     auto message = sync_message(byte);
-    if (message == sync_message::CREATE_CONTAINER_HOOKS_EXECUTED) {
+    if (message == sync_message::CREATECONTAINER_HOOKS_EXECUTED) {
         LINYAPS_BOX_DEBUG() << "Create container hooks executed";
         return;
     }
-    throw unexpected_sync_message(sync_message::CREATE_CONTAINER_HOOKS_EXECUTED, message);
+    throw unexpected_sync_message(sync_message::CREATECONTAINER_HOOKS_EXECUTED, message);
 }
 
 void wait_socket_close(linyaps_box::utils::file_descriptor &socket)
@@ -1967,22 +2006,22 @@ try {
 
 void poststart_hooks(const linyaps_box::container &container)
 {
-    if (container.get_config().hooks.poststart.empty()) {
+    if (!container.get_config().hooks.poststart) {
         return;
     }
 
-    for (const auto &hook : container.get_config().hooks.poststart) {
+    for (const auto &hook : container.get_config().hooks.poststart.value()) {
         execute_hook(hook);
     }
 }
 
 void poststop_hooks(const linyaps_box::container &container) noexcept
 {
-    if (container.get_config().hooks.poststop.empty()) {
+    if (!container.get_config().hooks.poststop) {
         return;
     }
 
-    for (const auto &hook : container.get_config().hooks.poststart) {
+    for (const auto &hook : container.get_config().hooks.poststart.value()) {
         try {
             execute_hook(hook);
         } catch (const std::exception &e) {
@@ -2096,7 +2135,7 @@ int linyaps_box::container::run(const config::process_t &process)
         }
 
         runtime_ns::configure_container_namespaces(*this, socket);
-        runtime_ns::prestart_hooks(*this);
+        runtime_ns::prestart_hooks(*this, socket);
         runtime_ns::create_runtime_hooks(*this, socket);
         runtime_ns::wait_create_container_result(*this, socket);
         runtime_ns::wait_socket_close(socket);
