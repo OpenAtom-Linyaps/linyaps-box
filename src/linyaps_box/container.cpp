@@ -202,32 +202,40 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook)
     }
 
     if (pid == 0) {
-        [&]() noexcept {
-            std::vector<const char *> c_args{ hook.path.c_str() };
-            for (const auto &arg : hook.args) {
-                c_args.push_back(arg.c_str());
+        const auto *bin = hook.path.c_str();
+        std::optional<std::vector<const char *>> c_args;
+        if (hook.args) {
+            c_args = std::vector<const char *>(hook.args.value().size() + 1);
+            const auto &args = hook.args.value();
+            for (const auto &arg : args) {
+                c_args->push_back(arg.c_str());
             }
-            c_args.push_back(nullptr);
+            c_args->push_back(nullptr);
+        }
 
-            std::vector<std::string> envs;
-            envs.reserve(hook.env.size());
-            for (const auto &env : hook.env) {
-                envs.push_back(env.first + "=" + env.second);
+        std::optional<std::vector<std::string>> envs;
+        std::optional<std::vector<const char *>> c_env;
+        if (hook.env) {
+            envs = std::vector<std::string>(hook.env.value().size());
+            for (const auto &[key, value] : hook.env.value()) {
+                std::string tmp{ key };
+                tmp.append('+' + value);
+                envs->push_back(std::move(tmp));
             }
 
-            std::vector<const char *> c_env;
-            c_env.reserve(envs.size());
-            for (const auto &env : envs) {
-                c_env.push_back(env.c_str());
+            c_env = std::vector<const char *>(envs->size() + 1);
+            for (const auto &env : envs.value()) {
+                c_env->push_back(env.c_str());
             }
+            c_env->push_back(nullptr);
+        }
 
-            execvpe(c_args[0],
-                    const_cast<char *const *>(c_args.data()),
-                    const_cast<char *const *>(c_env.data()));
+        execvpe(bin,
+                c_args ? const_cast<char *const *>(c_args->data()) : nullptr, // NOLINT
+                c_env ? const_cast<char *const *>(c_env->data()) : nullptr);  // NOLINT
 
-            std::cerr << "execvp: " << strerror(errno) << " errno=" << errno << std::endl;
-            exit(1);
-        }();
+        std::cerr << "execvp: " << strerror(errno) << " errno=" << errno << std::endl;
+        exit(1);
     }
 
     int status = 0;

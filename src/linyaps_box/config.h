@@ -132,9 +132,9 @@ struct config
         struct hook_t
         {
             std::filesystem::path path;
-            std::vector<std::string> args;
-            std::map<std::string, std::string> env;
-            int timeout;
+            std::optional<std::vector<std::string>> args;
+            std::optional<std::map<std::string, std::string>> env;
+            std::optional<int> timeout;
         };
 
         std::vector<hook_t> prestart;
