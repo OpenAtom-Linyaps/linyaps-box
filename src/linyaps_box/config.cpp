@@ -350,19 +350,36 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
             for (const auto &h : hooks[key]) {
                 linyaps_box::config::hooks_t::hook_t hook;
                 hook.path = h["path"].get<std::string>();
-                hook.args = h["args"].get<std::vector<std::string>>();
+                if (!hook.path.is_absolute()) {
+                    throw std::runtime_error(key + "path must be absolute");
+                }
+
+                if (h.contains("args")) {
+                    hook.args = h["args"].get<std::vector<std::string>>();
+                }
+
                 if (h.contains("env")) {
+                    std::map<std::string, std::string> env;
+
                     for (const auto &e : h["env"].get<std::vector<std::string>>()) {
                         auto pos = e.find('=');
                         if (pos == std::string::npos) {
                             throw std::runtime_error("invalid env entry: " + e);
                         }
-                        hook.env[e.substr(0, pos)] = e.substr(pos + 1);
+
+                        env[e.substr(0, pos)] = e.substr(pos + 1);
                     }
+
+                    hook.env = std::move(env);
                 }
+
                 if (h.contains("timeout")) {
                     hook.timeout = h["timeout"].get<int>();
+                    if (hook.timeout <= 0) {
+                        throw std::runtime_error(key + "timeout must be greater than zero");
+                    }
                 }
+
                 result.push_back(hook);
             }
 
