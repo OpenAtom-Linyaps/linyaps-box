@@ -212,7 +212,8 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook)
         const auto *bin = hook.path.c_str();
         std::optional<std::vector<const char *>> c_args;
         if (hook.args) {
-            c_args = std::vector<const char *>(hook.args.value().size() + 1);
+            c_args = std::vector<const char *>{};
+            c_args->reserve(hook.args.value().size() + 1);
             const auto &args = hook.args.value();
             for (const auto &arg : args) {
                 c_args->push_back(arg.c_str());
@@ -223,14 +224,16 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook)
         std::optional<std::vector<std::string>> envs;
         std::optional<std::vector<const char *>> c_env;
         if (hook.env) {
-            envs = std::vector<std::string>(hook.env.value().size());
+            envs = std::vector<std::string>{};
+            envs->reserve(hook.env.value().size() + 1);
             for (const auto &[key, value] : hook.env.value()) {
                 std::string tmp{ key };
                 tmp.append('+' + value);
                 envs->push_back(std::move(tmp));
             }
 
-            c_env = std::vector<const char *>(envs->size() + 1);
+            c_env = std::vector<const char *>{};
+            c_env->reserve(envs.value().size() + 1);
             for (const auto &env : envs.value()) {
                 c_env->push_back(env.c_str());
             }
