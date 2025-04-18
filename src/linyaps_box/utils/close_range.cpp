@@ -85,18 +85,18 @@ void close_range_fallback(uint first, uint last, int flags)
 void linyaps_box::utils::close_range(uint first, uint last, int flags)
 {
     LINYAPS_BOX_DEBUG() << "close_range (" << first << ", " << last << ")" << "with flags "
-                        << [flags] {
-                               std::stringstream ss;
-                               ss << '[';
-                               if ((flags & CLOSE_RANGE_CLOEXEC) != 0) {
-                                   ss << "CLOSE_RANGE_CLOEXEC ";
-                               }
-                               if ((flags & CLOSE_RANGE_UNSHARE) != 0) {
-                                   ss << "CLOSE_RANGE_UNSHARE ";
-                               }
-                               ss << ']';
-                               return ss.str();
-                           }();
+                        << [flags]() -> std::string {
+        std::stringstream ss;
+        ss << '[';
+        if ((flags & CLOSE_RANGE_CLOEXEC) != 0) {
+            ss << "CLOSE_RANGE_CLOEXEC ";
+        }
+        if ((flags & CLOSE_RANGE_UNSHARE) != 0) {
+            ss << "CLOSE_RANGE_UNSHARE ";
+        }
+        ss << ']';
+        return ss.str();
+    }();
 
     static bool support_close_range{ true };
     if (!support_close_range) {

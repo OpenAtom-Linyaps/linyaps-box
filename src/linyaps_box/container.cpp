@@ -192,7 +192,7 @@ class unexpected_sync_message : public std::logic_error
 {
 public:
     unexpected_sync_message(sync_message excepted, sync_message actual)
-        : std::logic_error([excepted, actual] {
+        : std::logic_error([excepted, actual]() -> std::string {
             std::stringstream stream;
             stream << "unexpected sync message: expected " << excepted << " got " << actual;
             return std::move(stream).str();
@@ -336,19 +336,18 @@ void syscall_mount(const char *_special_file,
         }
         return _dir;
     }() << "\n\t_fstype = "
-        <<
-            [_fstype]() {
-                if (_fstype == nullptr) {
-                    return "nullptr";
-                }
-                return _fstype;
-            }()
-        << "\n\t_rwflag = " << dump_mount_flags(_rwflag) << "\n\t_data = " << [_data]() {
-               if (_data == nullptr) {
-                   return "nullptr";
-               }
-               return reinterpret_cast<const char *>(_data);
-           }();
+        << [_fstype]() -> std::string {
+        if (_fstype == nullptr) {
+            return "nullptr";
+        }
+        return _fstype;
+    }() << "\n\t_rwflag = "
+        << dump_mount_flags(_rwflag) << "\n\t_data = " << [_data]() -> std::string {
+        if (_data == nullptr) {
+            return "nullptr";
+        }
+        return reinterpret_cast<const char *>(_data);
+    }();
 
     int ret = ::mount(_special_file, _dir, _fstype, _rwflag, _data);
     if (ret < 0) {
@@ -359,7 +358,7 @@ void syscall_mount(const char *_special_file,
 struct remount_t
 {
     linyaps_box::utils::file_descriptor destination_fd;
-    unsigned long flags;
+    unsigned long flags{};
     std::string data;
 };
 
@@ -1197,7 +1196,7 @@ void configure_mounts(const linyaps_box::container &container, const std::filesy
 
     LINYAPS_BOX_DEBUG() << "All opened file describers:\n" << linyaps_box::utils::inspect_fds();
 
-    LINYAPS_BOX_DEBUG() << "Execute container process:" << [&process] {
+    LINYAPS_BOX_DEBUG() << "Execute container process:" << [&process]() -> std::string {
         std::stringstream ss;
         ss << " " << process.args[0];
         for (size_t i = 1; i < process.args.size(); ++i) {
@@ -1503,7 +1502,7 @@ void start_container_hooks(const linyaps_box::container &container,
 
 void close_other_fds(std::set<uint> except_fds)
 {
-    LINYAPS_BOX_DEBUG() << "Close all fds excepts " << [&]() {
+    LINYAPS_BOX_DEBUG() << "Close all fds excepts " << [&]() -> std::string {
         std::stringstream ss;
         for (auto fd : except_fds) {
             ss << fd << " ";
@@ -1754,7 +1753,7 @@ std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
 
 void execute_user_namespace_helper(const std::vector<std::string> &args)
 {
-    LINYAPS_BOX_DEBUG() << "Execute user_namespace helper:" << [&]() {
+    LINYAPS_BOX_DEBUG() << "Execute user_namespace helper:" << [&]() -> std::string {
         std::stringstream result;
         for (const auto &arg : args) {
             result << " \"";

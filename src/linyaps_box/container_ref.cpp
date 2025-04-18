@@ -61,7 +61,7 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
     }
     argv.push_back(nullptr);
 
-    LINYAPS_BOX_DEBUG() << [&argv]() {
+    LINYAPS_BOX_DEBUG() << [&argv]() -> std::string {
         auto result = std::accumulate(argv.cbegin(),
                                       argv.cend() - 1,
                                       std::string{ "args:[" },
