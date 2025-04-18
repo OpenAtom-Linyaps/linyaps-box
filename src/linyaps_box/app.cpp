@@ -35,7 +35,7 @@ namespace linyaps_box {
 // Extended commands and options should be compatible with crun.
 int main(int argc, char **argv) noexcept
 try {
-    LINYAPS_BOX_DEBUG() << "linyaps box called with" << [=]() {
+    LINYAPS_BOX_DEBUG() << "linyaps box called with" << [=]() -> std::string {
         std::stringstream result;
         for (int i = 0; i < argc; ++i) {
             result << " \"";
