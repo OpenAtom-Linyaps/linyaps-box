@@ -412,13 +412,6 @@ function(setup_linyaps_box_smoke_tests)
         "${CMAKE_CURRENT_BINARY_DIR}/st-data"
         "${CMAKE_CURRENT_SOURCE_DIR}/${test}")
     list(APPEND linyaps-box_TESTS "${test}")
-
-    set_tests_properties(
-      "${test}"
-      PROPERTIES
-        ENVIRONMENT
-        "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_LIST_DIR}/tests/ll-box-st/glibc_leaks.txt"
-    )
   endforeach()
 endfunction()
 
