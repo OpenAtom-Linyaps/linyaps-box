@@ -37,7 +37,7 @@ void linyaps_box::impl::table_printer::print_statuses(const std::vector<containe
     for (const auto &s : status) {
         std::cout << std::left << std::setw(max_length) << s.ID << std::setw(10) << s.PID
                   << std::setw(9) << get_status_string(s.status) << std::setw(40) << s.bundle
-                  << std::setw(31) << s.created << '\n';
+                  << std::setw(31) << s.created << std::setw(0) << s.owner << '\n';
     }
 
     std::cout.flush();
@@ -51,6 +51,7 @@ void linyaps_box::impl::table_printer::print_status(const container_status_t &st
     std::cout << "status\t" << get_status_string(status.status) << '\n';
     std::cout << "bundle\t" << status.bundle << '\n';
     std::cout << "created\t" << status.created << '\n';
+    std::cout << "owner\t" << status.owner << '\n';
     std::cout << "annotations" << '\n';
     for (const auto &a : status.annotations) {
         std::cout << "\t" << a.first << "\t" << a.second << '\n';
