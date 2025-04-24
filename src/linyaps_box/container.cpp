@@ -2071,11 +2071,12 @@ linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
     LINYAPS_BOX_DEBUG() << "load config from " << config;
     this->config = linyaps_box::config::parse(ifs);
 
+#ifndef LINYAPS_BOX_STATIC_LINK
     auto *pw = getpwuid(geteuid());
     if (pw == nullptr) {
         throw std::system_error(errno, std::generic_category(), "getpwuid");
     }
-
+#endif
     {
         container_status_t status;
         status.oci_version = linyaps_box::config::oci_version;
@@ -2086,7 +2087,9 @@ linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
         status.created = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                                 std::chrono::system_clock::now().time_since_epoch())
                                                 .count());
+#ifndef LINYAPS_BOX_STATIC_LINK
         status.owner = pw->pw_name;
+#endif
         this->status_dir().write(status);
     }
 
