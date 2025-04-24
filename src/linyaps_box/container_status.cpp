@@ -46,6 +46,7 @@ nlohmann::json status_to_json(const linyaps_box::container_status_t &status)
                                     { "status", to_string(status.status) },
                                     { "bundle", status.bundle.string() },
                                     { "created", status.created },
+                                    { "owner", status.owner },
                                     { "annotations", status.annotations },
                                     { "ociVersion", status.oci_version } });
 }

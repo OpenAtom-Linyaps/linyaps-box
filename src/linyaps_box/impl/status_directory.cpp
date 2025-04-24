@@ -39,6 +39,7 @@ linyaps_box::container_status_t read_status(const std::filesystem::path &path)
     }
     ret.bundle = std::string(j["bundle"]);
     ret.created = j["created"];
+    ret.owner = j["owner"];
     ret.annotations = j["annotations"];
 
     return ret;
@@ -53,6 +54,7 @@ void linyaps_box::impl::status_directory::write(const container_status_t &status
                                                 { "status", to_string(status.status) },
                                                 { "bundle", status.bundle },
                                                 { "created", status.created },
+                                                { "owner", status.owner },
                                                 { "annotations", status.annotations },
                                                 { "ociVersion", status.oci_version } });
 

@@ -22,6 +22,7 @@ struct container_status_t
     runtime_status status;
     std::filesystem::path bundle;
     std::string created; // extension field
+    std::string owner;   // extension field
     std::unordered_map<std::string, std::string> annotations;
 };
 
