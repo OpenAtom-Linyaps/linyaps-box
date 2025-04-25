@@ -12,6 +12,7 @@
 #include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/mkdir.h"
+#include "linyaps_box/utils/mknod.h"
 #include "linyaps_box/utils/open_file.h"
 #include "linyaps_box/utils/platform.h"
 #include "linyaps_box/utils/socketpair.h"
@@ -1066,26 +1067,24 @@ private:
                                      + " already exists but it's not satisfied with requirement");
         }
 
-        // FIXME: couldn't open created device due to permission denied
-        // not existing, try to create it
-        // try {
-        //     auto path = destination.relative_path();
-        //     linyaps_box::utils::mknodat(root, path, mode | type, dev);
+        try {
+            auto path = destination.relative_path();
+            linyaps_box::utils::mknodat(root, path, mode | type, dev);
 
-        //     auto new_dev = linyaps_box::utils::open_at(root, path, O_PATH);
-        //     path = new_dev.proc_path();
-        //     if (chmod(path.c_str(), mode) < 0) {
-        //         throw std::system_error(errno, std::generic_category(), "chmod");
-        //     }
+            auto new_dev = linyaps_box::utils::open_at(root, path, O_PATH);
+            path = new_dev.proc_path();
+            if (chmod(path.c_str(), mode) < 0) {
+                throw std::system_error(errno, std::generic_category(), "chmod");
+            }
 
-        //     if (chown(path.c_str(), uid, gid) < 0) {
-        //         throw std::system_error(errno, std::generic_category(), "chown");
-        //     }
-        // } catch (const std::system_error &e) {
-        //     if (e.code().value() != EPERM) {
-        //         throw;
-        //     }
-        // }
+            if (chown(path.c_str(), uid, gid) < 0) {
+                throw std::system_error(errno, std::generic_category(), "chown");
+            }
+        } catch (const std::system_error &e) {
+            if (e.code().value() != EPERM) {
+                throw;
+            }
+        }
 
         // NOTE: fallback to bind mount host device into container
         LINYAPS_BOX_DEBUG() << "fallback to bind mount device";
