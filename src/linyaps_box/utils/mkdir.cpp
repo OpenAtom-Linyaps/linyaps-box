@@ -48,12 +48,18 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::mkdir(const file_descrip
         if (::mkdirat(current.get(), part.c_str(), mode) != 0 && errno != EEXIST) {
             LINYAPS_BOX_DEBUG() << "current path: " << utils::inspect_path(current.get())
                                 << " perm:" << utils::inspect_permissions(current.get());
-            throw std::system_error(errno, std::generic_category(), "mkdirat");
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "mkdirat: failed to create "
+                                            + (current.current_path() / part).string());
         }
 
         fd = ::openat(current.get(), part.c_str(), O_PATH);
         if (fd == -1) {
-            throw std::system_error(errno, std::generic_category(), "openat");
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "openat: failed to open "
+                                            + (current.current_path() / part).string());
         }
 
         current = file_descriptor(fd);

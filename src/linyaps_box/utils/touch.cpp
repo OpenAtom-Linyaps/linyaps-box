@@ -15,7 +15,9 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::touch(const file_descrip
     LINYAPS_BOX_DEBUG() << "touch " << path << " at " << inspect_fd(root.get());
     int fd = ::openat(root.get(), path.c_str(), O_CREAT | O_WRONLY, 0666);
     if (fd == -1) {
-        throw std::system_error(errno, std::system_category(), "openat");
+        throw std::system_error(errno,
+                                std::system_category(),
+                                "openat: " + (root.current_path() / path.relative_path()).string());
     }
 
     return linyaps_box::utils::file_descriptor{ fd };

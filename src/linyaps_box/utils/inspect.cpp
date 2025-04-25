@@ -233,7 +233,7 @@ std::filesystem::path inspect_path(int fd)
     std::error_code ec;
     auto ret = std::filesystem::read_symlink("/proc/self/fd/" + std::to_string(fd), ec);
     if (ec) {
-        LINYAPS_BOX_WARNING() << "failed to inspect path for fd " << fd << ":" << ec.message();
+        LINYAPS_BOX_ERR() << "failed to inspect path for fd " << fd << ":" << ec.message();
     }
 
     return ret;

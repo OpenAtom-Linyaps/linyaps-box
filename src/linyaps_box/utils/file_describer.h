@@ -42,7 +42,7 @@ public:
 
     [[nodiscard]] std::filesystem::path proc_path() const;
 
-    [[nodiscard]] std::filesystem::path current_path() const;
+    [[nodiscard]] std::filesystem::path current_path() const noexcept;
 
 private:
     int fd{ -1 };
