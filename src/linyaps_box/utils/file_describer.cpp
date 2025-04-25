@@ -121,7 +121,14 @@ std::filesystem::path linyaps_box::utils::file_descriptor::proc_path() const
             / std::to_string(fd);
 }
 
-std::filesystem::path linyaps_box::utils::file_descriptor::current_path() const
+std::filesystem::path linyaps_box::utils::file_descriptor::current_path() const noexcept
 {
-    return std::filesystem::read_symlink(proc_path());
+    std::error_code ec;
+    auto p_path = proc_path();
+    auto path = std::filesystem::read_symlink(p_path, ec);
+    if (ec) {
+        LINYAPS_BOX_ERR() << "failed to read symlink " << p_path.c_str() << ": " << ec.message();
+    }
+
+    return path;
 }

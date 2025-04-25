@@ -666,7 +666,10 @@ class mounter
             } catch (const std::system_error &e) {
                 auto parent_fd = ::openat(rootfsfd.get(), "..", O_PATH | O_CLOEXEC);
                 if (parent_fd < 0) {
-                    throw std::system_error(errno, std::generic_category(), "openat");
+                    throw std::system_error(errno,
+                                            std::generic_category(),
+                                            "openat: failed to open "
+                                                    + rootfsfd.current_path().string() + "/..");
                 }
 
                 rootfsfd = linyaps_box::utils::file_descriptor(parent_fd);
