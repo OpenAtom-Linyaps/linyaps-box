@@ -949,7 +949,7 @@ private:
             mount.source = "tmpfs";
             mount.destination = "/dev";
             mount.type = "tmpfs";
-            mount.flags = MS_NOSUID | MS_STRICTATIME | MS_NODEV;
+            mount.flags = MS_NOSUID | MS_STRICTATIME;
             mount.data = "mode=755,size=65536k";
             this->mount(mount);
         } while (false);
