@@ -1769,7 +1769,7 @@ void execute_user_namespace_helper(const std::vector<std::string> &args)
 
     auto pid = fork();
     if (pid < 0) {
-        throw std::runtime_error("fork failed");
+        throw std::system_error(errno, std::generic_category(), "fork");
     }
 
     if (pid == 0) {
@@ -1780,9 +1780,7 @@ void execute_user_namespace_helper(const std::vector<std::string> &args)
         }
 
         c_args.push_back(nullptr);
-        execvp(c_args[0], const_cast<char *const *>(c_args.data()));
-
-        throw std::system_error(errno, std::generic_category(), "execvp");
+        exit(execvp(c_args[0], const_cast<char *const *>(c_args.data())));
     }
 
     int status = 0;
@@ -2053,12 +2051,12 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 
 } // namespace
 
-linyaps_box::container::container(std::shared_ptr<status_directory> status_dir,
+linyaps_box::container::container(const status_directory &status_dir,
                                   const std::string &id,
                                   const std::filesystem::path &bundle,
                                   std::filesystem::path config,
                                   cgroup_manager_t manager)
-    : container_ref(std::move(status_dir), id)
+    : container_ref(status_dir, id)
     , bundle(bundle)
 {
     if (config.is_relative()) {

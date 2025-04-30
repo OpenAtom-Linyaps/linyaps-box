@@ -6,21 +6,20 @@
 
 #include "linyaps_box/utils/log.h"
 
-#include <csignal>
+#include <csignal> // IWYU pragma: keep
 #include <utility>
 
 #include <unistd.h>
 
-linyaps_box::container_ref::container_ref(std::shared_ptr<status_directory> status_dir,
-                                          std::string id)
+linyaps_box::container_ref::container_ref(const status_directory &status_dir, std::string id)
     : id(std::move(id))
-    , status_dir_(std::move(status_dir))
+    , status_dir_(status_dir)
 {
 }
 
 linyaps_box::container_status_t linyaps_box::container_ref::status() const
 {
-    return this->status_dir_->read(this->id);
+    return this->status_dir_.read(this->id);
 }
 
 void linyaps_box::container_ref::kill(int signal) const
@@ -100,9 +99,9 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
     throw std::system_error(errno, std::generic_category(), std::move(ss).str());
 }
 
-linyaps_box::status_directory &linyaps_box::container_ref::status_dir() const
+const linyaps_box::status_directory &linyaps_box::container_ref::status_dir() const
 {
-    return *this->status_dir_;
+    return this->status_dir_;
 }
 
 const std::string &linyaps_box::container_ref::get_id() const

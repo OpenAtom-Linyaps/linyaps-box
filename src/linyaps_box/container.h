@@ -14,7 +14,7 @@ namespace linyaps_box {
 class container : public container_ref
 {
 public:
-    container(std::shared_ptr<status_directory> status_dir,
+    container(const status_directory &status_dir,
               const std::string &id,
               const std::filesystem::path &bundle,
               std::filesystem::path config,
@@ -24,6 +24,7 @@ public:
     [[nodiscard]] const std::filesystem::path &get_bundle() const;
     [[nodiscard]] int run(const config::process_t &process);
     // TODO:: support fully container capabilities, e.g. create, start, stop, delete...
+
 private:
     void cgroup_preenter(const cgroup_options &options, utils::file_descriptor &dirfd);
     std::filesystem::path bundle;

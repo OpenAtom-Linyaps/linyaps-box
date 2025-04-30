@@ -18,7 +18,7 @@ std::unordered_map<std::string, linyaps_box::container_ref> linyaps_box::runtime
 
     std::unordered_map<std::string, container_ref> containers;
     for (const auto &container_id : container_ids) {
-        containers.emplace(container_id, container_ref(this->status_dir, container_id));
+        containers.emplace(container_id, container_ref(*this->status_dir, container_id));
     }
 
     return containers;
@@ -27,5 +27,5 @@ std::unordered_map<std::string, linyaps_box::container_ref> linyaps_box::runtime
 linyaps_box::container linyaps_box::runtime_t::create_container(
         const linyaps_box::runtime_t::create_container_options_t &options)
 {
-    return { this->status_dir, options.ID, options.bundle, options.config, options.manager };
+    return { *this->status_dir, options.ID, options.bundle, options.config, options.manager };
 }
