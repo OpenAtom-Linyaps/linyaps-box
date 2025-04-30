@@ -13,9 +13,9 @@ namespace linyaps_box::impl {
 class status_directory : public virtual linyaps_box::status_directory
 {
 public:
-    void write(const container_status_t &status) override;
+    void write(const container_status_t &status) const override;
     [[nodiscard]] container_status_t read(const std::string &id) const override;
-    void remove(const std::string &id) override;
+    void remove(const std::string &id) const override;
     [[nodiscard]] std::vector<std::string> list() const override;
 
     explicit status_directory(const std::filesystem::path &path);

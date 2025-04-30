@@ -30,7 +30,7 @@ public:
     container create_container(const create_container_options_t &options);
 
 private:
-    std::shared_ptr<status_directory> status_dir;
+    std::unique_ptr<status_directory> status_dir;
 };
 
 } // namespace linyaps_box

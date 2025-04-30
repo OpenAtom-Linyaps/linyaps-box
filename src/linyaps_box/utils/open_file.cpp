@@ -67,10 +67,11 @@ syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, uint6
 } // namespace
 
 linyaps_box::utils::file_descriptor linyaps_box::utils::open(const std::filesystem::path &path,
-                                                             int flag)
+                                                             int flag,
+                                                             mode_t mode)
 {
     LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " with " << inspect_fcntl_or_open_flags(flag);
-    int fd = ::open(path.c_str(), flag);
+    int fd = ::open(path.c_str(), flag, mode);
     if (fd == -1) {
         throw std::system_error(errno,
                                 std::generic_category(),
@@ -84,7 +85,7 @@ linyaps_box::utils::file_descriptor
 linyaps_box::utils::open_at(const linyaps_box::utils::file_descriptor &root,
                             const std::filesystem::path &path,
                             int flag,
-                            int mode)
+                            mode_t mode)
 {
     LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " at FD=" << root.get() << " with "
                         << inspect_fcntl_or_open_flags(flag) << "\n\t" << inspect_fd(root.get());

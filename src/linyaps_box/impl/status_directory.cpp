@@ -47,7 +47,7 @@ linyaps_box::container_status_t read_status(const std::filesystem::path &path)
 
 } // namespace
 
-void linyaps_box::impl::status_directory::write(const container_status_t &status)
+void linyaps_box::impl::status_directory::write(const container_status_t &status) const
 {
     nlohmann::json j = nlohmann::json::object({ { "id", status.ID },
                                                 { "pid", status.PID },
@@ -67,7 +67,7 @@ linyaps_box::impl::status_directory::read(const std::string &id) const
     return read_status(this->path / (id + ".json"));
 }
 
-void linyaps_box::impl::status_directory::remove(const std::string &id)
+void linyaps_box::impl::status_directory::remove(const std::string &id) const
 {
     auto path = this->path / (id + ".json");
     LINYAPS_BOX_DEBUG() << "Remove " << path;
