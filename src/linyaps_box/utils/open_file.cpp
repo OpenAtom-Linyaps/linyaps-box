@@ -108,10 +108,11 @@ linyaps_box::utils::open_at(const linyaps_box::utils::file_descriptor &root,
                 break;
             }
 
-            auto msg = std::string{ e.what() } + ": failed to open " + root.current_path().string()
-                    + path.relative_path().string();
-
-            throw std::system_error(code, std::generic_category(), msg);
+            throw std::system_error(
+                    code,
+                    std::generic_category(),
+                    std::string{ e.what() } + ": failed to open "
+                            + (root.current_path() / path.relative_path()).string());
         }
     }
 
