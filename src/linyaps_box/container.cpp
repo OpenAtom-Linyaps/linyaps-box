@@ -47,6 +47,20 @@
 
 constexpr auto propagations_flag = (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE);
 
+namespace linyaps_box {
+
+struct container_data
+{
+    bool deny_setgroups{ false };
+};
+
+container_data &get_private_data(const linyaps_box::container &c) noexcept
+{
+    return *(c.data);
+}
+
+} // namespace linyaps_box
+
 namespace {
 
 enum class sync_message : std::uint8_t {
@@ -1747,7 +1761,7 @@ std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
     return { child_pid, std::move(sockets.first) };
 }
 
-void execute_user_namespace_helper(const std::vector<std::string> &args)
+[[nodiscard]] int execute_user_namespace_helper(const std::vector<std::string> &args)
 {
     LINYAPS_BOX_DEBUG() << "Execute user_namespace helper:" << [&]() -> std::string {
         std::stringstream result;
@@ -1780,7 +1794,12 @@ void execute_user_namespace_helper(const std::vector<std::string> &args)
         }
 
         c_args.push_back(nullptr);
-        exit(execvp(c_args[0], const_cast<char *const *>(c_args.data())));
+        auto ret = execvp(c_args[0], const_cast<char *const *>(c_args.data()));
+        if (ret < 0) {
+            exit(errno);
+        }
+
+        exit(0);
     }
 
     int status = 0;
@@ -1799,56 +1818,197 @@ void execute_user_namespace_helper(const std::vector<std::string> &args)
         throw std::system_error(errno, std::generic_category(), "waitpid");
     }
 
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-        LINYAPS_BOX_DEBUG() << "user_namespace helper exited";
-        return;
+    if (WIFEXITED(status)) {
+        return WEXITSTATUS(status);
+    }
+
+    if (WIFSIGNALED(status)) {
+        throw std::runtime_error("user_namespace helper exited which caused by signal "
+                                 + std::to_string(WTERMSIG(status)));
     }
 
     throw std::runtime_error("user_namespace helper exited abnormally");
 }
 
-void configure_gid_mapping(
-        pid_t pid, const std::vector<linyaps_box::config::linux_t::id_mapping_t> &gid_mappings)
+void set_deny_groups(const linyaps_box::container &container, const std::filesystem::path &filepath)
+{
+    auto data = linyaps_box::get_private_data(container);
+    if (data.deny_setgroups) {
+        throw std::runtime_error("denying setgroups");
+    }
+
+    auto file = linyaps_box::utils::open(filepath, O_CLOEXEC | O_CREAT | O_TRUNC | O_WRONLY);
+    auto ret = ::write(file.get(), "deny", 4);
+    if (ret < 0) {
+        throw std::system_error{ errno, std::system_category(), "write setgroups" };
+    }
+
+    data.deny_setgroups = true;
+}
+
+void configure_gid_mapping(pid_t pid, const linyaps_box::container &container)
 {
     LINYAPS_BOX_DEBUG() << "Configure GID mappings";
 
-    if (gid_mappings.size() == 0) {
+    const auto &config = container.get_config();
+    const auto &gid_mappings = config.linux->gid_mappings;
+    if (!gid_mappings) {
         LINYAPS_BOX_DEBUG() << "Nothing to do";
         return;
+    }
+    const auto &gid_mappings_v = gid_mappings.value();
+
+    std::string content;
+    const auto len = gid_mappings_v.size();
+    auto self_process = std::filesystem::path{ "/proc" } / std::to_string(pid);
+    const auto is_single_mapping = (gid_mappings_v.size() == 1 && gid_mappings_v[0].size == 1
+                                    && gid_mappings_v[0].host_id == gid_mappings_v[0].container_id);
+    if (is_single_mapping) {
+        const auto &data = linyaps_box::get_private_data(container);
+        if (!data.deny_setgroups) {
+            set_deny_groups(container,
+                            std::filesystem::path{ "/proc" } / std::to_string(pid) / "setgroups");
+        }
+
+        const auto &mapping = gid_mappings_v[0];
+        content.append(std::to_string(mapping.host_id) + " ");
+        content.append(std::to_string(mapping.container_id) + " ");
+        content.append(std::to_string(mapping.size));
+
+        auto file = linyaps_box::utils::open(self_process / "gid_map",
+                                             O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC);
+        auto ret = ::write(file.get(), content.data(), content.size());
+        if (ret > 0) {
+            return;
+        }
+
+        throw std::system_error{ errno, std::system_category(), "single gid mapping failed" };
     }
 
     std::vector<std::string> args;
     args.emplace_back("newgidmap");
     args.push_back(std::to_string(pid));
-    for (const auto &mapping : gid_mappings) {
+    for (const auto &mapping : gid_mappings_v) {
         args.push_back(std::to_string(mapping.container_id));
         args.push_back(std::to_string(mapping.host_id));
         args.push_back(std::to_string(mapping.size));
     }
 
-    execute_user_namespace_helper(args);
-}
-
-void configure_uid_mapping(
-        pid_t pid, const std::vector<linyaps_box::config::linux_t::id_mapping_t> &uid_mappings)
-{
-    LINYAPS_BOX_DEBUG() << "Configure UID mappings";
-
-    if (uid_mappings.size() == 0) {
-        LINYAPS_BOX_DEBUG() << "Nothing to do";
+    auto ret = execute_user_namespace_helper(args);
+    if (ret == 0) {
         return;
     }
 
+    if (ret != ENOENT) {
+        throw std::system_error(ret, std::generic_category(), "newgidmap");
+    }
+
+    // maybe we have CAP_SETGID?
+    content.clear();
+    for (std::size_t i = 0; i < len; ++i) {
+        const auto &mapping = gid_mappings_v[i];
+        content.append(std::to_string(mapping.host_id) + " ");
+        content.append(std::to_string(mapping.container_id) + " ");
+        content.append(std::to_string(mapping.size));
+
+        if (i != len - 1) {
+            content.push_back('\n');
+        }
+    };
+
+    auto file = linyaps_box::utils::open(self_process / "gid_map",
+                                         O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC);
+    ret = ::write(file.get(), content.data(), content.size());
+    if (ret > 0) {
+        return;
+    }
+
+    throw std::system_error{ errno,
+                             std::generic_category(),
+                             "write to " + file.current_path().string() };
+}
+
+void configure_uid_mapping(pid_t pid, const linyaps_box::container &container)
+{
+    LINYAPS_BOX_DEBUG() << "Configure UID mappings";
+
+    const auto &config = container.get_config();
+    const auto &uid_mappings = config.linux->uid_mappings;
+    if (!uid_mappings) {
+        LINYAPS_BOX_DEBUG() << "Nothing to do";
+        return;
+    }
+    const auto &uid_mappings_v = uid_mappings.value();
+
+    // If we only need to mapping a single and equivalent uids, we could write it directly.
+    // This condition is the most of our usage, so try it at first instead of newuidmap
+
+    std::string content;
+    const auto len = uid_mappings_v.size();
+    auto self_process = std::filesystem::path{ "/proc" } / std::to_string(pid);
+    const auto is_single_mapping = (uid_mappings_v.size() == 1 && uid_mappings_v[0].size == 1
+                                    && uid_mappings_v[0].host_id == uid_mappings_v[0].container_id);
+    if (is_single_mapping) {
+        const auto &mapping = uid_mappings_v[0];
+
+        content.append(std::to_string(mapping.host_id) + " ");
+        content.append(std::to_string(mapping.container_id) + " ");
+        content.append(std::to_string(mapping.size));
+
+        auto file = linyaps_box::utils::open(self_process / "uid_map",
+                                             O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC);
+        auto ret = ::write(file.get(), content.data(), content.size());
+        if (ret > 0) {
+            return;
+        }
+
+        // NOTE: The writing process must have the same effective user ID as the process that
+        // created the user namespace
+        throw std::system_error{ errno, std::system_category(), "single uid mapping failed" };
+    }
+
+    // mapping multiple uid, try newuidmap at fist
     std::vector<std::string> args;
     args.emplace_back("newuidmap");
     args.push_back(std::to_string(pid));
-    for (const auto &mapping : uid_mappings) {
+    for (const auto &mapping : uid_mappings_v) {
         args.push_back(std::to_string(mapping.container_id));
         args.push_back(std::to_string(mapping.host_id));
         args.push_back(std::to_string(mapping.size));
     }
 
-    execute_user_namespace_helper(args);
+    auto ret = execute_user_namespace_helper(args);
+    if (ret == 0) {
+        return;
+    }
+
+    if (ret != ENOENT) {
+        throw std::system_error(ret, std::generic_category(), "newuidmap");
+    }
+
+    // try to write mapping directly, maybe we have CAP_SETUID?
+    content.clear();
+    for (std::size_t i = 0; i < len; ++i) {
+        const auto &mapping = uid_mappings_v[i];
+        content.append(std::to_string(mapping.host_id) + " ");
+        content.append(std::to_string(mapping.container_id) + " ");
+        content.append(std::to_string(mapping.size));
+
+        if (i != len - 1) {
+            content.push_back('\n');
+        }
+    };
+
+    auto file = linyaps_box::utils::open(self_process / "uid_map",
+                                         O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC);
+    ret = ::write(file.get(), content.data(), content.size());
+    if (ret > 0) {
+        return;
+    }
+
+    throw std::system_error{ errno,
+                             std::generic_category(),
+                             "write to " + file.current_path().string() };
 }
 
 void configure_container_cgroup([[maybe_unused]] const linyaps_box::container &container)
@@ -1890,12 +2050,12 @@ void configure_container_namespaces(const linyaps_box::container &container,
 
                 // TODO: if not mapping a range of uid/gid, we could set uid/gid in the
                 // container process
-                if (const auto &gid_mappings = linux->gid_mappings; gid_mappings) {
-                    configure_gid_mapping(pid, gid_mappings.value());
+                if (const auto &uid_mappings = linux->uid_mappings; uid_mappings) {
+                    configure_uid_mapping(pid, container);
                 }
 
-                if (const auto &uid_mappings = linux->uid_mappings; uid_mappings) {
-                    configure_uid_mapping(pid, uid_mappings.value());
+                if (const auto &gid_mappings = linux->gid_mappings; gid_mappings) {
+                    configure_gid_mapping(pid, container);
                 }
             }
         }
@@ -2058,6 +2218,7 @@ linyaps_box::container::container(const status_directory &status_dir,
                                   cgroup_manager_t manager)
     : container_ref(status_dir, id)
     , bundle(bundle)
+    , data(new linyaps_box::container_data)
 {
     if (config.is_relative()) {
         config = bundle / config;
@@ -2071,8 +2232,12 @@ linyaps_box::container::container(const status_directory &status_dir,
     LINYAPS_BOX_DEBUG() << "load config from " << config;
     this->config = linyaps_box::config::parse(ifs);
 
+    host_uid_ = ::geteuid();
+    host_gid_ = ::getegid();
+
+    // TODO: maybe find another way to get user name
 #ifndef LINYAPS_BOX_STATIC_LINK
-    auto *pw = getpwuid(geteuid());
+    auto *pw = getpwuid(host_uid_);
     if (pw == nullptr) {
         throw std::system_error(errno, std::generic_category(), "getpwuid");
     }
@@ -2103,6 +2268,11 @@ linyaps_box::container::container(const status_directory &status_dir,
     }
 }
 
+linyaps_box::container::~container() noexcept
+{
+    delete data;
+}
+
 const linyaps_box::config &linyaps_box::container::get_config() const
 {
     return this->config;
@@ -2114,7 +2284,7 @@ const std::filesystem::path &linyaps_box::container::get_bundle() const
 }
 
 // maybe we need a internal run function?
-int linyaps_box::container::run(const config::process_t &process)
+int linyaps_box::container::run(const config::process_t &process) const
 {
     int container_process_exit_code{ -1 };
     try {
@@ -2153,16 +2323,12 @@ int linyaps_box::container::run(const config::process_t &process)
         // Now we wait for the container process to exit
         container_process_exit_code = runtime_ns::wait_container_process(this->status().PID);
 
-        {
-            auto status = this->status();
-            assert(status.status == container_status_t::runtime_status::STOPPED);
-            status.PID = child_pid;
-            this->status_dir().write(status);
-        }
-
         runtime_ns::poststop_hooks(*this);
+    } catch (const std::system_error &e) {
+        LINYAPS_BOX_ERR() << "failed to run a container, caused by: " << e.what()
+                          << ", code: " << e.code();
     } catch (const std::exception &e) {
-        LINYAPS_BOX_ERR() << "failed to run a container: " << e.what();
+        LINYAPS_BOX_ERR() << "failed to run a container, caused by: " << e.what();
     }
 
     this->status_dir().remove(this->get_id());
