@@ -32,24 +32,25 @@ struct list_options
     {
     }
 
-    std::reference_wrapper<global_options> global;
     output_format_t output_format{ output_format_t::table };
+    std::reference_wrapper<global_options> global;
 };
 
 struct exec_options
 {
     explicit exec_options(global_options &global)
-        : global(global)
+        : no_new_privs(false)
+        , global(global)
     {
     }
 
+    bool no_new_privs;
     std::reference_wrapper<global_options> global;
-    bool no_new_privs{};
+    std::vector<std::string> command;
     std::string user;
-    std::optional<std::string> cwd;
     std::optional<std::vector<std::string>> caps;
     std::string ID;
-    std::vector<std::string> command;
+    std::optional<std::string> cwd;
 };
 
 struct run_options
