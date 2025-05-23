@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11.4) # for RHEL 8
 
 project(
   linyaps-box
-  VERSION 1.3.4
+  VERSION 2.0.0
   DESCRIPTION "A simple OCI runtime for desktop applications"
   HOMEPAGE_URL "https://github.com/OpenAtom-Linyaps/linyaps-box"
   LANGUAGES CXX)
@@ -179,9 +179,12 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/touch.cpp
     src/linyaps_box/utils/touch.h)
 
+set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/linyaps_box/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/src/linyaps_box/version.h @ONLY)
+
 # for gcc 8
 set(linyaps-box_LIBRARY_LINK_LIBRARIES "stdc++fs")
-set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/src")
 
 if(linyaps-box_STATIC)
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")

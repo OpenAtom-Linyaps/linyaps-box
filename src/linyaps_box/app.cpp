@@ -11,7 +11,6 @@
 #include "linyaps_box/utils/log.h"
 
 #include <iostream>
-#include <stdexcept>
 
 namespace {
 
@@ -58,24 +57,25 @@ try {
         return options.global.return_code;
     }
 
-    std::visit(subCommand{ [](const command::list_options &options) {
-                              command::list(options);
-                          },
-                           [](const command::exec_options &options) {
-                               command::exec(options);
-                           },
-                           [](const command::kill_options &options) {
-                               command::kill(options);
-                           },
-                           [](const command::run_options &options) {
-                               options.global.get().return_code = command::run(options);
-                           },
-                           [](const std::monostate &) {
-                               throw std::runtime_error("unknown subcommand");
-                           } },
-               options.subcommand_opt);
-
-    return options.global.return_code;
+    return std::visit(subCommand{ [](const command::list_options &options) {
+                                     command::list(options);
+                                     return 0;
+                                 },
+                                  [](const command::exec_options &options) {
+                                      command::exec(options);
+                                      return 0;
+                                  },
+                                  [](const command::kill_options &options) {
+                                      command::kill(options);
+                                      return 0;
+                                  },
+                                  [](const command::run_options &options) {
+                                      return command::run(options);
+                                  },
+                                  [code = options.global.return_code](const std::monostate &) {
+                                      return code;
+                                  } },
+                      options.subcommand_opt);
 } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << std::endl;
     return -1;

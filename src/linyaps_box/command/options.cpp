@@ -4,9 +4,10 @@
 
 #include "linyaps_box/command/options.h"
 
-#include <CLI/CLI.hpp>
+#include "linyaps_box/config.h"
+#include "linyaps_box/version.h"
 
-#include <csignal>
+#include <CLI/CLI.hpp>
 
 #include <unistd.h>
 
@@ -14,7 +15,13 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
 {
     CLI::App app{ "A simple OCI runtime implementation focused on desktop applications.",
                   "ll-box" };
-    argv = app.ensure_utf8(argv);
+    app.set_version_flag("-v,--version", [] {
+        std::stringstream ss;
+        ss << "ll-box version " << LINYAPS_BOX_VERSION << "\n";
+        ss << "spec " << linyaps_box::config::oci_version;
+        return ss.str();
+    });
+    app.require_subcommand();
 
     linyaps_box::command::options options;
 
@@ -36,8 +43,6 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                             { "disabled", cgroup_manager_t::disabled },
                     }))
             ->default_val(cgroup_manager_t::cgroupfs);
-
-    app.require_subcommand();
 
     list_options list_opt{ options.global };
     auto *cmd_list = app.add_subcommand("list", "List know containers");
@@ -91,6 +96,7 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     cmd_kill->add_option("CONTAINER", kill_opt.container, "The container ID")->required();
     cmd_kill->add_option("SIGNAL", kill_opt.signal, "Signal to send")->default_val("SIGTERM");
 
+    argv = app.ensure_utf8(argv);
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError &e) {
