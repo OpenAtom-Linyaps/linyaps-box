@@ -88,7 +88,9 @@ set(linyaps-box_ACTIVE_LOG_LEVEL
       "The active syslog priority. This is used to filter log messages at compile time."
 )
 
-set(linyaps-box_ENABLE_CPM ON CACHE BOOL "enable CPM")
+set(linyaps-box_ENABLE_CPM
+    ON
+    CACHE BOOL "enable CPM")
 
 if(CMAKE_VERSION VERSION_LESS "3.14")
   set(linyaps-box_ENABLE_CPM OFF)
@@ -96,13 +98,12 @@ if(CMAKE_VERSION VERSION_LESS "3.14")
     STATUS "cmake version ${CMAKE_VERSION} not compatible with CPM.cmake.")
 endif()
 
-# if just want to try local packages at first
-# set CPM_USE_LOCAL_PACKAGES ON
+# if just want to try local packages at first set CPM_USE_LOCAL_PACKAGES ON
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     OFF
     CACHE BOOL "use local packages only")
 
-if (linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
+if(linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
   set(linyaps-box_ENABLE_CPM OFF)
 endif()
 
@@ -180,11 +181,13 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/touch.h)
 
 set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/linyaps_box/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/src/linyaps_box/version.h @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/linyaps_box/version.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/src/linyaps_box/version.h @ONLY)
 
 # for gcc 8
 set(linyaps-box_LIBRARY_LINK_LIBRARIES "stdc++fs")
-set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/src")
+set(linyaps-box_LIBRARY_INCLUDE_DIRS PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
+                                     "${CMAKE_CURRENT_BINARY_DIR}/src")
 
 if(linyaps-box_STATIC)
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
@@ -223,9 +226,10 @@ if(linyaps-box_ENABLE_CPM)
 endif()
 
 find_package(nlohmann_json 3.11.3 QUIET)
-if (NOT nlohmann_json_FOUND)
+if(NOT nlohmann_json_FOUND)
   add_subdirectory(external/nlohmann_json)
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/nlohmann_json")
+  list(APPEND CMAKE_MODULE_PATH
+       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/nlohmann_json")
   find_package(nlohmann_json 3.11.3 REQUIRED)
 endif()
 
@@ -233,9 +237,10 @@ list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
      nlohmann_json::nlohmann_json)
 
 find_package(CLI11 2.4.1 QUIET)
-if (NOT CLI11_FOUND)
+if(NOT CLI11_FOUND)
   add_subdirectory(external/CLI11)
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
+  list(APPEND CMAKE_MODULE_PATH
+       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
   find_package(CLI11 2.4.1 REQUIRED)
 endif()
 
@@ -244,8 +249,8 @@ list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
 add_library("${linyaps-box_LIBRARY}" ${linyaps-box_LIBRARY_SOURCE})
 target_include_directories("${linyaps-box_LIBRARY}"
                            ${linyaps-box_LIBRARY_INCLUDE_DIRS})
-target_link_libraries("${linyaps-box_LIBRARY}" PRIVATE
-                      ${linyaps-box_LIBRARY_LINK_LIBRARIES})
+target_link_libraries("${linyaps-box_LIBRARY}"
+                      PRIVATE ${linyaps-box_LIBRARY_LINK_LIBRARIES})
 target_compile_features("${linyaps-box_LIBRARY}" PUBLIC cxx_std_17)
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_STANDARD 17)
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_EXTENSIONS OFF)
@@ -255,7 +260,8 @@ include(CheckIncludeFileCXX)
 check_include_file_cxx("linux/openat2.h" LINYAPS_BOX_HAVE_OPENAT2_H)
 
 if(${LINYAPS_BOX_HAVE_OPENAT2_H})
-  target_compile_definitions("${linyaps-box_LIBRARY}" PRIVATE "LINYAPS_BOX_HAVE_OPENAT2_H")
+  target_compile_definitions("${linyaps-box_LIBRARY}"
+                             PRIVATE "LINYAPS_BOX_HAVE_OPENAT2_H")
 endif()
 
 target_compile_definitions(
@@ -267,6 +273,10 @@ target_compile_definitions(
   PRIVATE "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
 target_compile_options("${linyaps-box_LIBRARY}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
+if(linyaps-box_STATIC)
+  target_compile_definitions("${linyaps-box_LIBRARY}"
+                             PUBLIC "LINYAPS_BOX_STATIC_LINK")
+endif()
 
 if(linyaps-box_ENABLE_SECCOMP)
   target_compile_definitions("${linyaps-box_LIBRARY}"
@@ -308,7 +318,6 @@ target_link_libraries("${linyaps-box_APP}" ${linyaps-box_APP_LINK_LIBRARIES})
 if(linyaps-box_STATIC)
   target_link_options("${linyaps-box_APP}" PRIVATE -static -static-libgcc
                       -static-libstdc++)
-  target_compile_definitions("${linyaps-box_APP}" PRIVATE "LINYAPS_BOX_STATIC_LINK")
 endif()
 target_compile_features("${linyaps-box_APP}" PRIVATE cxx_std_17)
 set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD 17)
@@ -326,9 +335,9 @@ target_compile_options("${linyaps-box_APP}"
 include(GNUInstallDirs)
 
 # parameter TYPE was added in CMake 3.14
-if (CMAKE_VERSION VERSION_LESS "3.14")
-  install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}" DESTINATION
-          "${CMAKE_INSTALL_BINDIR}")
+if(CMAKE_VERSION VERSION_LESS "3.14")
+  install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}"
+          DESTINATION "${CMAKE_INSTALL_BINDIR}")
 else()
   install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}" TYPE BIN)
 endif()
