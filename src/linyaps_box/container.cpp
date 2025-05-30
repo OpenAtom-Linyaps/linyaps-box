@@ -52,6 +52,7 @@ namespace linyaps_box {
 struct container_data
 {
     bool deny_setgroups{ false };
+    bool mount_dev_from_host{ false };
 };
 
 container_data &get_private_data(const linyaps_box::container &c) noexcept
@@ -618,6 +619,10 @@ void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor 
         if (!is_sys_rbind && mount.destination == "/sys" && (mount.flags & MS_REC) != 0) {
             is_sys_rbind = true;
         }
+
+        if (mount.destination == "/dev") {
+            linyaps_box::get_private_data(container).mount_dev_from_host = true;
+        }
     } else {
         // mount other types
         destination_fd = ensure_mount_destination(true, root, mount);
@@ -872,7 +877,11 @@ public:
     void finalize()
     {
         this->configure_default_filesystems();
-        this->configure_default_devices();
+
+        // maybe user will bind mount the sub directory of / from host
+        if (!linyaps_box::get_private_data(container).mount_dev_from_host) {
+            this->configure_default_devices();
+        }
 
         LINYAPS_BOX_DEBUG() << "finalize " << remounts.size() << " remounts";
         // our mount process has to do with the order

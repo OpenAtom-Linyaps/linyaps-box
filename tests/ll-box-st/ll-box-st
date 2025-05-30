@@ -175,9 +175,17 @@ function run_test() {
 	mkdir -p -- "${TEST_DIR}"
 
 	local TEST_CONFIG="${TEST_DIR}/test_config.json"
+	# patch process from test file
 	"${JQ}" >"${TEST_CONFIG}" \
 		".process |= $("${JQ}" -r '.process' "${TEST_FILE}" || true)" \
 		"${BUNDLE_DIR}/config.json"
+
+	# patch mount from test file if test file has mount field
+	if "${JQ}" -e '.mounts' "${TEST_FILE}" &>/dev/null; then
+		"${JQ}" >"${TEST_CONFIG}" \
+			".mounts |= $("${JQ}" -r '.mounts' "${TEST_FILE}" || true)" \
+			"${BUNDLE_DIR}/config.json"
+	fi
 
 	local CONTAINER_NAME
 	CONTAINER_NAME="$(basename -- "${TEST_FILE_NAME}" .json)"
