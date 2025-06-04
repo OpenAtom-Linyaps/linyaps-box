@@ -4,6 +4,7 @@
 
 #include "linyaps_box/utils/close_range.h"
 
+#include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/log.h"
 
 #include <cstring>
@@ -36,15 +37,24 @@ void close_range_fallback(uint first, uint last, int flags)
         throw std::system_error(errno, std::generic_category(), "opendir /proc/self/fd");
     }
 
+    auto close_dir = make_defer([dir]() noexcept {
+        if (closedir(dir) < 0) {
+            LINYAPS_BOX_WARNING() << "closedir /proc/self/fd failed: " << strerror(errno)
+                                  << ", but this may not be a problem";
+        }
+    });
+
     // except self fd
+    // use opendir instead of std::filesystem::directory_iterator
+    // because we should skip the file descriptor which is opened by opendir
     auto self_fd = dirfd(dir);
     if (self_fd < 0) {
         throw std::system_error(errno, std::generic_category(), "dirfd");
     }
 
-    auto *next = readdir(dir);
-    while (next != nullptr) {
-        if (next->d_name[0] == '.') {
+    struct dirent *next{ nullptr };
+    while ((next = ::readdir(dir)) != nullptr) {
+        if (next->d_name[0] == '.') { // skip "." and ".."
             continue;
         }
 
@@ -58,7 +68,7 @@ void close_range_fallback(uint first, uint last, int flags)
         }
 
         if ((flags & CLOSE_RANGE_CLOEXEC) != 0) {
-            if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
+            if (::fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
                 throw std::system_error(errno,
                                         std::generic_category(),
                                         std::string{ "failed to set up close-on-exec to " }
@@ -71,13 +81,6 @@ void close_range_fallback(uint first, uint last, int flags)
                                         std::string{ "failed to close " } + next->d_name);
             }
         }
-
-        next = readdir(dir);
-    }
-
-    if (closedir(dir) < 0) {
-        LINYAPS_BOX_WARNING() << "closedir /proc/self/fd failed: " << strerror(errno)
-                              << ", but this may not be a problem";
     }
 }
 } // namespace
