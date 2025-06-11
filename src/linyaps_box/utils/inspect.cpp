@@ -87,7 +87,7 @@ std::string inspect_fcntl_or_open_flags(size_t flags)
         ss << " O_NONBLOCK";
     }
     if ((flags & O_NDELAY) != 0) {
-        ss << " O_SYNC";
+        ss << " O_NDELAY";
     }
     if ((flags & O_SYNC) != 0) {
         ss << " O_SYNC";
