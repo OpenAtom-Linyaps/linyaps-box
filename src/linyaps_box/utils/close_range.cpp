@@ -16,9 +16,13 @@
 namespace {
 void syscall_close_range(uint fd, uint max_fd, int flags)
 {
-    auto ret = syscall(__NR_close_range, fd, max_fd, flags);
-    if (ret < 0) {
-        throw std::system_error(errno, std::generic_category(), "close_range");
+    if constexpr (__NR_close_range == -1) {
+        throw std::system_error(ENOSYS, std::generic_category(), "close_range");
+    } else {
+        auto ret = syscall(__NR_close_range, fd, max_fd, flags);
+        if (ret < 0) {
+            throw std::system_error(errno, std::generic_category(), "close_range");
+        }
     }
 }
 
