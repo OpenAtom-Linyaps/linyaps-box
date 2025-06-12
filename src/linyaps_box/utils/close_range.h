@@ -26,7 +26,7 @@
 // use __NR_* instead of SYS_*
 // https://man7.org/linux/man-pages/man2/syscalls.2.html
 #ifndef __NR_close_range
-#define __NR_close_range -1
+#define __NR_close_range 432
 #endif
 
 namespace linyaps_box::utils {
