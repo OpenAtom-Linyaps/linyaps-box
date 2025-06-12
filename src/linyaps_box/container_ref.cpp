@@ -39,7 +39,6 @@ void linyaps_box::container_ref::kill(int signal) const
 void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &process)
 {
     auto target = std::to_string(this->status().PID);
-    auto wd = "--wdns=" + process.cwd.string();
 
     std::vector<const char *> argv{
         "nsenter",
@@ -51,7 +50,6 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
         // FIXME:
         // Old nsenter command do not support --wdns,
         // so we have to implement nsenter by ourself in the future.
-        wd.c_str(),
         "--preserve-credentials",
     };
 
