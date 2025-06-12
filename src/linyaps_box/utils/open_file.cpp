@@ -7,7 +7,7 @@
 #include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/log.h"
 
-#include <asm/unistd.h>
+#include <sys/syscall.h>
 
 #ifdef LINYAPS_BOX_HAVE_OPENAT2_H
 #include <linux/openat2.h>
