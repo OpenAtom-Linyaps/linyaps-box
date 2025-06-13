@@ -1,3 +1,9 @@
 if(TARGET CLI11::CLI11)
   set(CLI11_FOUND TRUE)
+
+  # Set version variables
+  set(CLI11_VERSION_MAJOR 2)
+  set(CLI11_VERSION_MINOR 5)
+  set(CLI11_VERSION_PATCH 0)
+  set(CLI11_VERSION "2.5.0")
 endif()
