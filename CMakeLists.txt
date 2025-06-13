@@ -104,6 +104,7 @@ set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     CACHE BOOL "use local packages only")
 
 if(linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
+  message(STATUS "CPM is disabled")
   set(linyaps-box_ENABLE_CPM OFF)
 endif()
 
@@ -232,6 +233,7 @@ if(NOT nlohmann_json_FOUND)
   list(APPEND CMAKE_MODULE_PATH
        "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/nlohmann_json")
   find_package(nlohmann_json 3.11.3 REQUIRED)
+  message(STATUS "use vendor nlohmann_json ${nlohmann_json_VERSION}")
 endif()
 
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
@@ -243,6 +245,7 @@ if(NOT CLI11_FOUND)
   list(APPEND CMAKE_MODULE_PATH
        "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
   find_package(CLI11 2.4.1 REQUIRED)
+  message(STATUS "use vendor CLI11 ${CLI11_VERSION}")
 endif()
 
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
