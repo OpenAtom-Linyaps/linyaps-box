@@ -51,6 +51,7 @@ struct exec_options
     std::optional<std::vector<std::string>> caps;
     std::string ID;
     std::optional<std::string> cwd;
+    std::optional<std::vector<std::string>> envs;
 };
 
 struct run_options

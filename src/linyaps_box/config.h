@@ -46,7 +46,7 @@ struct config
         console_t console;
 
         std::filesystem::path cwd;
-        std::map<std::string, std::string> env;
+        std::vector<std::string> env;
         std::vector<std::string> args;
 
         struct rlimit_t

@@ -1179,14 +1179,9 @@ void configure_mounts(const linyaps_box::container &container, const std::filesy
     }
     c_args.push_back(nullptr);
 
-    std::vector<std::string> envs;
-    envs.reserve(process.env.size());
-    for (const auto &env : process.env) {
-        envs.push_back(env.first + "=" + env.second);
-    }
     std::vector<const char *> c_env;
-    c_env.reserve(envs.size());
-    for (const auto &env : envs) {
+    c_env.reserve(process.env.size());
+    for (const auto &env : process.env) {
         c_env.push_back(env.c_str());
     }
     c_env.push_back(nullptr);

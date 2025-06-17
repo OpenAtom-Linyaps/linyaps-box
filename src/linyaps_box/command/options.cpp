@@ -72,6 +72,16 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                          "or `1000:1000` for UID=1000 and GID=1000")
             ->type_name("UID[:GID]");
     cmd_exec->add_option("--cwd", exec_opt.cwd, "Current working directory.");
+    cmd_exec->add_option("--env", exec_opt.envs, "Environment variables to set")
+            ->multi_option_policy(CLI::MultiOptionPolicy::TakeAll)
+            ->check(
+                    [](const std::string &str) {
+                        if (str.find('=') == std::string::npos) {
+                            return "invalid argument, env must be in the format of KEY=VALUE";
+                        }
+                        return "";
+                    },
+                    "env_check");
     // TODO: enable capabilities and no_new_privs support after rewrite exec,
     //      cmd_exec->add_option("-c,--cap", options.exec.caps, "Set capabilities")
     //              ->check(

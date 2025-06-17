@@ -58,6 +58,13 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
     }
     argv.push_back(nullptr);
 
+    std::vector<const char *> c_env;
+    c_env.reserve(process.env.size());
+    for (const auto &env : process.env) {
+        c_env.push_back(env.c_str());
+    }
+    c_env.push_back(nullptr);
+
     LINYAPS_BOX_DEBUG() << [&argv]() -> std::string {
         auto result = std::accumulate(argv.cbegin(),
                                       argv.cend() - 1,
@@ -86,7 +93,7 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
     // no_new_privileges
     // oom_score_adj
 
-    ::execvp("nsenter", const_cast<char **>(argv.data()));
+    ::execvpe("nsenter", const_cast<char **>(argv.data()), const_cast<char **>(c_env.data()));
 
     std::stringstream ss;
     ss << "execvp nsenter with arguments:";
