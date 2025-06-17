@@ -296,8 +296,9 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
                 if (pos == std::string::npos) {
                     throw std::runtime_error("invalid env entry: " + e);
                 }
-                cfg.process.env[e.substr(0, pos)] = e.substr(pos + 1);
             }
+
+            cfg.process.env = std::move(env);
         }
 
         cfg.process.args = j[ptr / "process" / "args"].get<std::vector<std::string>>();
