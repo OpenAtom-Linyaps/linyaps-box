@@ -25,6 +25,7 @@ void linyaps_box::command::exec(const struct exec_options &options)
     proc.args = options.command;
     proc.terminal = isatty(STDIN_FILENO) == 1 && isatty(STDOUT_FILENO) == 1;
     proc.no_new_privileges = options.no_new_privs;
+    proc.env = options.envs.value_or(std::vector<std::string>{});
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
     if (options.caps) {
