@@ -1122,6 +1122,7 @@ private:
         this->mount(mount);
     }
 
+    // https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#default-devices
     void configure_default_devices()
     {
         LINYAPS_BOX_DEBUG() << "Configure default devices";
@@ -1136,9 +1137,14 @@ private:
         this->configure_device("/dev/urandom", default_mode, S_IFCHR, makedev(1, 9), uid, gid);
         this->configure_device("/dev/tty", default_mode, S_IFCHR, makedev(5, 0), uid, gid);
 
-        // TODO Handle `/dev/console`;
-
-        // TODO Handle `/dev/ptmx`;
+        // bind mount /dev/pts/ptmx to /dev/ptmx
+        // https://docs.kernel.org/filesystems/devpts.html
+        linyaps_box::config::mount_t mount;
+        mount.source = "/dev/pts/ptmx";
+        mount.destination = "/dev/ptmx";
+        mount.type = "bind";
+        mount.flags = MS_BIND | MS_PRIVATE | MS_NOEXEC | MS_NOSUID;
+        this->mount(mount);
     }
 };
 
