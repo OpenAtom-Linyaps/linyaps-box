@@ -16,6 +16,7 @@
 #include "linyaps_box/utils/open_file.h"
 #include "linyaps_box/utils/platform.h"
 #include "linyaps_box/utils/socketpair.h"
+#include "linyaps_box/utils/symlink.h"
 #include "linyaps_box/utils/touch.h"
 
 #include <linux/magic.h>
@@ -881,6 +882,7 @@ public:
         // maybe user will bind mount the sub directory of / from host
         if (!linyaps_box::get_private_data(container).mount_dev_from_host) {
             this->configure_default_devices();
+            this->configure_dev_symlinks();
         }
 
         LINYAPS_BOX_DEBUG() << "finalize " << remounts.size() << " remounts";
@@ -1145,6 +1147,19 @@ private:
         mount.type = "bind";
         mount.flags = MS_BIND | MS_PRIVATE | MS_NOEXEC | MS_NOSUID;
         this->mount(mount);
+    }
+
+    // https://github.com/opencontainers/runtime-spec/blob/main/runtime-linux.md
+    void configure_dev_symlinks()
+    {
+        LINYAPS_BOX_DEBUG() << "Configure dev symlinks";
+
+        auto dev_fd = linyaps_box::utils::open_at(root, "dev");
+
+        linyaps_box::utils::symlink_at("/proc/self/fd", dev_fd, "fd");
+        linyaps_box::utils::symlink_at("/proc/self/fd/0", dev_fd, "stdin");
+        linyaps_box::utils::symlink_at("/proc/self/fd/1", dev_fd, "stdout");
+        linyaps_box::utils::symlink_at("/proc/self/fd/2", dev_fd, "stderr");
     }
 };
 
