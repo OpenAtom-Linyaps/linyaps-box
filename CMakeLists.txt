@@ -179,6 +179,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/semver.h
     src/linyaps_box/utils/socketpair.cpp
     src/linyaps_box/utils/socketpair.h
+    src/linyaps_box/utils/symlink.cpp
+    src/linyaps_box/utils/symlink.h
     src/linyaps_box/utils/touch.cpp
     src/linyaps_box/utils/touch.h)
 
