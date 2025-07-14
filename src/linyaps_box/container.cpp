@@ -1142,7 +1142,7 @@ private:
         // bind mount /dev/pts/ptmx to /dev/ptmx
         // https://docs.kernel.org/filesystems/devpts.html
         linyaps_box::config::mount_t mount;
-        mount.source = "/dev/pts/ptmx";
+        mount.source = root.current_path() / "dev/pts/ptmx";
         mount.destination = "/dev/ptmx";
         mount.type = "bind";
         mount.flags = MS_BIND | MS_PRIVATE | MS_NOEXEC | MS_NOSUID;
