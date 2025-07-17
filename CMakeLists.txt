@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11.4) # for RHEL 8
 
 project(
   linyaps-box
-  VERSION 2.0.0
+  VERSION 2.0.3
   DESCRIPTION "A simple OCI runtime for desktop applications"
   HOMEPAGE_URL "https://github.com/OpenAtom-Linyaps/linyaps-box"
   LANGUAGES CXX)
@@ -38,6 +38,8 @@ option(linyaps-box_ENABLE_UNIT_TESTS "Enable unit tests."
        ${linyaps-box_IS_TOP_LEVEL})
 
 option(linyaps-box_ENABLE_SMOKE_TESTS "Enable smoke tests." OFF)
+
+option(linyaps-box_MAKE_RELEASE "Make release build." OFF)
 
 if(linyaps-box_ENABLE_SMOKE_TESTS OR linyaps-box_ENABLE_UNIT_TESTS)
   set(linyaps-box_ENABLE_TESTING ON)
@@ -185,6 +187,20 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/touch.h)
 
 set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
+
+if(NOT linyaps-box_MAKE_RELEASE)
+  message(STATUS "make dev build")
+
+  execute_process(
+    COMMAND git rev-parse --short=7 HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_COMMIT_HASH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+
+  set(LINYAPS_BOX_VERSION "${LINYAPS_BOX_VERSION}-dev-${GIT_COMMIT_HASH}")
+endif()
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/linyaps_box/version.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/src/linyaps_box/version.h @ONLY)
 
