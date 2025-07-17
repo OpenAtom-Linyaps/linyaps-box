@@ -15,7 +15,7 @@ namespace linyaps_box::command {
 
 struct global_options
 {
-    cgroup_manager_t manager{ cgroup_manager_t::cgroupfs };
+    cgroup_manager_t manager{ cgroup_manager_t::disabled };
     std::filesystem::path root;
     int return_code{ 0 };
 };

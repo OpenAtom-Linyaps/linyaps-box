@@ -17,6 +17,7 @@ int linyaps_box::command::run(const struct run_options &options)
     create_container_options.bundle = options.bundle;
     create_container_options.config = options.config;
     create_container_options.ID = options.ID;
+    create_container_options.manager = options.global.get().manager;
 
     auto container = runtime.create_container(create_container_options);
 
