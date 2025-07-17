@@ -34,4 +34,23 @@ private:
     cgroup_manager_t manager;
 };
 
+inline std::ostream &operator<<(std::ostream &os, cgroup_manager_t manager)
+{
+    switch (manager) {
+    case cgroup_manager_t::disabled: {
+        os << "disabled";
+    } break;
+    case cgroup_manager_t::systemd: {
+        os << "systemd";
+    } break;
+    case cgroup_manager_t::cgroupfs: {
+        os << "cgroupfs";
+    } break;
+    default:
+        os << "unknown";
+    }
+
+    return os;
+}
+
 } // namespace linyaps_box

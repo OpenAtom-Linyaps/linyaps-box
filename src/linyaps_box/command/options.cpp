@@ -42,7 +42,7 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                             { "systemd", cgroup_manager_t::systemd },
                             { "disabled", cgroup_manager_t::disabled },
                     }))
-            ->default_val(cgroup_manager_t::cgroupfs);
+            ->default_val(cgroup_manager_t::disabled);
 
     list_options list_opt{ options.global };
     auto *cmd_list = app.add_subcommand("list", "List know containers");
