@@ -33,7 +33,8 @@
 				"CMAKE_BUILD_TYPE": "Release",
 				"CMAKE_COLOR_DIAGNOSTICS": true,
 				"CMAKE_EXPORT_COMPILE_COMMANDS": true,
-				"linyaps-box_ENABLE_CPACK": "ON"
+				"linyaps-box_ENABLE_CPACK": "ON",
+				"linyaps-box_MAKE_RELEASE": "ON"
 			}
 		},
 		{
