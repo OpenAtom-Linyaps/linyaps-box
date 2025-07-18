@@ -265,6 +265,42 @@ linyaps_box::config::linux_t parse_linux(const nlohmann::json &obj,
     return linux;
 }
 
+static linyaps_box::config::process_t parse_process(const nlohmann::json &j, const nlohmann::json::json_pointer &ptr)
+{
+    linyaps_box::config::process_t proc;
+    if (j.contains(ptr / "process" / "terminal")) {
+        proc.terminal = j[ptr / "process" / "terminal"].get<bool>();
+    }
+    if (proc.terminal && j.contains(ptr / "process" / "consoleSize")) {
+        proc.console.height = j[ptr / "process" / "consoleSize" / "height"].get<uint>();
+        proc.console.width = j[ptr / "process" / "consoleSize" / "width"].get<uint>();
+    }
+    proc.cwd = j[ptr / "process" / "cwd"].get<std::string>();
+    if (j.contains(ptr / "process" / "env")) {
+        auto env = j[ptr / "process" / "env"].get<std::vector<std::string>>();
+        for (const auto &e : env) {
+            auto pos = e.find('=');
+            if (pos == std::string::npos) {
+                throw std::runtime_error("invalid env entry: " + e);
+            }
+        }
+        proc.env = std::move(env);
+    }
+    proc.args = j[ptr / "process" / "args"].get<std::vector<std::string>>();
+    if (auto rlimits = ptr / "process" / "rlimits"; j.contains(rlimits)) {
+        proc.rlimits = parse_rlimits(j, rlimits);
+    }
+#ifdef LINYAPS_BOX_ENABLE_CAP
+    if (auto cap = ptr / "process" / "capabilities"; j.contains(cap)) {
+        proc.capabilities = parse_capability(j, cap);
+    }
+#endif
+    if (j.contains(ptr / "process" / "noNewPrivileges")) {
+        proc.no_new_privileges = j[ptr / "process" / "noNewPrivileges"].get<bool>();
+    }
+    return proc;
+}
+
 linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 {
     static const auto ptr = ""_json_pointer;
@@ -275,47 +311,9 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
     }
 
     linyaps_box::config cfg;
+    cfg.process = parse_process(j, ptr);
 
-    {
-        if (j.contains(ptr / "process" / "terminal")) {
-            cfg.process.terminal = j[ptr / "process" / "terminal"].get<bool>();
-        }
-
-        // https://github.com/opencontainers/runtime-spec/blob/09fcb39bb7185b46dfb206bc8f3fea914c674779/config.md?plain=1#L245
-        if (cfg.process.terminal && j.contains(ptr / "process" / "consoleSize")) {
-            cfg.process.console.height = j[ptr / "process" / "consoleSize" / "height"].get<uint>();
-            cfg.process.console.width = j[ptr / "process" / "consoleSize" / "width"].get<uint>();
-        }
-
-        cfg.process.cwd = j[ptr / "process" / "cwd"].get<std::string>();
-
-        if (j.contains(ptr / "process" / "env")) {
-            auto env = j[ptr / "process" / "env"].get<std::vector<std::string>>();
-            for (const auto &e : env) {
-                auto pos = e.find('=');
-                if (pos == std::string::npos) {
-                    throw std::runtime_error("invalid env entry: " + e);
-                }
-            }
-
-            cfg.process.env = std::move(env);
-        }
-
-        cfg.process.args = j[ptr / "process" / "args"].get<std::vector<std::string>>();
-
-        if (auto rlimits = ptr / "process" / "rlimits"; j.contains(rlimits)) {
-            cfg.process.rlimits = parse_rlimits(j, rlimits);
-        }
-
-        // TODO: apparmorProfile
-#ifdef LINYAPS_BOX_ENABLE_CAP
-        if (auto cap = ptr / "process" / "capabilities"; j.contains(cap)) {
-            cfg.process.capabilities = parse_capability(j, cap);
-        }
-#endif
-
-        if (j.contains(ptr / "process" / "noNewPrivileges")) {
-            cfg.process.no_new_privileges = j[ptr / "process" / "noNewPrivileges"].get<bool>();
+    // remaining parsing logic...
         }
 
         if (j.contains(ptr / "process" / "oomScoreAdj")) {

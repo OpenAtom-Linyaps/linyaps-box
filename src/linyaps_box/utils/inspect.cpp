@@ -24,7 +24,7 @@ std::string inspect_fdinfo(const std::filesystem::path &fdinfoPath)
 
     std::stringstream ss;
     std::string key;
-    while (fdinfo >> key) {
+    while (static_cast<bool>(fdinfo >> key)) {
         ss << " " << key << " ";
         if (key != "flags:") {
             std::string value;
@@ -56,71 +56,37 @@ namespace linyaps_box::utils {
 
 std::string inspect_fcntl_or_open_flags(size_t flags)
 {
-    std::stringstream ss;
+    struct FlagInfo { size_t mask; const char* name; };
+    static constexpr FlagInfo flagInfos[] = {
+        { O_RDONLY,    "O_RDONLY"    },
+        { O_WRONLY,    "O_WRONLY"    },
+        { O_RDWR,      "O_RDWR"      },
+        { O_CREAT,     "O_CREAT"     },
+        { O_EXCL,      "O_EXCL"      },
+        { O_NOCTTY,    "O_NOCTTY"    },
+        { O_TRUNC,     "O_TRUNC"     },
+        { O_APPEND,    "O_APPEND"    },
+        { O_NONBLOCK,  "O_NONBLOCK"  },
+        { O_NDELAY,    "O_NDELAY"    },
+        { O_SYNC,      "O_SYNC"      },
+        { O_ASYNC,     "O_ASYNC"     },
+        { O_LARGEFILE, "O_LARGEFILE" },
+        { O_DIRECTORY, "O_DIRECTORY" },
+        { O_NOFOLLOW,  "O_NOFOLLOW"  },
+        { O_CLOEXEC,   "O_CLOEXEC"   },
+        { O_DIRECT,    "O_DIRECT"    },
+        { O_NOATIME,   "O_NOATIME"   },
+        { O_PATH,      "O_PATH"      },
+        { O_DSYNC,     "O_DSYNC"     },
+        { O_TMPFILE,   "O_TMPFILE"   }
+    };
 
+    std::stringstream ss;
     ss << "[";
-    if ((flags & O_RDONLY) != 0) {
-        ss << " O_RDONLY";
-    }
-    if ((flags & O_WRONLY) != 0) {
-        ss << " O_WRONLY";
-    }
-    if ((flags & O_RDWR) != 0) {
-        ss << " O_RDWR";
-    }
-    if ((flags & O_CREAT) != 0) {
-        ss << " O_CREAT";
-    }
-    if ((flags & O_EXCL) != 0) {
-        ss << " O_EXCL";
-    }
-    if ((flags & O_NOCTTY) != 0) {
-        ss << " O_NOCTTY";
-    }
-    if ((flags & O_TRUNC) != 0) {
-        ss << " O_TRUNC";
-    }
-    if ((flags & O_APPEND) != 0) {
-        ss << " O_APPEND";
-    }
-    if ((flags & O_NONBLOCK) != 0) {
-        ss << " O_NONBLOCK";
-    }
-    if ((flags & O_NDELAY) != 0) {
-        ss << " O_NDELAY";
-    }
-    if ((flags & O_SYNC) != 0) {
-        ss << " O_SYNC";
-    }
-    if ((flags & O_ASYNC) != 0) {
-        ss << " O_ASYNC";
-    }
-    if ((flags & O_LARGEFILE) != 0) {
-        ss << " O_LARGEFILE";
-    }
-    if ((flags & O_DIRECTORY) != 0) {
-        ss << " O_DIRECTORY";
-    }
-    if ((flags & O_NOFOLLOW) != 0) {
-        ss << " O_NOFOLLOW";
-    }
-    if ((flags & O_CLOEXEC) != 0) {
-        ss << " O_CLOEXEC";
-    }
-    if ((flags & O_DIRECT) != 0) {
-        ss << " O_DIRECT";
-    }
-    if ((flags & O_NOATIME) != 0) {
-        ss << " O_NOATIME";
-    }
-    if ((flags & O_PATH) != 0) {
-        ss << " O_PATH";
-    }
-    if ((flags & O_DSYNC) != 0) {
-        ss << " O_DSYNC";
-    }
-    if ((flags & O_TMPFILE) == O_TMPFILE) {
-        ss << " O_TMPFILE";
+    for (const auto& info : flagInfos) {
+        if ((flags & info.mask) == info.mask) {
+            ss << " " << info.name;
+        }
     }
     ss << " ]";
     return ss.str();

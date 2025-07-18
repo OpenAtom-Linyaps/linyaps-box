@@ -38,7 +38,7 @@ try {
         std::stringstream result;
         for (int i = 0; i < argc; ++i) {
             result << " \"";
-            for (char *c = argv[i]; *c; ++c) {
+            for (char *c = argv[i]; *c != '\0'; ++c) {
                 if (*c == '\\') {
                     result << "\\\\";
                 } else if (*c == '"') {

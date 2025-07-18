@@ -26,7 +26,7 @@ protected:
 
 private:
     std::string id;
-    const status_directory &status_dir_;
+    const status_directory *status_dir_;
 };
 
 } // namespace linyaps_box
