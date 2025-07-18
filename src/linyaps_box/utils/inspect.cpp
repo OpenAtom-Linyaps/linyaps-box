@@ -56,34 +56,29 @@ namespace linyaps_box::utils {
 
 std::string inspect_fcntl_or_open_flags(size_t flags)
 {
-    struct FlagInfo { size_t mask; const char* name; };
+    struct FlagInfo
+    {
+        size_t mask;
+        const char *name;
+    };
+
     static constexpr FlagInfo flagInfos[] = {
-        { O_RDONLY,    "O_RDONLY"    },
-        { O_WRONLY,    "O_WRONLY"    },
-        { O_RDWR,      "O_RDWR"      },
-        { O_CREAT,     "O_CREAT"     },
-        { O_EXCL,      "O_EXCL"      },
-        { O_NOCTTY,    "O_NOCTTY"    },
-        { O_TRUNC,     "O_TRUNC"     },
-        { O_APPEND,    "O_APPEND"    },
-        { O_NONBLOCK,  "O_NONBLOCK"  },
-        { O_NDELAY,    "O_NDELAY"    },
-        { O_SYNC,      "O_SYNC"      },
-        { O_ASYNC,     "O_ASYNC"     },
-        { O_LARGEFILE, "O_LARGEFILE" },
-        { O_DIRECTORY, "O_DIRECTORY" },
-        { O_NOFOLLOW,  "O_NOFOLLOW"  },
-        { O_CLOEXEC,   "O_CLOEXEC"   },
-        { O_DIRECT,    "O_DIRECT"    },
-        { O_NOATIME,   "O_NOATIME"   },
-        { O_PATH,      "O_PATH"      },
-        { O_DSYNC,     "O_DSYNC"     },
-        { O_TMPFILE,   "O_TMPFILE"   }
+        { O_RDONLY, "O_RDONLY" },       { O_WRONLY, "O_WRONLY" },
+        { O_RDWR, "O_RDWR" },           { O_CREAT, "O_CREAT" },
+        { O_EXCL, "O_EXCL" },           { O_NOCTTY, "O_NOCTTY" },
+        { O_TRUNC, "O_TRUNC" },         { O_APPEND, "O_APPEND" },
+        { O_NONBLOCK, "O_NONBLOCK" },   { O_NDELAY, "O_NDELAY" },
+        { O_SYNC, "O_SYNC" },           { O_ASYNC, "O_ASYNC" },
+        { O_LARGEFILE, "O_LARGEFILE" }, { O_DIRECTORY, "O_DIRECTORY" },
+        { O_NOFOLLOW, "O_NOFOLLOW" },   { O_CLOEXEC, "O_CLOEXEC" },
+        { O_DIRECT, "O_DIRECT" },       { O_NOATIME, "O_NOATIME" },
+        { O_PATH, "O_PATH" },           { O_DSYNC, "O_DSYNC" },
+        { O_TMPFILE, "O_TMPFILE" }
     };
 
     std::stringstream ss;
     ss << "[";
-    for (const auto& info : flagInfos) {
+    for (const auto &info : flagInfos) {
         if ((flags & info.mask) == info.mask) {
             ss << " " << info.name;
         }

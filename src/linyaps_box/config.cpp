@@ -265,7 +265,8 @@ linyaps_box::config::linux_t parse_linux(const nlohmann::json &obj,
     return linux;
 }
 
-static linyaps_box::config::process_t parse_process(const nlohmann::json &j, const nlohmann::json::json_pointer &ptr)
+static linyaps_box::config::process_t parse_process(const nlohmann::json &j,
+                                                    const nlohmann::json::json_pointer &ptr)
 {
     linyaps_box::config::process_t proc;
     if (j.contains(ptr / "process" / "terminal")) {
@@ -314,124 +315,124 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
     cfg.process = parse_process(j, ptr);
 
     // remaining parsing logic...
+}
+
+if (j.contains(ptr / "process" / "oomScoreAdj")) {
+    cfg.process.oom_score_adj = j[ptr / "process" / "oomScoreAdj"].get<int>();
+}
+
+cfg.process.user.uid = j[ptr / "process" / "user" / "uid"].get<uid_t>();
+cfg.process.user.gid = j[ptr / "process" / "user" / "gid"].get<gid_t>();
+
+if (j.contains(ptr / "process" / "user" / "umask")) {
+    cfg.process.user.umask = j[ptr / "process" / "user" / "umask"].get<mode_t>();
+}
+
+if (j.contains(ptr / "process" / "user" / "additionalGids")) {
+    cfg.process.user.additional_gids =
+            j[ptr / "process" / "user" / "additionalGids"].get<std::vector<gid_t>>();
+}
+}
+
+if (auto linux_ptr = ptr / "linux"; j.contains(linux_ptr)) {
+    cfg.linux = parse_linux(j, linux_ptr);
+}
+
+if (j.contains(ptr / "hooks")) {
+    auto hooks = j[ptr / "hooks"];
+    auto get_hooks = [&](const std::string &key)
+            -> std::optional<std::vector<linyaps_box::config::hooks_t::hook_t>> {
+        if (!hooks.contains(key)) {
+            return std::nullopt;
         }
 
-        if (j.contains(ptr / "process" / "oomScoreAdj")) {
-            cfg.process.oom_score_adj = j[ptr / "process" / "oomScoreAdj"].get<int>();
-        }
-
-        cfg.process.user.uid = j[ptr / "process" / "user" / "uid"].get<uid_t>();
-        cfg.process.user.gid = j[ptr / "process" / "user" / "gid"].get<gid_t>();
-
-        if (j.contains(ptr / "process" / "user" / "umask")) {
-            cfg.process.user.umask = j[ptr / "process" / "user" / "umask"].get<mode_t>();
-        }
-
-        if (j.contains(ptr / "process" / "user" / "additionalGids")) {
-            cfg.process.user.additional_gids =
-                    j[ptr / "process" / "user" / "additionalGids"].get<std::vector<gid_t>>();
-        }
-    }
-
-    if (auto linux_ptr = ptr / "linux"; j.contains(linux_ptr)) {
-        cfg.linux = parse_linux(j, linux_ptr);
-    }
-
-    if (j.contains(ptr / "hooks")) {
-        auto hooks = j[ptr / "hooks"];
-        auto get_hooks = [&](const std::string &key)
-                -> std::optional<std::vector<linyaps_box::config::hooks_t::hook_t>> {
-            if (!hooks.contains(key)) {
-                return std::nullopt;
+        std::vector<linyaps_box::config::hooks_t::hook_t> result;
+        for (const auto &h : hooks[key]) {
+            linyaps_box::config::hooks_t::hook_t hook;
+            hook.path = h["path"].get<std::string>();
+            if (!hook.path.is_absolute()) {
+                throw std::runtime_error(key + "path must be absolute");
             }
 
-            std::vector<linyaps_box::config::hooks_t::hook_t> result;
-            for (const auto &h : hooks[key]) {
-                linyaps_box::config::hooks_t::hook_t hook;
-                hook.path = h["path"].get<std::string>();
-                if (!hook.path.is_absolute()) {
-                    throw std::runtime_error(key + "path must be absolute");
-                }
+            if (h.contains("args")) {
+                hook.args = h["args"].get<std::vector<std::string>>();
+            }
 
-                if (h.contains("args")) {
-                    hook.args = h["args"].get<std::vector<std::string>>();
-                }
+            if (h.contains("env")) {
+                std::map<std::string, std::string> env;
 
-                if (h.contains("env")) {
-                    std::map<std::string, std::string> env;
-
-                    for (const auto &e : h["env"].get<std::vector<std::string>>()) {
-                        auto pos = e.find('=');
-                        if (pos == std::string::npos) {
-                            throw std::runtime_error("invalid env entry: " + e);
-                        }
-
-                        env[e.substr(0, pos)] = e.substr(pos + 1);
+                for (const auto &e : h["env"].get<std::vector<std::string>>()) {
+                    auto pos = e.find('=');
+                    if (pos == std::string::npos) {
+                        throw std::runtime_error("invalid env entry: " + e);
                     }
 
-                    hook.env = std::move(env);
+                    env[e.substr(0, pos)] = e.substr(pos + 1);
                 }
 
-                if (h.contains("timeout")) {
-                    hook.timeout = h["timeout"].get<int>();
-                    if (hook.timeout <= 0) {
-                        throw std::runtime_error(key + "timeout must be greater than zero");
-                    }
+                hook.env = std::move(env);
+            }
+
+            if (h.contains("timeout")) {
+                hook.timeout = h["timeout"].get<int>();
+                if (hook.timeout <= 0) {
+                    throw std::runtime_error(key + "timeout must be greater than zero");
                 }
-
-                result.push_back(hook);
             }
 
-            return result;
-        };
-
-        cfg.hooks.prestart = get_hooks("prestart");
-        cfg.hooks.create_runtime = get_hooks("createRuntime");
-        cfg.hooks.create_container = get_hooks("createContainer");
-        cfg.hooks.start_container = get_hooks("startContainer");
-        cfg.hooks.poststart = get_hooks("poststart");
-        cfg.hooks.poststop = get_hooks("poststop");
-    }
-
-    if (j.contains(ptr / "mounts")) {
-        std::vector<linyaps_box::config::mount_t> mounts;
-        for (const auto &m : j[ptr / "mounts"]) {
-            linyaps_box::config::mount_t mount;
-            if (m.contains("source")) {
-                mount.source = m["source"].get<std::string>();
-            }
-            if (m.contains("destination")) {
-                mount.destination = m["destination"].get<std::string>();
-            }
-            mount.type = m["type"].get<std::string>();
-
-            const auto it = m.find("options");
-            if (it != m.end()) {
-                auto options = it->get<std::vector<std::string>>();
-                std::tie(mount.flags, mount.propagation_flags, mount.extra_flags, mount.data) =
-                        parse_mount_options(options);
-            }
-
-            mounts.push_back(mount);
+            result.push_back(hook);
         }
-        cfg.mounts = mounts;
-    }
 
-    auto root = ptr / "root";
-    if (!j.contains(root)) {
-        throw std::runtime_error("root must be specified");
-    }
+        return result;
+    };
 
-    if (!j.contains(root / "path")) {
-        throw std::runtime_error("root.path must be specified");
-    }
-    cfg.root.path = j[root / "path"].get<std::filesystem::path>();
+    cfg.hooks.prestart = get_hooks("prestart");
+    cfg.hooks.create_runtime = get_hooks("createRuntime");
+    cfg.hooks.create_container = get_hooks("createContainer");
+    cfg.hooks.start_container = get_hooks("startContainer");
+    cfg.hooks.poststart = get_hooks("poststart");
+    cfg.hooks.poststop = get_hooks("poststop");
+}
 
-    if (j.contains(root / "readonly")) {
-        cfg.root.readonly = j[root / "readonly"].get<bool>();
-    }
+if (j.contains(ptr / "mounts")) {
+    std::vector<linyaps_box::config::mount_t> mounts;
+    for (const auto &m : j[ptr / "mounts"]) {
+        linyaps_box::config::mount_t mount;
+        if (m.contains("source")) {
+            mount.source = m["source"].get<std::string>();
+        }
+        if (m.contains("destination")) {
+            mount.destination = m["destination"].get<std::string>();
+        }
+        mount.type = m["type"].get<std::string>();
 
-    return cfg;
+        const auto it = m.find("options");
+        if (it != m.end()) {
+            auto options = it->get<std::vector<std::string>>();
+            std::tie(mount.flags, mount.propagation_flags, mount.extra_flags, mount.data) =
+                    parse_mount_options(options);
+        }
+
+        mounts.push_back(mount);
+    }
+    cfg.mounts = mounts;
+}
+
+auto root = ptr / "root";
+if (!j.contains(root)) {
+    throw std::runtime_error("root must be specified");
+}
+
+if (!j.contains(root / "path")) {
+    throw std::runtime_error("root.path must be specified");
+}
+cfg.root.path = j[root / "path"].get<std::filesystem::path>();
+
+if (j.contains(root / "readonly")) {
+    cfg.root.readonly = j[root / "readonly"].get<bool>();
+}
+
+return cfg;
 }
 
 } // namespace
