@@ -268,7 +268,7 @@ endif()
 
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
 
-add_library("${linyaps-box_LIBRARY}" ${linyaps-box_LIBRARY_SOURCE})
+add_library("${linyaps-box_LIBRARY}" STATIC ${linyaps-box_LIBRARY_SOURCE})
 target_include_directories("${linyaps-box_LIBRARY}"
                            ${linyaps-box_LIBRARY_INCLUDE_DIRS})
 target_link_libraries("${linyaps-box_LIBRARY}"
