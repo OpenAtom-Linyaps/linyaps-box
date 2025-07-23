@@ -30,6 +30,7 @@
 #include <csignal>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -1517,6 +1518,53 @@ void close_other_fds(std::set<uint> except_fds)
     }
 }
 
+void processing_extensions(const linyaps_box::container &container)
+{
+    const auto &config = container.get_config();
+
+    if (!config.annotations) {
+        return;
+    }
+
+    LINYAPS_BOX_DEBUG() << "Processing container extensions";
+
+    // ext_ns_last_pid
+    if (auto it = config.annotations->find("cn.org.linyaps.runtime.ns_last_pid");
+        it != config.annotations->end()) {
+        LINYAPS_BOX_DEBUG() << "Processing ns_last_pid extension: " << it->second;
+
+        // Validate input is a valid pid_t number
+        try {
+            // Use std::stoll to handle larger ranges, then check if it fits in pid_t
+            const auto value = std::stoll(it->second);
+            if (value < 0 || value > std::numeric_limits<pid_t>::max()) {
+                throw std::runtime_error("ns_last_pid value out of range: " + it->second
+                                         + " (must be between 0 and "
+                                         + std::to_string(std::numeric_limits<pid_t>::max()) + ")");
+            }
+        } catch (const std::out_of_range &e) {
+            throw std::runtime_error("ns_last_pid value out of range: " + it->second);
+        } catch (const std::invalid_argument &e) {
+            throw std::runtime_error("Invalid ns_last_pid value: " + it->second
+                                     + " (must be a valid number)");
+        }
+
+        std::ofstream ofs("/proc/sys/kernel/ns_last_pid");
+        if (!ofs) {
+            throw std::runtime_error("failed to open /proc/sys/kernel/ns_last_pid");
+        }
+
+        ofs << it->second;
+        if (!ofs) {
+            throw std::runtime_error("failed to write to /proc/sys/kernel/ns_last_pid");
+        }
+
+        LINYAPS_BOX_DEBUG() << "Successfully set ns_last_pid to " << it->second;
+    }
+
+    LINYAPS_BOX_DEBUG() << "Container extensions processing completed";
+}
+
 void signal_USR1_handler([[maybe_unused]] int sig)
 {
     LINYAPS_BOX_DEBUG() << "Signal USR1 received:" << sig;
@@ -1568,6 +1616,8 @@ try {
     // TODO: selinux label/apparmor profile
     do_pivot_root(rootfs);
     set_umask(container.get_config().process.user.umask);
+    // processing all extensions before drop capabilities
+    processing_extensions(container);
     set_capabilities(container, runtime_cap);
     start_container_hooks(container, socket);
     execute_process(process);

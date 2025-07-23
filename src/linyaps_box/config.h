@@ -7,8 +7,8 @@
 #include <sys/mount.h>
 
 #include <filesystem>
-#include <map>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 #include <sys/resource.h>
@@ -133,7 +133,7 @@ struct config
         {
             std::filesystem::path path;
             std::optional<std::vector<std::string>> args;
-            std::optional<std::map<std::string, std::string>> env;
+            std::optional<std::unordered_map<std::string, std::string>> env;
             std::optional<int> timeout;
         };
 
@@ -169,6 +169,8 @@ struct config
     };
 
     root_t root;
+
+    std::optional<std::unordered_map<std::string, std::string>> annotations;
 };
 
 } // namespace linyaps_box
