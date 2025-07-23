@@ -54,11 +54,12 @@ void close_range_fallback(uint first, uint last, int flags)
 
     struct dirent *next{ nullptr };
     while ((next = ::readdir(dir)) != nullptr) {
-        if (next->d_name[0] == '.') { // skip "." and ".."
+        const std::string name{ next->d_name[0] };
+        if (name == "." || name == "..") { // skip "." and ".."
             continue;
         }
 
-        auto fd = std::stoi(next->d_name);
+        auto fd = std::stoi(name.c_str());
         if (fd == self_fd) {
             continue;
         }
@@ -71,14 +72,11 @@ void close_range_fallback(uint first, uint last, int flags)
             if (::fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
                 throw std::system_error(errno,
                                         std::generic_category(),
-                                        std::string{ "failed to set up close-on-exec to " }
-                                                + next->d_name);
+                                        "failed to set up close-on-exec to " + name);
             }
         } else {
             if (::close(fd) < 0) {
-                throw std::system_error(errno,
-                                        std::generic_category(),
-                                        std::string{ "failed to close " } + next->d_name);
+                throw std::system_error(errno, std::generic_category(), "failed to close " + name);
             }
         }
     }
