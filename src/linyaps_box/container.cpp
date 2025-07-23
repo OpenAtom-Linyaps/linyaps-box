@@ -119,7 +119,7 @@ std::ostream &operator<<(std::ostream &os, const sync_message message)
 
 struct MountFlag
 {
-    decltype(MS_RDONLY) flag;
+    std::underlying_type_t<decltype(MS_RDONLY)> flag;
     std::string_view name;
 };
 
