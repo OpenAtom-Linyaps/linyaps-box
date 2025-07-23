@@ -70,7 +70,7 @@ template class Logger<LOG_DEBUG>;
 
 bool force_log_to_stderr()
 {
-    static auto *result = getenv("LINYAPS_BOX_LOG_FORCE_STDERR");
+    static const auto *result = getenv("LINYAPS_BOX_LOG_FORCE_STDERR");
     return result != nullptr;
 }
 
