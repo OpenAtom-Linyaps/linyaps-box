@@ -13,7 +13,7 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::touch(const file_descrip
                                                               const std::filesystem::path &path)
 {
     LINYAPS_BOX_DEBUG() << "touch " << path << " at " << inspect_fd(root.get());
-    int fd = ::openat(root.get(), path.c_str(), O_CREAT | O_WRONLY, 0666);
+    const auto fd = ::openat(root.get(), path.c_str(), O_CREAT | O_WRONLY, 0666);
     if (fd == -1) {
         throw std::system_error(errno,
                                 std::system_category(),

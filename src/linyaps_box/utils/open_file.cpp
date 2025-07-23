@@ -35,8 +35,8 @@ open_at_fallback(const linyaps_box::utils::file_descriptor &root,
                         << linyaps_box::utils::inspect_fd(root.get());
     // TODO: we need implement a compatible fallback
     // currently we just use openat and do some simple check
-    auto file_path = path.relative_path();
-    int fd = ::openat(root.get(), file_path.c_str(), flag, mode);
+    const auto &file_path = path.relative_path();
+    const auto fd = ::openat(root.get(), file_path.c_str(), flag, mode);
     if (fd < 0) {
         auto full_path = root.current_path() / path.relative_path();
         throw std::system_error(errno,
@@ -57,7 +57,7 @@ syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, uint6
         uint64_t resolve;
     } how{ flag, mode, resolve };
 
-    auto ret = syscall(__NR_openat2, dirfd, path, &how, sizeof(openat2_how), 0);
+    const auto ret = syscall(__NR_openat2, dirfd, path, &how, sizeof(openat2_how), 0);
     if (ret < 0) {
         throw std::system_error(errno, std::generic_category(), "openat2");
     }
@@ -71,7 +71,7 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::open(const std::filesyst
                                                              mode_t mode)
 {
     LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " with " << inspect_fcntl_or_open_flags(flag);
-    int fd = ::open(path.c_str(), flag, mode);
+    const auto fd = ::open(path.c_str(), flag, mode);
     if (fd == -1) {
         throw std::system_error(errno,
                                 std::generic_category(),
@@ -95,7 +95,7 @@ linyaps_box::utils::open_at(const linyaps_box::utils::file_descriptor &root,
         try {
             return syscall_openat2(root.get(), path.c_str(), flag, mode, RESOLVE_IN_ROOT);
         } catch (const std::system_error &e) {
-            auto code = e.code().value();
+            const auto code = e.code().value();
             if (code == EINTR || code == EAGAIN) {
                 continue;
             }

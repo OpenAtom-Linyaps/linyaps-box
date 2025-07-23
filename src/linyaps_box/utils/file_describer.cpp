@@ -4,7 +4,6 @@
 
 #include "linyaps_box/utils/file_describer.h"
 
-#include "linyaps_box/utils/fstat.h"
 #include "linyaps_box/utils/log.h"
 
 #include <cstring>

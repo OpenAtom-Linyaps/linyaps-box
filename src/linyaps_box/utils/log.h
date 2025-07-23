@@ -20,11 +20,34 @@ std::string get_pid_namespace(int pid = 0);
 std::string get_current_command();
 
 template<unsigned int level>
-class Logger : public std::stringstream
+class Logger
 {
 public:
-    using std::stringstream::stringstream;
-    ~Logger() override;
+    Logger() = default;
+    Logger(const Logger &) = delete;
+    Logger &operator=(const Logger &) = delete;
+    Logger(Logger &&) noexcept(std::is_nothrow_move_constructible_v<std::ostringstream>) = // NOLINT
+            default;
+    Logger &
+    operator=(Logger &&) noexcept(std::is_nothrow_move_assignable_v<std::ostringstream>) = // NOLINT
+            default;
+    ~Logger() noexcept;
+
+    template<typename T>
+    Logger &operator<<(const T &value)
+    {
+        ss << value;
+        return *this;
+    }
+
+    Logger &operator<<(std::ostream &(*manipulator)(std::ostream &))
+    {
+        manipulator(ss);
+        return *this;
+    }
+
+private:
+    std::ostringstream ss;
 };
 
 extern template class Logger<LOG_EMERG>;

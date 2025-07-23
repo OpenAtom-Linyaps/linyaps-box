@@ -25,7 +25,7 @@ void linyaps_box::utils::symlink_at(const std::filesystem::path &target,
     LINYAPS_BOX_DEBUG() << "Create symlink " << link_path << " which under " << dirfd.current_path()
                         << " point to " << target;
 
-    auto ret = ::symlinkat(target.c_str(), dirfd.get(), link_path.c_str());
+    const auto ret = ::symlinkat(target.c_str(), dirfd.get(), link_path.c_str());
     if (ret == -1) {
         throw std::system_error(errno, std::system_category(), "symlinkat");
     }

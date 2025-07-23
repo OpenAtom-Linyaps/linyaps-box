@@ -10,10 +10,10 @@
 
 namespace linyaps_box::utils {
 
-void symlink(const std::filesystem::path &source, const std::filesystem::path &target);
+void symlink(const std::filesystem::path &target, const std::filesystem::path &link_path);
 
 void symlink_at(const std::filesystem::path &target,
-               const file_descriptor &dirfd,
-               const std::filesystem::path &link_path);
+                const file_descriptor &dirfd,
+                const std::filesystem::path &link_path);
 
 } // namespace linyaps_box::utils
