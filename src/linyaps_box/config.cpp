@@ -360,7 +360,7 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
                 }
 
                 if (h.contains("env")) {
-                    std::map<std::string, std::string> env;
+                    std::unordered_map<std::string, std::string> env;
 
                     for (const auto &e : h["env"].get<std::vector<std::string>>()) {
                         auto pos = e.find('=');
@@ -431,6 +431,11 @@ linyaps_box::config parse_1_2_0(const nlohmann::json &j)
 
     if (j.contains(root / "readonly")) {
         cfg.root.readonly = j[root / "readonly"].get<bool>();
+    }
+
+    auto annotations = ptr / "annotations";
+    if (j.contains(annotations)) {
+        cfg.annotations = j[annotations].get<std::unordered_map<std::string, std::string>>();
     }
 
     return cfg;
