@@ -8,7 +8,6 @@
 
 #include <array>
 #include <chrono>
-#include <cstring>
 #include <iostream>
 
 #include <sys/time.h>
@@ -21,14 +20,14 @@
 namespace linyaps_box::utils {
 
 template<unsigned int level>
-Logger<level>::~Logger()
+Logger<level>::~Logger() noexcept
 {
     if (level > get_current_log_level()) {
         return;
     }
 
-    flush();
-    auto str = this->str();
+    ss.flush();
+    auto str = ss.str();
 
     syslog(level, "%s", str.c_str());
 
@@ -77,7 +76,7 @@ bool force_log_to_stderr()
 
 bool stderr_is_a_tty()
 {
-    static bool result = isatty(fileno(stderr)) != 0;
+    static const bool result = isatty(fileno(stderr)) != 0;
     return result;
 }
 
@@ -104,13 +103,13 @@ unsigned int get_current_log_level_from_env()
 
 unsigned int get_current_log_level()
 {
-    static unsigned int level = get_current_log_level_from_env();
+    static const unsigned int level = get_current_log_level_from_env();
     return level;
 }
 
 std::string get_pid_namespace(int pid)
 {
-    std::string pidns_path = "/proc/" + ((pid != 0) ? std::to_string(pid) : "self") + "/ns/pid";
+    const auto &pidns_path = "/proc/" + ((pid != 0) ? std::to_string(pid) : "self") + "/ns/pid";
 
     std::array<char, PATH_MAX + 1> buf{};
     auto length = ::readlink(pidns_path.c_str(), buf.data(), PATH_MAX);

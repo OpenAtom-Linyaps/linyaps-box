@@ -116,90 +116,48 @@ std::ostream &operator<<(std::ostream &os, const sync_message message)
     return os;
 }
 
+struct MountFlag
+{
+    decltype(MS_RDONLY) flag;
+    std::string_view name;
+};
+
+constexpr std::array<MountFlag, 27> mount_flags{ MountFlag{ MS_RDONLY, "MS_RDONLY" },
+                                                 { MS_NOSUID, "MS_NOSUID" },
+                                                 { MS_NODEV, "MS_NODEV" },
+                                                 { MS_NOEXEC, "MS_NOEXEC" },
+                                                 { MS_SYNCHRONOUS, "MS_SYNCHRONOUS" },
+                                                 { MS_REMOUNT, "MS_REMOUNT" },
+                                                 { MS_MANDLOCK, "MS_MANDLOCK" },
+                                                 { MS_DIRSYNC, "MS_DIRSYNC" },
+                                                 { LINGYAPS_MS_NOSYMFOLLOW, "MS_NOSYMFOLLOW" },
+                                                 { MS_NOATIME, "MS_NOATIME" },
+                                                 { MS_NODIRATIME, "MS_NODIRATIME" },
+                                                 { MS_BIND, "MS_BIND" },
+                                                 { MS_MOVE, "MS_MOVE" },
+                                                 { MS_REC, "MS_REC" },
+                                                 { MS_SILENT, "MS_SILENT" },
+                                                 { MS_POSIXACL, "MS_POSIXACL" },
+                                                 { MS_UNBINDABLE, "MS_UNBINDABLE" },
+                                                 { MS_PRIVATE, "MS_PRIVATE" },
+                                                 { MS_SLAVE, "MS_SLAVE" },
+                                                 { MS_SHARED, "MS_SHARED" },
+                                                 { MS_RELATIME, "MS_RELATIME" },
+                                                 { MS_KERNMOUNT, "MS_KERNMOUNT" },
+                                                 { MS_I_VERSION, "MS_I_VERSION" },
+                                                 { MS_STRICTATIME, "MS_STRICTATIME" },
+                                                 { MS_LAZYTIME, "MS_LAZYTIME" },
+                                                 { MS_ACTIVE, "MS_ACTIVE" },
+                                                 { MS_NOUSER, "MS_NOUSER" } };
+
 std::string dump_mount_flags(uint flags) noexcept
 {
     std::stringstream ss;
     ss << "[ ";
-    if ((flags & MS_RDONLY) != 0) {
-        ss << "MS_RDONLY ";
-    }
-    if ((flags & MS_NOSUID) != 0) {
-        ss << "MS_NOSUID ";
-    }
-    if ((flags & MS_NODEV) != 0) {
-        ss << "MS_NODEV ";
-    }
-    if ((flags & MS_NOEXEC) != 0) {
-        ss << "MS_NOEXEC ";
-    }
-    if ((flags & MS_SYNCHRONOUS) != 0) {
-        ss << "MS_SYNCHRONOUS ";
-    }
-    if ((flags & MS_REMOUNT) != 0) {
-        ss << "MS_REMOUNT ";
-    }
-    if ((flags & MS_MANDLOCK) != 0) {
-        ss << "MS_MANDLOCK ";
-    }
-    if ((flags & MS_DIRSYNC) != 0) {
-        ss << "MS_DIRSYNC ";
-    }
-    if ((flags & LINGYAPS_MS_NOSYMFOLLOW) != 0) {
-        ss << "MS_NOSYMFOLLOW ";
-    }
-    if ((flags & MS_NOATIME) != 0) {
-        ss << "MS_NOATIME ";
-    }
-    if ((flags & MS_NODIRATIME) != 0) {
-        ss << "MS_NODIRATIME ";
-    }
-    if ((flags & MS_BIND) != 0) {
-        ss << "MS_BIND ";
-    }
-    if ((flags & MS_MOVE) != 0) {
-        ss << "MS_MOVE ";
-    }
-    if ((flags & MS_REC) != 0) {
-        ss << "MS_REC ";
-    }
-    if ((flags & MS_SILENT) != 0) {
-        ss << "MS_SILENT ";
-    }
-    if ((flags & MS_POSIXACL) != 0) {
-        ss << "MS_POSIXACL ";
-    }
-    if ((flags & MS_UNBINDABLE) != 0) {
-        ss << "MS_UNBINDABLE ";
-    }
-    if ((flags & MS_PRIVATE) != 0) {
-        ss << "MS_PRIVATE ";
-    }
-    if ((flags & MS_SLAVE) != 0) {
-        ss << "MS_SLAVE ";
-    }
-    if ((flags & MS_SHARED) != 0) {
-        ss << "MS_SHARED ";
-    }
-    if ((flags & MS_RELATIME) != 0) {
-        ss << "MS_RELATIME ";
-    }
-    if ((flags & MS_KERNMOUNT) != 0) {
-        ss << "MS_KERNMOUNT ";
-    }
-    if ((flags & MS_I_VERSION) != 0) {
-        ss << "MS_I_VERSION ";
-    }
-    if ((flags & MS_STRICTATIME) != 0) {
-        ss << "MS_STRICTATIME ";
-    }
-    if ((flags & MS_LAZYTIME) != 0) {
-        ss << "MS_LAZYTIME ";
-    }
-    if ((flags & MS_ACTIVE) != 0) {
-        ss << "MS_ACTIVE ";
-    }
-    if ((flags & MS_NOUSER) != 0) {
-        ss << "MS_NOUSER ";
+    for (const auto &[flag, name] : mount_flags) {
+        if ((flags & flag) != 0) {
+            ss << name << " ";
+        }
     }
     ss << "]";
     return ss.str();
@@ -327,23 +285,23 @@ void syscall_mount(const char *_special_file,
                    unsigned long int _rwflag,
                    const void *_data)
 {
-    constexpr decltype(auto) fd_prefix = "/proc/self/fd/";
+    constexpr std::string_view fd_prefix = "/proc/self/fd/";
     LINYAPS_BOX_DEBUG() << "mount\n"
-                        << "\t_special_file = " << [_special_file]() -> std::string {
+                        << "\t_special_file = " << [_special_file, fd_prefix]() -> std::string {
         if (_special_file == nullptr) {
             return "nullptr";
         }
         if (auto str = std::string_view{ _special_file }; str.rfind(fd_prefix, 0) == 0) {
-            return linyaps_box::utils::inspect_fd(std::stoi(str.data() + sizeof(fd_prefix) - 1));
+            return linyaps_box::utils::inspect_fd(std::stoi(str.data() + fd_prefix.size()));
         }
         return _special_file;
     }() << "\n\t_dir = "
-        << [_dir]() -> std::string {
+        << [_dir, fd_prefix]() -> std::string {
         if (_dir == nullptr) {
             return "nullptr";
         }
         if (auto str = std::string_view{ _dir }; str.rfind(fd_prefix, 0) == 0) {
-            return linyaps_box::utils::inspect_fd(std::stoi(str.data() + sizeof(fd_prefix) - 1));
+            return linyaps_box::utils::inspect_fd(std::stoi(str.data() + fd_prefix.size()));
         }
         return _dir;
     }() << "\n\t_fstype = "
@@ -357,10 +315,10 @@ void syscall_mount(const char *_special_file,
         if (_data == nullptr) {
             return "nullptr";
         }
-        return reinterpret_cast<const char *>(_data);
+        return static_cast<const char *>(_data);
     }();
 
-    int ret = ::mount(_special_file, _dir, _fstype, _rwflag, _data);
+    auto ret = ::mount(_special_file, _dir, _fstype, _rwflag, _data);
     if (ret < 0) {
         throw std::system_error(errno, std::generic_category(), "mount");
     }
