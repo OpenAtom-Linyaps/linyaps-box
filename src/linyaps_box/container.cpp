@@ -55,6 +55,7 @@ struct container_data
 {
     bool deny_setgroups{ false };
     bool mount_dev_from_host{ false };
+    unsigned int rootfs_propagation{ 0 };
 };
 
 container_data &get_private_data(const linyaps_box::container &c) noexcept
@@ -215,8 +216,16 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook)
                 const_cast<char *const *>(c_args.data()), // NOLINT
                 const_cast<char *const *>(c_env.data())); // NOLINT
 
-        std::cerr << "execvp: " << strerror(errno) << " errno=" << errno << std::endl;
-        exit(1);
+        LINYAPS_BOX_ERR() << "execute hook " << [&bin, &c_args]() -> std::string {
+            std::stringstream stream;
+            stream << bin;
+            for (const auto &arg : c_args) {
+                stream << " " << arg;
+            }
+            return std::move(stream).str();
+        }() << " failed: "
+            << strerror(errno);
+        _exit(EXIT_FAILURE);
     }
 
     int status = 0;
@@ -687,20 +696,31 @@ public:
 
         // we will pivot root later
         LINYAPS_BOX_DEBUG() << "configure rootfs";
-        do_propagation_mount(linyaps_box::utils::open("/", O_PATH | O_CLOEXEC | O_DIRECTORY),
-                             MS_REC | MS_PRIVATE);
+        auto flags = config.linux->rootfs_propagation;
+        if ((flags & propagations_flag) == 0) {
+            flags = MS_PRIVATE | MS_REC;
+        }
 
-        // make sure the parent mount of rootfs is private
+        // change the propagation type of rootfs mountpoint to configured type
+        // otherwise bind mount will inherit the propagation type of rootfs mountpoint
+        do_propagation_mount(linyaps_box::utils::open("/", O_PATH | O_CLOEXEC | O_DIRECTORY),
+                             flags);
+
+        // make sure the parent mountpoint of new root is private
         // pivot root will fail if it has shared propagation type
         make_rootfs_private();
+
+        // pivot root will reset the propagation type of rootfs mountpoint
+        // we need to save the propagation type to make sure the parent mountpoint of new root is
+        // what we want
+        get_private_data(container).rootfs_propagation = flags;
 
         LINYAPS_BOX_DEBUG() << "rebind container rootfs";
 
         linyaps_box::config::mount_t mount;
         mount.source = root.current_path();
         mount.destination = ".";
-        mount.flags = MS_BIND | MS_REC;
-        // mount.propagation_flags = MS_PRIVATE | MS_REC;
+        mount.flags = MS_BIND | MS_REC | MS_PRIVATE;
         auto ret = do_mount(container, root, mount);
         assert(!ret);
 
@@ -1278,7 +1298,7 @@ void create_container_hooks(const linyaps_box::container &container,
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
 
-void do_pivot_root(const std::filesystem::path &rootfs)
+void do_pivot_root(const linyaps_box::container &container, const std::filesystem::path &rootfs)
 {
     LINYAPS_BOX_DEBUG() << "start pivot root";
     LINYAPS_BOX_DEBUG() << linyaps_box::utils::inspect_fds();
@@ -1303,6 +1323,15 @@ void do_pivot_root(const std::filesystem::path &rootfs)
         throw std::system_error(errno, std::generic_category(), "pivot_root");
     }
 
+    ret = fchdir(old_root.get());
+    if (ret < 0) {
+        throw std::system_error(errno, std::generic_category(), "fchdir");
+    }
+
+    // make sure that umount event couldn't propagate to host
+    do_propagation_mount(old_root, MS_REC | MS_PRIVATE);
+
+    // umount old root
     ret = umount2(".", MNT_DETACH);
     if (ret < 0) {
         throw std::system_error(errno, std::generic_category(), "umount2");
@@ -1322,6 +1351,10 @@ void do_pivot_root(const std::filesystem::path &rootfs)
     if (ret < 0) {
         throw std::system_error(errno, std::generic_category(), "chdir");
     }
+
+    // restore the propagation type of rootfs mountpoint
+    do_propagation_mount(linyaps_box::utils::open("/", O_PATH | O_CLOEXEC | O_DIRECTORY),
+                         get_private_data(container).rootfs_propagation);
 }
 
 void set_umask(const std::optional<mode_t> &mask)
@@ -1614,7 +1647,7 @@ try {
     wait_create_runtime_result(container, socket);
     create_container_hooks(container, socket);
     // TODO: selinux label/apparmor profile
-    do_pivot_root(rootfs);
+    do_pivot_root(container, rootfs);
     set_umask(container.get_config().process.user.umask);
     // processing all extensions before drop capabilities
     processing_extensions(container);
@@ -1622,10 +1655,10 @@ try {
     start_container_hooks(container, socket);
     execute_process(process);
 } catch (const std::exception &e) {
-    std::cerr << e.what() << std::endl;
+    LINYAPS_BOX_ERR() << "clone failed: " << e.what();
     return -1;
 } catch (...) {
-    std::cerr << "unknown error" << std::endl;
+    LINYAPS_BOX_ERR() << "clone failed: unknown error";
     return -1;
 }
 
@@ -1719,8 +1752,7 @@ public:
             return;
         }
 
-        const auto code = errno;
-        std::cerr << "munmap: " << strerror(code) << std::endl;
+        LINYAPS_BOX_ERR() << "munmap child stack failed: " << strerror(errno);
         assert(false);
     }
 
@@ -1827,12 +1859,9 @@ std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
         }
 
         c_args.push_back(nullptr);
-        auto ret = execvp(c_args[0], const_cast<char *const *>(c_args.data()));
-        if (ret < 0) {
-            exit(errno);
-        }
-
-        exit(0);
+        execvp(c_args[0], const_cast<char *const *>(c_args.data()));
+        LINYAPS_BOX_ERR() << "execute helper " << c_args[0] << " failed: " << strerror(errno);
+        _exit(EXIT_FAILURE);
     }
 
     int status = 0;
@@ -2214,7 +2243,7 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
         try {
             execute_hook(hook);
         } catch (const std::exception &e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+            LINYAPS_BOX_ERR() << "execute poststop hook " << hook.path << " failed: " << e.what();
         }
     }
 }
