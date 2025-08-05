@@ -123,6 +123,7 @@ struct config
         std::optional<std::vector<id_mapping_t>> gid_mappings;
         std::optional<std::vector<std::filesystem::path>> masked_paths;
         std::optional<std::vector<std::filesystem::path>> readonly_paths;
+        unsigned int rootfs_propagation{ 0 };
     };
 
     std::optional<linux_t> linux;
