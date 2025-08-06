@@ -5,7 +5,7 @@
 			"uid": 0,
 			"gid": 0
 		},
-		"args": ["/bin/env", "bash", "-c", "pwd"],
+		"args": ["true"],
 		"env": [
 			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 			"TERM=xterm",
