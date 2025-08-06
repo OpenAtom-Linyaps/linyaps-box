@@ -1,0 +1,32 @@
+From c8ad72f807bfc5d6b7522528c2b08edbd36bcf7f Mon Sep 17 00:00:00 2001
+From: ComixHe <ComixHe1895@outlook.com>
+Date: Thu, 19 Jun 2025 17:08:47 +0800
+Subject: [PATCH] feat: write cred before start container process
+
+Signed-off-by: ComixHe <ComixHe1895@outlook.com>
+---
+ src/linyaps_box/container.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/linyaps_box/container.cpp b/src/linyaps_box/container.cpp
+index 4087b99..f30a2b5 100644
+--- a/src/linyaps_box/container.cpp
++++ b/src/linyaps_box/container.cpp
+@@ -1219,6 +1219,14 @@ void configure_mounts(const linyaps_box::container &container, const std::filesy
+         return ss.str();
+     }();
+
++    // NOTE: This node only exist in UOS kernel, it is used to identify child process
++    // running in linyaps container
++    auto elf_verify_cred = std::filesystem::path{ "/proc/self/attr/elfverify/cred" };
++    if (std::filesystem::exists(elf_verify_cred)) {
++        std::ofstream ofs(elf_verify_cred);
++        ofs << "1";
++    }
++
+     execvpe(c_args[0],
+             const_cast<char *const *>(c_args.data()),
+             const_cast<char *const *>(c_env.data()));
+--
+2.50.0
+

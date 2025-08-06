@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+include /usr/share/dpkg/default.mk
+
+%:
+	dh $@ --buildsystem=cmake
+
+EXTRA_OPTION = -DCMAKE_BUILD_TYPE=Release -Dlinyaps-box_ENABLE_CPACK=ON -Dlinyaps-box_CPM_LOCAL_PACKAGES_ONLY=ON
+override_dh_auto_configure:
+	dh_auto_configure --  ${EXTRA_OPTION}  ${DH_AUTO_ARGS}
