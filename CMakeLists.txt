@@ -195,8 +195,7 @@ if(NOT linyaps-box_MAKE_RELEASE)
     COMMAND git rev-parse --short=7 HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_COMMIT_HASH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   set(LINYAPS_BOX_VERSION "${LINYAPS_BOX_VERSION}-dev-${GIT_COMMIT_HASH}")
 endif()
@@ -438,7 +437,8 @@ function(setup_linyaps_box_smoke_tests)
       ./tests/ll-box-st/09-check-rlimit.json
       ./tests/ll-box-st/10-check-oom.json
       ./tests/ll-box-st/11-output-to-null.json
-      ./tests/ll-box-st/12-bind-host-dev.json)
+      ./tests/ll-box-st/12-bind-host-dev.json
+      ./tests/ll-box-st/13-pid-extension.json)
 
   foreach(test ${linyaps-box_SMOKE_TESTS})
     add_test(
