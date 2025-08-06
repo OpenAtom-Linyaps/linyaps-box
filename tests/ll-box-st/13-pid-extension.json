@@ -1,0 +1,29 @@
+{
+	"name": "Set ns_last_pid",
+	"process": {
+		"user": {
+			"uid": 0,
+			"gid": 0
+		},
+		"args": ["/bin/env", "bash", "-c", "cat /proc/sys/kernel/ns_last_pid"],
+		"env": [
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"TERM=xterm",
+			"HOME=/root"
+		],
+		"cwd": "/"
+	},
+	"annotations": {
+		"cn.org.linyaps.runtime.ns_last_pid": "100"
+	},
+	"linux": {
+		"readonlyPaths": [
+			"/proc/asound",
+			"/proc/bus",
+			"/proc/fs",
+			"/proc/irq",
+			"/proc/sysrq-trigger"
+		]
+	},
+	"expected": "100"
+}
