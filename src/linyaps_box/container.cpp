@@ -282,10 +282,17 @@ void initialize_container(const linyaps_box::config &config,
 
         std::ofstream ofs("/proc/self/oom_score_adj");
         if (!ofs) {
-            throw std::runtime_error("failed to open /proc/self/oom_score_adj");
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "failed to open /proc/self/oom_score_adj");
         }
 
         ofs << score;
+        if (!ofs) {
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "failed to write to /proc/self/oom_score_adj");
+        }
     }
 }
 
@@ -1584,12 +1591,16 @@ void processing_extensions(const linyaps_box::container &container)
 
         std::ofstream ofs("/proc/sys/kernel/ns_last_pid");
         if (!ofs) {
-            throw std::runtime_error("failed to open /proc/sys/kernel/ns_last_pid");
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "failed to open /proc/sys/kernel/ns_last_pid");
         }
 
         ofs << it->second;
         if (!ofs) {
-            throw std::runtime_error("failed to write to /proc/sys/kernel/ns_last_pid");
+            throw std::system_error(errno,
+                                    std::generic_category(),
+                                    "failed to write to /proc/sys/kernel/ns_last_pid");
         }
 
         LINYAPS_BOX_DEBUG() << "Successfully set ns_last_pid to " << it->second;
