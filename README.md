@@ -2,6 +2,8 @@
 
 \[ **en** | [zh_CN](./README.zh_CN.md) \]
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/linyaps-box.svg)](https://repology.org/project/linyaps-box/versions)
+
 This project is a simple [OCI runtime] mainly used by [linyaps],
 which is a toolkit for Linux desktop application distributing.
 
