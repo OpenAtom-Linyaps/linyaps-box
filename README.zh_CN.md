@@ -2,6 +2,8 @@
 
 \[ [en](./README.md) | **zh_CN** \]
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/linyaps-box.svg)](https://repology.org/project/linyaps-box/versions)
+
 这个项目是一个简单的[OCI运行时]，主要由[玲珑]使用，
 玲珑是一个用于Linux桌面应用程序分发的工具包。
 
