@@ -152,7 +152,7 @@ constexpr std::array<MountFlag, 27> mount_flags{ MountFlag{ MS_RDONLY, "MS_RDONL
                                                  { MS_ACTIVE, "MS_ACTIVE" },
                                                  { MS_NOUSER, "MS_NOUSER" } };
 
-std::string dump_mount_flags(uint flags) noexcept
+[[maybe_unused]] std::string dump_mount_flags(uint flags) noexcept
 {
     std::stringstream ss;
     ss << "[ ";
