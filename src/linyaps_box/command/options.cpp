@@ -111,6 +111,7 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
         app.parse(argc, argv);
     } catch (const CLI::ParseError &e) {
         options.global.return_code = app.exit(e);
+        return options;
     }
 
     if (cmd_list->parsed()) {
