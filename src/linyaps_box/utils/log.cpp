@@ -68,31 +68,32 @@ template class Logger<LOG_NOTICE>;
 template class Logger<LOG_INFO>;
 template class Logger<LOG_DEBUG>;
 
-bool force_log_to_stderr()
+auto force_log_to_stderr() -> bool
 {
     static const auto *result = getenv("LINYAPS_BOX_LOG_FORCE_STDERR");
     return result != nullptr;
 }
 
-bool stderr_is_a_tty()
+auto stderr_is_a_tty() -> bool
 {
     static const bool result = isatty(fileno(stderr)) != 0;
     return result;
 }
 
 namespace {
-unsigned int get_current_log_level_from_env()
+auto get_current_log_level_from_env() -> unsigned int
 {
     auto *env = getenv("LINYAPS_BOX_LOG_LEVEL");
     if (env == nullptr) {
         return LINYAPS_BOX_LOG_DEFAULT_LEVEL;
     }
 
-    auto level = std::stoi(env);
-    if (level < 0) {
+    auto ret = std::stoi(env);
+    if (ret < 0) {
         return LOG_ALERT;
     }
 
+    auto level = static_cast<unsigned int>(ret);
     if (level > LOG_DEBUG) {
         return LOG_DEBUG;
     }
@@ -101,13 +102,13 @@ unsigned int get_current_log_level_from_env()
 }
 } // namespace
 
-unsigned int get_current_log_level()
+auto get_current_log_level() -> unsigned int
 {
     static const unsigned int level = get_current_log_level_from_env();
     return level;
 }
 
-std::string get_pid_namespace(int pid)
+auto get_pid_namespace(int pid) -> std::string
 {
     const auto &pidns_path = "/proc/" + ((pid != 0) ? std::to_string(pid) : "self") + "/ns/pid";
 
@@ -117,16 +118,25 @@ std::string get_pid_namespace(int pid)
         return "not available";
     }
 
-    std::string result{ buf.begin(), buf.begin() + length };
-    if (result.rfind("pid:[", 0) != 0) {
-        std::abort();
+    const std::string_view result(buf.data(), static_cast<size_t>(length));
+    constexpr std::string_view prefix = "pid:[";
+    constexpr char suffix = ']';
+    constexpr auto prefix_len = prefix.size();
+    constexpr auto total_wrapper_len = prefix_len + 1; // "pid:[" + "]"
+
+    if (result.size() < total_wrapper_len) {
+        return "invalid format";
     }
 
-    if (result.back() != ']') {
-        std::abort();
+    if (result.rfind(prefix, 0) != 0) {
+        return "invalid format";
     }
 
-    return result.substr(sizeof("pid:[") - 1, result.size() - 6);
+    if (result.back() != suffix) {
+        return "invalid format";
+    }
+
+    return std::string{ result.substr(prefix_len, result.size() - total_wrapper_len) };
 }
 
 } // namespace linyaps_box::utils

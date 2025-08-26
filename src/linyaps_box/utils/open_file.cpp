@@ -24,15 +24,15 @@
 #endif
 
 namespace {
-linyaps_box::utils::file_descriptor
-open_at_fallback(const linyaps_box::utils::file_descriptor &root,
-                 const std::filesystem::path &path,
-                 int flag,
-                 int mode)
+auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
+                      const std::filesystem::path &path,
+                      int flag,
+                      uint mode) -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "fallback openat " << path.c_str() << " at FD=" << root.get() << " with "
-                        << linyaps_box::utils::inspect_fcntl_or_open_flags(flag) << "\n\t"
-                        << linyaps_box::utils::inspect_fd(root.get());
+                        << linyaps_box::utils::inspect_fcntl_or_open_flags(
+                                   static_cast<size_t>(flag))
+                        << "\n\t" << linyaps_box::utils::inspect_fd(root.get());
     // TODO: we need implement a compatible fallback
     // currently we just use openat and do some simple check
     const auto &file_path = path.relative_path();
@@ -47,8 +47,8 @@ open_at_fallback(const linyaps_box::utils::file_descriptor &root,
     return linyaps_box::utils::file_descriptor{ fd };
 }
 
-linyaps_box::utils::file_descriptor
-syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, uint64_t resolve)
+auto syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, uint64_t resolve)
+        -> linyaps_box::utils::file_descriptor
 {
     struct openat2_how
     {
@@ -66,11 +66,11 @@ syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, uint6
 }
 } // namespace
 
-linyaps_box::utils::file_descriptor linyaps_box::utils::open(const std::filesystem::path &path,
-                                                             int flag,
-                                                             mode_t mode)
+auto linyaps_box::utils::open(const std::filesystem::path &path, int flag, mode_t mode)
+        -> linyaps_box::utils::file_descriptor
 {
-    LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " with " << inspect_fcntl_or_open_flags(flag);
+    LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " with "
+                        << inspect_fcntl_or_open_flags(static_cast<size_t>(flag));
     const auto fd = ::open(path.c_str(), flag, mode);
     if (fd == -1) {
         throw std::system_error(errno,
@@ -81,19 +81,23 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::open(const std::filesyst
     return linyaps_box::utils::file_descriptor{ fd };
 }
 
-linyaps_box::utils::file_descriptor
-linyaps_box::utils::open_at(const linyaps_box::utils::file_descriptor &root,
-                            const std::filesystem::path &path,
-                            int flag,
-                            mode_t mode)
+auto linyaps_box::utils::open_at(const linyaps_box::utils::file_descriptor &root,
+                                 const std::filesystem::path &path,
+                                 int flag,
+                                 mode_t mode) -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " at FD=" << root.get() << " with "
-                        << inspect_fcntl_or_open_flags(flag) << "\n\t" << inspect_fd(root.get());
+                        << inspect_fcntl_or_open_flags(static_cast<size_t>(flag)) << "\n\t"
+                        << inspect_fd(root.get());
 
     static bool support_openat2{ true };
     while (support_openat2) {
         try {
-            return syscall_openat2(root.get(), path.c_str(), flag, mode, RESOLVE_IN_ROOT);
+            return syscall_openat2(root.get(),
+                                   path.c_str(),
+                                   static_cast<uint64_t>(flag),
+                                   mode,
+                                   RESOLVE_IN_ROOT);
         } catch (const std::system_error &e) {
             const auto code = e.code().value();
             if (code == EINTR || code == EAGAIN) {

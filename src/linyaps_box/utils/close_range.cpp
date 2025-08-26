@@ -24,7 +24,7 @@ void syscall_close_range(uint fd, uint max_fd, int flags)
 
 void close_range_fallback(uint first, uint last, int flags)
 {
-    if ((flags & CLOSE_RANGE_UNSHARE) != 0) {
+    if ((static_cast<uint>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
         // not support CLOSE_RANGE_UNSHARE
         // it request to create a new file descriptor table
         // we can't do that in user space
@@ -59,7 +59,7 @@ void close_range_fallback(uint first, uint last, int flags)
             continue;
         }
 
-        auto fd = std::stoi(name.c_str());
+        auto fd = std::stoi(name);
         if (fd == self_fd) {
             continue;
         }
@@ -68,7 +68,7 @@ void close_range_fallback(uint first, uint last, int flags)
             continue;
         }
 
-        if ((flags & CLOSE_RANGE_CLOEXEC) != 0) {
+        if ((static_cast<uint>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
             if (::fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
                 throw std::system_error(errno,
                                         std::generic_category(),
@@ -89,10 +89,10 @@ void linyaps_box::utils::close_range(uint first, uint last, int flags)
                         << [flags]() -> std::string {
         std::stringstream ss;
         ss << '[';
-        if ((flags & CLOSE_RANGE_CLOEXEC) != 0) {
+        if ((static_cast<uint>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
             ss << "CLOSE_RANGE_CLOEXEC ";
         }
-        if ((flags & CLOSE_RANGE_UNSHARE) != 0) {
+        if ((static_cast<uint>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
             ss << "CLOSE_RANGE_UNSHARE ";
         }
         ss << ']';

@@ -31,7 +31,7 @@ struct config
 {
     static constexpr auto oci_version = "1.2.0";
 
-    static config parse(std::istream &is);
+    static auto parse(std::istream &is) -> config;
 
     struct process_t
     {

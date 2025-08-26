@@ -8,6 +8,6 @@
 
 namespace linyaps_box::utils {
 
-file_descriptor touch(const file_descriptor &root, const std::filesystem::path &path);
+auto touch(const file_descriptor &root, const std::filesystem::path &path) -> file_descriptor;
 
 } // namespace linyaps_box::utils

@@ -14,11 +14,11 @@ class status_directory : public virtual linyaps_box::status_directory
 {
 public:
     void write(const container_status_t &status) const override;
-    [[nodiscard]] container_status_t read(const std::string &id) const override;
+    [[nodiscard]] auto read(const std::string &id) const -> container_status_t override;
     void remove(const std::string &id) const override;
-    [[nodiscard]] std::vector<std::string> list() const override;
+    [[nodiscard]] auto list() const -> std::vector<std::string> override;
 
-    explicit status_directory(const std::filesystem::path &path);
+    explicit status_directory(std::filesystem::path dir);
 
 private:
     std::filesystem::path path;

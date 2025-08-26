@@ -9,8 +9,8 @@
 
 #include <fcntl.h>
 
-linyaps_box::utils::file_descriptor linyaps_box::utils::touch(const file_descriptor &root,
-                                                              const std::filesystem::path &path)
+auto linyaps_box::utils::touch(const file_descriptor &root, const std::filesystem::path &path)
+        -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "touch " << path << " at " << inspect_fd(root.get());
     const auto fd = ::openat(root.get(), path.c_str(), O_CREAT | O_WRONLY, 0666);

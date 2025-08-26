@@ -11,9 +11,9 @@ namespace linyaps_box {
 class disabled_cgroup_manager : public virtual cgroup_manager
 {
 public:
-    [[nodiscard]] cgroup_manager_t type() const override;
+    [[nodiscard]] auto type() const -> cgroup_manager_t override;
 
-    cgroup_status create_cgroup([[maybe_unused]] const cgroup_options &options) override;
+    auto create_cgroup([[maybe_unused]] const cgroup_options &options) -> cgroup_status override;
 
     void precreate_cgroup([[maybe_unused]] const cgroup_options &options,
                           [[maybe_unused]] utils::file_descriptor &dirfd) override;
