@@ -9,8 +9,7 @@
 #include "linyaps_box/command/list.h"
 #include "linyaps_box/command/run.h"
 #include "linyaps_box/utils/log.h"
-
-#include <iostream>
+#include "utils/log.h"
 
 namespace {
 
@@ -32,19 +31,19 @@ namespace linyaps_box {
 // Command line arguments are parsed according to
 // https://github.com/opencontainers/runtime-tools/blob/v0.9.0/docs/command-line-interface.md
 // Extended commands and options should be compatible with crun.
-int main(int argc, char **argv) noexcept
+auto main(int argc, char **argv) noexcept -> int
 try {
     LINYAPS_BOX_DEBUG() << "linyaps box called with" << [=]() -> std::string {
         std::stringstream result;
         for (int i = 0; i < argc; ++i) {
             result << " \"";
-            for (const char *c = argv[i]; *c != '\0'; ++c) {
-                if (*c == '\\') {
+            for (const auto ch : std::string_view(argv[i])) { // NOLINT
+                if (ch == '\\') {
                     result << "\\\\";
-                } else if (*c == '"') {
+                } else if (ch == '"') {
                     result << "\\\"";
                 } else {
-                    result << *c;
+                    result << ch;
                 }
             }
             result << "\"";
@@ -52,18 +51,18 @@ try {
         return result.str();
     }();
 
-    command::options options = command::parse(argc, argv);
-    if (options.global.return_code != 0) {
-        return options.global.return_code;
+    auto opts = command::parse(argc, argv);
+    if (opts.global.return_code != 0) {
+        return opts.global.return_code;
     }
 
     return std::visit(subCommand{ [](const command::list_options &options) {
                                      command::list(options);
                                      return 0;
                                  },
-                                  [](const command::exec_options &options) {
+                                  [](const command::exec_options &options) -> int {
                                       command::exec(options);
-                                      return 0;
+                                      __builtin_unreachable();
                                   },
                                   [](const command::kill_options &options) {
                                       command::kill(options);
@@ -72,10 +71,10 @@ try {
                                   [](const command::run_options &options) {
                                       return command::run(options);
                                   },
-                                  [code = options.global.return_code](const std::monostate &) {
-                                      return code;
+                                  [](const std::monostate &) {
+                                      return 0;
                                   } },
-                      options.subcommand_opt);
+                      opts.subcommand_opt);
 } catch (const std::exception &e) {
     LINYAPS_BOX_ERR() << "Error: " << e.what();
     return -1;

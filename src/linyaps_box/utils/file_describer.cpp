@@ -15,19 +15,22 @@ linyaps_box::utils::file_descriptor_closed_exception::file_descriptor_closed_exc
 {
 }
 
+linyaps_box::utils::file_descriptor_closed_exception::~file_descriptor_closed_exception() noexcept =
+        default;
+
 linyaps_box::utils::file_descriptor::file_descriptor(int fd)
-    : fd(fd)
+    : fd_(fd)
 {
 }
 
 linyaps_box::utils::file_descriptor::~file_descriptor()
 {
-    if (fd == -1) {
+    if (fd_ == -1) {
         return;
     }
 
-    if (close(fd) != 0) {
-        LINYAPS_BOX_ERR() << "close " << fd << " failed:" << ::strerror(errno);
+    if (close(fd_) != 0) {
+        LINYAPS_BOX_ERR() << "close " << fd_ << " failed:" << ::strerror(errno);
     }
 }
 
@@ -36,33 +39,33 @@ linyaps_box::utils::file_descriptor::file_descriptor(file_descriptor &&other) no
     *this = std::move(other);
 }
 
-int linyaps_box::utils::file_descriptor::release() && noexcept
+auto linyaps_box::utils::file_descriptor::release() && noexcept -> int
 {
     int ret = -1;
-    std::swap(ret, fd);
+    std::swap(ret, fd_);
 
     return ret;
 }
 
-int linyaps_box::utils::file_descriptor::get() const noexcept
+auto linyaps_box::utils::file_descriptor::get() const noexcept -> int
 {
-    return fd;
+    return fd_;
 }
 
-linyaps_box::utils::file_descriptor linyaps_box::utils::file_descriptor::duplicate() const
+auto linyaps_box::utils::file_descriptor::duplicate() const -> linyaps_box::utils::file_descriptor
 {
-    if (fd == -1) {
+    if (fd_ == -1) {
         throw file_descriptor_closed_exception();
     }
 
-    auto ret = dup(fd);
+    auto ret = dup(fd_);
     if (ret < 0) {
         throw std::system_error(errno, std::generic_category(), "fcntl");
     }
 
     // dup will lost the close-on-exec flag
     // and we don't want to use FD_DUPFD_CLOEXEC due to it require a specific fd number
-    auto flag = fcntl(fd, F_GETFD);
+    auto flag = fcntl(fd_, F_GETFD);
     if (flag < 0) {
         throw std::system_error(errno, std::generic_category(), "fcntl");
     }
@@ -74,11 +77,11 @@ linyaps_box::utils::file_descriptor linyaps_box::utils::file_descriptor::duplica
     return file_descriptor{ ret };
 }
 
-linyaps_box::utils::file_descriptor &
-linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
+auto linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
+        -> linyaps_box::utils::file_descriptor &
 {
     while (true) {
-        auto ret = write(fd, &byte, 1);
+        auto ret = write(fd_, &byte, 1);
         if (ret == 1) {
             return *this;
         }
@@ -89,18 +92,18 @@ linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
     }
 }
 
-linyaps_box::utils::file_descriptor &
-linyaps_box::utils::file_descriptor::operator=(file_descriptor &&other) noexcept
+auto linyaps_box::utils::file_descriptor::operator=(file_descriptor &&other) noexcept
+        -> linyaps_box::utils::file_descriptor &
 {
-    std::swap(this->fd, other.fd);
+    std::swap(this->fd_, other.fd_);
     return *this;
 }
 
-linyaps_box::utils::file_descriptor &
-linyaps_box::utils::file_descriptor::operator>>(std::byte &byte)
+auto linyaps_box::utils::file_descriptor::operator>>(std::byte &byte)
+        -> linyaps_box::utils::file_descriptor &
 {
     while (true) {
-        auto ret = read(fd, &byte, 1);
+        auto ret = read(fd_, &byte, 1);
         if (ret == 1) {
             return *this;
         }
@@ -114,13 +117,13 @@ linyaps_box::utils::file_descriptor::operator>>(std::byte &byte)
     }
 }
 
-std::filesystem::path linyaps_box::utils::file_descriptor::proc_path() const
+auto linyaps_box::utils::file_descriptor::proc_path() const -> std::filesystem::path
 {
     return std::filesystem::current_path().root_path() / "proc" / "self" / "fd"
-            / std::to_string(fd);
+            / std::to_string(fd_);
 }
 
-std::filesystem::path linyaps_box::utils::file_descriptor::current_path() const noexcept
+auto linyaps_box::utils::file_descriptor::current_path() const noexcept -> std::filesystem::path
 {
     std::error_code ec;
     auto p_path = proc_path();

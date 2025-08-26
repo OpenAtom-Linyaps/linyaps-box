@@ -11,7 +11,7 @@
 
 constexpr auto cgroup_root = "/sys/fs/cgroups";
 
-linyaps_box::utils::cgroup_t linyaps_box::utils::get_cgroup_type()
+auto linyaps_box::utils::get_cgroup_type() -> linyaps_box::utils::cgroup_t
 {
     static auto cgroup_type = []() -> cgroup_t {
         struct statfs stat{};

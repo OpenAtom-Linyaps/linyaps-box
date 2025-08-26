@@ -9,10 +9,10 @@
 
 namespace linyaps_box::utils {
 
-std::string inspect_fcntl_or_open_flags(size_t flags);
-std::string inspect_fd(int fd);
-std::string inspect_fds();
-std::string inspect_permissions(int fd);
-std::filesystem::path inspect_path(int fd);
+auto inspect_fcntl_or_open_flags(size_t flags) -> std::string;
+auto inspect_fd(int fd) -> std::string;
+auto inspect_fds() -> std::string;
+auto inspect_permissions(int fd) -> std::string;
+auto inspect_path(int fd) -> std::filesystem::path;
 
 } // namespace linyaps_box::utils

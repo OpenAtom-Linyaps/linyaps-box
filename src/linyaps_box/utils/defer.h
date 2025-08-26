@@ -26,16 +26,15 @@ template<typename Fn,
 struct defer
 {
     explicit defer(Fn &&fn) noexcept
-        : fn(std::move(fn))
-        , cancelled(false)
+        : fn_(std::move(fn))
     {
     }
 
     defer(const defer &) = delete;
-    defer &operator=(const defer &) = delete;
+    auto operator=(const defer &) -> defer & = delete;
 
     defer(defer &&other) noexcept
-        : fn(std::move(other.fn))
+        : fn_(std::move(other.fn_))
         , cancelled(other.cancelled)
     {
         other.cancelled = true;
@@ -51,7 +50,7 @@ struct defer
             execute();
         }
 
-        fn = std::move(other.fn);
+        fn_ = std::move(other.fn_);
         cancelled = other.cancelled;
         other.cancelled = true;
 
@@ -67,22 +66,22 @@ struct defer
 
     void cancel() noexcept { cancelled = true; }
 
-    [[nodiscard]] bool is_cancelled() const noexcept { return cancelled; }
+    [[nodiscard]] auto is_cancelled() const noexcept -> bool { return cancelled; }
 
 private:
     void execute() noexcept
     {
         if constexpr (Policy == defer_policy::always) {
-            fn();
+            fn_();
         } else if constexpr (Policy == defer_policy::on_error) {
             if (std::uncaught_exceptions() > 0) {
-                fn();
+                fn_();
             }
         }
     }
 
-    Fn fn;
-    bool cancelled;
+    Fn fn_;
+    bool cancelled{ false };
 };
 
 // Helper functions to create defer objects

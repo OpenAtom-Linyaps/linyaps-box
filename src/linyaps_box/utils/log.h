@@ -13,11 +13,11 @@
 // TODO: maybe fmt with spdlog
 namespace linyaps_box::utils {
 
-bool force_log_to_stderr();
-bool stderr_is_a_tty();
-unsigned int get_current_log_level();
-std::string get_pid_namespace(int pid = 0);
-std::string get_current_command();
+auto force_log_to_stderr() -> bool;
+auto stderr_is_a_tty() -> bool;
+auto get_current_log_level() -> unsigned int;
+auto get_pid_namespace(int pid = 0) -> std::string;
+auto get_current_command() -> std::string;
 
 template<unsigned int level>
 class Logger
@@ -25,7 +25,7 @@ class Logger
 public:
     Logger() = default;
     Logger(const Logger &) = delete;
-    Logger &operator=(const Logger &) = delete;
+    auto operator=(const Logger &) -> Logger & = delete;
     Logger(Logger &&) noexcept(std::is_nothrow_move_constructible_v<std::ostringstream>) = // NOLINT
             default;
     Logger &
@@ -34,13 +34,13 @@ public:
     ~Logger() noexcept;
 
     template<typename T>
-    Logger &operator<<(const T &value)
+    auto operator<<(const T &value) -> Logger &
     {
         ss << value;
         return *this;
     }
 
-    Logger &operator<<(std::ostream &(*manipulator)(std::ostream &))
+    auto operator<<(std::ostream &(*manipulator)(std::ostream &)) -> Logger &
     {
         manipulator(ss);
         return *this;

@@ -11,10 +11,10 @@ class interface
 {
 public:
     interface() = default;
-    virtual ~interface() = default;
+    virtual ~interface();
     interface(const interface &) = delete;
-    interface &operator=(const interface &) = delete;
+    auto operator=(const interface &) -> interface & = delete;
     interface(interface &&) = delete;
-    interface &operator=(interface &&) = delete;
+    auto operator=(interface &&) -> interface & = delete;
 };
 } // namespace linyaps_box

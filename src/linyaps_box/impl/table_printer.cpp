@@ -7,7 +7,7 @@
 #include <iostream>
 
 namespace {
-std::string get_status_string(const linyaps_box::container_status_t::runtime_status &status)
+auto get_status_string(const linyaps_box::container_status_t::runtime_status &status) -> std::string
 {
     switch (status) {
     case linyaps_box::container_status_t::runtime_status::CREATING:
@@ -18,17 +18,17 @@ std::string get_status_string(const linyaps_box::container_status_t::runtime_sta
         return "running";
     case linyaps_box::container_status_t::runtime_status::STOPPED:
         return "stopped";
+    default:
+        throw std::logic_error("unknown status");
     }
-
-    throw std::logic_error("unknown status");
 }
 } // namespace
 
 void linyaps_box::impl::table_printer::print_statuses(const std::vector<container_status_t> &status)
 {
-    size_t max_length = 4;
+    int max_length = 4;
     for (const auto &s : status) {
-        max_length = std::max(max_length, s.ID.length());
+        max_length = std::max(max_length, static_cast<int>(s.ID.length()));
     }
 
     std::cout << std::left << std::setw(max_length + 1) << "NAME" << std::setw(10) << "PID"

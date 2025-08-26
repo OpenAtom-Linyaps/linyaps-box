@@ -11,11 +11,11 @@
 #include <sys/resource.h>
 
 namespace linyaps_box::utils {
-int str_to_signal(std::string_view str)
+auto str_to_signal(std::string_view str) -> int
 {
     // Only support standard signals for now,
     // TODO: support real-time signal in the future
-    static const std::unordered_map<std::string_view, int> sigMap{
+    const std::unordered_map<std::string_view, int> sigMap{
         { "SIGABRT", SIGABRT },   { "SIGALRM", SIGALRM }, { "SIGBUS", SIGBUS },
         { "SIGCHLD", SIGCHLD },   { "SIGCONT", SIGCONT }, { "SIGFPE", SIGFPE },
         { "SIGHUP", SIGHUP },     { "SIGILL", SIGILL },   { "SIGINT", SIGINT },
@@ -37,9 +37,9 @@ int str_to_signal(std::string_view str)
     return it->second;
 }
 
-int str_to_rlimit(std::string_view str)
+auto str_to_rlimit(std::string_view str) -> int
 {
-    const static std::unordered_map<std::string_view, int> resources{
+    const std::unordered_map<std::string_view, int> resources{
         { "RLIMIT_AS", RLIMIT_AS },
         { "RLIMIT_CORE", RLIMIT_CORE },
         { "RLIMIT_CPU", RLIMIT_CPU },
