@@ -11,7 +11,7 @@
 void linyaps_box::command::exec(const struct exec_options &options)
 {
     std::unique_ptr<status_directory> dir =
-            std::make_unique<impl::status_directory>(options.global.get().root);
+            std::make_unique<impl::status_directory>(options.global_.get().root);
     runtime_t runtime(std::move(dir));
 
     auto container_refs = runtime.containers();

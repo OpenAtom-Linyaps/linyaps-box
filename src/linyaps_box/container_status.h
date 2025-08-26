@@ -26,8 +26,8 @@ struct container_status_t
     std::unordered_map<std::string, std::string> annotations;
 };
 
-std::string to_string(linyaps_box::container_status_t::runtime_status status);
-linyaps_box::container_status_t::runtime_status from_string(std::string_view status);
-nlohmann::json status_to_json(const linyaps_box::container_status_t &status);
+auto to_string(linyaps_box::container_status_t::runtime_status status) -> std::string;
+auto from_string(std::string_view status) -> linyaps_box::container_status_t::runtime_status;
+auto status_to_json(const linyaps_box::container_status_t &status) -> nlohmann::json;
 
 } // namespace linyaps_box

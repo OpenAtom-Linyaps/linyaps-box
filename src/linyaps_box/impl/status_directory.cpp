@@ -9,15 +9,15 @@
 #include "linyaps_box/utils/log.h"
 #include "nlohmann/json.hpp"
 
-#include <csignal>
-#include <cstdlib>
+#include <csignal> // IWYU pragma: keep
 #include <fstream>
+#include <utility>
 
 #include <unistd.h>
 
 namespace {
 
-linyaps_box::container_status_t read_status(const std::filesystem::path &path)
+auto read_status(const std::filesystem::path &path) -> linyaps_box::container_status_t
 {
     nlohmann::json j;
     {
@@ -34,7 +34,7 @@ linyaps_box::container_status_t read_status(const std::filesystem::path &path)
     ret.PID = j["pid"];
     ret.ID = j["id"];
     ret.status = linyaps_box::from_string(j["status"].get<std::string>());
-    if (kill(ret.PID, 0) != 0) {
+    if (::kill(ret.PID, 0) != 0) {
         ret.status = linyaps_box::container_status_t::runtime_status::STOPPED;
     }
     ret.bundle = std::string(j["bundle"]);
@@ -61,22 +61,22 @@ void linyaps_box::impl::status_directory::write(const container_status_t &status
     utils::atomic_write(this->path / (status.ID + ".json"), j.dump());
 }
 
-linyaps_box::container_status_t
-linyaps_box::impl::status_directory::read(const std::string &id) const
+auto linyaps_box::impl::status_directory::read(const std::string &id) const
+        -> linyaps_box::container_status_t
 {
     return read_status(this->path / (id + ".json"));
 }
 
 void linyaps_box::impl::status_directory::remove(const std::string &id) const
 {
-    auto path = this->path / (id + ".json");
-    LINYAPS_BOX_DEBUG() << "Remove " << path;
-    if (!std::filesystem::remove(path)) {
-        LINYAPS_BOX_WARNING() << "Failed to remove " << path;
+    auto file_path = this->path / (id + ".json");
+    LINYAPS_BOX_DEBUG() << "Remove " << file_path;
+    if (!std::filesystem::remove(file_path)) {
+        LINYAPS_BOX_WARNING() << "Failed to remove " << file_path;
     }
 }
 
-std::vector<std::string> linyaps_box::impl::status_directory::list() const
+auto linyaps_box::impl::status_directory::list() const -> std::vector<std::string>
 {
     std::vector<std::string> ret;
     for (const auto &entry : std::filesystem::directory_iterator(this->path)) {
@@ -95,8 +95,8 @@ std::vector<std::string> linyaps_box::impl::status_directory::list() const
     return ret;
 }
 
-linyaps_box::impl::status_directory::status_directory(const std::filesystem::path &path)
-    : path(path)
+linyaps_box::impl::status_directory::status_directory(std::filesystem::path dir)
+    : path(std::move(dir))
 {
     if (std::filesystem::is_directory(path) || std::filesystem::create_directories(path)) {
         return;

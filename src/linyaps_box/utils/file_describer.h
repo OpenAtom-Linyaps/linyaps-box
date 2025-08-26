@@ -14,6 +14,13 @@ class file_descriptor_closed_exception : public std::runtime_error
 {
 public:
     file_descriptor_closed_exception();
+    file_descriptor_closed_exception(const file_descriptor_closed_exception &) = default;
+    file_descriptor_closed_exception(file_descriptor_closed_exception &&) noexcept = default;
+    auto operator=(const file_descriptor_closed_exception &)
+            -> file_descriptor_closed_exception & = default;
+    auto operator=(file_descriptor_closed_exception &&) noexcept
+            -> file_descriptor_closed_exception & = default;
+    ~file_descriptor_closed_exception() noexcept override;
 };
 
 class file_descriptor
@@ -24,28 +31,28 @@ public:
     ~file_descriptor();
 
     file_descriptor(const file_descriptor &) = delete;
-    file_descriptor &operator=(const file_descriptor &) = delete;
+    auto operator=(const file_descriptor &) -> file_descriptor & = delete;
 
     file_descriptor(file_descriptor &&other) noexcept;
 
-    file_descriptor &operator=(file_descriptor &&other) noexcept;
+    auto operator=(file_descriptor &&other) noexcept -> file_descriptor &;
 
-    [[nodiscard]] int get() const noexcept;
+    [[nodiscard]] auto get() const noexcept -> int;
 
-    int release() && noexcept;
+    auto release() && noexcept -> int;
 
-    [[nodiscard]] file_descriptor duplicate() const;
+    [[nodiscard]] auto duplicate() const -> file_descriptor;
 
-    file_descriptor &operator<<(const std::byte &byte);
+    auto operator<<(const std::byte &byte) -> file_descriptor &;
 
-    file_descriptor &operator>>(std::byte &byte);
+    auto operator>>(std::byte &byte) -> file_descriptor &;
 
-    [[nodiscard]] std::filesystem::path proc_path() const;
+    [[nodiscard]] auto proc_path() const -> std::filesystem::path;
 
-    [[nodiscard]] std::filesystem::path current_path() const noexcept;
+    [[nodiscard]] auto current_path() const noexcept -> std::filesystem::path;
 
 private:
-    int fd{ -1 };
+    int fd_{ -1 };
 };
 
 } // namespace linyaps_box::utils

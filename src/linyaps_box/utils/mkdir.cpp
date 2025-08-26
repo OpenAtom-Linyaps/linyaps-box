@@ -12,9 +12,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-linyaps_box::utils::file_descriptor linyaps_box::utils::mkdir(const file_descriptor &root,
-                                                              std::filesystem::path path,
-                                                              mode_t mode)
+auto linyaps_box::utils::mkdir(const file_descriptor &root, std::filesystem::path path, mode_t mode)
+        -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "mkdir " << path << " at " << inspect_fd(root.get());
 

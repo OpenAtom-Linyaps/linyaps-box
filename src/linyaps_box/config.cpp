@@ -11,17 +11,19 @@
 
 namespace {
 
-std::tuple<unsigned long, unsigned long, std::uint8_t, std::string>
-parse_mount_options(const std::vector<std::string> &options)
+// This function is used to parse the mount options from the config file and it only will be called
+// once.
+auto parse_mount_options(const std::vector<std::string> &options)
+        -> std::tuple<unsigned long, unsigned long, std::uint8_t, std::string>
 {
-    const static std::unordered_map<std::string_view, unsigned long> propagation_flags_map{
+    const std::unordered_map<std::string_view, unsigned long> propagation_flags_map{
         { "rprivate", MS_PRIVATE | MS_REC },       { "private", MS_PRIVATE },
         { "rslave", MS_SLAVE | MS_REC },           { "slave", MS_SLAVE },
         { "rshared", MS_SHARED | MS_REC },         { "shared", MS_SHARED },
         { "runbindable", MS_UNBINDABLE | MS_REC }, { "unbindable", MS_UNBINDABLE },
     };
 
-    const static std::unordered_map<std::string_view, unsigned long> flags_map{
+    const std::unordered_map<std::string_view, unsigned long> flags_map{
         { "bind", MS_BIND },
         { "defaults", 0 },
         { "dirsync", MS_DIRSYNC },
@@ -43,7 +45,7 @@ parse_mount_options(const std::vector<std::string> &options)
         { "sync", MS_SYNCHRONOUS },
     };
 
-    const static std::unordered_map<std::string_view, unsigned long> unset_flags_map{
+    const std::unordered_map<std::string_view, unsigned long> unset_flags_map{
         { "async", MS_SYNCHRONOUS },
         { "atime", MS_NOATIME },
         { "dev", MS_NODEV },
@@ -60,7 +62,7 @@ parse_mount_options(const std::vector<std::string> &options)
         { "symfollow", LINGYAPS_MS_NOSYMFOLLOW },
     };
 
-    const static std::unordered_map<std::string_view, std::uint8_t> extra_flags_map{
+    const std::unordered_map<std::string_view, std::uint8_t> extra_flags_map{
         { "copy-symlink", linyaps_box::config::mount_t::COPY_SYMLINK }
     };
 
@@ -162,8 +164,8 @@ linyaps_box::config::process_t::rlimits_t parse_rlimits(const nlohmann::json &ob
     return ret;
 }
 
-linyaps_box::config::linux_t parse_linux(const nlohmann::json &obj,
-                                         const nlohmann::json::json_pointer &ptr)
+auto parse_linux(const nlohmann::json &obj, const nlohmann::json::json_pointer &ptr)
+        -> linyaps_box::config::linux_t
 {
     auto linux = linyaps_box::config::linux_t{};
     if (auto uid_ptr = ptr / "uidMappings"; obj.contains(uid_ptr)) {
@@ -280,9 +282,9 @@ linyaps_box::config::linux_t parse_linux(const nlohmann::json &obj,
     return linux;
 }
 
-linyaps_box::config parse_1_2_0(const nlohmann::json &j)
+auto parse_1_2_0(const nlohmann::json &j) -> linyaps_box::config
 {
-    static const auto ptr = ""_json_pointer;
+    const auto ptr = ""_json_pointer;
 
     auto semver = linyaps_box::utils::semver(j[ptr / "ociVersion"].get<std::string>());
     if (!linyaps_box::utils::semver(linyaps_box::config::oci_version).is_compatible_with(semver)) {

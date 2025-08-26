@@ -10,47 +10,52 @@
 
 namespace linyaps_box {
 
-enum class cgroup_manager_t : std::uint16_t { disabled, systemd, cgroupfs };
+enum class cgroup_manager_t : std::uint8_t { disabled, systemd, cgroupfs };
 
 struct cgroup_options
 {
     std::unordered_map<std::string, std::string> annotations;
     std::filesystem::path cgroup_path;
-    std::string id;
     std::filesystem::path state_root;
+    std::string id;
     pid_t pid;
     // resources and so on...
 };
 
 struct cgroup_status
 {
-    std::filesystem::path path;
-    std::string scope;
+public:
+    [[nodiscard]] auto path() const noexcept -> std::filesystem::path { return path_; }
 
-    [[nodiscard]] cgroup_manager_t manager_type() const noexcept { return manager; }
+    [[nodiscard]] auto scope() const noexcept -> std::string_view { return scope_; }
+
+    [[nodiscard]] auto manager() const noexcept -> cgroup_manager_t { return manager_; }
 
 private:
     friend class cgroup_manager;
-    cgroup_manager_t manager;
+    std::filesystem::path path_;
+    std::string scope_;
+    cgroup_manager_t manager_;
 };
 
-inline std::ostream &operator<<(std::ostream &os, cgroup_manager_t manager)
+inline auto operator<<(std::ostream &stream, cgroup_manager_t manager) -> std::ostream &
 {
     switch (manager) {
     case cgroup_manager_t::disabled: {
-        os << "disabled";
+        stream << "disabled";
     } break;
     case cgroup_manager_t::systemd: {
-        os << "systemd";
+        stream << "systemd";
     } break;
     case cgroup_manager_t::cgroupfs: {
-        os << "cgroupfs";
+        stream << "cgroupfs";
     } break;
-    default:
-        os << "unknown";
+    default: {
+        stream << "unknown";
+    } break;
     }
 
-    return os;
+    return stream;
 }
 
 } // namespace linyaps_box

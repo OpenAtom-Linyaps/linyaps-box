@@ -3,3 +3,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "linyaps_box/interface.h"
+
+namespace linyaps_box {
+
+// ensure vtable only here
+interface::~interface() = default;
+
+} // namespace linyaps_box

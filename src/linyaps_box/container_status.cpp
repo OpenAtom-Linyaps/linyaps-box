@@ -5,7 +5,7 @@
 #include "linyaps_box/container_status.h"
 
 namespace linyaps_box {
-std::string to_string(linyaps_box::container_status_t::runtime_status status)
+auto to_string(linyaps_box::container_status_t::runtime_status status) -> std::string
 {
     switch (status) {
     case linyaps_box::container_status_t::runtime_status::CREATING:
@@ -16,12 +16,12 @@ std::string to_string(linyaps_box::container_status_t::runtime_status status)
         return "running";
     case linyaps_box::container_status_t::runtime_status::STOPPED:
         return "stopped";
+    default:
+        throw std::logic_error("unknown status");
     }
-
-    throw std::logic_error("unknown status");
 }
 
-linyaps_box::container_status_t::runtime_status from_string(std::string_view status)
+auto from_string(std::string_view status) -> linyaps_box::container_status_t::runtime_status
 {
     if (status == "creating") {
         return linyaps_box::container_status_t::runtime_status::CREATING;
@@ -39,7 +39,7 @@ linyaps_box::container_status_t::runtime_status from_string(std::string_view sta
     throw std::logic_error("unknown status");
 }
 
-nlohmann::json status_to_json(const linyaps_box::container_status_t &status)
+auto status_to_json(const linyaps_box::container_status_t &status) -> nlohmann::json
 {
     return nlohmann::json::object({ { "id", status.ID },
                                     { "pid", status.PID },

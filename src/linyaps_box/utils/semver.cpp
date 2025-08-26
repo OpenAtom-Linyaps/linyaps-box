@@ -16,7 +16,11 @@ linyaps_box::utils::semver::semver(const std::string &str)
         throw std::invalid_argument("invalid semver: " + str);
     }
 
-    auto major = std::stoi(str.substr(begin, end));
+    auto ret = std::stoi(str.substr(begin, end));
+    if (ret < 0) {
+        throw std::invalid_argument("invalid semver: " + str);
+    }
+    const auto major{ static_cast<unsigned int>(ret) };
 
     begin = end + 1;
     end = str.find('.', begin);
@@ -24,12 +28,20 @@ linyaps_box::utils::semver::semver(const std::string &str)
         throw std::invalid_argument("invalid semver: " + str);
     }
 
-    auto minor = std::stoi(str.substr(begin, end));
+    ret = std::stoi(str.substr(begin, end));
+    if (ret < 0) {
+        throw std::invalid_argument("invalid semver: " + str);
+    }
+    const auto minor{ static_cast<unsigned int>(ret) };
 
     begin = end + 1;
     end = str.find_first_of("-+", begin);
 
-    auto patch = std::stoi(str.substr(begin, end));
+    ret = std::stoi(str.substr(begin, end));
+    if (ret < 0) {
+        throw std::invalid_argument("invalid semver: " + str);
+    }
+    const auto patch{ static_cast<unsigned int>(ret) };
 
     if (end == std::string::npos) {
         this->major_ = major;

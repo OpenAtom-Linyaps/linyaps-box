@@ -5,15 +5,16 @@
 #include "linyaps_box/impl/disabled_cgroup_manager.h"
 
 namespace linyaps_box {
-[[nodiscard]] cgroup_manager_t disabled_cgroup_manager::type() const
+[[nodiscard]] auto disabled_cgroup_manager::type() const -> cgroup_manager_t
 {
     return cgroup_manager_t::disabled;
 }
 
-cgroup_status disabled_cgroup_manager::create_cgroup([[maybe_unused]] const cgroup_options &options)
+auto disabled_cgroup_manager::create_cgroup([[maybe_unused]] const cgroup_options &options)
+        -> cgroup_status
 {
     cgroup_status status{};
-    set_manager_type(status, type());
+    set_manager(status, type());
     return status;
 }
 

@@ -3,3 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "linyaps_box/status_directory.h"
+
+namespace linyaps_box {
+status_directory::~status_directory() = default;
+} // namespace linyaps_box

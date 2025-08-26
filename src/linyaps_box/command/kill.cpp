@@ -28,7 +28,7 @@ void linyaps_box::command::kill(const struct kill_options &options)
         break;
     }
 
-    auto status_dir = std::make_unique<impl::status_directory>(options.global.get().root);
+    auto status_dir = std::make_unique<impl::status_directory>(options.global_.get().root);
     if (!status_dir) {
         throw std::runtime_error("failed to create status directory");
     }
