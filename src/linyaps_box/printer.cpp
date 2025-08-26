@@ -3,3 +3,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "linyaps_box/printer.h"
+
+namespace linyaps_box {
+
+printer::~printer() = default;
+
+} // namespace linyaps_box

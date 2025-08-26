@@ -6,6 +6,6 @@
 #include <string_view>
 
 namespace linyaps_box::utils {
-int str_to_signal(std::string_view str);
-int str_to_rlimit(std::string_view str);
+auto str_to_signal(std::string_view str) -> int;
+auto str_to_rlimit(std::string_view str) -> int;
 } // namespace linyaps_box::utils

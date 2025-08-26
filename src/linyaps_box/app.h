@@ -6,6 +6,6 @@
 
 namespace linyaps_box {
 
-int main(int argc, char **argv) noexcept;
+auto main(int argc, char **argv) noexcept -> int;
 
 } // namespace linyaps_box

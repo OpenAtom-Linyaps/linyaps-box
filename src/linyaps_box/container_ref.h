@@ -14,18 +14,23 @@ class container_ref
 {
 public:
     container_ref(const status_directory &status_dir, std::string id);
-    virtual ~container_ref() noexcept = default;
+    virtual ~container_ref() noexcept;
 
-    [[nodiscard]] container_status_t status() const;
+    container_ref(const container_ref &) = delete;
+    auto operator=(const container_ref &) -> container_ref & = delete;
+    container_ref(container_ref &&) = delete;
+    auto operator=(container_ref &&) -> container_ref & = delete;
+
+    [[nodiscard]] auto status() const -> container_status_t;
     void kill(int signal) const;
     [[noreturn]] void exec(const config::process_t &process);
 
 protected:
-    [[nodiscard]] const status_directory &status_dir() const;
-    [[nodiscard]] const std::string &get_id() const;
+    [[nodiscard]] auto status_dir() const -> const status_directory &;
+    [[nodiscard]] auto get_id() const -> const std::string &;
 
 private:
-    std::string id;
+    std::string id_;
     const status_directory &status_dir_;
 };
 

@@ -22,30 +22,27 @@ struct global_options
 
 struct list_options
 {
-    // FIXME: if the underlying type of enum class is std::uint8_t,
-    //  the mapping message of CLI11 transformer is incorrect
-    //  use std::uint16_t for now
-    enum class output_format_t : std::uint16_t { table, json };
+    enum class output_format_t : std::uint8_t { table, json };
 
     explicit list_options(global_options &global)
-        : global(global)
+        : global_(global)
     {
     }
 
     output_format_t output_format{ output_format_t::table };
-    std::reference_wrapper<global_options> global;
+    std::reference_wrapper<global_options> global_;
 };
 
 struct exec_options
 {
     explicit exec_options(global_options &global)
         : no_new_privs(false)
-        , global(global)
+        , global_(global)
     {
     }
 
     bool no_new_privs;
-    std::reference_wrapper<global_options> global;
+    std::reference_wrapper<global_options> global_;
     std::vector<std::string> command;
     std::string user;
     std::optional<std::vector<std::string>> caps;
@@ -57,11 +54,11 @@ struct exec_options
 struct run_options
 {
     explicit run_options(global_options &global)
-        : global(global)
+        : global_(global)
     {
     }
 
-    std::reference_wrapper<global_options> global;
+    std::reference_wrapper<global_options> global_;
     std::string ID;
     std::string bundle;
     std::string config;
@@ -70,11 +67,11 @@ struct run_options
 struct kill_options
 {
     explicit kill_options(global_options &global)
-        : global(global)
+        : global_(global)
     {
     }
 
-    std::reference_wrapper<global_options> global;
+    std::reference_wrapper<global_options> global_;
     std::string container;
     std::string signal;
 };

@@ -17,7 +17,7 @@
 
 namespace {
 
-std::string inspect_fdinfo(const std::filesystem::path &fdinfoPath)
+auto inspect_fdinfo(const std::filesystem::path &fdinfoPath) -> std::string
 {
     std::ifstream fdinfo(fdinfoPath);
     assert(fdinfo.is_open());
@@ -42,7 +42,7 @@ std::string inspect_fdinfo(const std::filesystem::path &fdinfoPath)
     return ss.str();
 }
 
-std::string inspect_fdinfo(int fd)
+auto inspect_fdinfo(int fd) -> std::string
 {
     std::stringstream ss;
     ss << linyaps_box::utils::inspect_path(fd) << " ";
@@ -54,7 +54,7 @@ std::string inspect_fdinfo(int fd)
 
 namespace linyaps_box::utils {
 
-std::string inspect_fcntl_or_open_flags(size_t flags)
+auto inspect_fcntl_or_open_flags(size_t flags) -> std::string
 {
     std::stringstream ss;
 
@@ -126,12 +126,12 @@ std::string inspect_fcntl_or_open_flags(size_t flags)
     return ss.str();
 }
 
-std::string inspect_fd(int fd)
+auto inspect_fd(int fd) -> std::string
 {
     return inspect_fdinfo(fd);
 }
 
-std::string inspect_fds()
+auto inspect_fds() -> std::string
 {
     std::stringstream ss;
 
@@ -160,7 +160,7 @@ std::string inspect_fds()
     return ss.str();
 }
 
-std::string inspect_permissions(int fd)
+auto inspect_permissions(int fd) -> std::string
 {
     std::stringstream ss;
     struct stat buf{};
@@ -228,7 +228,7 @@ std::string inspect_permissions(int fd)
     return ss.str();
 }
 
-std::filesystem::path inspect_path(int fd)
+auto inspect_path(int fd) -> std::filesystem::path
 {
     std::error_code ec;
     auto ret = std::filesystem::read_symlink("/proc/self/fd/" + std::to_string(fd), ec);

@@ -8,8 +8,8 @@
 
 namespace linyaps_box::utils {
 
-enum class cgroup_t : std::uint16_t { unified, legacy, hybrid };
+enum class cgroup_t : std::uint8_t { unified, legacy, hybrid };
 
-cgroup_t get_cgroup_type();
+auto get_cgroup_type() -> cgroup_t;
 
 } // namespace linyaps_box::utils

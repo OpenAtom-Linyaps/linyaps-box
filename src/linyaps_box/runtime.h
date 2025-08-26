@@ -17,7 +17,7 @@ class runtime_t
 {
 public:
     explicit runtime_t(std::unique_ptr<status_directory> &&status_dir);
-    std::unordered_map<std::string, container_ref> containers();
+    auto containers() -> std::unordered_map<std::string, container_ref>;
 
     struct create_container_options_t
     {
@@ -27,10 +27,10 @@ public:
         cgroup_manager_t manager;
     };
 
-    container create_container(const create_container_options_t &options);
+    auto create_container(const create_container_options_t &options) -> container;
 
 private:
-    std::unique_ptr<status_directory> status_dir;
+    std::unique_ptr<status_directory> status_dir_;
 };
 
 } // namespace linyaps_box

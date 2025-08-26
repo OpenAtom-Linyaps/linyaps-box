@@ -19,14 +19,14 @@ public:
 
     explicit semver(const std::string &str);
 
-    [[nodiscard]] unsigned int major() const;
-    [[nodiscard]] unsigned int minor() const;
-    [[nodiscard]] unsigned int patch() const;
-    [[nodiscard]] const std::string &prerelease() const;
-    [[nodiscard]] const std::string &build() const;
+    [[nodiscard]] auto major() const -> unsigned int;
+    [[nodiscard]] auto minor() const -> unsigned int;
+    [[nodiscard]] auto patch() const -> unsigned int;
+    [[nodiscard]] auto prerelease() const -> const std::string &;
+    [[nodiscard]] auto build() const -> const std::string &;
 
-    [[nodiscard]] std::string to_string() const;
-    [[nodiscard]] bool is_compatible_with(const semver &other) const;
+    [[nodiscard]] auto to_string() const -> std::string;
+    [[nodiscard]] auto is_compatible_with(const semver &other) const -> bool;
 
 private:
     unsigned int major_;

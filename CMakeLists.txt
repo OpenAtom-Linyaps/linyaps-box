@@ -118,7 +118,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/app.cpp
     src/linyaps_box/app.h
     src/linyaps_box/cgroup.h
-    src/linyaps_box/cgroup_manager.c
+    src/linyaps_box/cgroup_manager.cpp
     src/linyaps_box/cgroup_manager.h
     src/linyaps_box/command/exec.cpp
     src/linyaps_box/command/exec.h

@@ -13,9 +13,17 @@ namespace linyaps_box {
 class cgroup_manager : public virtual interface
 {
 public:
-    [[nodiscard]] virtual cgroup_manager_t type() const = 0;
+    cgroup_manager() = default;
+    ~cgroup_manager() override;
 
-    virtual cgroup_status create_cgroup(const cgroup_options &options) = 0;
+    cgroup_manager(const cgroup_manager &) = delete;
+    auto operator=(const cgroup_manager &) -> cgroup_manager & = delete;
+    cgroup_manager(cgroup_manager &&) = delete;
+    auto operator=(cgroup_manager &&) -> cgroup_manager & = delete;
+
+    [[nodiscard]] virtual auto type() const -> cgroup_manager_t = 0;
+
+    virtual auto create_cgroup(const cgroup_options &options) -> cgroup_status = 0;
 
     virtual void precreate_cgroup(const cgroup_options &options, utils::file_descriptor &dirfd) = 0;
 
@@ -24,9 +32,9 @@ public:
     // TODO: support update resource
     // virtual void update_resource(const cgroup_status &status, ) = 0;
 protected:
-    static void set_manager_type(cgroup_status &status, cgroup_manager_t type) noexcept
+    static void set_manager(cgroup_status &status, cgroup_manager_t type) noexcept
     {
-        status.manager = type;
+        status.manager_ = type;
     }
 };
 

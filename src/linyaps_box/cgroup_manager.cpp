@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#pragma once
-
 #include <linyaps_box/cgroup_manager.h>
+
+namespace linyaps_box {
+
+cgroup_manager::~cgroup_manager() = default;
+
+} // namespace linyaps_box
