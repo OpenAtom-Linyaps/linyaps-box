@@ -18,6 +18,15 @@ linyaps_box::utils::file_descriptor_closed_exception::file_descriptor_closed_exc
 linyaps_box::utils::file_descriptor_closed_exception::~file_descriptor_closed_exception() noexcept =
         default;
 
+linyaps_box::utils::file_descriptor_invalid_exception::file_descriptor_invalid_exception(
+        const std::string &message)
+    : std::runtime_error(message)
+{
+}
+
+linyaps_box::utils::file_descriptor_invalid_exception::
+        ~file_descriptor_invalid_exception() noexcept = default;
+
 linyaps_box::utils::file_descriptor::file_descriptor(int fd)
     : fd_(fd)
 {
@@ -25,7 +34,7 @@ linyaps_box::utils::file_descriptor::file_descriptor(int fd)
 
 linyaps_box::utils::file_descriptor::~file_descriptor()
 {
-    if (fd_ == -1) {
+    if (fd_ < 0) {
         return;
     }
 
@@ -56,6 +65,10 @@ auto linyaps_box::utils::file_descriptor::duplicate() const -> linyaps_box::util
 {
     if (fd_ == -1) {
         throw file_descriptor_closed_exception();
+    }
+
+    if (fd_ == AT_FDCWD) {
+        throw file_descriptor_invalid_exception("cannot duplicate AT_FDCWD");
     }
 
     auto ret = dup(fd_);
@@ -133,4 +146,9 @@ auto linyaps_box::utils::file_descriptor::current_path() const noexcept -> std::
     }
 
     return path;
+}
+
+auto linyaps_box::utils::file_descriptor::cwd() -> file_descriptor
+{
+    return file_descriptor{ AT_FDCWD };
 }
