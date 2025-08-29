@@ -6,6 +6,10 @@
 
 #include "linyaps_box/utils/log.h"
 
+#include <linux/limits.h>
+
+#include <array>
+
 void linyaps_box::utils::symlink(const std::filesystem::path &target,
                                  const std::filesystem::path &link_path)
 {
@@ -29,4 +33,27 @@ void linyaps_box::utils::symlink_at(const std::filesystem::path &target,
     if (ret == -1) {
         throw std::system_error(errno, std::system_category(), "symlinkat");
     }
+}
+
+std::filesystem::path linyaps_box::utils::readlink(const std::filesystem::path &path)
+{
+    std::error_code ec;
+    auto ret = std::filesystem::read_symlink(path, ec);
+    if (ec) {
+        throw std::system_error{ ec.value(), std::system_category(), ec.message() };
+    }
+
+    return ret;
+}
+
+std::filesystem::path linyaps_box::utils::readlinkat(const file_descriptor &dirfd,
+                                                     const std::filesystem::path &path)
+{
+    std::array<char, PATH_MAX + 1> buf{};
+    auto ret = ::readlinkat(dirfd.get(), path.c_str(), buf.data(), PATH_MAX + 1);
+    if (ret == -1) {
+        throw std::system_error(errno, std::system_category(), "readlinkat");
+    }
+
+    return std::filesystem::path{ buf.data() };
 }

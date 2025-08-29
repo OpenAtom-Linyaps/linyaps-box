@@ -23,6 +23,19 @@ public:
     ~file_descriptor_closed_exception() noexcept override;
 };
 
+class file_descriptor_invalid_exception : public std::runtime_error
+{
+public:
+    explicit file_descriptor_invalid_exception(const std::string &message);
+    file_descriptor_invalid_exception(const file_descriptor_invalid_exception &) = default;
+    file_descriptor_invalid_exception(file_descriptor_invalid_exception &&) noexcept = default;
+    auto operator=(const file_descriptor_invalid_exception &)
+            -> file_descriptor_invalid_exception & = default;
+    auto operator=(file_descriptor_invalid_exception &&) noexcept
+            -> file_descriptor_invalid_exception & = default;
+    ~file_descriptor_invalid_exception() noexcept override;
+};
+
 class file_descriptor
 {
 public:
@@ -50,6 +63,8 @@ public:
     [[nodiscard]] auto proc_path() const -> std::filesystem::path;
 
     [[nodiscard]] auto current_path() const noexcept -> std::filesystem::path;
+
+    static auto cwd() -> file_descriptor;
 
 private:
     int fd_{ -1 };
