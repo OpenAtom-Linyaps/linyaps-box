@@ -48,6 +48,7 @@
 #endif
 
 constexpr auto propagations_flag = (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE);
+constexpr auto max_symlink_depth{ 32 };
 
 namespace linyaps_box {
 
@@ -399,15 +400,6 @@ void do_remount(const remount_t &mount)
     }
 }
 
-[[nodiscard]] linyaps_box::utils::file_descriptor create_destination_file(
-        const linyaps_box::utils::file_descriptor &root, const std::filesystem::path &destination)
-{
-    LINYAPS_BOX_DEBUG() << "Creating file " << destination.string() << " under "
-                        << linyaps_box::utils::inspect_path(root.get());
-    const auto &parent = linyaps_box::utils::mkdir(root, destination.parent_path());
-    return linyaps_box::utils::touch(parent, destination.filename());
-}
-
 [[nodiscard]] linyaps_box::utils::file_descriptor create_destination_directory(
         const linyaps_box::utils::file_descriptor &root, const std::filesystem::path &destination)
 {
@@ -417,11 +409,39 @@ void do_remount(const remount_t &mount)
 }
 
 [[nodiscard]] linyaps_box::utils::file_descriptor
+create_destination_file(const linyaps_box::utils::file_descriptor &root,
+                        const std::filesystem::path &destination,
+                        int max_depth)
+{
+    if (max_depth < 0) {
+        throw std::system_error(ELOOP, std::system_category(), "failed to create file");
+    }
+
+    LINYAPS_BOX_DEBUG() << "Creating file " << destination.string() << " under "
+                        << linyaps_box::utils::inspect_path(root.get());
+    const auto &parent = create_destination_directory(root, destination.parent_path());
+
+    try {
+        auto ret = linyaps_box::utils::touch(parent,
+                                             destination.filename(),
+                                             O_CLOEXEC | O_CREAT | O_WRONLY | O_NOFOLLOW);
+        return ret;
+    } catch (std::system_error &e) {
+        if (e.code() != std::errc::too_many_symbolic_link_levels) {
+            throw;
+        }
+
+        auto target = linyaps_box::utils::readlinkat(parent, destination.filename());
+        return create_destination_file(root, target, max_depth - 1);
+    }
+}
+
+[[nodiscard]] linyaps_box::utils::file_descriptor
 create_destination_symlink(const linyaps_box::utils::file_descriptor &root,
                            const std::filesystem::path &source,
                            std::filesystem::path destination)
 {
-    auto ret = std::filesystem::read_symlink(source);
+    auto ret = linyaps_box::utils::readlink(source);
     auto parent = linyaps_box::utils::mkdir(root, destination.parent_path());
 
     LINYAPS_BOX_DEBUG() << "Creating symlink " << destination.string() << " under "
@@ -447,13 +467,8 @@ create_destination_symlink(const linyaps_box::utils::file_descriptor &root,
                                         + " already exists and is not a symlink");
     }
 
-    std::array<char, PATH_MAX + 1> buf{};
-    auto to = ::readlinkat(root.get(), destination.c_str(), buf.data(), buf.size());
-    if (to == -1) {
-        throw std::system_error(errno, std::system_category(), "readlinkat");
-    }
-
-    if (std::string_view{ buf.data(), static_cast<size_t>(to) } == ret) {
+    auto target = linyaps_box::utils::readlinkat(root, destination);
+    if (target == ret) {
         return linyaps_box::utils::open_at(root, destination, O_PATH | O_NOFOLLOW | O_CLOEXEC);
     }
 
@@ -469,11 +484,9 @@ ensure_mount_destination(bool isDir,
                          const linyaps_box::config::mount_t &mount)
 try {
     assert(mount.destination.has_value());
-    auto open_flag = O_PATH;
-    if ((mount.flags & LINGYAPS_MS_NOSYMFOLLOW) != 0) {
-        open_flag |= O_NOFOLLOW;
-    }
-
+    auto open_flag = O_PATH | O_CLOEXEC;
+    LINYAPS_BOX_DEBUG() << "Opening " << (isDir ? "directory " : "file ")
+                        << mount.destination.value() << " under " << root.current_path();
     return linyaps_box::utils::open_at(root, mount.destination.value(), open_flag);
 } catch (const std::system_error &e) {
     if (e.code().value() != ENOENT) {
@@ -492,7 +505,7 @@ try {
         return create_destination_directory(root, path);
     }
 
-    return create_destination_file(root, path);
+    return create_destination_file(root, path, max_symlink_depth);
 }
 
 void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination,
