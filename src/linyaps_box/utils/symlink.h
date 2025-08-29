@@ -16,4 +16,8 @@ void symlink_at(const std::filesystem::path &target,
                 const file_descriptor &dirfd,
                 const std::filesystem::path &link_path);
 
+std::filesystem::path readlink(const std::filesystem::path &path);
+
+std::filesystem::path readlinkat(const file_descriptor &dirfd, const std::filesystem::path &path);
+
 } // namespace linyaps_box::utils
