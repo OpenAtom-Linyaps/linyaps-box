@@ -48,12 +48,16 @@ linyaps_box::utils::file_descriptor::file_descriptor(file_descriptor &&other) no
     *this = std::move(other);
 }
 
-auto linyaps_box::utils::file_descriptor::release() && noexcept -> int
+auto linyaps_box::utils::file_descriptor::release() -> void
 {
     int ret = -1;
     std::swap(ret, fd_);
 
-    return ret;
+    if (::close(ret) < 0) {
+        auto msg{ "failed to close file descriptor " + std::to_string(ret) + ": "
+                  + ::strerror(errno) };
+        throw file_descriptor_invalid_exception(msg);
+    }
 }
 
 auto linyaps_box::utils::file_descriptor::get() const noexcept -> int
