@@ -1655,11 +1655,17 @@ try {
 
     auto &args = *static_cast<clone_fn_args *>(data);
 
-    assert(args.socket.get() >= 0);
-    close_other_fds({ STDIN_FILENO,
-                      STDOUT_FILENO,
-                      STDERR_FILENO,
-                      static_cast<unsigned int>(args.socket.get()) });
+    assert(args.self_socket.get() >= 0);
+    std::set<uint> except_fds{
+        STDIN_FILENO,
+        STDOUT_FILENO,
+        STDERR_FILENO,
+    };
+    for (uint fd = 0; fd < args.container->preserve_fds(); ++fd) {
+        except_fds.insert(fd + 3);
+    }
+    except_fds.insert(static_cast<unsigned int>(args.socket.get()));
+    close_other_fds(std::move(except_fds));
 
     const auto &container = *args.container;
     const auto &process = *args.process;
@@ -1837,14 +1843,16 @@ std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
         namespaces = config.linux->namespaces;
     }
 
-    int clone_flag = runtime_ns::generate_clone_flag(namespaces);
-    clone_fn_args args = { &container, &process, std::move(sockets.second) };
+    const int clone_flag = runtime_ns::generate_clone_flag(namespaces);
+    clone_fn_args args = { &container,
+                           &process,
+                           linyaps_box::utils::file_descriptor{ sockets.second.get() } };
 
     LINYAPS_BOX_DEBUG() << "OCI runtime in runtime namespace: PID=" << getpid()
                         << " PIDNS=" << linyaps_box::utils::get_pid_namespace();
 
-    child_stack stack;
-    int child_pid = clone(container_ns::clone_fn, stack.top(), clone_flag, (void *)&args);
+    const child_stack stack;
+    const int child_pid = clone(container_ns::clone_fn, stack.top(), clone_flag, (void *)&args);
     if (child_pid < 0) {
         throw std::runtime_error("clone failed");
     }
@@ -2307,14 +2315,13 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 } // namespace
 
 linyaps_box::container::container(const status_directory &status_dir,
-                                  const std::string &id,
-                                  const std::filesystem::path &bundle,
-                                  std::filesystem::path config,
-                                  cgroup_manager_t manager)
-    : container_ref(status_dir, id)
-    , bundle(bundle)
+                                  const create_container_options_t &options)
+    : container_ref(status_dir, options.ID)
+    , preserve_fds_(options.preserve_fds)
     , data(new linyaps_box::container_data)
+    , bundle(options.bundle)
 {
+    auto config = options.config;
     if (config.is_relative()) {
         config = bundle / config;
     }
@@ -2340,7 +2347,7 @@ linyaps_box::container::container(const status_directory &status_dir,
     {
         container_status_t status;
         status.oci_version = linyaps_box::config::oci_version;
-        status.ID = id;
+        status.ID = options.ID;
         status.PID = getpid();
         status.status = container_status_t::runtime_status::CREATING;
         status.bundle = bundle;
@@ -2353,7 +2360,7 @@ linyaps_box::container::container(const status_directory &status_dir,
         this->status_dir().write(status);
     }
 
-    switch (manager) {
+    switch (options.manager) {
     case cgroup_manager_t::disabled: {
         this->manager = std::make_unique<disabled_cgroup_manager>();
     } break;
