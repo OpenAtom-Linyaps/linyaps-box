@@ -61,6 +61,10 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     cmd_run->add_option("-b,--bundle", run_opt.bundle, "Path to the OCI bundle")->default_val(".");
     cmd_run->add_option("-f,--config", run_opt.config, "Override the configuration file to use")
             ->default_val("config.json");
+    cmd_run->add_option("--preserve-fds",
+                        run_opt.preserve_fds,
+                        "Pass N additional file descriptors to the container")
+            ->default_val(0);
 
     exec_options exec_opt{ options.global };
     auto *cmd_exec = app.add_subcommand("exec", "Exec a command in a running container")
