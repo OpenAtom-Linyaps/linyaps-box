@@ -47,12 +47,11 @@ public:
     auto operator=(const file_descriptor &) -> file_descriptor & = delete;
 
     file_descriptor(file_descriptor &&other) noexcept;
-
     auto operator=(file_descriptor &&other) noexcept -> file_descriptor &;
 
     [[nodiscard]] auto get() const noexcept -> int;
 
-    auto release() && noexcept -> int;
+    auto release() -> void;
 
     [[nodiscard]] auto duplicate() const -> file_descriptor;
 

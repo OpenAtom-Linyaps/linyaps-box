@@ -27,8 +27,8 @@ auto linyaps_box::runtime_t::containers()
     return containers;
 }
 
-auto linyaps_box::runtime_t::create_container(
-        const linyaps_box::runtime_t::create_container_options_t &options) -> linyaps_box::container
+auto linyaps_box::runtime_t::create_container(const create_container_options_t &options)
+        -> linyaps_box::container
 {
-    return { *this->status_dir_, options.ID, options.bundle, options.config, options.manager };
+    return { *this->status_dir_, options };
 }

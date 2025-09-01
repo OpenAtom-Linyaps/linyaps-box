@@ -19,14 +19,6 @@ public:
     explicit runtime_t(std::unique_ptr<status_directory> &&status_dir);
     auto containers() -> std::unordered_map<std::string, container_ref>;
 
-    struct create_container_options_t
-    {
-        std::filesystem::path bundle;
-        std::filesystem::path config;
-        std::string ID;
-        cgroup_manager_t manager;
-    };
-
     auto create_container(const create_container_options_t &options) -> container;
 
 private:

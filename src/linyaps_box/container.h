@@ -13,14 +13,19 @@ namespace linyaps_box {
 
 struct container_data;
 
+struct create_container_options_t
+{
+    cgroup_manager_t manager;
+    uint preserve_fds;
+    std::string ID;
+    std::filesystem::path bundle;
+    std::filesystem::path config;
+};
+
 class container final : public container_ref
 {
 public:
-    container(const status_directory &status_dir,
-              const std::string &id,
-              const std::filesystem::path &bundle,
-              std::filesystem::path config,
-              cgroup_manager_t manager);
+    container(const status_directory &status_dir, const create_container_options_t &options);
 
     container(const container &) = delete;
     auto operator=(const container &) -> container & = delete;
@@ -38,14 +43,17 @@ public:
 
     [[nodiscard]] auto host_uid() const noexcept { return host_uid_; }
 
+    [[nodiscard]] auto preserve_fds() const noexcept { return preserve_fds_; }
+
 private:
     void cgroup_preenter(const cgroup_options &options, utils::file_descriptor &dirfd);
-    std::filesystem::path bundle;
-    linyaps_box::config config;
-    std::unique_ptr<cgroup_manager> manager;
+    uint preserve_fds_;
     gid_t host_gid_;
     uid_t host_uid_;
     container_data *data{ nullptr };
+    std::filesystem::path bundle;
+    std::unique_ptr<cgroup_manager> manager;
+    linyaps_box::config config;
 };
 
 } // namespace linyaps_box
