@@ -1655,7 +1655,7 @@ try {
 
     auto &args = *static_cast<clone_fn_args *>(data);
 
-    assert(args.self_socket.get() >= 0);
+    assert(args.socket.get() >= 0);
     std::set<uint> except_fds{
         STDIN_FILENO,
         STDOUT_FILENO,
