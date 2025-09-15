@@ -12,12 +12,12 @@
 
 namespace linyaps_box::utils {
 
-auto open(const std::filesystem::path &path, int flag = O_RDONLY, mode_t mode = 0)
+auto open(const std::filesystem::path &path, int flag = O_PATH | O_CLOEXEC, mode_t mode = 0)
         -> file_descriptor;
 
 auto open_at(const file_descriptor &root,
              const std::filesystem::path &path,
-             int flag = O_RDONLY,
+             int flag = O_PATH | O_CLOEXEC,
              mode_t mode = 0) -> file_descriptor;
 
 } // namespace linyaps_box::utils
