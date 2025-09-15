@@ -318,6 +318,7 @@ void syscall_mount(const char *_special_file,
         if (_dir == nullptr) {
             return "nullptr";
         }
+
         if (auto str = std::string_view{ _dir }; str.rfind(fd_prefix, 0) == 0) {
             return linyaps_box::utils::inspect_fd(std::stoi(str.data() + fd_prefix.size()));
         }
@@ -790,6 +791,8 @@ public:
             return;
         }
 
+        LINYAPS_BOX_DEBUG() << "make readonly paths";
+
         for (const auto &path : *linux->readonly_paths) {
             linyaps_box::utils::file_descriptor dst;
             try {
@@ -836,10 +839,14 @@ public:
             return;
         }
 
+        LINYAPS_BOX_DEBUG() << "make masked paths";
+
         for (const auto &path : *linux->masked_paths) {
             linyaps_box::utils::file_descriptor dst;
             try {
-                dst = linyaps_box::utils::open_at(root, path);
+                // we only need to open a fd to refer to the path
+                // so O_PATH is sufficient.
+                dst = linyaps_box::utils::open_at(root, path, O_PATH | O_CLOEXEC);
             } catch (const std::system_error &e) {
                 if (auto err = e.code().value(); err == ENOENT || err == EACCES) {
                     continue;
