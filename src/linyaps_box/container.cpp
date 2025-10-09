@@ -1680,6 +1680,7 @@ try {
 
     auto rootfs = container.get_config().root.path;
     if (rootfs.is_relative()) {
+        LINYAPS_BOX_DEBUG() << "rootfs is relative based on bundle path:" << container.get_bundle();
         rootfs = std::filesystem::canonical(container.get_bundle() / rootfs);
     }
 
@@ -1853,7 +1854,7 @@ std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
     const int clone_flag = runtime_ns::generate_clone_flag(namespaces);
     clone_fn_args args = { &container,
                            &process,
-                           linyaps_box::utils::file_descriptor{ sockets.second.get() } };
+                           std::move(sockets.second)};
 
     LINYAPS_BOX_DEBUG() << "OCI runtime in runtime namespace: PID=" << getpid()
                         << " PIDNS=" << linyaps_box::utils::get_pid_namespace();
