@@ -1852,9 +1852,7 @@ std::tuple<int, linyaps_box::utils::file_descriptor> start_container_process(
     }
 
     const int clone_flag = runtime_ns::generate_clone_flag(namespaces);
-    clone_fn_args args = { &container,
-                           &process,
-                           std::move(sockets.second)};
+    clone_fn_args args = { &container, &process, std::move(sockets.second) };
 
     LINYAPS_BOX_DEBUG() << "OCI runtime in runtime namespace: PID=" << getpid()
                         << " PIDNS=" << linyaps_box::utils::get_pid_namespace();
