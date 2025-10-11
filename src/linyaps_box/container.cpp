@@ -1594,8 +1594,13 @@ void processing_extensions(const linyaps_box::container &container)
     LINYAPS_BOX_DEBUG() << "Processing container extensions";
 
     // ext_ns_last_pid
-    if (auto it = config.annotations->find("cn.org.linyaps.runtime.ns_last_pid");
-        it != config.annotations->end()) {
+    // This file may not exist if the kernel config CONFIG_CHECKPOINT_RESTORE is not enabled
+    // and this feature originally was used for userspace checkpoint/restore
+    // we use this feature for avoiding two process has the same pid.
+    // e.g some application will register a tray through dbus and use the pid as the part of
+    // dbus object path, if two process has the same pid, the dbus object path will conflict
+    auto it = config.annotations->find("cn.org.linyaps.runtime.ns_last_pid");
+    while (it != config.annotations->end()) {
         LINYAPS_BOX_DEBUG() << "Processing ns_last_pid extension: " << it->second;
 
         // Validate input is a valid pid_t number
@@ -1613,7 +1618,13 @@ void processing_extensions(const linyaps_box::container &container)
             throw std::runtime_error("parse ns_last_pid " + it->second + " failed: " + e.what());
         }
 
-        std::ofstream ofs("/proc/sys/kernel/ns_last_pid");
+        // ignore ns_last_pid if the file does not exist
+        auto ns_last_pid = std::filesystem::path{ "/proc/sys/kernel/ns_last_pid" };
+        if (!std::filesystem::exists(ns_last_pid)) {
+            break;
+        }
+
+        std::ofstream ofs(ns_last_pid);
         if (!ofs) {
             throw std::system_error(errno,
                                     std::generic_category(),
@@ -1628,6 +1639,7 @@ void processing_extensions(const linyaps_box::container &container)
         }
 
         LINYAPS_BOX_DEBUG() << "Successfully set ns_last_pid to " << it->second;
+        break;
     }
 
     LINYAPS_BOX_DEBUG() << "Container extensions processing completed";
