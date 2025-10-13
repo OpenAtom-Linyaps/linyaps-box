@@ -22,6 +22,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-TEST(LINYAPS_BOX, Placeholder1) {
-  EXPECT_EQ(1, 1);
+TEST(LINYAPS_BOX, Placeholder1)
+{
+    EXPECT_EQ(1, 1);
 }
