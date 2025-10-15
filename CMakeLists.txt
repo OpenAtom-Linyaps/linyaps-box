@@ -91,7 +91,7 @@ set(linyaps-box_ACTIVE_LOG_LEVEL
 )
 
 set(linyaps-box_ENABLE_CPM
-    ON
+    OFF
     CACHE BOOL "enable CPM")
 
 if(CMAKE_VERSION VERSION_LESS "3.14")
@@ -104,11 +104,6 @@ endif()
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     OFF
     CACHE BOOL "use local packages only")
-
-if(linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
-  message(STATUS "CPM is disabled")
-  set(linyaps-box_ENABLE_CPM OFF)
-endif()
 
 # ==============================================================================
 
@@ -227,6 +222,10 @@ endif()
 if(linyaps-box_ENABLE_CPM)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
   include(CPM)
+
+  if (linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
+    set(CPM_USE_LOCAL_PACKAGES ON)
+  endif()
 
   CPMFindPackage(
     NAME nlohmann_json
