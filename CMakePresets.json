@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 10,
 	"cmakeMinimumRequired": {
 		"major": 3,
 		"minor": 25,
@@ -21,7 +21,8 @@
 				"linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": "",
 				"linyaps-box_ENABLE_SMOKE_TESTS": true,
 				"linyaps-box_DEFAULT_LOG_LEVEL": "7",
-				"linyaps-box_ACTIVE_LOG_LEVEL": "7"
+				"linyaps-box_ACTIVE_LOG_LEVEL": "7",
+				"linyaps-box_ENABLE_CPM": "ON"
 			}
 		},
 		{
@@ -47,7 +48,9 @@
 				"CMAKE_COLOR_DIAGNOSTICS": true,
 				"CMAKE_CXX_FLAGS": "-fno-asynchronous-unwind-tables -fdata-sections -ffunction-sections -flto=auto $env{CXXFLAGS}",
 				"CMAKE_EXE_LINKER_FLAGS_INIT": "-Wl,--gc-sections,--strip-all,--exclude-libs,ALL -flto=auto",
-				"linyaps-box_STATIC": true
+				"linyaps-box_STATIC": true,
+				"linyaps-box_ENABLE_CPACK": "ON",
+				"linyaps-box_MAKE_RELEASE": "ON"
 			}
 		},
 		{
