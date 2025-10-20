@@ -16,7 +16,7 @@ struct container_data;
 struct create_container_options_t
 {
     cgroup_manager_t manager;
-    uint preserve_fds;
+    int preserve_fds;
     std::string ID;
     std::filesystem::path bundle;
     std::filesystem::path config;
@@ -47,7 +47,7 @@ public:
 
 private:
     void cgroup_preenter(const cgroup_options &options, utils::file_descriptor &dirfd);
-    uint preserve_fds_;
+    int preserve_fds_;
     gid_t host_gid_;
     uid_t host_uid_;
     container_data *data{ nullptr };

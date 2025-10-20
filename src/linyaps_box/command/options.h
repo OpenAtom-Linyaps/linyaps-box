@@ -62,7 +62,7 @@ struct run_options
     std::string ID;
     std::string bundle;
     std::string config;
-    uint preserve_fds;
+    int preserve_fds;
 };
 
 struct kill_options
