@@ -42,6 +42,7 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <type_traits>
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
 #include <sys/capability.h>
@@ -121,7 +122,8 @@ std::ostream &operator<<(std::ostream &os, const sync_message message)
 
 struct MountFlag
 {
-    std::underlying_type_t<decltype(MS_RDONLY)> flag;
+    // mount flag should be unsigned int due to MS_NOUSER (1U << 31)
+    unsigned int flag;
     std::string_view name;
 };
 
