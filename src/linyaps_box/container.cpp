@@ -1680,7 +1680,7 @@ try {
         STDOUT_FILENO,
         STDERR_FILENO,
     };
-    for (uint fd = 0; fd < args.container->preserve_fds(); ++fd) {
+    for (auto fd = 0; fd < args.container->preserve_fds(); ++fd) {
         except_fds.insert(fd + 3);
     }
     except_fds.insert(static_cast<unsigned int>(args.socket.get()));
