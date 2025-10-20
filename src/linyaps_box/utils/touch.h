@@ -6,11 +6,13 @@
 
 #include "linyaps_box/utils/file_describer.h"
 
+#include <sys/types.h>
+
 namespace linyaps_box::utils {
 
 auto touch(const file_descriptor &root,
            const std::filesystem::path &path,
            int flag,
-           mode_t mode = 0700) -> file_descriptor;
+           mode_t mode = 0644) -> file_descriptor;
 
 } // namespace linyaps_box::utils

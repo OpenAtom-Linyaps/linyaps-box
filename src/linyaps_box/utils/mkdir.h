@@ -6,6 +6,8 @@
 
 #include "linyaps_box/utils/file_describer.h"
 
+#include <sys/types.h>
+
 namespace linyaps_box::utils {
 
 auto mkdir(const file_descriptor &root, std::filesystem::path path, mode_t mode = 0755)
