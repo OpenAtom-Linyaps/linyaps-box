@@ -26,7 +26,10 @@ auto str_to_signal(std::string_view str) -> int
         { "SIGTTIN", SIGTTIN },   { "SIGTTOU", SIGTTOU }, { "SIGURG", SIGURG },
         { "SIGUSR1", SIGUSR1 },   { "SIGUSR2", SIGUSR2 }, { "SIGVTALRM", SIGVTALRM },
         { "SIGWINCH", SIGWINCH }, { "SIGXCPU", SIGXCPU }, { "SIGXFSZ", SIGXFSZ },
-        { "SIGIO", SIGIO },       { "SIGIOT", SIGIOT },   { "SIGCLD", SIGCLD },
+        { "SIGIO", SIGIO },       { "SIGIOT", SIGIOT },
+#ifdef SIGCLD
+        { "SIGCLD", SIGCLD },
+#endif
     };
 
     auto it = sigMap.find(str);
