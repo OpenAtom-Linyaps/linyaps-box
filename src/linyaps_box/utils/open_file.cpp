@@ -27,7 +27,7 @@ namespace {
 auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
                       const std::filesystem::path &path,
                       int flag,
-                      uint mode) -> linyaps_box::utils::file_descriptor
+                      mode_t mode) -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "fallback openat " << path.c_str() << " at FD=" << root.get() << " with "
                         << linyaps_box::utils::inspect_fcntl_or_open_flags(

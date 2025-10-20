@@ -156,6 +156,8 @@ auto to_string(std::filesystem::file_type type) noexcept -> std::string_view
     case std::filesystem::file_type::unknown:
         return "Unknown";
     }
+
+    __builtin_unreachable();
 }
 
 } // namespace linyaps_box::utils

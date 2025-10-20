@@ -8,6 +8,8 @@
 
 #include <filesystem>
 
+#include <sys/types.h>
+
 namespace linyaps_box::utils {
 void mknodat(const file_descriptor &root,
              const std::filesystem::path &path,
