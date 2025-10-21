@@ -121,38 +121,42 @@ std::ostream &operator<<(std::ostream &os, const sync_message message)
 
 struct MountFlag
 {
-    // mount flag should be unsigned int due to MS_NOUSER (1U << 31)
     unsigned int flag;
     std::string_view name;
 };
 
-constexpr std::array<MountFlag, 27> mount_flags{ MountFlag{ MS_RDONLY, "MS_RDONLY" },
-                                                 { MS_NOSUID, "MS_NOSUID" },
-                                                 { MS_NODEV, "MS_NODEV" },
-                                                 { MS_NOEXEC, "MS_NOEXEC" },
-                                                 { MS_SYNCHRONOUS, "MS_SYNCHRONOUS" },
-                                                 { MS_REMOUNT, "MS_REMOUNT" },
-                                                 { MS_MANDLOCK, "MS_MANDLOCK" },
-                                                 { MS_DIRSYNC, "MS_DIRSYNC" },
-                                                 { LINGYAPS_MS_NOSYMFOLLOW, "MS_NOSYMFOLLOW" },
-                                                 { MS_NOATIME, "MS_NOATIME" },
-                                                 { MS_NODIRATIME, "MS_NODIRATIME" },
-                                                 { MS_BIND, "MS_BIND" },
-                                                 { MS_MOVE, "MS_MOVE" },
-                                                 { MS_REC, "MS_REC" },
-                                                 { MS_SILENT, "MS_SILENT" },
-                                                 { MS_POSIXACL, "MS_POSIXACL" },
-                                                 { MS_UNBINDABLE, "MS_UNBINDABLE" },
-                                                 { MS_PRIVATE, "MS_PRIVATE" },
-                                                 { MS_SLAVE, "MS_SLAVE" },
-                                                 { MS_SHARED, "MS_SHARED" },
-                                                 { MS_RELATIME, "MS_RELATIME" },
-                                                 { MS_KERNMOUNT, "MS_KERNMOUNT" },
-                                                 { MS_I_VERSION, "MS_I_VERSION" },
-                                                 { MS_STRICTATIME, "MS_STRICTATIME" },
-                                                 { MS_LAZYTIME, "MS_LAZYTIME" },
-                                                 { MS_ACTIVE, "MS_ACTIVE" },
-                                                 { MS_NOUSER, "MS_NOUSER" } };
+constexpr std::array<MountFlag, 27> mount_flags{
+    MountFlag{ MS_RDONLY, "MS_RDONLY" },
+    { MS_NOSUID, "MS_NOSUID" },
+    { MS_NODEV, "MS_NODEV" },
+    { MS_NOEXEC, "MS_NOEXEC" },
+    { MS_SYNCHRONOUS, "MS_SYNCHRONOUS" },
+    { MS_REMOUNT, "MS_REMOUNT" },
+    { MS_MANDLOCK, "MS_MANDLOCK" },
+    { MS_DIRSYNC, "MS_DIRSYNC" },
+    { LINGYAPS_MS_NOSYMFOLLOW, "MS_NOSYMFOLLOW" },
+    { MS_NOATIME, "MS_NOATIME" },
+    { MS_NODIRATIME, "MS_NODIRATIME" },
+    { MS_BIND, "MS_BIND" },
+    { MS_MOVE, "MS_MOVE" },
+    { MS_REC, "MS_REC" },
+    { MS_SILENT, "MS_SILENT" },
+    { MS_POSIXACL, "MS_POSIXACL" },
+    { MS_UNBINDABLE, "MS_UNBINDABLE" },
+    { MS_PRIVATE, "MS_PRIVATE" },
+    { MS_SLAVE, "MS_SLAVE" },
+    { MS_SHARED, "MS_SHARED" },
+    { MS_RELATIME, "MS_RELATIME" },
+    { MS_KERNMOUNT, "MS_KERNMOUNT" },
+    { MS_I_VERSION, "MS_I_VERSION" },
+    { MS_STRICTATIME, "MS_STRICTATIME" },
+    { MS_LAZYTIME, "MS_LAZYTIME" },
+    { MS_ACTIVE, "MS_ACTIVE" },
+    // MS_NOUSER will be overflowed before 2.42.9000
+    // refer:
+    // https://sourceware.org/git/?p=glibc.git;a=commitdiff;h=3263675250cbcbbcc76ede4f7c660418bd345a11;hp=cd335350021fd0b7ac533c83717ee38832fd9887
+    { static_cast<unsigned int>(MS_NOUSER), "MS_NOUSER" }
+};
 
 [[maybe_unused]] auto dump_mount_flags(unsigned long flags) noexcept -> std::string
 {
