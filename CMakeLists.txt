@@ -94,6 +94,12 @@ set(linyaps-box_ENABLE_CPM
     OFF
     CACHE BOOL "enable CPM")
 
+set(linyaps-box_HARDENING
+    ON
+    CACHE BOOL "enable hardening")
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 if(CMAKE_VERSION VERSION_LESS "3.14")
   set(linyaps-box_ENABLE_CPM OFF)
   message(
@@ -106,6 +112,17 @@ set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     CACHE BOOL "use local packages only")
 
 # ==============================================================================
+
+if (linyaps-box_HARDENING)
+  message(STATUS "applying harden settings")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie -Wl,-z,relro -Wl,-z,now")
+  add_compile_options(-fstack-protector-strong)
+
+  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Non-Debug build, enabling FORTIFY_SOURCE")
+    add_compile_definitions(_FORTIFY_SOURCE=2)
+  endif()
+endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
 set(linyaps-box_LIBRARY_SOURCE
