@@ -255,11 +255,12 @@ if(linyaps-box_ENABLE_CPM)
     NAME CLI11
     VERSION 2.5.0
     GITHUB_REPOSITORY CLIUtils/CLI11
-    GIT_TAG v2.5.0
+    GIT_TAG v2.6.1
     EXCLUDE_FROM_ALL ON
     OPTIONS "CLI11_BUILD_TESTS OFF")
 endif()
 
+# find minimal version
 find_package(nlohmann_json 3.11.3 QUIET)
 if(NOT nlohmann_json_FOUND)
   add_subdirectory(external/nlohmann_json)
