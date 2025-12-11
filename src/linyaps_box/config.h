@@ -35,15 +35,15 @@ struct config
 
     struct process_t
     {
-        bool terminal = false;
+        bool terminal{ false };
 
-        struct console_t
+        struct console_size_t
         {
-            uint height = 0;
-            uint width = 0;
+            unsigned short height{ 0 };
+            unsigned short width{ 0 };
         };
 
-        console_t console;
+        std::optional<console_size_t> console_size;
 
         std::filesystem::path cwd;
         std::vector<std::string> env;
@@ -87,6 +87,7 @@ struct config
             std::optional<std::vector<gid_t>> additional_gids;
         };
 
+        // TODO: user is optional
         user_t user;
     };
 
@@ -103,8 +104,8 @@ struct config
 
         struct namespace_t
         {
-            enum type_t {
-                INVALID = 0,
+            enum class type : unsigned int {
+                NONE = 0,
                 IPC = CLONE_NEWIPC,
                 UTS = CLONE_NEWUTS,
                 MOUNT = CLONE_NEWNS,
@@ -114,7 +115,7 @@ struct config
                 CGROUP = CLONE_NEWCGROUP,
             };
 
-            type_t type{ type_t::INVALID };
+            type type_{ type::NONE };
             std::optional<std::filesystem::path> path;
         };
 
@@ -150,12 +151,12 @@ struct config
 
     struct mount_t
     {
-        enum extension : std::uint8_t { COPY_SYMLINK = 1 };
+        enum class extension : std::uint8_t { NONE = 0, COPY_SYMLINK };
 
         std::optional<std::string> source;
         std::optional<std::filesystem::path> destination;
         std::string type;
-        std::uint8_t extra_flags{ 0 };
+        extension extension_flags{ 0 };
         unsigned long flags{ 0 };
         unsigned long propagation_flags{ 0 };
         std::string data;
@@ -174,4 +175,76 @@ struct config
     std::optional<std::unordered_map<std::string, std::string>> annotations;
 };
 
+std::string to_string(linyaps_box::config::linux_t::namespace_t::type type) noexcept;
+
 } // namespace linyaps_box
+
+constexpr linyaps_box::config::mount_t::extension
+operator|(linyaps_box::config::mount_t::extension lhs, linyaps_box::config::mount_t::extension rhs)
+{
+    return static_cast<linyaps_box::config::mount_t::extension>(
+            static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(lhs)
+            | static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(rhs));
+}
+
+constexpr linyaps_box::config::mount_t::extension
+operator&(linyaps_box::config::mount_t::extension lhs, linyaps_box::config::mount_t::extension rhs)
+{
+    return static_cast<linyaps_box::config::mount_t::extension>(
+            static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(lhs)
+            & static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(rhs));
+}
+
+constexpr linyaps_box::config::mount_t::extension &
+operator|=(linyaps_box::config::mount_t::extension &lhs,
+           linyaps_box::config::mount_t::extension rhs) noexcept
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+constexpr linyaps_box::config::mount_t::extension &
+operator&=(linyaps_box::config::mount_t::extension &lhs,
+           linyaps_box::config::mount_t::extension rhs) noexcept
+{
+    lhs = lhs & rhs;
+    return lhs;
+}
+
+constexpr linyaps_box::config::linux_t::namespace_t::type
+operator|(linyaps_box::config::linux_t::namespace_t::type lhs,
+          linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
+{
+    return static_cast<linyaps_box::config::linux_t::namespace_t::type>(
+            static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(
+                    lhs)
+            | static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(
+                    rhs));
+}
+
+constexpr linyaps_box::config::linux_t::namespace_t::type
+operator&(linyaps_box::config::linux_t::namespace_t::type lhs,
+          linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
+{
+    return static_cast<linyaps_box::config::linux_t::namespace_t::type>(
+            static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(
+                    lhs)
+            & static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(
+                    rhs));
+}
+
+constexpr linyaps_box::config::linux_t::namespace_t::type &
+operator|=(linyaps_box::config::linux_t::namespace_t::type &lhs,
+           linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+constexpr linyaps_box::config::linux_t::namespace_t::type &
+operator&=(linyaps_box::config::linux_t::namespace_t::type &lhs,
+           linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
+{
+    lhs = lhs & rhs;
+    return lhs;
+}

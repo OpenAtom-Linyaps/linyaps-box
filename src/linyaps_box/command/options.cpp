@@ -5,6 +5,7 @@
 #include "linyaps_box/command/options.h"
 
 #include "linyaps_box/config.h"
+#include "linyaps_box/utils/file.h"
 #include "linyaps_box/version.h"
 
 #include <CLI/CLI.hpp>
@@ -66,6 +67,26 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                         "Pass N additional file descriptors to the container")
             ->default_val(0);
 
+    auto socket_check = [](const std::string &str) {
+        try {
+            auto ret = utils::lstat(str);
+            if (!utils::is_type(ret.st_mode, std::filesystem::file_type::socket)) {
+                return "console-socket must be a socket";
+            }
+        } catch (const std::system_error &e) {
+            return e.what();
+        }
+
+        return "";
+    };
+
+    cmd_run->add_option("--console-socket",
+                        run_opt.console_socket,
+                        "Path to an unix socket that will receive the master end of the console's "
+                        "pseudoterminal")
+            ->type_name("SOCKET")
+            ->check(socket_check);
+
     exec_options exec_opt{ options.global };
     auto *cmd_exec = app.add_subcommand("exec", "Exec a command in a running container")
                              ->positionals_at_end();
@@ -86,6 +107,13 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                         return "";
                     },
                     "env_check");
+    cmd_exec->add_option("--console-socket",
+                         exec_opt.console_socket,
+                         "Path to an unix socket that will receive the master end of the console's "
+                         "pseudoterminal")
+            ->type_name("SOCKET")
+            ->check(socket_check);
+    cmd_exec->add_flag("--tty", exec_opt.tty, "Allocate a pseudo-TTY")->default_val(false);
     // TODO: enable capabilities and no_new_privs support after rewrite exec,
     //      cmd_exec->add_option("-c,--cap", options.exec.caps, "Set capabilities")
     //              ->check(

@@ -7,6 +7,7 @@
 #include "linyaps_box/cgroup_manager.h"
 #include "linyaps_box/container_ref.h"
 #include "linyaps_box/status_directory.h"
+#include "linyaps_box/unixsocket.h"
 #include "linyaps_box/utils/file_describer.h"
 
 namespace linyaps_box {
@@ -16,10 +17,15 @@ struct container_data;
 struct create_container_options_t
 {
     cgroup_manager_t manager;
-    int preserve_fds;
     std::string ID;
     std::filesystem::path bundle;
     std::filesystem::path config;
+};
+
+struct run_container_options_t
+{
+    int preserve_fds;
+    std::optional<unixSocketClient> console_socket;
 };
 
 class container final : public container_ref
@@ -34,7 +40,7 @@ public:
 
     [[nodiscard]] auto get_config() const -> const linyaps_box::config &;
     [[nodiscard]] auto get_bundle() const -> const std::filesystem::path &;
-    [[nodiscard]] auto run(const config::process_t &process) const -> int;
+    [[nodiscard]] auto run(run_container_options_t options) const -> int;
     // TODO:: support fully container capabilities, e.g. create, start, stop, delete...
     friend auto get_private_data(const container &c) noexcept -> container_data &;
     ~container() noexcept override;
@@ -43,11 +49,8 @@ public:
 
     [[nodiscard]] auto host_uid() const noexcept { return host_uid_; }
 
-    [[nodiscard]] auto preserve_fds() const noexcept { return preserve_fds_; }
-
 private:
     void cgroup_preenter(const cgroup_options &options, utils::file_descriptor &dirfd);
-    int preserve_fds_;
     gid_t host_gid_;
     uid_t host_uid_;
     container_data *data{ nullptr };

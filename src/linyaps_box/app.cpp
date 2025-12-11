@@ -9,20 +9,8 @@
 #include "linyaps_box/command/list.h"
 #include "linyaps_box/command/run.h"
 #include "linyaps_box/utils/log.h"
+#include "linyaps_box/utils/utils.h"
 #include "utils/log.h"
-
-namespace {
-
-template<typename... T>
-struct subCommand : T...
-{
-    using T::operator()...;
-};
-
-template<typename... T>
-subCommand(T...) -> subCommand<T...>;
-
-} // namespace
 
 namespace linyaps_box {
 
@@ -56,24 +44,24 @@ try {
         return opts.global.return_code;
     }
 
-    return std::visit(subCommand{ [](const command::list_options &options) {
-                                     command::list(options);
-                                     return 0;
-                                 },
-                                  [](const command::exec_options &options) -> int {
-                                      command::exec(options);
-                                      __builtin_unreachable();
-                                  },
-                                  [](const command::kill_options &options) {
-                                      command::kill(options);
-                                      return 0;
-                                  },
-                                  [](const command::run_options &options) {
-                                      return command::run(options);
-                                  },
-                                  [](const std::monostate &) {
-                                      return 0;
-                                  } },
+    return std::visit(utils::Overload{ [](const command::list_options &options) {
+                                          command::list(options);
+                                          return 0;
+                                      },
+                                       [](const command::exec_options &options) -> int {
+                                           command::exec(options);
+                                           __builtin_unreachable();
+                                       },
+                                       [](const command::kill_options &options) {
+                                           command::kill(options);
+                                           return 0;
+                                       },
+                                       [](const command::run_options &options) {
+                                           return command::run(options);
+                                       },
+                                       [](const std::monostate &) {
+                                           return 0;
+                                       } },
                       opts.subcommand_opt);
 } catch (const std::exception &e) {
     LINYAPS_BOX_ERR() << "Error: " << e.what();

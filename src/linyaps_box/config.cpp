@@ -13,8 +13,8 @@ namespace {
 
 // This function is used to parse the mount options from the config file and it only will be called
 // once.
-auto parse_mount_options(const std::vector<std::string> &options)
-        -> std::tuple<unsigned long, unsigned long, std::uint8_t, std::string>
+auto parse_mount_options(const std::vector<std::string> &options) -> std::
+        tuple<unsigned long, unsigned long, linyaps_box::config::mount_t::extension, std::string>
 {
     const std::unordered_map<std::string_view, unsigned long> propagation_flags_map{
         { "rprivate", MS_PRIVATE | MS_REC },       { "private", MS_PRIVATE },
@@ -62,12 +62,15 @@ auto parse_mount_options(const std::vector<std::string> &options)
         { "symfollow", LINGYAPS_MS_NOSYMFOLLOW },
     };
 
-    const std::unordered_map<std::string_view, std::uint8_t> extra_flags_map{
-        { "copy-symlink", linyaps_box::config::mount_t::COPY_SYMLINK }
-    };
+    const std::unordered_map<std::string_view, linyaps_box::config::mount_t::extension>
+            extra_flags_map{ { "copy-symlink",
+                               linyaps_box::config::mount_t::extension::COPY_SYMLINK } };
 
     unsigned long flags = 0;
-    std::uint8_t extra_flags = 0;
+    linyaps_box::config::mount_t::extension extra_flags{
+        linyaps_box::config::mount_t::extension::NONE
+    };
+
     unsigned long propagation_flags = 0;
     std::stringstream data;
 
@@ -209,19 +212,19 @@ auto parse_linux(const nlohmann::json &obj, const nlohmann::json::json_pointer &
             linyaps_box::config::linux_t::namespace_t n;
             auto type = json["type"].get<std::string>();
             if (type == "pid") {
-                n.type = linyaps_box::config::linux_t::namespace_t::type_t::PID;
+                n.type_ = linyaps_box::config::linux_t::namespace_t::type::PID;
             } else if (type == "network") {
-                n.type = linyaps_box::config::linux_t::namespace_t::type_t::NET;
+                n.type_ = linyaps_box::config::linux_t::namespace_t::type::NET;
             } else if (type == "ipc") {
-                n.type = linyaps_box::config::linux_t::namespace_t::type_t::IPC;
+                n.type_ = linyaps_box::config::linux_t::namespace_t::type::IPC;
             } else if (type == "uts") {
-                n.type = linyaps_box::config::linux_t::namespace_t::type_t::UTS;
+                n.type_ = linyaps_box::config::linux_t::namespace_t::type::UTS;
             } else if (type == "mount") {
-                n.type = linyaps_box::config::linux_t::namespace_t::type_t::MOUNT;
+                n.type_ = linyaps_box::config::linux_t::namespace_t::type::MOUNT;
             } else if (type == "user") {
-                n.type = linyaps_box::config::linux_t::namespace_t::type_t::USER;
+                n.type_ = linyaps_box::config::linux_t::namespace_t::type::USER;
             } else if (type == "cgroup") {
-                n.type = linyaps_box::config::linux_t::namespace_t::type_t::CGROUP;
+                n.type_ = linyaps_box::config::linux_t::namespace_t::type::CGROUP;
             } else {
                 throw std::runtime_error("unsupported namespace type: " + type);
             }
@@ -300,8 +303,10 @@ auto parse_1_2_0(const nlohmann::json &j) -> linyaps_box::config
 
         // https://github.com/opencontainers/runtime-spec/blob/09fcb39bb7185b46dfb206bc8f3fea914c674779/config.md?plain=1#L245
         if (cfg.process.terminal && j.contains(ptr / "process" / "consoleSize")) {
-            cfg.process.console.height = j[ptr / "process" / "consoleSize" / "height"].get<uint>();
-            cfg.process.console.width = j[ptr / "process" / "consoleSize" / "width"].get<uint>();
+            cfg.process.console_size = linyaps_box::config::process_t::console_size_t{
+                j[ptr / "process" / "consoleSize" / "height"].get<unsigned short>(),
+                j[ptr / "process" / "consoleSize" / "width"].get<unsigned short>()
+            };
         }
 
         cfg.process.cwd = j[ptr / "process" / "cwd"].get<std::string>();
@@ -427,7 +432,7 @@ auto parse_1_2_0(const nlohmann::json &j) -> linyaps_box::config
             const auto it = m.find("options");
             if (it != m.end()) {
                 auto options = it->get<std::vector<std::string>>();
-                std::tie(mount.flags, mount.propagation_flags, mount.extra_flags, mount.data) =
+                std::tie(mount.flags, mount.propagation_flags, mount.extension_flags, mount.data) =
                         parse_mount_options(options);
             }
 
@@ -464,4 +469,28 @@ linyaps_box::config linyaps_box::config::parse(std::istream &is)
 {
     auto j = nlohmann::json::parse(is);
     return parse_1_2_0(j);
+}
+
+std::string linyaps_box::to_string(linyaps_box::config::linux_t::namespace_t::type type) noexcept
+{
+    switch (type) {
+    case config::linux_t::namespace_t::type::NONE:
+        return "none";
+    case config::linux_t::namespace_t::type::IPC:
+        return "ipc";
+    case config::linux_t::namespace_t::type::UTS:
+        return "uts";
+    case config::linux_t::namespace_t::type::MOUNT:
+        return "mount";
+    case config::linux_t::namespace_t::type::PID:
+        return "pid";
+    case config::linux_t::namespace_t::type::NET:
+        return "net";
+    case config::linux_t::namespace_t::type::USER:
+        return "user";
+    case config::linux_t::namespace_t::type::CGROUP:
+        return "cgroup";
+    }
+
+    __builtin_unreachable();
 }

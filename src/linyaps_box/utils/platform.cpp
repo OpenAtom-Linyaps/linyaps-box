@@ -4,7 +4,11 @@
 
 #include "linyaps_box/utils/platform.h"
 
+#include "linyaps_box/utils/log.h"
+
+#include <climits> // IWYU pragma: keep
 #include <csignal>
+#include <cstring>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -67,4 +71,27 @@ auto str_to_rlimit(std::string_view str) -> int
 
     return it->second;
 }
+
+auto get_path_max(const std::filesystem::path &fs_dir) noexcept -> std::size_t
+{
+    errno = 0;
+    auto max = pathconf(fs_dir.c_str(), _PC_PATH_MAX);
+    if (max == -1) {
+        if (errno != 0) {
+            auto saved_errno = errno;
+            LINYAPS_BOX_WARNING() << "Failed to get pathconf: " << ::strerror(saved_errno)
+                                  << ", use default value";
+            errno = 0;
+        }
+#ifdef PATH_MAX
+        return PATH_MAX;
+#else
+        // Should we make the default value to be configured value?
+        return 4096;
+#endif
+    }
+
+    return static_cast<std::size_t>(max);
+}
+
 } // namespace linyaps_box::utils
