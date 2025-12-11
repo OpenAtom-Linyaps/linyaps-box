@@ -31,19 +31,18 @@ void linyaps_box::command::exec(const struct exec_options &options)
     if (options.caps) {
         const auto &caps = options.caps.value();
         auto transform_cap = [&caps](std::vector<cap_value_t> &cap_set) {
-            std::transform(caps.cbegin(),
-                           caps.cend(),
-                           std::back_inserter(cap_set),
-                           [](const std::string &cap) {
-                               cap_value_t val{ 0 };
-                               if (cap_from_name(cap.c_str(), &val) < 0) {
-                                   throw std::system_error(errno,
-                                                           std::generic_category(),
-                                                           "cap_from_name");
-                               }
+            std::transform(
+                    caps.cbegin(),
+                    caps.cend(),
+                    std::back_inserter(cap_set),
+                    [](const std::string &cap) {
+                        cap_value_t val{ 0 };
+                        if (cap_from_name(cap.c_str(), &val) < 0) {
+                            throw std::system_error(errno, std::system_category(), "cap_from_name");
+                        }
 
-                               return val;
-                           });
+                        return val;
+                    });
         };
 
         transform_cap(proc.capabilities.effective);

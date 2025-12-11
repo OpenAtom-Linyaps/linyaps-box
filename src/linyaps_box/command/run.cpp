@@ -14,11 +14,17 @@ auto linyaps_box::command::run(const struct run_options &options) -> int
             std::make_unique<impl::status_directory>(options.global_.get().root);
     runtime_t runtime(std::move(dir));
     const create_container_options_t create_container_options{ options.global_.get().manager,
-                                                               options.preserve_fds,
                                                                options.ID,
                                                                options.bundle,
                                                                options.config };
-
     auto container = runtime.create_container(create_container_options);
-    return container.run(container.get_config().process);
+
+    run_container_options_t run_options;
+    run_options.preserve_fds = options.preserve_fds;
+
+    if (container.get_config().process.terminal && !options.console_socket.empty()) {
+        run_options.console_socket = unixSocketClient::connect(options.console_socket);
+    }
+
+    return container.run(std::move(run_options));
 }

@@ -42,6 +42,7 @@ struct exec_options
     }
 
     bool no_new_privs;
+    bool tty;
     std::reference_wrapper<global_options> global_;
     std::vector<std::string> command;
     std::string user;
@@ -49,6 +50,7 @@ struct exec_options
     std::string ID;
     std::optional<std::string> cwd;
     std::optional<std::vector<std::string>> envs;
+    std::optional<std::string> console_socket;
 };
 
 struct run_options
@@ -62,7 +64,8 @@ struct run_options
     std::string ID;
     std::string bundle;
     std::string config;
-    int preserve_fds;
+    std::string console_socket;
+    int preserve_fds{};
 };
 
 struct kill_options

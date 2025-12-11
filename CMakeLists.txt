@@ -113,9 +113,10 @@ set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
 
 # ==============================================================================
 
-if (linyaps-box_HARDENING)
+if(linyaps-box_HARDENING)
   message(STATUS "applying harden settings")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie -Wl,-z,relro -Wl,-z,now")
+  set(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} -pie -Wl,-z,relro -Wl,-z,now")
   add_compile_options(-fstack-protector-strong)
 
   if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -160,12 +161,20 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/impl/table_printer.h
     src/linyaps_box/interface.cpp
     src/linyaps_box/interface.h
+    src/linyaps_box/io/epoll.cpp
+    src/linyaps_box/io/epoll.h
+    src/linyaps_box/io/forwarder.cpp
+    src/linyaps_box/io/forwarder.h
     src/linyaps_box/printer.cpp
     src/linyaps_box/printer.h
     src/linyaps_box/runtime.cpp
     src/linyaps_box/runtime.h
     src/linyaps_box/status_directory.cpp
     src/linyaps_box/status_directory.h
+    src/linyaps_box/terminal.cpp
+    src/linyaps_box/terminal.h
+    src/linyaps_box/unixsocket.cpp
+    src/linyaps_box/unixsocket.h
     src/linyaps_box/utils/atomic_write.cpp
     src/linyaps_box/utils/atomic_write.h
     src/linyaps_box/utils/cgroups.cpp
@@ -173,30 +182,41 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/close_range.cpp
     src/linyaps_box/utils/close_range.h
     src/linyaps_box/utils/defer.h
+    src/linyaps_box/utils/epoll.cpp
+    src/linyaps_box/utils/epoll.h
+    src/linyaps_box/utils/file.cpp
     src/linyaps_box/utils/file_describer.cpp
     src/linyaps_box/utils/file_describer.h
-    src/linyaps_box/utils/fstat.cpp
-    src/linyaps_box/utils/fstat.h
+    src/linyaps_box/utils/file.h
     src/linyaps_box/utils/inspect.cpp
     src/linyaps_box/utils/inspect.h
+    src/linyaps_box/utils/ioctl.h
     src/linyaps_box/utils/log.cpp
     src/linyaps_box/utils/log.h
     src/linyaps_box/utils/mkdir.cpp
     src/linyaps_box/utils/mkdir.h
     src/linyaps_box/utils/mknod.cpp
     src/linyaps_box/utils/mknod.h
-    src/linyaps_box/utils/open_file.cpp
-    src/linyaps_box/utils/open_file.h
     src/linyaps_box/utils/platform.cpp
     src/linyaps_box/utils/platform.h
+    src/linyaps_box/utils/process.cpp
+    src/linyaps_box/utils/process.h
+    src/linyaps_box/utils/ringbuffer.cpp
+    src/linyaps_box/utils/ringbuffer.h
     src/linyaps_box/utils/semver.cpp
     src/linyaps_box/utils/semver.h
-    src/linyaps_box/utils/socketpair.cpp
-    src/linyaps_box/utils/socketpair.h
+    src/linyaps_box/utils/session.cpp
+    src/linyaps_box/utils/session.h
+    src/linyaps_box/utils/signal.cpp
+    src/linyaps_box/utils/signal.h
+    src/linyaps_box/utils/socket.cpp
+    src/linyaps_box/utils/socket.h
+    src/linyaps_box/utils/span.h
     src/linyaps_box/utils/symlink.cpp
     src/linyaps_box/utils/symlink.h
-    src/linyaps_box/utils/touch.cpp
-    src/linyaps_box/utils/touch.h)
+    src/linyaps_box/utils/terminal.cpp
+    src/linyaps_box/utils/terminal.h
+    src/linyaps_box/utils/utils.h)
 
 set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
 
@@ -240,7 +260,7 @@ if(linyaps-box_ENABLE_CPM)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
   include(CPM)
 
-  if (linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
+  if(linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
     set(CPM_USE_LOCAL_PACKAGES ON)
   endif()
 

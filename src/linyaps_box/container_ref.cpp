@@ -35,7 +35,7 @@ void linyaps_box::container_ref::kill(int signal) const
 
     std::stringstream ss;
     ss << "failed to kill process " << pid << " with signal " << signal;
-    throw std::system_error(errno, std::generic_category(), std::move(ss).str());
+    throw std::system_error(errno, std::system_category(), std::move(ss).str());
 }
 
 void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &process)
@@ -49,6 +49,7 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
         "--user",
         "--mount",
         "--pid",
+        "--no-fork",
         // FIXME:
         // Old nsenter command do not support --wdns,
         // so we have to implement nsenter by ourself in the future.
@@ -103,7 +104,7 @@ void linyaps_box::container_ref::exec(const linyaps_box::config::process_t &proc
         ss << " " << arg;
     }
 
-    throw std::system_error(errno, std::generic_category(), std::move(ss).str());
+    throw std::system_error(errno, std::system_category(), std::move(ss).str());
 }
 
 const linyaps_box::status_directory &linyaps_box::container_ref::status_dir() const
