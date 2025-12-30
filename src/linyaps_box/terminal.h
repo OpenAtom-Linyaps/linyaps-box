@@ -70,8 +70,8 @@ public:
     auto set_raw() -> void;
 
 private:
-    std::optional<struct termios> termios;
     utils::file_descriptor slave_;
+    std::optional<struct termios> termios;
 };
 
 auto create_pty_pair() -> std::pair<terminal_master, terminal_slave>;

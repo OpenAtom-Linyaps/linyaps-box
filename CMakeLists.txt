@@ -147,6 +147,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/config.h
     src/linyaps_box/container.cpp
     src/linyaps_box/container.h
+    src/linyaps_box/container_monitor.cpp
+    src/linyaps_box/container_monitor.h
     src/linyaps_box/container_ref.cpp
     src/linyaps_box/container_ref.h
     src/linyaps_box/container_status.cpp

@@ -21,7 +21,10 @@ auto epoll_wait(const linyaps_box::utils::file_descriptor &efd,
                 int timeout) -> uint
 {
     while (true) {
-        auto ret = ::epoll_wait(efd.get(), events.data(), static_cast<int>(events.size()), timeout);
+        auto ret = ::epoll_wait(efd.get(),
+                                events.data(),
+                                static_cast<int>(events.capacity()),
+                                timeout);
         if (ret < 0) {
             if (errno == EINTR) {
                 continue;

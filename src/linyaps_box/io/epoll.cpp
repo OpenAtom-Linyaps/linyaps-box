@@ -11,11 +11,11 @@ namespace linyaps_box::io {
 Epoll::Epoll(linyaps_box::utils::file_descriptor &&fd)
     : epoll_fd{ std::move(fd) }
 {
-    events_buffer.resize(10);
+    events_buffer.reserve(16);
 }
 
 Epoll::Epoll(bool close_on_exec)
-    : epoll_fd{ linyaps_box::utils::epoll_create1(close_on_exec ? EPOLL_CLOEXEC : 0) }
+    : Epoll(linyaps_box::utils::epoll_create1(close_on_exec ? EPOLL_CLOEXEC : 0))
 {
 }
 
@@ -38,11 +38,6 @@ auto Epoll::add(const utils::file_descriptor &fd, uint32_t events) -> bool
         throw;
     }
 
-    if (events_buffer.size() == events_buffer.capacity()) {
-        events_buffer.reserve(events_buffer.capacity() * 2);
-    }
-
-    events_buffer.resize(events_buffer.size() + 1);
     return true;
 }
 

@@ -4,9 +4,8 @@
 
 #include "linyaps_box/container.h"
 
+#include "linyaps_box/container_monitor.h"
 #include "linyaps_box/impl/disabled_cgroup_manager.h"
-#include "linyaps_box/io/epoll.h"
-#include "linyaps_box/io/forwarder.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/unixsocket.h"
 #include "linyaps_box/utils/cgroups.h"
@@ -2344,136 +2343,6 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
     }
 }
 
-struct wait_process_ctx
-{
-    pid_t pid{ -1 };
-    std::optional<linyaps_box::terminal_master> master;
-    std::optional<linyaps_box::terminal_slave> host_tty;
-    linyaps_box::utils::file_descriptor in;
-    linyaps_box::utils::file_descriptor out;
-};
-
-[[nodiscard]] int wait_container_process(wait_process_ctx ctx)
-{
-    LINYAPS_BOX_DEBUG() << "Wait container process: " << ctx.pid;
-
-    sigset_t set;
-    linyaps_box::utils::sigfillset(set);
-    linyaps_box::utils::sigprocmask(SIG_BLOCK, set, nullptr);
-    auto signalfd = linyaps_box::utils::create_signalfd(set);
-
-    int exit_code{ 0 };
-    bool child_exited{ false };
-
-    // try to reap child process. Child process may exit before we create signalfd and it wouldn't
-    // receive SIGCHLD anymore. If we don't do this, the child process (or its children) will be
-    // zombie process
-    auto ret = linyaps_box::utils::waitpid(ctx.pid, WNOHANG);
-
-    if (ret.status == linyaps_box::utils::WaitStatus::Reaped) {
-        child_exited = true;
-        exit_code = WIFSIGNALED(ret.exit_code) ? 128 + WTERMSIG(ret.exit_code)
-                                               : WEXITSTATUS(ret.exit_code);
-    } else if (ret.status == linyaps_box::utils::WaitStatus::NoChild) {
-        throw std::runtime_error("target pid " + std::to_string(ctx.pid) + " is not a child");
-    }
-
-    linyaps_box::io::Epoll epoll;
-    auto signalfd_pollable = epoll.add(signalfd, EPOLLIN);
-    assert(signalfd_pollable);
-    if (UNLIKELY(!signalfd_pollable)) {
-        throw std::runtime_error("failed to add signalfd to epoll");
-    }
-
-    constexpr auto buffer_size = 256 * 1024;
-    std::optional<linyaps_box::utils::file_descriptor> master_out;
-    std::optional<linyaps_box::io::Forwarder> in_fwd;
-    std::optional<linyaps_box::io::Forwarder> out_fwd;
-
-    if (ctx.master) {
-        master_out = ctx.master->get().duplicate();
-        master_out->set_nonblock(true);
-
-        if (!child_exited) {
-            in_fwd.emplace(epoll, buffer_size);
-            in_fwd->set_src(ctx.in);
-            in_fwd->set_dst(ctx.master->get());
-        }
-
-        out_fwd.emplace(epoll, buffer_size);
-        out_fwd->set_src(master_out.value());
-        out_fwd->set_dst(ctx.out);
-    }
-
-    auto handle_signal = [&] {
-        struct signalfd_siginfo info{};
-        if (signalfd.read(info) != linyaps_box::unixSocketClient::IOStatus::Success) {
-            return;
-        }
-
-        if (info.ssi_signo == SIGCHLD) {
-            auto res = linyaps_box::utils::waitpid(ctx.pid, WNOHANG);
-            if (res.status == linyaps_box::utils::WaitStatus::Reaped) {
-                child_exited = true;
-                in_fwd.reset();
-                exit_code = WIFSIGNALED(res.exit_code) ? 128 + WTERMSIG(res.exit_code)
-                                                       : WEXITSTATUS(res.exit_code);
-            }
-        } else if (info.ssi_signo == SIGWINCH && ctx.master) {
-            ctx.master->resize(ctx.host_tty->get_size());
-        } else if (!child_exited) {
-            kill(ctx.pid, info.ssi_signo);
-        }
-    };
-
-    while (!child_exited || out_fwd) {
-        bool keep_pumping{ false };
-
-        if (in_fwd) {
-            auto s = in_fwd->handle_forwarding();
-            if (s == linyaps_box::io::Forwarder::Status::Finished) {
-                in_fwd.reset();
-            } else if (s == linyaps_box::io::Forwarder::Status::Busy
-                       && !in_fwd->is_src_pollable()) {
-                keep_pumping = true;
-            }
-        }
-
-        if (out_fwd) {
-            auto s = out_fwd->handle_forwarding();
-            if (s == linyaps_box::io::Forwarder::Status::Finished) {
-                out_fwd.reset();
-            } else if (s == linyaps_box::io::Forwarder::Status::Busy
-                       && !out_fwd->is_dst_pollable()) {
-                keep_pumping = true;
-            }
-        }
-
-        const auto &events = epoll.wait(keep_pumping ? 0 : -1);
-        for (const auto &ev : events) {
-            if (ev.data.fd == signalfd.get()) {
-                handle_signal();
-                if (child_exited) {
-                    break;
-                }
-
-                continue;
-            }
-        }
-
-        if (child_exited && out_fwd) {
-            auto status = out_fwd->handle_forwarding();
-            if (status == linyaps_box::io::Forwarder::Status::Finished) {
-                out_fwd.reset();
-            } else if (status == linyaps_box::io::Forwarder::Status::Busy) {
-                keep_pumping = true;
-            }
-        }
-    }
-
-    return exit_code;
-}
-
 } // namespace runtime_ns
 
 } // namespace
@@ -2576,6 +2445,10 @@ int linyaps_box::container::run(run_container_options_t options) const
         // TODO: cgroup preenter
         auto [child_pid, socket] = runtime_ns::start_container_process(*this, options);
 
+        auto in = utils::file_descriptor{ utils::fileno(stdin), false };
+        auto out = utils::file_descriptor{ utils::fileno(stdout), false };
+        container_monitor monitor(child_pid);
+
         {
             auto status = this->status();
             assert(status.status == container_status_t::runtime_status::CREATING);
@@ -2589,15 +2462,36 @@ int linyaps_box::container::run(run_container_options_t options) const
         runtime_ns::create_runtime_hooks(*this, socket);
         runtime_ns::wait_create_container_result(*this, socket);
 
-        auto master = [&recv_socketpair]() -> std::optional<linyaps_box::terminal_master> {
+        auto host_tty = [&recv_socketpair, &monitor, &in, &out]() -> std::optional<terminal_slave> {
             if (!recv_socketpair) {
                 return std::nullopt;
             }
 
-            auto ret = runtime_ns::recv_master_tty(recv_socketpair.value());
+            LINYAPS_BOX_DEBUG() << "Container requires a terminal";
+
+            auto master = runtime_ns::recv_master_tty(recv_socketpair.value());
             recv_socketpair->release();
-            return ret;
+
+            in.set_nonblock(true);
+            out.set_nonblock(true);
+
+            std::optional<terminal_slave> host_tty;
+            if (utils::isatty(in)) {
+                host_tty.emplace(in.duplicate());
+            } else if (utils::isatty(out)) {
+                host_tty.emplace(out.duplicate());
+            } else {
+                auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
+                host_tty.emplace(std::move(default_tty));
+            }
+
+            host_tty->set_raw();
+            monitor.enable_io_forwarding(std::move(master), in, out);
+
+            return host_tty;
         }();
+
+        monitor.enable_signal_forwarding(std::move(host_tty));
 
         runtime_ns::wait_socket_close(socket);
 
@@ -2613,35 +2507,7 @@ int linyaps_box::container::run(run_container_options_t options) const
 
         // TODO: support detach from the parent's process
         // Now we wait for the container process to exit
-        runtime_ns::wait_process_ctx ctx;
-        ctx.pid = this->status().PID;
-
-        if (master) {
-            LINYAPS_BOX_DEBUG() << "Container requires a terminal";
-
-            master->get().set_nonblock(true);
-
-            ctx.in = utils::file_descriptor{ utils::fileno(stdin), false };
-            ctx.in.set_nonblock(true);
-
-            ctx.out = utils::file_descriptor{ utils::fileno(stdout), false };
-            ctx.out.set_nonblock(true);
-
-            if (utils::isatty(ctx.in)) {
-                ctx.host_tty = linyaps_box::terminal_slave{ ctx.in.duplicate() };
-                ctx.host_tty->set_raw();
-            } else if (utils::isatty(ctx.out)) {
-                ctx.host_tty = linyaps_box::terminal_slave{ ctx.out.duplicate() };
-                ctx.host_tty->set_raw();
-            } else {
-                auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
-                ctx.host_tty = linyaps_box::terminal_slave{ std::move(default_tty) };
-            }
-        }
-
-        ctx.master = std::move(master);
-
-        container_process_exit_code = runtime_ns::wait_container_process(std::move(ctx));
+        container_process_exit_code = monitor.wait_container_exit();
 
         runtime_ns::poststop_hooks(*this);
     } catch (const std::system_error &e) {
