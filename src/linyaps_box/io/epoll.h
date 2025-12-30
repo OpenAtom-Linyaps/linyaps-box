@@ -30,8 +30,8 @@ public:
     auto wait(int timeout) -> const std::vector<struct epoll_event> &;
 
 private:
-    std::vector<struct epoll_event> events_buffer;
     linyaps_box::utils::file_descriptor epoll_fd;
+    std::vector<struct epoll_event> events_buffer;
 };
 
 } // namespace linyaps_box::io

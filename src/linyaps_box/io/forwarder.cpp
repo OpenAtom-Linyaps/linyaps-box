@@ -5,7 +5,6 @@
 #include "linyaps_box/io/forwarder.h"
 
 #include "linyaps_box/utils/log.h"
-#include "linyaps_box/utils/utils.h"
 
 namespace linyaps_box::io {
 
@@ -24,122 +23,136 @@ auto Forwarder::set_src(const utils::file_descriptor &src) -> void
     src_.last_events = src_.pollable ? ev : 0;
 
     LINYAPS_BOX_DEBUG() << "Forwarder: Source fd: " << src_.fd->get()
-                        << ", pollable: " << src_.pollable;
+                        << ", pollable: " << std::boolalpha << src_.pollable;
 }
 
 auto Forwarder::set_dst(const utils::file_descriptor &dst) -> void
 {
     dst_.fd = &dst;
-    const auto ev = EPOLLOUT | EPOLLET;
+    const auto ev = EPOLLET;
 
     dst_.pollable = poller.get().add(*dst_.fd, ev);
     dst_.last_events = dst_.pollable ? ev : 0;
 
     LINYAPS_BOX_DEBUG() << "Forwarder: Destination fd: " << dst_.fd->get()
-                        << ", pollable: " << dst_.pollable;
+                        << ", pollable: " << std::boolalpha << dst_.pollable;
 }
 
-auto Forwarder::handle_forwarding() -> Status
+auto Forwarder::pull() -> Status
 {
-    if (UNLIKELY((src_.fd == nullptr) || (dst_.fd == nullptr))) {
-        throw std::runtime_error("src or dst is not set");
+    if (src_eof) {
+        return rb->empty() ? Status::Finished : Status::Blocked;
     }
 
-    bool moved{ false };
+    if (rb->full()) {
+        return Status::Blocked;
+    }
+
+    last_pull_again = false;
+    while (!rb->full()) {
+        auto vecs = rb->get_write_vecs();
+        const auto iov_cnt = (vecs[1].iov_len > 0) ? 2U : 1U;
+
+        std::size_t bytes_read{ 0 };
+        auto status = src_.fd->read_vecs({ vecs.data(), iov_cnt }, bytes_read);
+
+        if (bytes_read > 0) {
+            rb->advance_tail(bytes_read);
+        }
+
+        if (status == utils::file_descriptor::IOStatus::TryAgain) {
+            last_pull_again = true;
+            break;
+        }
+
+        if (status != utils::file_descriptor::IOStatus::Success) {
+            src_eof = true;
+            update_event(src_, false);
+            break;
+        }
+
+        if (!src_.pollable) {
+            break;
+        }
+    }
+
+    if (!src_eof && !rb->full() && !last_pull_again) {
+        return Status::Continue;
+    }
+
+    return Status::Blocked;
+}
+
+auto Forwarder::push() -> Status
+{
+    if (rb->empty()) {
+        return src_eof ? Status::Finished : Status::Blocked;
+    }
+
+    last_push_again = false;
     while (!rb->empty()) {
         auto vecs = rb->get_read_vecs();
         const auto iov_cnt = (vecs[1].iov_len > 0) ? 2U : 1U;
 
-        std::size_t bytes_written{ 0 };
-        auto status = dst_.fd->write_vecs({ vecs.data(), iov_cnt }, bytes_written);
+        std::size_t bytes_write{ 0 };
+        auto status = dst_.fd->write_vecs({ vecs.data(), iov_cnt }, bytes_write);
 
-        if (bytes_written > 0) {
-            rb->advance_head(bytes_written);
-            moved = true;
+        if (bytes_write > 0) {
+            rb->advance_head(bytes_write);
         }
 
-        if (status == utils::file_descriptor::IOStatus::Success) {
-            if (bytes_written == 0) {
-                break;
-            }
-
-            const std::size_t requested = vecs[0].iov_len + vecs[1].iov_len;
-            if (bytes_written < requested) {
-                break;
-            }
-
-            continue;
+        if (status == utils::file_descriptor::IOStatus::TryAgain) {
+            last_push_again = true;
+            update_event(dst_, true);
+            break;
         }
 
-        if (status == utils::file_descriptor::IOStatus::Closed) {
+        if (status != utils::file_descriptor::IOStatus::Success) {
             return Status::Finished;
         }
 
-        break;
-    }
-
-    if (!src_eof) {
-        while (!rb->full()) {
-            auto vecs = rb->get_write_vecs();
-            const auto iov_cnt = (vecs[1].iov_len > 0) ? 2U : 1U;
-
-            std::size_t bytes_read{ 0 };
-            auto status = src_.fd->read_vecs({ vecs.data(), iov_cnt }, bytes_read);
-
-            if (bytes_read > 0) {
-                rb->advance_tail(bytes_read);
-                moved = true;
-            }
-
-            if (status == utils::file_descriptor::IOStatus::Eof
-                || status == utils::file_descriptor::IOStatus::Closed) {
-                src_eof = true;
-                break;
-            }
-
-            if (status == utils::file_descriptor::IOStatus::Success) {
-                if (bytes_read == 0) {
-                    break;
-                }
-
-                const std::size_t requested = vecs[0].iov_len + vecs[1].iov_len;
-                if (bytes_read < requested) {
-                    break;
-                }
-
-                continue;
-            }
-
-            if (status == utils::file_descriptor::IOStatus::TryAgain) {
-                break;
-            }
+        if (!dst_.pollable) {
+            break;
         }
     }
 
-    update_interests();
-
-    if (src_eof) {
-        return rb->empty() ? Status::Finished : Status::SourceClosed;
+    if (src_eof && rb->empty()) {
+        return Status::Finished;
     }
 
-    return moved ? Status::Busy : Status::Idle;
+    if (!rb->empty() && !last_push_again) {
+        return Status::Continue;
+    }
+
+    if (rb->empty()) {
+        update_event(dst_, false);
+    }
+
+    return Status::Blocked;
 }
 
-auto Forwarder::update_interests() -> void
+auto Forwarder::update_event(FdContext &ctx, bool on) -> void
 {
-    auto update = [this](FdContext &ctx, uint32_t next) {
-        if (!ctx.pollable) {
-            return;
-        }
+    if (!ctx.pollable) {
+        return;
+    }
 
-        if (ctx.last_events != next) {
-            this->poller.get().modify(*ctx.fd, next);
-            ctx.last_events = next;
-        }
-    };
+    uint32_t new_events = EPOLLET;
 
-    update(src_, (src_eof || rb->full()) ? 0 : (EPOLLIN | EPOLLET));
-    update(dst_, rb->empty() ? 0 : (EPOLLOUT | EPOLLET));
+    if (ctx.fd == src_.fd) {
+        if (on) {
+            new_events |= EPOLLIN;
+        }
+    } else if (ctx.fd == dst_.fd) {
+        if (on) {
+            new_events |= EPOLLOUT;
+        }
+    }
+
+    if (ctx.last_events != new_events) {
+        poller.get().modify(*ctx.fd, new_events);
+        ctx.last_events = new_events;
+    }
 }
 
 Forwarder::~Forwarder() noexcept

@@ -13,7 +13,7 @@ namespace linyaps_box::io {
 class Forwarder
 {
 public:
-    enum class Status : uint8_t { Busy, Idle, SourceClosed, Finished };
+    enum class Status : uint8_t { Continue, Blocked, Finished };
 
     explicit Forwarder(Epoll &poller, std::size_t buffer_size = BUFSIZ);
 
@@ -26,25 +26,30 @@ public:
 
     auto set_src(const utils::file_descriptor &src) -> void;
 
+    [[nodiscard]] auto src() const -> const utils::file_descriptor & { return *src_.fd; }
+
     auto set_dst(const utils::file_descriptor &dst) -> void;
 
-    [[nodiscard]] auto is_src_pollable() const noexcept -> bool { return src_.pollable; };
+    [[nodiscard]] auto dst() const -> const utils::file_descriptor & { return *dst_.fd; }
 
-    [[nodiscard]] auto is_dst_pollable() const noexcept -> bool { return dst_.pollable; }
+    auto pull() -> Status;
 
-    [[nodiscard]] auto handle_forwarding() -> Status;
+    [[nodiscard]] auto push() -> Status;
 
 private:
     struct FdContext
     {
         const utils::file_descriptor *fd{ nullptr };
-        uint32_t last_events{ std::numeric_limits<uint32_t>::max() };
+        uint32_t last_events{ 0 };
         bool pollable{ false };
     };
 
-    void update_interests();
+    auto update_event(FdContext &ctx, bool on) -> void;
 
     bool src_eof{ false };
+    bool last_pull_again{ false };
+    bool last_push_again{ false };
+
     std::reference_wrapper<Epoll> poller;
     FdContext src_;
     FdContext dst_;
