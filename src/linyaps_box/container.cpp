@@ -1665,7 +1665,7 @@ void configure_terminal(const linyaps_box::container &container,
     }
 
     if (process.console_size) {
-        slave.set_size({ process.console_size->height, process.console_size->height, 0, 0 });
+        slave.set_size({ process.console_size->height, process.console_size->width, 0, 0 });
     }
 
     auto root = linyaps_box::utils::open("/", O_PATH | O_CLOEXEC | O_DIRECTORY);
