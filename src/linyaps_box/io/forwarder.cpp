@@ -29,7 +29,7 @@ auto Forwarder::set_src(const utils::file_descriptor &src) -> void
 auto Forwarder::set_dst(const utils::file_descriptor &dst) -> void
 {
     dst_.fd = &dst;
-    const auto ev = EPOLLET;
+    const uint32_t ev = EPOLLET;
 
     dst_.pollable = poller.get().add(*dst_.fd, ev);
     dst_.last_events = dst_.pollable ? ev : 0;

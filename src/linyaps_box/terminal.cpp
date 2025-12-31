@@ -33,8 +33,8 @@ auto terminal_master::resize(struct winsize size) -> void
 }
 
 terminal_slave::terminal_slave(terminal_slave &&other) noexcept
-    : termios(std::exchange(other.termios, std::nullopt))
-    , slave_(std::move(other.slave_))
+    : slave_(std::move(other.slave_))
+    , termios(std::exchange(other.termios, std::nullopt))
 {
 }
 
