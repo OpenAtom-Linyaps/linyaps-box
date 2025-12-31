@@ -15,7 +15,8 @@ set(linyaps-box_SMOKE_TESTS
     ./10-check-oom.json
     ./11-output-to-null.json
     ./12-bind-host-dev.json
-    ./13-pid-extension.json)
+    ./13-pid-extension.json
+    ./14-console-size.json)
 
 foreach(test ${linyaps-box_SMOKE_TESTS})
   add_test(

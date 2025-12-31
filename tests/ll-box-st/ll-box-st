@@ -202,7 +202,7 @@ function run_test() {
 	log "[INFO] ==== COMMAND OUTPUT START ===="
 	local REAL
 	REAL="$(
-		LINYAPS_BOX_LOG_FORCE_STDERR=1 "${TEST_COMMAND[@]}" </dev/null | tr -d '\r' && :
+	 LINYAPS_BOX_LOG_LEVEL=6 LINYAPS_BOX_LOG_FORCE_STDERR=1 "${TEST_COMMAND[@]}" </dev/null | tr -d '\r' && :
 	)" && :
 	EXIT_CODE=$?
 	log "[INFO] ==== COMMAND OUTPUT END ======"
