@@ -7,8 +7,16 @@
 #include "linyaps_box/config.h"
 #include "linyaps_box/container_status.h"
 #include "linyaps_box/status_directory.h"
+#include "linyaps_box/unixsocket.h"
 
 namespace linyaps_box {
+
+struct exec_container_option
+{
+    int preserve_fds;
+    config::process_t proc;
+    std::optional<unixSocketClient> console_socket;
+};
 
 class container_ref
 {
@@ -23,7 +31,7 @@ public:
 
     [[nodiscard]] auto status() const -> container_status_t;
     void kill(int signal) const;
-    [[noreturn]] void exec(const config::process_t &process);
+    [[nodiscard]] auto exec(exec_container_option option) -> int;
 
 protected:
     [[nodiscard]] auto status_dir() const -> const status_directory &;

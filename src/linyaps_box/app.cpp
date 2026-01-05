@@ -49,8 +49,7 @@ try {
                                           return 0;
                                       },
                                        [](const command::exec_options &options) -> int {
-                                           command::exec(options);
-                                           __builtin_unreachable();
+                                           return command::exec(options);
                                        },
                                        [](const command::kill_options &options) {
                                            command::kill(options);

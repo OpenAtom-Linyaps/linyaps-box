@@ -36,13 +36,13 @@ struct list_options
 struct exec_options
 {
     explicit exec_options(global_options &global)
-        : no_new_privs(false)
-        , global_(global)
+        : global_(global)
     {
     }
 
-    bool no_new_privs;
-    bool tty;
+    bool no_new_privs{ false };
+    bool tty{ false };
+    int preserve_fds{ 0 };
     std::reference_wrapper<global_options> global_;
     std::vector<std::string> command;
     std::string user;
@@ -64,8 +64,8 @@ struct run_options
     std::string ID;
     std::string bundle;
     std::string config;
-    std::string console_socket;
-    int preserve_fds{};
+    std::optional<std::string> console_socket;
+    int preserve_fds{ 0 };
 };
 
 struct kill_options

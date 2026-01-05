@@ -8,7 +8,7 @@
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory.h"
 
-void linyaps_box::command::exec(const struct exec_options &options)
+auto linyaps_box::command::exec(const struct exec_options &options) -> int
 {
     std::unique_ptr<status_directory> dir =
             std::make_unique<impl::status_directory>(options.global_.get().root);
@@ -20,12 +20,17 @@ void linyaps_box::command::exec(const struct exec_options &options)
         throw std::runtime_error("container not found");
     }
 
-    config::process_t proc;
-    proc.cwd = options.cwd.value_or("/");
-    proc.args = options.command;
-    proc.terminal = isatty(STDIN_FILENO) == 1 && isatty(STDOUT_FILENO) == 1;
-    proc.no_new_privileges = options.no_new_privs;
-    proc.env = options.envs.value_or(std::vector<std::string>{});
+    exec_container_option option;
+    option.proc.cwd = options.cwd.value_or("/");
+    option.proc.args = options.command;
+    option.proc.terminal = options.tty;
+    option.proc.no_new_privileges = options.no_new_privs;
+    option.proc.env = options.envs.value_or(std::vector<std::string>{});
+    option.preserve_fds = options.preserve_fds;
+
+    if (option.proc.terminal && options.console_socket) {
+        option.console_socket = unixSocketClient::connect(options.console_socket.value());
+    }
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
     if (options.caps) {
@@ -45,14 +50,14 @@ void linyaps_box::command::exec(const struct exec_options &options)
                     });
         };
 
-        transform_cap(proc.capabilities.effective);
-        transform_cap(proc.capabilities.ambient);
-        transform_cap(proc.capabilities.bounding);
-        transform_cap(proc.capabilities.permitted);
+        transform_cap(option.proc.capabilities.effective);
+        transform_cap(option.proc.capabilities.ambient);
+        transform_cap(option.proc.capabilities.bounding);
+        transform_cap(option.proc.capabilities.permitted);
     }
 #endif
 
     // TODO: support exec fully
 
-    container->second.exec(proc);
+    return container->second.exec(std::move(option));
 }
