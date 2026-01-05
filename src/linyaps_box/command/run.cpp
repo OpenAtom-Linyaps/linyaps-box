@@ -22,8 +22,8 @@ auto linyaps_box::command::run(const struct run_options &options) -> int
     run_container_options_t run_options;
     run_options.preserve_fds = options.preserve_fds;
 
-    if (container.get_config().process.terminal && !options.console_socket.empty()) {
-        run_options.console_socket = unixSocketClient::connect(options.console_socket);
+    if (container.get_config().process.terminal && options.console_socket) {
+        run_options.console_socket = unixSocketClient::connect(options.console_socket.value());
     }
 
     return container.run(std::move(run_options));

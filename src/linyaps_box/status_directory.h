@@ -10,6 +10,7 @@
 #include <vector>
 
 namespace linyaps_box {
+// TODO: place container status into a directory
 class status_directory : public virtual interface
 {
 protected:

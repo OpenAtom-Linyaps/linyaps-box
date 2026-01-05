@@ -96,24 +96,27 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                          "for example `1000` for UID=1000 "
                          "or `1000:1000` for UID=1000 and GID=1000")
             ->type_name("UID[:GID]");
-    cmd_exec->add_option("--cwd", exec_opt.cwd, "Current working directory.");
+    cmd_exec->add_option("--cwd", exec_opt.cwd, "Current working directory.")->type_name("PATH");
     cmd_exec->add_option("--env", exec_opt.envs, "Environment variables to set")
-            ->multi_option_policy(CLI::MultiOptionPolicy::TakeAll)
-            ->check(
-                    [](const std::string &str) {
-                        if (str.find('=') == std::string::npos) {
-                            return "invalid argument, env must be in the format of KEY=VALUE";
-                        }
-                        return "";
-                    },
-                    "env_check");
+            ->type_name("ENV")
+            ->take_all()
+            ->check([](const std::string &str) {
+                if (str.find('=') == std::string::npos) {
+                    return "invalid argument, env must be in the format of KEY=VALUE";
+                }
+                return "";
+            });
     cmd_exec->add_option("--console-socket",
                          exec_opt.console_socket,
                          "Path to an unix socket that will receive the master end of the console's "
                          "pseudoterminal")
             ->type_name("SOCKET")
             ->check(socket_check);
-    cmd_exec->add_flag("--tty", exec_opt.tty, "Allocate a pseudo-TTY")->default_val(false);
+    cmd_exec->add_flag("-t,--tty", exec_opt.tty, "Allocate a pseudo-TTY")->take_last();
+    cmd_exec->add_option("--preserve-fds",
+                         exec_opt.preserve_fds,
+                         "Pass N additional file descriptors to the container")
+            ->type_name("N");
     // TODO: enable capabilities and no_new_privs support after rewrite exec,
     //      cmd_exec->add_option("-c,--cap", options.exec.caps, "Set capabilities")
     //              ->check(
