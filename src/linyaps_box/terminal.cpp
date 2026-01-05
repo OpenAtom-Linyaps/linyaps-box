@@ -61,6 +61,11 @@ auto terminal_slave::setup_stdio() -> void
 
 auto terminal_slave::set_size(struct winsize size) -> void
 {
+    if (size.ws_col == 0 || size.ws_row == 0) {
+        auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
+        utils::ioctl(default_tty, TIOCGWINSZ, &size);
+    }
+
     utils::ioctl(slave_, TIOCSWINSZ, &size);
 }
 
