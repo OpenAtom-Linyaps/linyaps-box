@@ -4,9 +4,11 @@
 
 #include "linyaps_box/container_monitor.h"
 
+#include "linyaps_box/utils/file.h"
 #include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/process.h"
 #include "linyaps_box/utils/signal.h"
+#include "linyaps_box/utils/terminal.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <sys/signalfd.h>
@@ -15,10 +17,8 @@
 
 namespace linyaps_box {
 
-auto container_monitor::enable_signal_forwarding(std::optional<terminal_slave> host_tty) -> void
+auto container_monitor::enable_signal_forwarding() -> bool
 {
-    this->host_tty = std::move(host_tty);
-
     sigset_t set;
     utils::sigfillset(set);
     utils::sigprocmask(SIG_BLOCK, set, nullptr);
@@ -28,14 +28,27 @@ auto container_monitor::enable_signal_forwarding(std::optional<terminal_slave> h
     // try to reap child process. Child process may exit before we create signalfd and it wouldn't
     // receive SIGCHLD anymore. If we don't do this, the child process (or its children) will be
     // zombie process
-    auto ret = linyaps_box::utils::waitpid(pid, WNOHANG);
-    if (ret.status == linyaps_box::utils::WaitStatus::Reaped) {
-        LINYAPS_BOX_DEBUG() << "child exited early with code " << ret.exit_code;
-        child_exited = true;
-        exit_code = WIFSIGNALED(ret.exit_code) ? 128 + WTERMSIG(ret.exit_code)
-                                               : WEXITSTATUS(ret.exit_code);
-    } else if (ret.status == linyaps_box::utils::WaitStatus::NoChild) {
-        throw std::runtime_error("target pid " + std::to_string(pid) + " is not a child");
+
+    while (true) {
+        auto ret = linyaps_box::utils::waitpid(-1, WNOHANG);
+        if (ret.status == linyaps_box::utils::WaitStatus::Reaped) {
+            if (ret.pid == pid) {
+                // maybe child exited and output something, we should't exit here immediately
+                LINYAPS_BOX_DEBUG() << "child exited early with code " << ret.exit_code;
+                child_exited = true;
+                exit_code = WIFSIGNALED(ret.exit_code) ? 128 + WTERMSIG(ret.exit_code)
+                                                       : WEXITSTATUS(ret.exit_code);
+            }
+
+            continue;
+        }
+
+        if (ret.status == linyaps_box::utils::WaitStatus::NoChild) {
+            // no child process to wait, just exit
+            return false;
+        }
+
+        break;
     }
 
     auto signalfd_pollable = epoll.add(signal_fd, EPOLLIN);
@@ -43,6 +56,8 @@ auto container_monitor::enable_signal_forwarding(std::optional<terminal_slave> h
     if (!UNLIKELY(signalfd_pollable)) {
         throw std::runtime_error("failed to add signalfd to epoll");
     }
+
+    return true;
 }
 
 auto container_monitor::handle_signals() -> void
@@ -88,6 +103,17 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
                                              const linyaps_box::utils::file_descriptor &in,
                                              const linyaps_box::utils::file_descriptor &out) -> void
 {
+    if (utils::isatty(in)) {
+        host_tty.emplace(in.duplicate());
+    } else if (utils::isatty(out)) {
+        host_tty.emplace(out.duplicate());
+    } else {
+        auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
+        host_tty.emplace(std::move(default_tty));
+    }
+
+    host_tty->set_raw();
+
     this->master = std::move(master);
 
     this->master->get().set_nonblock(true);

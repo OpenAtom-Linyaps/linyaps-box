@@ -2445,10 +2445,6 @@ int linyaps_box::container::run(run_container_options_t options) const
         // TODO: cgroup preenter
         auto [child_pid, socket] = runtime_ns::start_container_process(*this, options);
 
-        auto in = utils::file_descriptor{ utils::fileno(stdin), false };
-        auto out = utils::file_descriptor{ utils::fileno(stdout), false };
-        container_monitor monitor(child_pid);
-
         {
             auto status = this->status();
             assert(status.status == container_status_t::runtime_status::CREATING);
@@ -2462,37 +2458,6 @@ int linyaps_box::container::run(run_container_options_t options) const
         runtime_ns::create_runtime_hooks(*this, socket);
         runtime_ns::wait_create_container_result(*this, socket);
 
-        auto host_tty = [&recv_socketpair, &monitor, &in, &out]() -> std::optional<terminal_slave> {
-            if (!recv_socketpair) {
-                return std::nullopt;
-            }
-
-            LINYAPS_BOX_DEBUG() << "Container requires a terminal";
-
-            auto master = runtime_ns::recv_master_tty(recv_socketpair.value());
-            recv_socketpair->release();
-
-            in.set_nonblock(true);
-            out.set_nonblock(true);
-
-            std::optional<terminal_slave> host_tty;
-            if (utils::isatty(in)) {
-                host_tty.emplace(in.duplicate());
-            } else if (utils::isatty(out)) {
-                host_tty.emplace(out.duplicate());
-            } else {
-                auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
-                host_tty.emplace(std::move(default_tty));
-            }
-
-            host_tty->set_raw();
-            monitor.enable_io_forwarding(std::move(master), in, out);
-
-            return host_tty;
-        }();
-
-        monitor.enable_signal_forwarding(std::move(host_tty));
-
         runtime_ns::wait_socket_close(socket);
 
         {
@@ -2504,6 +2469,29 @@ int linyaps_box::container::run(run_container_options_t options) const
         }
 
         runtime_ns::poststart_hooks(*this);
+
+        container_monitor monitor(child_pid);
+        auto in = utils::file_descriptor{ utils::fileno(stdin), false };
+        auto out = utils::file_descriptor{ utils::fileno(stdout), false };
+        [&recv_socketpair, &monitor, &in, &out]() -> void {
+            if (!recv_socketpair) {
+                return;
+            }
+
+            LINYAPS_BOX_DEBUG() << "Container requires a terminal";
+
+            auto master = runtime_ns::recv_master_tty(recv_socketpair.value());
+            recv_socketpair->release();
+
+            in.set_nonblock(true);
+            out.set_nonblock(true);
+
+            monitor.enable_io_forwarding(std::move(master), in, out);
+        }();
+
+        if (!monitor.enable_signal_forwarding()) {
+            return 0;
+        }
 
         // TODO: support detach from the parent's process
         // Now we wait for the container process to exit
