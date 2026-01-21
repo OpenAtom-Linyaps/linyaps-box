@@ -1741,8 +1741,8 @@ try {
     // TODO: selinux label/apparmor profile
     do_pivot_root(container, rootfs);
 
+    linyaps_box::utils::setsid();
     if (args.console_socket) {
-        linyaps_box::utils::setsid();
         configure_terminal(container, args.console_socket.value());
     }
 
