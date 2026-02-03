@@ -16,7 +16,7 @@ auto ring_buffer_deleter::operator()(ring_buffer *rb) const -> void
     rb->~ring_buffer();
     ::operator delete(rb,
                       total_size,
-                      std::align_val_t(std::hardware_constructive_interference_size));
+                      std::align_val_t(compat::hardware_constructive_interference_size));
 }
 
 auto ring_buffer::create(std::size_t requested_capacity)
@@ -31,7 +31,7 @@ auto ring_buffer::create(std::size_t requested_capacity)
 
     const auto total_size = sizeof(ring_buffer) + capacity;
     auto *mem = ::operator new(total_size,
-                               std::align_val_t(std::hardware_constructive_interference_size));
+                               std::align_val_t(compat::hardware_constructive_interference_size));
     auto *rb = new (mem) ring_buffer(capacity);
     return { rb, ring_buffer_deleter(total_size) };
 }
