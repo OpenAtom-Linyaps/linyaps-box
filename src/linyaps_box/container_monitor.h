@@ -22,7 +22,7 @@ public:
     container_monitor &operator=(container_monitor &&) = delete;
     ~container_monitor() = default;
 
-    [[nodiscard]] auto enable_signal_forwarding() -> bool;
+    auto enable_signal_forwarding() -> void;
     auto enable_io_forwarding(terminal_master master,
                               const linyaps_box::utils::file_descriptor &in,
                               const linyaps_box::utils::file_descriptor &out) -> void;

@@ -144,10 +144,7 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
         monitor.enable_io_forwarding(std::move(master), in, out);
     }();
 
-    if (!monitor.enable_signal_forwarding()) {
-        return 0;
-    }
-
+    monitor.enable_signal_forwarding();
     return monitor.wait_container_exit();
 }
 
