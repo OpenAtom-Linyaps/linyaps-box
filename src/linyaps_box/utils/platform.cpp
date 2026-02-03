@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include <sys/resource.h>
+#include <unistd.h>
 
 namespace linyaps_box::utils {
 auto str_to_signal(std::string_view str) -> int
