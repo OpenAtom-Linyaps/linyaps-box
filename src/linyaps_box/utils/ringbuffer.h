@@ -12,6 +12,18 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
+namespace linyaps_box::compat {
+#ifdef __cpp_lib_hardware_interference_size
+using std::hardware_constructive_interference_size;
+using std::hardware_destructive_interference_size;
+#else
+// default to 64 bytes if not defined
+// if the platform has different cache line size, please define these macros accordingly
+constexpr std::size_t hardware_constructive_interference_size = 64;
+constexpr std::size_t hardware_destructive_interference_size = 64;
+#endif
+} // namespace linyaps_box::compat
+
 namespace linyaps_box::utils {
 
 class ring_buffer;
@@ -26,7 +38,7 @@ private:
     std::size_t total_size{ 0 };
 };
 
-class alignas(std::hardware_constructive_interference_size) ring_buffer
+class alignas(compat::hardware_constructive_interference_size) ring_buffer
 {
     using iov_view = std::array<struct iovec, 2>;
 
