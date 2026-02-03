@@ -2489,9 +2489,7 @@ int linyaps_box::container::run(run_container_options_t options) const
             monitor.enable_io_forwarding(std::move(master), in, out);
         }();
 
-        if (!monitor.enable_signal_forwarding()) {
-            return 0;
-        }
+        monitor.enable_signal_forwarding();
 
         // TODO: support detach from the parent's process
         // Now we wait for the container process to exit

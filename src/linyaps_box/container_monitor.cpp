@@ -17,7 +17,7 @@
 
 namespace linyaps_box {
 
-auto container_monitor::enable_signal_forwarding() -> bool
+auto container_monitor::enable_signal_forwarding() -> void
 {
     sigset_t set;
     utils::sigfillset(set);
@@ -43,11 +43,6 @@ auto container_monitor::enable_signal_forwarding() -> bool
             continue;
         }
 
-        if (ret.status == linyaps_box::utils::WaitStatus::NoChild) {
-            // no child process to wait, just exit
-            return false;
-        }
-
         break;
     }
 
@@ -56,8 +51,6 @@ auto container_monitor::enable_signal_forwarding() -> bool
     if (!UNLIKELY(signalfd_pollable)) {
         throw std::runtime_error("failed to add signalfd to epoll");
     }
-
-    return true;
 }
 
 auto container_monitor::handle_signals() -> void
