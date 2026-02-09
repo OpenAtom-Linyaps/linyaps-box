@@ -18,7 +18,7 @@ void syscall_close_range(uint fd, uint max_fd, int flags)
 {
     auto ret = syscall(__NR_close_range, fd, max_fd, flags);
     if (ret < 0) {
-        throw std::system_error(errno, std::generic_category(), "close_range");
+        throw std::system_error(errno, std::system_category(), "close_range");
     }
 }
 
@@ -34,7 +34,7 @@ void close_range_fallback(uint first, uint last, int flags)
 
     auto *dir = opendir("/proc/self/fd");
     if (dir == nullptr) {
-        throw std::system_error(errno, std::generic_category(), "opendir /proc/self/fd");
+        throw std::system_error(errno, std::system_category(), "opendir /proc/self/fd");
     }
 
     auto close_dir = make_defer([dir]() noexcept {
@@ -49,7 +49,7 @@ void close_range_fallback(uint first, uint last, int flags)
     // because we should skip the file descriptor which is opened by opendir
     auto self_fd = dirfd(dir);
     if (self_fd < 0) {
-        throw std::system_error(errno, std::generic_category(), "dirfd");
+        throw std::system_error(errno, std::system_category(), "dirfd");
     }
 
     struct dirent *next{ nullptr };
@@ -71,12 +71,12 @@ void close_range_fallback(uint first, uint last, int flags)
         if ((static_cast<uint>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
             if (::fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
                 throw std::system_error(errno,
-                                        std::generic_category(),
+                                        std::system_category(),
                                         "failed to set up close-on-exec to " + name);
             }
         } else {
             if (::close(fd) < 0) {
-                throw std::system_error(errno, std::generic_category(), "failed to close " + name);
+                throw std::system_error(errno, std::system_category(), "failed to close " + name);
             }
         }
     }

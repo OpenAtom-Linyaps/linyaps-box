@@ -45,7 +45,7 @@ auto inspect_fdinfo(const std::filesystem::path &fdinfoPath) -> std::string
 auto inspect_fdinfo(int fd) -> std::string
 {
     std::stringstream ss;
-    ss << linyaps_box::utils::inspect_path(fd) << " ";
+    ss << fd << " -> " << linyaps_box::utils::inspect_path(fd) << "\n";
     ss << inspect_fdinfo(std::filesystem::path("/proc/self/fdinfo/" + std::to_string(fd)));
     return ss.str();
 }
@@ -166,7 +166,7 @@ auto inspect_permissions(int fd) -> std::string
     struct stat buf{};
 
     if (fstat(fd, &buf) == -1) {
-        throw std::system_error(errno, std::generic_category(), "fstat");
+        throw std::system_error(errno, std::system_category(), "fstat");
     }
 
     ss << buf.st_uid << ":" << buf.st_gid << " ";

@@ -5,6 +5,7 @@
 #include "linyaps_box/utils/symlink.h"
 
 #include "linyaps_box/utils/log.h"
+#include "linyaps_box/utils/platform.h"
 
 #include <linux/limits.h>
 
@@ -49,8 +50,15 @@ std::filesystem::path linyaps_box::utils::readlink(const std::filesystem::path &
 std::filesystem::path linyaps_box::utils::readlinkat(const file_descriptor &dirfd,
                                                      const std::filesystem::path &path)
 {
-    std::array<char, PATH_MAX + 1> buf{};
-    auto ret = ::readlinkat(dirfd.get(), path.c_str(), buf.data(), PATH_MAX + 1);
+    auto parent = path.parent_path();
+    if (path.is_relative()) {
+        parent = dirfd.current_path() / parent;
+    }
+
+    auto buf_len = get_path_max(parent) + 1;
+    std::string buf(buf_len, '\0');
+
+    auto ret = ::readlinkat(dirfd.get(), path.c_str(), buf.data(), buf_len - 1);
     if (ret == -1) {
         throw std::system_error(errno, std::system_category(), "readlinkat");
     }

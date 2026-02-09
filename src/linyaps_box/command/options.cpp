@@ -5,6 +5,7 @@
 #include "linyaps_box/command/options.h"
 
 #include "linyaps_box/config.h"
+#include "linyaps_box/utils/file.h"
 #include "linyaps_box/version.h"
 
 #include <CLI/CLI.hpp>
@@ -66,6 +67,26 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                         "Pass N additional file descriptors to the container")
             ->default_val(0);
 
+    auto socket_check = [](const std::string &str) {
+        try {
+            auto ret = utils::lstat(str);
+            if (!utils::is_type(ret.st_mode, std::filesystem::file_type::socket)) {
+                return "console-socket must be a socket";
+            }
+        } catch (const std::system_error &e) {
+            return e.what();
+        }
+
+        return "";
+    };
+
+    cmd_run->add_option("--console-socket",
+                        run_opt.console_socket,
+                        "Path to an unix socket that will receive the master end of the console's "
+                        "pseudoterminal")
+            ->type_name("SOCKET")
+            ->check(socket_check);
+
     exec_options exec_opt{ options.global };
     auto *cmd_exec = app.add_subcommand("exec", "Exec a command in a running container")
                              ->positionals_at_end();
@@ -75,17 +96,27 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
                          "for example `1000` for UID=1000 "
                          "or `1000:1000` for UID=1000 and GID=1000")
             ->type_name("UID[:GID]");
-    cmd_exec->add_option("--cwd", exec_opt.cwd, "Current working directory.");
+    cmd_exec->add_option("--cwd", exec_opt.cwd, "Current working directory.")->type_name("PATH");
     cmd_exec->add_option("--env", exec_opt.envs, "Environment variables to set")
-            ->multi_option_policy(CLI::MultiOptionPolicy::TakeAll)
-            ->check(
-                    [](const std::string &str) {
-                        if (str.find('=') == std::string::npos) {
-                            return "invalid argument, env must be in the format of KEY=VALUE";
-                        }
-                        return "";
-                    },
-                    "env_check");
+            ->type_name("ENV")
+            ->take_all()
+            ->check([](const std::string &str) {
+                if (str.find('=') == std::string::npos) {
+                    return "invalid argument, env must be in the format of KEY=VALUE";
+                }
+                return "";
+            });
+    cmd_exec->add_option("--console-socket",
+                         exec_opt.console_socket,
+                         "Path to an unix socket that will receive the master end of the console's "
+                         "pseudoterminal")
+            ->type_name("SOCKET")
+            ->check(socket_check);
+    cmd_exec->add_flag("-t,--tty", exec_opt.tty, "Allocate a pseudo-TTY")->take_last();
+    cmd_exec->add_option("--preserve-fds",
+                         exec_opt.preserve_fds,
+                         "Pass N additional file descriptors to the container")
+            ->type_name("N");
     // TODO: enable capabilities and no_new_privs support after rewrite exec,
     //      cmd_exec->add_option("-c,--cap", options.exec.caps, "Set capabilities")
     //              ->check(

@@ -4,8 +4,11 @@
 
 #pragma once
 
+#include "linyaps_box/utils/span.h"
+
 #include <filesystem>
 
+#include <sys/uio.h>
 #include <unistd.h>
 
 namespace linyaps_box::utils {
@@ -39,9 +42,12 @@ public:
 class file_descriptor
 {
 public:
-    explicit file_descriptor(int fd = -1);
+    enum class IOStatus : uint8_t { Success, TryAgain, Eof, Closed };
 
-    ~file_descriptor();
+    file_descriptor() = default;
+    explicit file_descriptor(int fd, bool auto_close = true);
+
+    virtual ~file_descriptor();
 
     file_descriptor(const file_descriptor &) = delete;
     auto operator=(const file_descriptor &) -> file_descriptor & = delete;
@@ -49,11 +55,17 @@ public:
     file_descriptor(file_descriptor &&other) noexcept;
     auto operator=(file_descriptor &&other) noexcept -> file_descriptor &;
 
-    [[nodiscard]] auto get() const noexcept -> int;
+    [[nodiscard]] auto get() const & noexcept -> int;
+
+    [[nodiscard]] auto get() && noexcept -> int;
+
+    [[nodiscard]] auto valid() const -> bool { return fd_ != -1; }
 
     auto release() -> void;
 
     [[nodiscard]] auto duplicate() const -> file_descriptor;
+
+    auto duplicate_to(int target, int flags) const -> void;
 
     auto operator<<(const std::byte &byte) -> file_descriptor &;
 
@@ -65,7 +77,42 @@ public:
 
     static auto cwd() -> file_descriptor;
 
+    [[nodiscard]] auto type() const -> std::filesystem::file_type;
+
+    auto set_nonblock(bool nonblock) -> void;
+
+    auto read_span(span<std::byte> ws, std::size_t &bytes_read) const -> IOStatus;
+
+    auto write_span(span<const std::byte> rs, std::size_t &bytes_written) const -> IOStatus;
+
+    auto read_vecs(span<struct iovec> ws, std::size_t &bytes_read) const -> IOStatus;
+
+    auto write_vecs(span<const struct iovec> rs, std::size_t &bytes_written) const -> IOStatus;
+
+    template<typename T>
+    [[nodiscard]] auto read(T &out) const -> IOStatus
+    {
+        static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable for raw read");
+
+        std::size_t bytes_read{ 0 };
+        auto ws = span<std::byte>(reinterpret_cast<std::byte *>(&out), sizeof(T));
+        return read_span(ws, bytes_read);
+    }
+
+    template<typename T>
+    [[nodiscard]] auto write(const T &in) const -> IOStatus
+    {
+        static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
+
+        std::size_t bytes_written{ 0 };
+        auto rs = span<const std::byte>(reinterpret_cast<const std::byte *>(&in), sizeof(T));
+        return write_span(rs, bytes_written);
+    }
+
 private:
+    // keep this layout, for padding optimization
+    bool nonblock_{ false };
+    bool auto_close_{ false };
     int fd_{ -1 };
 };
 

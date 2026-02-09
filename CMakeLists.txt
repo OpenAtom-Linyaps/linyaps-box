@@ -94,6 +94,12 @@ set(linyaps-box_ENABLE_CPM
     OFF
     CACHE BOOL "enable CPM")
 
+set(linyaps-box_HARDENING
+    ON
+    CACHE BOOL "enable hardening")
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 if(CMAKE_VERSION VERSION_LESS "3.14")
   set(linyaps-box_ENABLE_CPM OFF)
   message(
@@ -106,6 +112,18 @@ set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     CACHE BOOL "use local packages only")
 
 # ==============================================================================
+
+if(linyaps-box_HARDENING)
+  message(STATUS "applying harden settings")
+  set(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} -pie -Wl,-z,relro -Wl,-z,now")
+  add_compile_options(-fstack-protector-strong)
+
+  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Non-Debug build, enabling FORTIFY_SOURCE")
+    add_compile_definitions(_FORTIFY_SOURCE=2)
+  endif()
+endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
 set(linyaps-box_LIBRARY_SOURCE
@@ -129,6 +147,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/config.h
     src/linyaps_box/container.cpp
     src/linyaps_box/container.h
+    src/linyaps_box/container_monitor.cpp
+    src/linyaps_box/container_monitor.h
     src/linyaps_box/container_ref.cpp
     src/linyaps_box/container_ref.h
     src/linyaps_box/container_status.cpp
@@ -143,12 +163,20 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/impl/table_printer.h
     src/linyaps_box/interface.cpp
     src/linyaps_box/interface.h
+    src/linyaps_box/io/epoll.cpp
+    src/linyaps_box/io/epoll.h
+    src/linyaps_box/io/forwarder.cpp
+    src/linyaps_box/io/forwarder.h
     src/linyaps_box/printer.cpp
     src/linyaps_box/printer.h
     src/linyaps_box/runtime.cpp
     src/linyaps_box/runtime.h
     src/linyaps_box/status_directory.cpp
     src/linyaps_box/status_directory.h
+    src/linyaps_box/terminal.cpp
+    src/linyaps_box/terminal.h
+    src/linyaps_box/unixsocket.cpp
+    src/linyaps_box/unixsocket.h
     src/linyaps_box/utils/atomic_write.cpp
     src/linyaps_box/utils/atomic_write.h
     src/linyaps_box/utils/cgroups.cpp
@@ -156,30 +184,41 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/close_range.cpp
     src/linyaps_box/utils/close_range.h
     src/linyaps_box/utils/defer.h
+    src/linyaps_box/utils/epoll.cpp
+    src/linyaps_box/utils/epoll.h
+    src/linyaps_box/utils/file.cpp
     src/linyaps_box/utils/file_describer.cpp
     src/linyaps_box/utils/file_describer.h
-    src/linyaps_box/utils/fstat.cpp
-    src/linyaps_box/utils/fstat.h
+    src/linyaps_box/utils/file.h
     src/linyaps_box/utils/inspect.cpp
     src/linyaps_box/utils/inspect.h
+    src/linyaps_box/utils/ioctl.h
     src/linyaps_box/utils/log.cpp
     src/linyaps_box/utils/log.h
     src/linyaps_box/utils/mkdir.cpp
     src/linyaps_box/utils/mkdir.h
     src/linyaps_box/utils/mknod.cpp
     src/linyaps_box/utils/mknod.h
-    src/linyaps_box/utils/open_file.cpp
-    src/linyaps_box/utils/open_file.h
     src/linyaps_box/utils/platform.cpp
     src/linyaps_box/utils/platform.h
+    src/linyaps_box/utils/process.cpp
+    src/linyaps_box/utils/process.h
+    src/linyaps_box/utils/ringbuffer.cpp
+    src/linyaps_box/utils/ringbuffer.h
     src/linyaps_box/utils/semver.cpp
     src/linyaps_box/utils/semver.h
-    src/linyaps_box/utils/socketpair.cpp
-    src/linyaps_box/utils/socketpair.h
+    src/linyaps_box/utils/session.cpp
+    src/linyaps_box/utils/session.h
+    src/linyaps_box/utils/signal.cpp
+    src/linyaps_box/utils/signal.h
+    src/linyaps_box/utils/socket.cpp
+    src/linyaps_box/utils/socket.h
+    src/linyaps_box/utils/span.h
     src/linyaps_box/utils/symlink.cpp
     src/linyaps_box/utils/symlink.h
-    src/linyaps_box/utils/touch.cpp
-    src/linyaps_box/utils/touch.h)
+    src/linyaps_box/utils/terminal.cpp
+    src/linyaps_box/utils/terminal.h
+    src/linyaps_box/utils/utils.h)
 
 set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
 
@@ -223,7 +262,7 @@ if(linyaps-box_ENABLE_CPM)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
   include(CPM)
 
-  if (linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
+  if(linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
     set(CPM_USE_LOCAL_PACKAGES ON)
   endif()
 
@@ -238,11 +277,12 @@ if(linyaps-box_ENABLE_CPM)
     NAME CLI11
     VERSION 2.5.0
     GITHUB_REPOSITORY CLIUtils/CLI11
-    GIT_TAG v2.5.0
+    GIT_TAG v2.6.1
     EXCLUDE_FROM_ALL ON
     OPTIONS "CLI11_BUILD_TESTS OFF")
 endif()
 
+# find minimal version
 find_package(nlohmann_json 3.11.3 QUIET)
 if(NOT nlohmann_json_FOUND)
   add_subdirectory(external/nlohmann_json)
@@ -379,142 +419,4 @@ endif()
 
 enable_testing()
 
-include(GoogleTest)
-
-set(linyaps-box_UNIT_TESTS ll-box-ut)
-set(linyaps-box_UNIT_TESTS_SOURCE ./tests/ll-box-ut/src/test.cpp)
-set(linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
-set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-ut/src")
-
-find_package(GTest REQUIRED)
-
-if(CMAKE_VERSION VERSION_LESS 3.20)
-  add_library(GTest::gtest_main INTERFACE IMPORTED)
-  target_link_libraries(GTest::gtest_main INTERFACE GTest::Main)
-endif()
-
-list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE GTest::gtest_main)
-
-add_executable("${linyaps-box_UNIT_TESTS}" ${linyaps-box_UNIT_TESTS_SOURCE})
-target_include_directories("${linyaps-box_UNIT_TESTS}"
-                           ${linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS})
-target_link_libraries("${linyaps-box_UNIT_TESTS}"
-                      ${linyaps-box_UNIT_TESTS_LINK_LIBRARIES})
-target_compile_features("${linyaps-box_UNIT_TESTS}" PRIVATE cxx_std_17)
-set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD 17)
-set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_EXTENSIONS OFF)
-set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD_REQUIRED
-                                                         ON)
-target_compile_options("${linyaps-box_UNIT_TESTS}"
-                       PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
-
-set(GTEST_DISCOVER_TESTS_ARGS "${linyaps-box_UNIT_TESTS}" WORKING_DIRECTORY
-                              "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-ut")
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  list(APPEND GTEST_DISCOVER_TESTS_ARGS PROPERTIES ENVIRONMENT
-       "LLVM_PROFILE_FILE=/dev/null")
-endif()
-
-gtest_discover_tests(${GTEST_DISCOVER_TESTS_ARGS})
-
-function(setup_linyaps_box_smoke_tests)
-  if(NOT linyaps-box_ENABLE_SMOKE_TESTS)
-    return()
-  endif()
-
-  set(linyaps-box_SMOKE_TESTS
-      ./tests/ll-box-st/01-run-whoami.json
-      ./tests/ll-box-st/02-check-procfs.json
-      ./tests/ll-box-st/03-check-mounts.json
-      ./tests/ll-box-st/04-check-noNewPrivs.json
-      ./tests/ll-box-st/05-check-env.json
-      ./tests/ll-box-st/06-check-cwd.json
-      ./tests/ll-box-st/07-check-capability.json
-      ./tests/ll-box-st/08-check-umask.json
-      ./tests/ll-box-st/09-check-rlimit.json
-      ./tests/ll-box-st/10-check-oom.json
-      ./tests/ll-box-st/11-output-to-null.json
-      ./tests/ll-box-st/12-bind-host-dev.json
-      ./tests/ll-box-st/13-pid-extension.json)
-
-  foreach(test ${linyaps-box_SMOKE_TESTS})
-    add_test(
-      NAME "${test}"
-      COMMAND
-        "${CMAKE_CURRENT_SOURCE_DIR}/tests/ll-box-st/ll-box-st"
-        "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}"
-        "${CMAKE_CURRENT_BINARY_DIR}/st-data"
-        "${CMAKE_CURRENT_SOURCE_DIR}/${test}")
-    list(APPEND linyaps-box_TESTS "${test}")
-
-    set_tests_properties(
-      "${test}"
-      PROPERTIES
-        ENVIRONMENT
-        "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_LIST_DIR}/tests/ll-box-st/glibc_leaks.txt"
-    )
-  endforeach()
-endfunction()
-
-setup_linyaps_box_smoke_tests()
-
-function(setup_linyaps_box_coverage)
-  if(NOT linyaps-box_ENABLE_COVERAGE)
-    return()
-  endif()
-
-  set(COVERAGE_INFO "coverage.info")
-
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set_tests_properties(
-      ${linyaps-box_TESTS}
-      PROPERTIES ENVIRONMENT
-                 "LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/default.profraw"
-    )
-
-    find_program(LLVM_PROFDATA llvm-profdata REQUIRED)
-
-    add_custom_command(
-      OUTPUT default.profdata
-      DEPENDS "${linyaps-box_APP}" test
-      COMMAND "${LLVM_PROFDATA}" merge -sparse default.profraw -o
-              default.profdata)
-
-    find_program(LLVM_COV llvm-cov REQUIRED)
-
-    add_custom_command(
-      OUTPUT coverage.info
-      DEPENDS default.profdata
-      COMMAND "${LLVM_COV}" show -instr-profile=default.profdata
-              -object="$<TARGET_FILE_NAME:${linyaps-box_APP}>" > coverage.info)
-
-    add_custom_command(
-      OUTPUT coverage.tar.gz
-      DEPENDS default.profdata
-      COMMAND rm -rf coverage
-      COMMAND
-        "${LLVM_COV}" show -instr-profile=default.profdata -format=html
-        -object="$<TARGET_FILE_NAME:${linyaps-box_APP}>" -output-dir=coverage
-      COMMAND tar -czf coverage-html.tar.gz coverage)
-
-    add_custom_target(coverage DEPENDS coverage.info coverage.tar.gz)
-  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    find_program(LCOV lcov REQUIRED)
-    find_program(SED sed REQUIRED)
-    add_custom_target(
-      coverage
-      COMMAND "${LCOV}" --capture --directory . --output-file coverage.info
-              --branch-coverage --rc geninfo_unexecuted_blocks=1
-      COMMAND "${LCOV}" --remove coverage.info '/usr/*' --output-file
-              coverage.info
-      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-      DEPENDS "${linyaps-box_APP}" test)
-  else()
-    message(
-      FATAL_ERROR "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}.")
-  endif()
-endfunction()
-
-setup_linyaps_box_coverage()
+add_subdirectory(tests)

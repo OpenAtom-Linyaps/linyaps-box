@@ -4,9 +4,11 @@
 
 #include "linyaps_box/utils/log.h"
 
+#include "linyaps_box/utils/symlink.h"
+#include "linyaps_box/utils/terminal.h"
+
 #include <linux/limits.h>
 
-#include <array>
 #include <chrono>
 #include <iostream>
 
@@ -76,7 +78,10 @@ auto force_log_to_stderr() -> bool
 
 auto stderr_is_a_tty() -> bool
 {
-    static const bool result = isatty(fileno(stderr)) != 0;
+    static const bool result = [] {
+        auto err = linyaps_box::utils::fileno(stderr);
+        return isatty(file_descriptor{ err, false });
+    }();
     return result;
 }
 
@@ -111,14 +116,8 @@ auto get_current_log_level() -> unsigned int
 auto get_pid_namespace(int pid) -> std::string
 {
     const auto &pidns_path = "/proc/" + ((pid != 0) ? std::to_string(pid) : "self") + "/ns/pid";
+    auto result = readlink(pidns_path).string();
 
-    std::array<char, PATH_MAX + 1> buf{};
-    auto length = ::readlink(pidns_path.c_str(), buf.data(), PATH_MAX);
-    if (length < 0) {
-        return "not available";
-    }
-
-    const std::string_view result(buf.data(), static_cast<size_t>(length));
     constexpr std::string_view prefix = "pid:[";
     constexpr char suffix = ']';
     constexpr auto prefix_len = prefix.size();
@@ -136,7 +135,7 @@ auto get_pid_namespace(int pid) -> std::string
         return "invalid format";
     }
 
-    return std::string{ result.substr(prefix_len, result.size() - total_wrapper_len) };
+    return result.substr(prefix_len, result.size() - total_wrapper_len);
 }
 
 } // namespace linyaps_box::utils

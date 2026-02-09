@@ -11,4 +11,8 @@ namespace linyaps_box::utils {
 
 auto socketpair(int domain, int type, int protocol) -> std::pair<file_descriptor, file_descriptor>;
 
+auto socket(int domain, int type, int protocol) -> file_descriptor;
+
+auto connect(const file_descriptor &fd, struct sockaddr *addr, socklen_t addrlen) -> void;
+
 } // namespace linyaps_box::utils

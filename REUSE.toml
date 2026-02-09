@@ -1,46 +1,42 @@
 version = 1
-SPDX-PackageName = "linglong-box"
+SPDX-PackageName = "linyaps-box"
 SPDX-PackageSupplier = "UnionTech Software Technology Co., Ltd. <>"
-SPDX-PackageDownloadLocation = "https://github.com/linuxdeepin/linglong-box"
+SPDX-PackageDownloadLocation = "https://github.com/OpenAtom-Linyaps/linyaps-box"
+
+[[annotations]]
+path = [
+    "**/CMakeLists.txt",
+    "**/CMakePresets.json",
+    "**/.gitignore",
+    ".clang-format",
+    ".cmake-format.py",
+    "cmake.external/**",
+    "external/*/CMakeLists.txt",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
+SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
 path = [
     ".github/**",
     ".gitlab-ci.yml",
+    ".obs/workflows.yml",
     "tests/ll-box-st/**.json",
     "tests/ll-box-st/*.txt",
     "tests/ll-box-ut/data/**",
-    ".obs/workflows.yml",
 ]
+
+exclude = ["**/cmake_test_discovery_*.json"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = [
-    "README.md",
-    "README.zh_CN.md",
-]
+path = ["README.md", "README.zh_CN.md"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
 SPDX-License-Identifier = "CC-BY-4.0"
-
-[[annotations]]
-path = [
-    "CMakePresets.json",
-    "CMakeLists.txt",
-    ".gitignore",
-    "tests/ll-box-ut/.gitignore",
-]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
-SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
-path = [".clang-format", ".cmake-format.py"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
-SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
 path = ["cmake/CPM.cmake"]
@@ -49,15 +45,9 @@ SPDX-FileCopyrightText = "2019-2023 Lars Melchior and contributors"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
-path = ["cmake.external/**"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
-SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
 path = ["external/nlohmann_json/include/**"]
 precedence = "aggregate"
-SPDX-FileCopyrightText = "2013-2023 Niels Lohmann <https://nlohmann.me>"
+SPDX-FileCopyrightText = "2013-2025 Niels Lohmann <https://nlohmann.me>"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
@@ -65,9 +55,3 @@ path = ["external/CLI11/include/**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2017-2025 University of Cincinnati, developed by Henry Schreiner under NSF AWARD 1414736."
 SPDX-License-Identifier = "BSD-3-Clause"
-
-[[annotations]]
-path = ["external/*/CMakeLists.txt"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = "UnionTech Software Technology Co., Ltd."
-SPDX-License-Identifier = "CC0-1.0"

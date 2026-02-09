@@ -1,0 +1,31 @@
+{
+	"name": "Change terminal size",
+	"process": {
+		"user": {
+			"uid": 0,
+			"gid": 0
+		},
+		"args": ["stty", "size"],
+		"env": [
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"TERM=xterm",
+			"HOME=/root"
+		],
+		"cwd": "/",
+		"terminal": true,
+		"consoleSize": {
+			"height": 24,
+			"width": 80
+		}
+	},
+	"linux": {
+		"readonlyPaths": [
+			"/proc/asound",
+			"/proc/bus",
+			"/proc/fs",
+			"/proc/irq",
+			"/proc/sysrq-trigger"
+		]
+	},
+	"expected": "24 80"
+}
