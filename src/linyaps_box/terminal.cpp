@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -53,9 +53,9 @@ terminal_slave &terminal_slave::operator=(terminal_slave &&other) noexcept
 auto terminal_slave::setup_stdio() -> void
 {
     LINYAPS_BOX_DEBUG() << "Setup stdio";
-    slave_.duplicate_to(utils::fileno(stdin), 0);
-    slave_.duplicate_to(utils::fileno(stdout), 0);
-    slave_.duplicate_to(utils::fileno(stderr), 0);
+    slave_.duplicate_to(STDIN_FILENO, 0);
+    slave_.duplicate_to(STDOUT_FILENO, 0);
+    slave_.duplicate_to(STDERR_FILENO, 0);
     utils::ioctl(slave_, TIOCSCTTY, 0);
 }
 
@@ -77,7 +77,7 @@ auto terminal_slave::set_raw() -> void
 
     LINYAPS_BOX_DEBUG() << "Set terminal " << slave_.get() << " to raw mode";
 
-    struct termios orig_term{};
+    struct termios orig_term{ };
     utils::tcgetattr(slave_, orig_term);
 
     auto raw = orig_term;
@@ -90,7 +90,7 @@ auto terminal_slave::set_raw() -> void
 
 auto terminal_slave::get_size() -> struct winsize
 {
-    struct winsize size{};
+    struct winsize size{ };
     utils::ioctl(slave_, TIOCGWINSZ, &size);
     return size;
 }

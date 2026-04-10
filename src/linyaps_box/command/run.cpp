@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022-2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -23,7 +23,7 @@ auto linyaps_box::command::run(const struct run_options &options) -> int
     run_options.preserve_fds = options.preserve_fds;
 
     if (container.get_config().process.terminal && options.console_socket) {
-        run_options.console_socket = unixSocketClient::connect(options.console_socket.value());
+        run_options.console_socket = unix_socket::connect(options.console_socket.value());
     }
 
     return container.run(std::move(run_options));
