@@ -1,11 +1,10 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022-2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "linyaps_box/utils/file_describer.h"
 
 #include "linyaps_box/utils/file.h"
-#include "linyaps_box/utils/ioctl.h"
 #include "linyaps_box/utils/log.h"
 
 #include <cstring>
@@ -32,8 +31,8 @@ linyaps_box::utils::file_descriptor_invalid_exception::
         ~file_descriptor_invalid_exception() noexcept = default;
 
 linyaps_box::utils::file_descriptor::file_descriptor(int fd, bool auto_close)
-    : auto_close_(auto_close)
-    , fd_(fd)
+    : fd_(fd)
+    , auto_close_(auto_close)
 {
     if (fd < 0) {
         throw file_descriptor_invalid_exception("invalid file descriptor");
@@ -47,21 +46,21 @@ linyaps_box::utils::file_descriptor::file_descriptor(int fd, bool auto_close)
     }
 }
 
-linyaps_box::utils::file_descriptor::~file_descriptor()
+linyaps_box::utils::file_descriptor::~file_descriptor() noexcept
 {
     if (fd_ < 0 || !auto_close_) {
         return;
     }
 
-    if (close(fd_) != 0) {
+    if (::close(fd_) != 0) {
         LINYAPS_BOX_ERR() << "close " << fd_ << " failed:" << ::strerror(errno);
     }
 }
 
 linyaps_box::utils::file_descriptor::file_descriptor(file_descriptor &&other) noexcept
-    : nonblock_(other.nonblock_)
+    : fd_(other.fd_)
+    , nonblock_(other.nonblock_)
     , auto_close_(other.auto_close_)
-    , fd_(other.fd_)
 {
     other.fd_ = -1;
 }
@@ -79,16 +78,25 @@ auto linyaps_box::utils::file_descriptor::operator=(file_descriptor &&other) noe
     return *this;
 }
 
-auto linyaps_box::utils::file_descriptor::release() -> void
+auto linyaps_box::utils::file_descriptor::release() & -> int
 {
-    int tmp = -1;
-    std::swap(tmp, fd_);
+    check_valid();
 
-    if (tmp >= 0 && ::close(tmp) < 0) {
-        auto msg{ "failed to close file descriptor " + std::to_string(tmp) + ": "
-                  + ::strerror(errno) };
-        throw file_descriptor_invalid_exception(msg);
+    int tmp{ -1 };
+    std::swap(tmp, fd_);
+    return tmp;
+}
+
+auto linyaps_box::utils::file_descriptor::close() & -> void
+{
+    check_valid();
+
+    auto ret = ::close(fd_);
+    if (ret < 0) {
+        throw std::system_error(errno, std::system_category(), "close");
     }
+
+    fd_ = -1;
 }
 
 auto linyaps_box::utils::file_descriptor::get() const & noexcept -> int
@@ -96,16 +104,15 @@ auto linyaps_box::utils::file_descriptor::get() const & noexcept -> int
     return fd_;
 }
 
-auto linyaps_box::utils::file_descriptor::get() && noexcept -> int
+auto linyaps_box::utils::file_descriptor::get() && -> int
 {
+    check_valid();
     return std::exchange(fd_, -1);
 }
 
 auto linyaps_box::utils::file_descriptor::duplicate() const -> linyaps_box::utils::file_descriptor
 {
-    if (fd_ == -1) {
-        throw file_descriptor_closed_exception();
-    }
+    check_valid();
 
     if (fd_ == AT_FDCWD) {
         throw file_descriptor_invalid_exception("cannot duplicate AT_FDCWD");
@@ -128,9 +135,7 @@ auto linyaps_box::utils::file_descriptor::duplicate() const -> linyaps_box::util
 
 auto linyaps_box::utils::file_descriptor::duplicate_to(int target, int flags) const -> void
 {
-    if (fd_ == -1) {
-        throw file_descriptor_closed_exception();
-    }
+    check_valid();
 
     if (fd_ == AT_FDCWD) {
         throw file_descriptor_invalid_exception("cannot duplicate AT_FDCWD");
@@ -145,6 +150,8 @@ auto linyaps_box::utils::file_descriptor::duplicate_to(int target, int flags) co
 auto linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
         -> linyaps_box::utils::file_descriptor &
 {
+    check_valid();
+
     while (true) {
         auto status = write(byte);
         switch (status) {
@@ -164,6 +171,8 @@ auto linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
 auto linyaps_box::utils::file_descriptor::operator>>(std::byte &byte)
         -> linyaps_box::utils::file_descriptor &
 {
+    check_valid();
+
     while (true) {
         auto status = read(byte);
         switch (status) {
@@ -182,12 +191,16 @@ auto linyaps_box::utils::file_descriptor::operator>>(std::byte &byte)
 
 auto linyaps_box::utils::file_descriptor::proc_path() const -> std::filesystem::path
 {
+    check_valid();
+
     return std::filesystem::current_path().root_path() / "proc" / "self" / "fd"
             / std::to_string(fd_);
 }
 
 auto linyaps_box::utils::file_descriptor::current_path() const noexcept -> std::filesystem::path
 {
+    check_valid();
+
     std::error_code ec;
     auto p_path = proc_path();
     auto path = std::filesystem::read_symlink(p_path, ec);
@@ -203,9 +216,10 @@ auto linyaps_box::utils::file_descriptor::cwd() -> file_descriptor
     return file_descriptor{ AT_FDCWD };
 }
 
-auto linyaps_box::utils::file_descriptor::set_nonblock(bool nonblock) -> void
+auto linyaps_box::utils::file_descriptor::set_nonblock(bool nonblock) & -> void
 {
     LINYAPS_BOX_DEBUG() << "set fd " << fd_ << " to nonblock: " << std::boolalpha << nonblock;
+    check_valid();
 
     auto flags = fcntl(*this, F_GETFL, 0);
     fcntl(*this,
@@ -216,6 +230,7 @@ auto linyaps_box::utils::file_descriptor::set_nonblock(bool nonblock) -> void
 
 auto linyaps_box::utils::file_descriptor::type() const -> std::filesystem::file_type
 {
+    check_valid();
     auto stat = linyaps_box::utils::fstat(*this);
     return linyaps_box::utils::to_fs_file_type(stat.st_mode);
 }
@@ -223,6 +238,8 @@ auto linyaps_box::utils::file_descriptor::type() const -> std::filesystem::file_
 auto linyaps_box::utils::file_descriptor::read_span(span<std::byte> ws,
                                                     std::size_t &bytes_read) const -> IOStatus
 {
+    check_valid();
+
     bytes_read = 0;
     if (ws.empty()) {
         return IOStatus::Success;
@@ -265,6 +282,8 @@ auto linyaps_box::utils::file_descriptor::read_span(span<std::byte> ws,
 auto linyaps_box::utils::file_descriptor::write_span(span<const std::byte> rs,
                                                      std::size_t &bytes_written) const -> IOStatus
 {
+    check_valid();
+
     bytes_written = 0;
     if (rs.empty()) {
         return IOStatus::Success;
@@ -308,6 +327,8 @@ auto linyaps_box::utils::file_descriptor::write_span(span<const std::byte> rs,
 auto linyaps_box::utils::file_descriptor::read_vecs(span<struct iovec> ws,
                                                     std::size_t &bytes_read) const -> IOStatus
 {
+    check_valid();
+
     bytes_read = 0;
     if (ws.empty()) {
         return IOStatus::Success;
@@ -348,6 +369,8 @@ auto linyaps_box::utils::file_descriptor::read_vecs(span<struct iovec> ws,
 auto linyaps_box::utils::file_descriptor::write_vecs(span<const struct iovec> rs,
                                                      std::size_t &bytes_written) const -> IOStatus
 {
+    check_valid();
+
     bytes_written = 0;
     if (rs.empty()) {
         return IOStatus::Success;

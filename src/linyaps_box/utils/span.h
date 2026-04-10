@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -16,6 +16,8 @@ public:
     using element_type = T;
     using pointer = T *;
     using size_type = std::size_t;
+
+    static constexpr size_type npos = static_cast<size_type>(-1);
 
     constexpr span() noexcept
         : data_(nullptr)
@@ -35,13 +37,19 @@ public:
 
     [[nodiscard]] constexpr bool empty() const noexcept { return size_ == 0; }
 
-    [[nodiscard]] constexpr span subspan(size_type offset, size_type count = -1) const noexcept
+    [[nodiscard]] constexpr T &operator[](size_type idx) const noexcept { return data_[idx]; }
+
+    [[nodiscard]] constexpr pointer begin() const noexcept { return data_; }
+
+    [[nodiscard]] constexpr pointer end() const noexcept { return data_ + size_; }
+
+    [[nodiscard]] constexpr span subspan(size_type offset, size_type count = npos) const noexcept
     {
         if (offset >= size_) {
-            return {};
+            return { };
         }
 
-        size_type actual_count = (count == static_cast<size_type>(-1)) ? (size_ - offset) : count;
+        size_type actual_count = (count == npos) ? (size_ - offset) : count;
         return { data_ + offset, std::min(actual_count, size_ - offset) };
     }
 
