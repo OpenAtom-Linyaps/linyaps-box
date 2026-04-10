@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022-2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -47,7 +47,7 @@ public:
     file_descriptor() = default;
     explicit file_descriptor(int fd, bool auto_close = true);
 
-    virtual ~file_descriptor();
+    ~file_descriptor() noexcept;
 
     file_descriptor(const file_descriptor &) = delete;
     auto operator=(const file_descriptor &) -> file_descriptor & = delete;
@@ -57,11 +57,13 @@ public:
 
     [[nodiscard]] auto get() const & noexcept -> int;
 
-    [[nodiscard]] auto get() && noexcept -> int;
+    [[nodiscard]] auto get() && -> int;
 
     [[nodiscard]] auto valid() const -> bool { return fd_ != -1; }
 
-    auto release() -> void;
+    [[nodiscard]] auto release() & -> int;
+
+    auto close() & -> void;
 
     [[nodiscard]] auto duplicate() const -> file_descriptor;
 
@@ -79,7 +81,7 @@ public:
 
     [[nodiscard]] auto type() const -> std::filesystem::file_type;
 
-    auto set_nonblock(bool nonblock) -> void;
+    auto set_nonblock(bool nonblock) & -> void;
 
     auto read_span(span<std::byte> ws, std::size_t &bytes_read) const -> IOStatus;
 
@@ -93,6 +95,7 @@ public:
     [[nodiscard]] auto read(T &out) const -> IOStatus
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable for raw read");
+        check_valid();
 
         std::size_t bytes_read{ 0 };
         auto ws = span<std::byte>(reinterpret_cast<std::byte *>(&out), sizeof(T));
@@ -103,6 +106,7 @@ public:
     [[nodiscard]] auto write(const T &in) const -> IOStatus
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
+        check_valid();
 
         std::size_t bytes_written{ 0 };
         auto rs = span<const std::byte>(reinterpret_cast<const std::byte *>(&in), sizeof(T));
@@ -110,10 +114,17 @@ public:
     }
 
 private:
+    void check_valid() const
+    {
+        if (!valid()) {
+            throw file_descriptor_invalid_exception("invalid fd");
+        }
+    }
+
     // keep this layout, for padding optimization
+    int fd_{ -1 };
     bool nonblock_{ false };
     bool auto_close_{ false };
-    int fd_{ -1 };
 };
 
 } // namespace linyaps_box::utils
