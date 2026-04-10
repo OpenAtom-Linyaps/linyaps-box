@@ -1,52 +1,34 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include "linyaps_box/unixsocket.h"
+#include "linyaps_box/unix_socket.h"
 
-#include "linyaps_box/utils/file.h"
 #include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/log.h"
-#include "linyaps_box/utils/socket.h"
 
 #include <array>
 #include <cstring>
 
 namespace linyaps_box {
 
-unixSocketClient::unixSocketClient(linyaps_box::utils::file_descriptor socket)
-    : linyaps_box::utils::file_descriptor(std::move(socket))
+unix_socket::unix_socket(linyaps_box::socket socket)
+    : socket_(std::move(socket))
 {
-    if (auto type = this->type(); type != std::filesystem::file_type::socket) {
-        auto msg = std::string{ "expected socket, got " };
-        msg.append(linyaps_box::utils::to_string(type));
-        throw std::runtime_error(msg);
-    }
 }
 
-unixSocketClient unixSocketClient::connect(const std::filesystem::path &path)
+unix_socket unix_socket::connect(const std::filesystem::path &path)
 {
-    auto fd = linyaps_box::utils::socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
-    fd.set_nonblock(true);
-
-    struct sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-
-    auto str = path.string();
-    if (str.length() >= sizeof(addr.sun_path)) {
-        throw std::system_error(ENAMETOOLONG, std::system_category(), "path too long");
-    }
-
-    // TODO: add timeout
-    std::copy(str.cbegin(), str.cend(), addr.sun_path);
-    utils::connect(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
-
-    return unixSocketClient(std::move(fd));
+    auto addr = socketAddress::unix(path.native());
+    auto socket = linyaps_box::socket(socket::Domain::Unix, socket::Type::Seqpacket);
+    socket.connect(addr); // Maybe add timeout?
+    socket.set_nonblock(true);
+    return unix_socket(std::move(socket));
 }
 
 // TODO: support request/response
 // https://github.com/opencontainers/runtime-tools/blob/v0.9.0/docs/command-line-interface.md#console-socket
-auto unixSocketClient::send_fd(utils::file_descriptor &&fd, std::string_view payload) const -> void
+auto unix_socket::send_fd(utils::file_descriptor &&fd, std::string_view payload) const -> void
 {
     if (!fd.valid()) {
         throw std::runtime_error("invalid file descriptor");
@@ -54,13 +36,13 @@ auto unixSocketClient::send_fd(utils::file_descriptor &&fd, std::string_view pay
 
     LINYAPS_BOX_DEBUG() << "Send fd \n"
                         << utils::inspect_fd(fd.get()) << "\n to socket \n"
-                        << utils::inspect_fd(this->get());
+                        << utils::inspect_fd(socket_.native_handle());
 
     const auto raw_fd = fd.get();
-    alignas(struct cmsghdr) std::array<std::byte, CMSG_SPACE(sizeof(raw_fd))> ctrl_buf{};
+    alignas(struct cmsghdr) std::array<std::byte, CMSG_SPACE(sizeof(raw_fd))> ctrl_buf{ };
 
     std::byte placeholder{ 0 };
-    struct iovec iov{};
+    struct iovec iov{ };
     if (payload.empty()) {
         iov.iov_base = &placeholder;
         iov.iov_len = sizeof(placeholder);
@@ -69,7 +51,7 @@ auto unixSocketClient::send_fd(utils::file_descriptor &&fd, std::string_view pay
         iov.iov_len = payload.size();
     }
 
-    struct msghdr msg{};
+    struct msghdr msg{ };
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
     msg.msg_control = ctrl_buf.data();
@@ -84,7 +66,7 @@ auto unixSocketClient::send_fd(utils::file_descriptor &&fd, std::string_view pay
     msg.msg_controllen = ctrl_msg->cmsg_len;
 
     while (true) {
-        auto ret = ::sendmsg(get(), &msg, 0);
+        auto ret = ::sendmsg(socket_.native_handle(), &msg, 0);
         if (ret < 0) {
             if (errno == EINTR) {
                 continue;
@@ -97,26 +79,27 @@ auto unixSocketClient::send_fd(utils::file_descriptor &&fd, std::string_view pay
     }
 }
 
-auto unixSocketClient::recv_fd(std::string &payload) const -> utils::file_descriptor
+auto unix_socket::recv_fd(std::string &payload) const -> utils::file_descriptor
 {
-    LINYAPS_BOX_DEBUG() << "Receive fd from socket \n" << utils::inspect_fd(this->get());
+    LINYAPS_BOX_DEBUG() << "Receive fd from socket \n"
+                        << utils::inspect_fd(socket_.native_handle());
 
     constexpr auto batch_size = 4096;
     payload.clear();
     payload.reserve(batch_size);
 
-    struct msghdr msg{};
+    struct msghdr msg{ };
     struct iovec iov{ payload.data(), batch_size };
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
-    alignas(struct cmsghdr) std::array<std::byte, CMSG_SPACE(sizeof(int))> cmsg_buf{};
+    alignas(struct cmsghdr) std::array<std::byte, CMSG_SPACE(sizeof(int))> cmsg_buf{ };
     msg.msg_control = cmsg_buf.data();
     msg.msg_controllen = cmsg_buf.size();
 
     ssize_t len{ 0 };
     while (true) {
-        len = ::recvmsg(get(), &msg, 0);
+        len = ::recvmsg(socket_.native_handle(), &msg, 0);
         if (len > 0) {
             break;
         }
@@ -152,6 +135,28 @@ auto unixSocketClient::recv_fd(std::string &payload) const -> utils::file_descri
     LINYAPS_BOX_DEBUG() << "Received fd " << utils::inspect_fd(received_fd);
 
     return utils::file_descriptor{ received_fd };
+}
+
+auto unix_socket::pair() -> std::pair<unix_socket, unix_socket>
+{
+    std::array<int, 2> fds{ };
+    if (::socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, fds.data()) == -1) {
+        throw std::system_error(errno, std::system_category(), "socketpair");
+    }
+
+    return { unix_socket{ fds.at(0) }, unix_socket{ fds.at(1) } };
+}
+
+auto unix_socket::operator<<(const std::byte &byte) -> unix_socket &
+{
+    socket_ << byte;
+    return *this;
+}
+
+auto unix_socket::operator>>(std::byte &byte) -> unix_socket &
+{
+    socket_ >> byte;
+    return *this;
 }
 
 } // namespace linyaps_box
