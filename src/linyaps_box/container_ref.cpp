@@ -1,17 +1,15 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "linyaps_box/container_ref.h"
 
 #include "linyaps_box/container_monitor.h"
+#include "linyaps_box/socket.h"
 #include "linyaps_box/terminal.h"
-#include "linyaps_box/utils/file.h"
 #include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/process.h"
 #include "linyaps_box/utils/session.h"
-#include "linyaps_box/utils/socket.h"
-#include "linyaps_box/utils/terminal.h"
 
 #include <csignal> // IWYU pragma: keep
 #include <utility>
@@ -52,11 +50,11 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
     // TODO: support detach later
     utils::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
 
-    std::optional<unixSocketClient> recv_socketpair;
+    std::optional<unix_socket> recv_socketpair;
     if (option.proc.terminal && !option.console_socket) {
-        auto [socket1, socket2] = utils::socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
-        option.console_socket = unixSocketClient{ std::move(socket1) };
-        recv_socketpair = unixSocketClient{ std::move(socket2) };
+        auto [socket1, socket2] = linyaps_box::unix_socket::pair();
+        option.console_socket = unix_socket{ std::move(socket1) };
+        recv_socketpair = unix_socket{ std::move(socket2) };
     }
 
     auto child = fork();
@@ -72,7 +70,7 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
 
             slave.setup_stdio();
             // TODO: use fchown after we implement exec option `--user`
-            slave.set_size({});
+            slave.set_size({ });
 
             option.console_socket->send_fd(std::move(master).take());
             option.console_socket.reset();
@@ -121,8 +119,8 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
         _exit(EXIT_FAILURE);
     }
 
-    auto in = utils::file_descriptor{ utils::fileno(stdin), false };
-    auto out = utils::file_descriptor{ utils::fileno(stdout), false };
+    auto in = utils::file_descriptor{ STDIN_FILENO, false };
+    auto out = utils::file_descriptor{ STDOUT_FILENO, false };
 
     container_monitor monitor{ child };
 

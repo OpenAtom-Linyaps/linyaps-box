@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -7,7 +7,7 @@
 #include "linyaps_box/cgroup_manager.h"
 #include "linyaps_box/container_ref.h"
 #include "linyaps_box/status_directory.h"
-#include "linyaps_box/unixsocket.h"
+#include "linyaps_box/unix_socket.h"
 #include "linyaps_box/utils/file_describer.h"
 
 namespace linyaps_box {
@@ -25,7 +25,7 @@ struct create_container_options_t
 struct run_container_options_t
 {
     int preserve_fds;
-    std::optional<unixSocketClient> console_socket;
+    std::optional<unix_socket> console_socket;
 };
 
 class container final : public container_ref
