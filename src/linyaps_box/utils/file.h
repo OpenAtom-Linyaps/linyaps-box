@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -60,5 +60,9 @@ auto is_type(mode_t mode, std::filesystem::file_type type) noexcept -> bool;
 auto is_type(mode_t mode, mode_t type) noexcept -> bool;
 
 auto to_string(std::filesystem::file_type type) noexcept -> std::string_view;
+
+auto read_all(const std::filesystem::path &path) -> std::string;
+
+auto read_all(const file_descriptor &fd, std::size_t size) -> std::string;
 
 } // namespace linyaps_box::utils

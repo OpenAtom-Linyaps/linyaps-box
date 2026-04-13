@@ -1,7 +1,6 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
-
 #include "linyaps_box/utils/file.h"
 
 #include "linyaps_box/utils/inspect.h"
@@ -10,6 +9,7 @@
 #include <sys/syscall.h>
 
 #include <cassert>
+#include <fstream>
 
 #ifdef LINYAPS_BOX_HAVE_OPENAT2_H
 #include <linux/openat2.h>
@@ -65,6 +65,16 @@ auto syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, 
     }
 
     return linyaps_box::utils::file_descriptor{ static_cast<int>(ret) };
+}
+
+auto read_pseudo_file(const std::filesystem::path &path) -> std::string
+{
+    std::ifstream ifs(path, std::ios::in | std::ios::binary);
+    if (!ifs) {
+        throw std::runtime_error("Can't open pseudo file " + path.string());
+    }
+
+    return { (std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>() };
 }
 
 } // namespace
@@ -146,7 +156,7 @@ auto touch(const file_descriptor &root, const std::filesystem::path &path, int f
 
 auto fstat(const file_descriptor &fd) -> struct stat
 {
-    struct stat statbuf{};
+    struct stat statbuf{ };
     auto ret = ::fstat(fd.get(), &statbuf);
     if (ret == -1) {
         throw std::system_error(errno, std::system_category(), "fstat");
@@ -159,7 +169,7 @@ auto fstat(const file_descriptor &fd) -> struct stat
 auto fstatat(const file_descriptor &fd, const std::filesystem::path &path, int flag) -> struct stat
 
 {
-    struct stat statbuf{};
+    struct stat statbuf{ };
     auto ret = ::fstatat(fd.get(), path.c_str(), &statbuf, flag);
     if (ret == -1) {
         throw std::system_error(errno, std::system_category(), "fstatat");
@@ -186,7 +196,7 @@ auto lstatat(const file_descriptor &fd, const std::filesystem::path &path) -> st
 auto lstat(const std::filesystem::path &path) -> struct stat
 
 {
-    struct stat statbuf{};
+    struct stat statbuf{ };
     auto ret = ::lstat(path.c_str(), &statbuf);
     if (ret == -1) {
         throw std::system_error(errno,
@@ -201,7 +211,7 @@ auto lstat(const std::filesystem::path &path) -> struct stat
 auto statfs(const file_descriptor &fd) -> struct statfs
 
 {
-    struct statfs statbuf{};
+    struct statfs statbuf{ };
     auto ret = ::statfs(fd.proc_path().c_str(), &statbuf);
     if (ret == -1) {
         throw std::system_error(errno, std::system_category(), "statfs");
@@ -316,6 +326,30 @@ auto to_string(std::filesystem::file_type type) noexcept -> std::string_view
     }
 
     __builtin_unreachable();
+}
+
+auto read_all(const std::filesystem::path &path) -> std::string
+{
+    auto fd = open(path, O_RDONLY | O_CLOEXEC);
+    auto stat = fstat(fd);
+    if (stat.st_size == 0) {
+        return read_pseudo_file(path);
+    }
+    return read_all(fd, stat.st_size);
+}
+
+auto read_all(const file_descriptor &fd, std::size_t size) -> std::string
+{
+    std::string content;
+    content.resize(size);
+    std::size_t bytes_read{ 0 };
+    const span<std::byte> buffer(reinterpret_cast<std::byte *>(content.data()), size);
+    auto status = fd.read_span(buffer, bytes_read);
+    if (status != utils::file_descriptor::IOStatus::Success) {
+        throw std::runtime_error("Failed to read file: " + fd.current_path().string());
+    }
+
+    return content;
 }
 
 } // namespace linyaps_box::utils

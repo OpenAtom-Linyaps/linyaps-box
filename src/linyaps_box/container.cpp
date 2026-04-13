@@ -2428,13 +2428,10 @@ linyaps_box::container::container(const status_directory &status_dir,
         config = bundle / config;
     }
 
-    std::ifstream ifs(config);
-    if (!ifs) {
-        throw std::runtime_error("Can't open config file " + config.string());
-    }
-
     LINYAPS_BOX_DEBUG() << "load config from " << config;
-    this->config = linyaps_box::config::parse(ifs);
+    const auto config_str = linyaps_box::utils::read_all(config);
+
+    this->config = linyaps_box::config::parse(config_str);
 
     host_uid_ = ::geteuid();
     host_gid_ = ::getegid();
