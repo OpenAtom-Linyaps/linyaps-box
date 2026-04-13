@@ -200,13 +200,12 @@ void from_json(const nlohmann::json &j, config::process_t &v)
     j.at("cwd").get_to(v.cwd);
 
     if (auto it = j.find("env"); it != j.end()) {
-        auto env = it->get<std::vector<std::string>>();
-        for (const auto &e : env) {
+        it->get_to(v.env);
+        for (const auto &e : v.env) {
             if (e.find('=') == std::string::npos) {
                 throw std::runtime_error("invalid env entry: " + e);
             }
         }
-        v.env = std::move(env);
     }
 
     j.at("args").get_to(v.args);
@@ -299,12 +298,14 @@ void from_json(const nlohmann::json &j, config::hooks_t::hook_t &v)
 
     if (auto it = j.find("env"); it != j.end()) {
         std::unordered_map<std::string, std::string> env;
-        for (const auto &e : it->get<std::vector<std::string>>()) {
+        for (auto &e : it->get<std::vector<std::string>>()) {
             auto pos = e.find('=');
             if (pos == std::string::npos) {
                 throw std::runtime_error("invalid env entry: " + e);
             }
-            env[e.substr(0, pos)] = e.substr(pos + 1);
+            auto key = e.substr(0, pos);
+            e.erase(0, pos + 1);
+            env[std::move(key)] = std::move(e);
         }
         v.env = std::move(env);
     }

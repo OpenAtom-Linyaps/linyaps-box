@@ -55,22 +55,6 @@
 constexpr auto propagations_flag = (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE);
 constexpr auto max_symlink_depth{ 32 };
 
-namespace linyaps_box {
-
-struct container_data
-{
-    bool deny_setgroups{ false };
-    bool mount_dev_from_host{ false };
-    unsigned int rootfs_propagation{ 0 };
-};
-
-container_data &get_private_data(const linyaps_box::container &c) noexcept
-{
-    return *(c.data);
-}
-
-} // namespace linyaps_box
-
 namespace {
 
 enum class sync_message : std::uint8_t {
@@ -335,7 +319,7 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook,
 struct clone_fn_args
 {
     int preserve_fds;
-    const linyaps_box::container *container;
+    linyaps_box::container *container{ nullptr };
     linyaps_box::unix_socket socket;
     std::optional<linyaps_box::unix_socket> console_socket;
 };
@@ -643,7 +627,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
     throw std::runtime_error("mount cgroup: Not implemented");
 }
 
-[[nodiscard]] std::optional<remount_t> do_mount(const linyaps_box::container &container,
+[[nodiscard]] std::optional<remount_t> do_mount(linyaps_box::container &container,
                                                 const linyaps_box::utils::file_descriptor &root,
                                                 const linyaps_box::config::mount_t &mount)
 {
@@ -693,7 +677,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
         }
 
         if (mount.destination == "/dev") {
-            linyaps_box::get_private_data(container).mount_dev_from_host = true;
+            container.set_mount_dev_from_host();
         }
     } else {
         // mount other types
@@ -771,8 +755,7 @@ class mounter
     }
 
 public:
-    explicit mounter(linyaps_box::utils::file_descriptor rootfd,
-                     const linyaps_box::container &container)
+    explicit mounter(linyaps_box::utils::file_descriptor rootfd, linyaps_box::container &container)
         : container(container)
         , root(std::move(rootfd))
     {
@@ -780,7 +763,7 @@ public:
 
     void configure_rootfs()
     {
-        const auto &config = container.get_config();
+        const auto &config = container.get().get_config();
 
         if (!config.linux || !config.linux->namespaces) {
             return;
@@ -816,7 +799,7 @@ public:
         // pivot root will reset the propagation type of rootfs mountpoint
         // we need to save the propagation type to make sure the parent mountpoint of new root is
         // what we want
-        get_private_data(container).rootfs_propagation = flags;
+        container.get().set_rootfs_propagation(flags);
 
         LINYAPS_BOX_DEBUG() << "rebind container rootfs";
 
@@ -841,7 +824,7 @@ public:
 
     void do_mounts()
     {
-        for (const auto &mount : container.get_config().mounts) {
+        for (const auto &mount : container.get().get_config().mounts) {
             this->mount(mount);
         }
     }
@@ -866,7 +849,7 @@ public:
 
     void make_path_readonly()
     {
-        const auto &linux = container.get_config().linux;
+        const auto &linux = container.get().get_config().linux;
         if (!linux || !linux->readonly_paths) {
             LINYAPS_BOX_DEBUG() << "no readonly paths";
             return;
@@ -914,7 +897,7 @@ public:
 
     void make_path_masked()
     {
-        const auto &linux = container.get_config().linux;
+        const auto &linux = container.get().get_config().linux;
         if (!linux || !linux->masked_paths) {
             LINYAPS_BOX_DEBUG() << "no masked paths";
             return;
@@ -969,7 +952,7 @@ public:
         this->configure_default_filesystems();
 
         // maybe user will bind mount the sub directory of / from host
-        if (!linyaps_box::get_private_data(container).mount_dev_from_host) {
+        if (!container.get().mount_dev_from_host()) {
             this->configure_default_devices();
             this->configure_dev_symlinks();
         }
@@ -981,7 +964,7 @@ public:
     }
 
 private:
-    const linyaps_box::container &container;
+    std::reference_wrapper<linyaps_box::container> container;
     linyaps_box::utils::file_descriptor root;
     std::vector<remount_t> remounts;
 
@@ -1210,8 +1193,8 @@ private:
 
         constexpr auto default_mode = 0666;
         constexpr auto default_type = std::filesystem::file_type::character;
-        auto uid = container.get_config().process.user.uid;
-        auto gid = container.get_config().process.user.gid;
+        auto uid = container.get().get_config().process.user.uid;
+        auto gid = container.get().get_config().process.user.gid;
 
         this->configure_device("/dev/null", default_mode, default_type, makedev(1, 3), uid, gid);
         this->configure_device("/dev/zero", default_mode, default_type, makedev(1, 5), uid, gid);
@@ -1244,7 +1227,7 @@ private:
     }
 };
 
-void configure_mounts(const linyaps_box::container &container, const std::filesystem::path &rootfs)
+void configure_mounts(linyaps_box::container &container, const std::filesystem::path &rootfs)
 {
     LINYAPS_BOX_DEBUG() << "Configure mounts";
 
@@ -1460,7 +1443,7 @@ void do_pivot_root(const linyaps_box::container &container, const std::filesyste
 
     // restore the propagation type of rootfs mountpoint
     do_propagation_mount(linyaps_box::utils::open("/", O_PATH | O_CLOEXEC | O_DIRECTORY),
-                         get_private_data(container).rootfs_propagation);
+                         container.rootfs_propagation());
 }
 
 void set_umask(const std::optional<mode_t> &mask)
@@ -1790,7 +1773,7 @@ try {
     except_fds.insert(static_cast<unsigned int>(args.socket.fd().get()));
     close_other_fds(std::move(except_fds));
 
-    const auto &container = *args.container;
+    auto &container = *args.container;
     const auto &config = container.get_config();
     auto &socket = args.socket;
 
@@ -1934,7 +1917,7 @@ void set_rlimits(const linyaps_box::config::process_t::rlimits_t &rlimits)
 }
 
 std::tuple<int, linyaps_box::unix_socket> start_container_process(
-        const linyaps_box::container &container, linyaps_box::run_container_options_t &options)
+        linyaps_box::container &container, linyaps_box::run_container_options_t &options)
 {
     const auto &config = container.get_config();
     LINYAPS_BOX_DEBUG() << "All opened file describers before open sockets:\n"
@@ -2047,10 +2030,9 @@ std::tuple<int, linyaps_box::unix_socket> start_container_process(
     throw std::runtime_error("user_namespace helper exited abnormally");
 }
 
-void set_deny_groups(const linyaps_box::container &container, const std::filesystem::path &filepath)
+void set_deny_groups(linyaps_box::container &container, const std::filesystem::path &filepath)
 {
-    auto data = linyaps_box::get_private_data(container);
-    if (data.deny_setgroups) {
+    if (container.deny_setgroups()) {
         throw std::runtime_error("denying setgroups");
     }
 
@@ -2060,10 +2042,10 @@ void set_deny_groups(const linyaps_box::container &container, const std::filesys
         throw std::system_error{ errno, std::system_category(), "write setgroups" };
     }
 
-    data.deny_setgroups = true;
+    container.set_deny_setgroups();
 }
 
-void configure_gid_mapping(pid_t pid, const linyaps_box::container &container)
+void configure_gid_mapping(pid_t pid, linyaps_box::container &container)
 {
     LINYAPS_BOX_DEBUG() << "Configure GID mappings";
 
@@ -2081,8 +2063,7 @@ void configure_gid_mapping(pid_t pid, const linyaps_box::container &container)
     const auto is_single_mapping = (gid_mappings_v.size() == 1 && gid_mappings_v[0].size == 1
                                     && gid_mappings_v[0].host_id == gid_mappings_v[0].container_id);
     if (is_single_mapping) {
-        const auto &data = linyaps_box::get_private_data(container);
-        if (!data.deny_setgroups) {
+        if (!container.deny_setgroups()) {
             set_deny_groups(container,
                             std::filesystem::path{ "/proc" } / std::to_string(pid) / "setgroups");
         }
@@ -2236,7 +2217,7 @@ void configure_container_cgroup([[maybe_unused]] const linyaps_box::container &c
     // do some other settings -> configuration done
 }
 
-void configure_container_namespaces(const linyaps_box::container &container,
+void configure_container_namespaces(linyaps_box::container &container,
                                     linyaps_box::unix_socket &socket)
 {
     LINYAPS_BOX_DEBUG()
@@ -2420,7 +2401,6 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 linyaps_box::container::container(const status_directory &status_dir,
                                   const create_container_options_t &options)
     : container_ref(status_dir, options.ID)
-    , data(new linyaps_box::container_data)
     , bundle(options.bundle)
 {
     auto config = options.config;
@@ -2469,11 +2449,6 @@ linyaps_box::container::container(const status_directory &status_dir,
     }
 }
 
-linyaps_box::container::~container() noexcept
-{
-    delete data;
-}
-
 const linyaps_box::config &linyaps_box::container::get_config() const
 {
     return this->config;
@@ -2485,7 +2460,7 @@ const std::filesystem::path &linyaps_box::container::get_bundle() const
 }
 
 // maybe we need a internal run function?
-int linyaps_box::container::run(run_container_options_t options) const
+int linyaps_box::container::run(run_container_options_t options)
 {
     int container_process_exit_code{ -1 };
 
