@@ -30,7 +30,7 @@ namespace linyaps_box {
 
 struct config
 {
-    static constexpr auto oci_version = "1.2.0";
+    static constexpr auto oci_version = "1.2.1";
 
     static auto parse(std::string_view content) -> config;
 
