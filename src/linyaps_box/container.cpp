@@ -829,8 +829,21 @@ public:
         }
     }
 
-    void mount(const linyaps_box::config::mount_t &mount)
+    void mount(const linyaps_box::config::mount_t &mount_input)
     {
+        auto mount = mount_input;
+
+        if ((mount.flags & MS_BIND) != 0 && mount.source.has_value()) {
+            auto source_path = std::filesystem::path(mount.source.value());
+            if (source_path.is_relative()) {
+                auto absolute_source =
+                        std::filesystem::canonical(container.get().get_bundle() / source_path);
+                mount.source = absolute_source.string();
+                LINYAPS_BOX_DEBUG() << "Resolved relative mount source " << source_path << " to "
+                                    << absolute_source;
+            }
+        }
+
         if ((mount.extension_flags & linyaps_box::config::mount_t::extension::COPY_SYMLINK)
             != linyaps_box::config::mount_t::extension::NONE) {
             auto ret = create_destination_symlink(root,
