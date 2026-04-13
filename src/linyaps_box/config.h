@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022-2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -31,7 +32,7 @@ struct config
 {
     static constexpr auto oci_version = "1.2.0";
 
-    static auto parse(std::istream &is) -> config;
+    static auto parse(std::string_view content) -> config;
 
     struct process_t
     {
