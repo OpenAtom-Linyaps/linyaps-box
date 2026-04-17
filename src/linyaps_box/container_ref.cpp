@@ -48,7 +48,7 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
     auto target = std::to_string(this->status().PID);
 
     // TODO: support detach later
-    utils::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
+    std::ignore = utils::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
 
     std::optional<unix_socket> recv_socketpair;
     if (option.proc.terminal && !option.console_socket) {

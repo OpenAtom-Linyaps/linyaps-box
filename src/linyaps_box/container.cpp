@@ -25,7 +25,6 @@
 
 #include <linux/magic.h>
 #include <sys/mount.h>
-#include <sys/prctl.h>
 #include <sys/signalfd.h>
 #include <sys/statfs.h>
 #include <sys/sysmacros.h>
@@ -1564,10 +1563,7 @@ void set_capabilities(const linyaps_box::config &config, int last_cap)
     }
 
     // keep current capabilities, we need these caps on later
-    ret = prctl(PR_SET_KEEPCAPS, 1);
-    if (ret < 0) {
-        throw std::system_error(errno, std::system_category(), "keep current capabilities");
-    }
+    std::ignore = linyaps_box::utils::prctl(PR_SET_KEEPCAPS, 1);
 
     const auto &process = config.process;
     ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
@@ -1586,16 +1582,10 @@ void set_capabilities(const linyaps_box::config &config, int last_cap)
     }
 
 #ifdef PR_CAP_AMBIENT
-    ret = prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L);
-    if (ret < 0) {
-        throw std::system_error(errno, std::system_category(), "cap_ambient_clear_all");
-    }
+    std::ignore = linyaps_box::utils::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L);
 
     std::for_each(capabilities.ambient.cbegin(), capabilities.ambient.cend(), [](cap_value_t cap) {
-        auto ret = prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap, 0L, 0L);
-        if (ret < 0) {
-            throw std::system_error(errno, std::system_category(), "cap_ambient_raise");
-        }
+        std::ignore = linyaps_box::utils::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap, 0L, 0L);
     });
 #endif
 
@@ -1603,9 +1593,7 @@ void set_capabilities(const linyaps_box::config &config, int last_cap)
 
     if (config.process.no_new_privileges) {
         LINYAPS_BOX_DEBUG() << "Set no new privileges";
-        if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0) {
-            throw std::system_error(errno, std::system_category(), "prctl");
-        }
+        std::ignore = linyaps_box::utils::prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
     }
 }
 
@@ -2477,7 +2465,7 @@ int linyaps_box::container::run(run_container_options_t options)
 {
     int container_process_exit_code{ -1 };
 
-    utils::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
+    std::ignore = utils::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
 
     try {
         // TODO: there are some thing that should be done before starting the container process
