@@ -1378,6 +1378,7 @@ void wait_create_runtime_result(const linyaps_box::config &config, linyaps_box::
 }
 
 void create_container_hooks(const linyaps_box::container &container,
+                            const linyaps_box::container_status_t &status,
                             linyaps_box::unix_socket &socket)
 {
     const auto &config = container.get_config();
@@ -1387,9 +1388,8 @@ void create_container_hooks(const linyaps_box::container &container,
 
     LINYAPS_BOX_DEBUG() << "Execute create container hooks";
 
-    auto state = container.status();
     for (const auto &hook : config.hooks.create_container.value()) {
-        execute_hook(hook, state);
+        execute_hook(hook, status);
     }
 
     LINYAPS_BOX_DEBUG() << "Create container hooks executed";
@@ -1598,6 +1598,7 @@ void set_capabilities(const linyaps_box::config &config, int last_cap)
 }
 
 void start_container_hooks(const linyaps_box::container &container,
+                           const linyaps_box::container_status_t &status,
                            linyaps_box::unix_socket &socket)
 {
     const auto &config = container.get_config();
@@ -1607,9 +1608,8 @@ void start_container_hooks(const linyaps_box::container &container,
 
     LINYAPS_BOX_DEBUG() << "Execute start container hooks";
 
-    auto state = container.status();
     for (const auto &hook : config.hooks.start_container.value()) {
-        execute_hook(hook, state);
+        execute_hook(hook, status);
     }
 
     LINYAPS_BOX_DEBUG() << "Start container hooks executed";
@@ -1789,7 +1789,9 @@ try {
     configure_mounts(container, rootfs);
     wait_prestart_hooks_result(config, socket);
     wait_create_runtime_result(config, socket);
-    create_container_hooks(container, socket);
+
+    auto status = container.status();
+    create_container_hooks(container, status, socket);
     // TODO: selinux label/apparmor profile
     do_pivot_root(container, rootfs);
 
@@ -1809,7 +1811,7 @@ try {
     linyaps_box::utils::sigprocmask(SIG_UNBLOCK, set, nullptr);
     linyaps_box::utils::reset_signals(set);
 
-    start_container_hooks(container, socket);
+    start_container_hooks(container, status, socket);
     execute_process(config);
 } catch (const std::system_error &e) {
     LINYAPS_BOX_ERR() << "clone failed: " << e.what();

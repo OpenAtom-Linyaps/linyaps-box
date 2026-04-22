@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -23,7 +23,9 @@ auto read_status(const std::filesystem::path &path) -> linyaps_box::container_st
     {
         std::ifstream istrm(path);
         if (istrm.fail()) {
-            throw std::runtime_error("failed to open status file:" + path.string());
+            throw std::system_error(errno,
+                                    std::system_category(),
+                                    "failed to open status file:" + path.string());
         }
 
         istrm >> j;
@@ -71,6 +73,11 @@ void linyaps_box::impl::status_directory::remove(const std::string &id) const
 {
     auto file_path = this->path / (id + ".json");
     LINYAPS_BOX_DEBUG() << "Remove " << file_path;
+    if (!std::filesystem::exists(file_path)) {
+        LINYAPS_BOX_WARNING() << "Status file " << file_path << " does not exist";
+        return;
+    }
+
     if (!std::filesystem::remove(file_path)) {
         LINYAPS_BOX_WARNING() << "Failed to remove " << file_path;
     }
