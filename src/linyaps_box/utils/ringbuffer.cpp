@@ -68,7 +68,7 @@ auto ring_buffer::create(std::size_t requested_capacity) -> ptr
     auto *data_base = static_cast<std::byte *>(addr) + meta_size;
     auto *rb = new (addr) ring_buffer(cap, data_base);
 
-    auto deleter = ring_buffer::deleter{ .total_size = total_vma };
+    auto deleter = ring_buffer::deleter{ total_vma };
     return { rb, std::move(deleter) };
 }
 
