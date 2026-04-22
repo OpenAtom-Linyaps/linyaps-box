@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -37,7 +37,7 @@ void close_range_fallback(uint first, uint last, int flags)
         throw std::system_error(errno, std::system_category(), "opendir /proc/self/fd");
     }
 
-    auto close_dir = make_defer([dir]() noexcept {
+    auto close_dir = linyaps_box::utils::make_defer([dir]() noexcept {
         if (closedir(dir) < 0) {
             LINYAPS_BOX_WARNING() << "closedir /proc/self/fd failed: " << strerror(errno)
                                   << ", but this may not be a problem";

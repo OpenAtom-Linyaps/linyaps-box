@@ -201,6 +201,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/mkdir.h
     src/linyaps_box/utils/mknod.cpp
     src/linyaps_box/utils/mknod.h
+    src/linyaps_box/utils/mman.cpp
     src/linyaps_box/utils/platform.cpp
     src/linyaps_box/utils/platform.h
     src/linyaps_box/utils/process.cpp
