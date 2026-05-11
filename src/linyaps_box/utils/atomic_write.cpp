@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -6,7 +6,7 @@
 
 #include <fstream>
 
-void linyaps_box::utils::atomic_write(const std::filesystem::path &path, const std::string &content)
+void linyaps_box::utils::atomic_write(const std::filesystem::path &path, std::string_view content)
 {
     std::filesystem::path temp_path = path;
     temp_path += ".tmp";
