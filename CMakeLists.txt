@@ -152,15 +152,13 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/container_ref.cpp
     src/linyaps_box/container_ref.h
     src/linyaps_box/container_status.cpp
-    src/linyaps_box/container_status.h
-    src/linyaps_box/impl/disabled_cgroup_manager.cpp
-    src/linyaps_box/impl/disabled_cgroup_manager.h
-    src/linyaps_box/impl/json_printer.cpp
-    src/linyaps_box/impl/json_printer.h
-    src/linyaps_box/impl/status_directory.cpp
-    src/linyaps_box/impl/status_directory.h
-    src/linyaps_box/impl/table_printer.cpp
-    src/linyaps_box/impl/table_printer.h
+     src/linyaps_box/container_status.h
+     src/linyaps_box/impl/disabled_cgroup_manager.cpp
+     src/linyaps_box/impl/disabled_cgroup_manager.h
+     src/linyaps_box/impl/json_printer.cpp
+     src/linyaps_box/impl/json_printer.h
+     src/linyaps_box/impl/table_printer.cpp
+     src/linyaps_box/impl/table_printer.h
     src/linyaps_box/interface.cpp
     src/linyaps_box/interface.h
     src/linyaps_box/io/epoll.cpp
@@ -173,8 +171,10 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/runtime.h
     src/linyaps_box/socket.cpp
     src/linyaps_box/socket.h
-    src/linyaps_box/status_directory.cpp
-    src/linyaps_box/status_directory.h
+     src/linyaps_box/status_directory.cpp
+     src/linyaps_box/status_directory.h
+     src/linyaps_box/status_directory_manager.cpp
+     src/linyaps_box/status_directory_manager.h
     src/linyaps_box/terminal.cpp
     src/linyaps_box/terminal.h
     src/linyaps_box/unix_socket.cpp

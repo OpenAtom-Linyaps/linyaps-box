@@ -2401,9 +2401,9 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 
 } // namespace
 
-linyaps_box::container::container(const status_directory &status_dir,
-                                  const create_container_options_t &options)
-    : container_ref(status_dir, options.ID)
+linyaps_box::container::container(status_directory status_dir,
+                                   const create_container_options_t &options)
+    : container_ref(std::move(status_dir), options.ID)
     , bundle(options.bundle)
 {
     auto config = options.config;
@@ -2419,7 +2419,6 @@ linyaps_box::container::container(const status_directory &status_dir,
     host_uid_ = ::geteuid();
     host_gid_ = ::getegid();
 
-    // TODO: maybe find another way to get user name
 #ifndef LINYAPS_BOX_STATIC_LINK
     auto *pw = getpwuid(host_uid_);
     if (pw == nullptr) {
@@ -2441,6 +2440,8 @@ linyaps_box::container::container(const status_directory &status_dir,
 #endif
         this->status_dir().write(status);
     }
+
+    this->status_dir().write_config(config_str);
 
     switch (options.manager) {
     case cgroup_manager_t::disabled: {
@@ -2550,7 +2551,7 @@ int linyaps_box::container::run(run_container_options_t options)
         LINYAPS_BOX_ERR() << "failed to run a container, caused by: " << e.what();
     }
 
-    this->status_dir().remove(this->get_id());
+    this->status_dir().remove();
 
     // TODO: cleanup cgroup
 

@@ -31,7 +31,7 @@ struct run_container_options_t
 class container final : public container_ref
 {
 public:
-    container(const status_directory &status_dir, const create_container_options_t &options);
+    container(status_directory status_dir, const create_container_options_t &options);
 
     container(const container &) = delete;
     auto operator=(const container &) -> container & = delete;

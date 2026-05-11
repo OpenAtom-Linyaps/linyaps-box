@@ -1,18 +1,16 @@
-// SPDX-FileCopyrightText: 2022-2026 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "linyaps_box/command/exec.h"
 
-#include "linyaps_box/impl/status_directory.h"
 #include "linyaps_box/runtime.h"
-#include "linyaps_box/status_directory.h"
+#include "linyaps_box/status_directory_manager.h"
 
 auto linyaps_box::command::exec(const struct exec_options &options) -> int
 {
-    std::unique_ptr<status_directory> dir =
-            std::make_unique<impl::status_directory>(options.global_.get().root);
-    runtime_t runtime(std::move(dir));
+    status_directory_manager mgr(options.global_.get().root);
+    runtime_t runtime(std::move(mgr));
 
     auto container_refs = runtime.containers();
     auto container = container_refs.find(options.ID);
@@ -25,7 +23,7 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
     option.proc.args = options.command;
     option.proc.terminal = options.tty;
     option.proc.no_new_privileges = options.no_new_privs;
-    option.proc.env = options.envs.value_or(std::vector<std::string>{ });
+    option.proc.env = options.envs.value_or(std::vector<std::string>{});
     option.preserve_fds = options.preserve_fds;
 
     if (option.proc.terminal && options.console_socket) {
@@ -41,7 +39,7 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
                     caps.cend(),
                     std::back_inserter(cap_set),
                     [](const std::string &cap) {
-                        cap_value_t val{ 0 };
+                        cap_value_t val{0};
                         if (cap_from_name(cap.c_str(), &val) < 0) {
                             throw std::system_error(errno, std::system_category(), "cap_from_name");
                         }
@@ -56,8 +54,6 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
         transform_cap(option.proc.capabilities.permitted);
     }
 #endif
-
-    // TODO: support exec fully
 
     return container->second.exec(std::move(option));
 }
