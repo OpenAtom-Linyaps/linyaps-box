@@ -461,7 +461,10 @@ void do_remount(const remount_t &mount)
     if ((dest_flag & MS_RDONLY) != 0) {
         remount_flags = dest_flag & (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RDONLY);
         syscall_mount(nullptr, destination.c_str(), nullptr, mount.flags | remount_flags, data_ptr);
+        return;
     }
+
+    throw std::runtime_error("remount failed after all fallbacks");
 }
 
 [[nodiscard]] linyaps_box::utils::file_descriptor create_destination_directory(
