@@ -418,7 +418,7 @@ void do_remount(const remount_t &mount)
     assert(mount.destination_fd.get() != -1);
     assert(mount.flags & (MS_BIND | MS_REMOUNT | MS_RDONLY));
 
-    auto destination = mount.destination_fd.proc_path();
+    auto destination = mount.destination_fd.current_path();
     const auto *data_ptr = mount.data.empty() ? nullptr : mount.data.c_str();
 
     // for old kernel
@@ -456,12 +456,16 @@ void do_remount(const remount_t &mount)
                                 << "with flags " << dump_mount_flags(remount_flags | mount.flags)
                                 << ": " << e.what() << ", retrying";
         }
-    }
 
-    if ((dest_flag & MS_RDONLY) != 0) {
-        remount_flags = dest_flag & (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RDONLY);
-        syscall_mount(nullptr, destination.c_str(), nullptr, mount.flags | remount_flags, data_ptr);
-        return;
+        if ((dest_flag & MS_RDONLY) != 0) {
+            remount_flags = dest_flag & (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RDONLY);
+            syscall_mount(nullptr,
+                          destination.c_str(),
+                          nullptr,
+                          mount.flags | remount_flags,
+                          data_ptr);
+            return;
+        }
     }
 
     throw std::runtime_error("remount failed after all fallbacks");
@@ -578,13 +582,15 @@ try {
 void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination,
                           const unsigned long &flags)
 {
+    LINYAPS_BOX_DEBUG() << "mount propagation flags";
+
     assert(destination.get() != -1);
 
     if (flags == 0) {
         return;
     }
 
-    syscall_mount(nullptr, destination.proc_path().c_str(), nullptr, flags, nullptr);
+    syscall_mount(nullptr, destination.current_path().c_str(), nullptr, flags, nullptr);
 }
 
 [[nodiscard]] linyaps_box::utils::file_descriptor do_bind_mount(
@@ -808,7 +814,8 @@ public:
         linyaps_box::config::mount_t mount;
         mount.source = root.current_path();
         mount.destination = ".";
-        mount.flags = MS_BIND | MS_REC | MS_PRIVATE;
+        mount.flags = MS_BIND | MS_REC;
+        mount.propagation_flags = MS_PRIVATE | MS_REC;
         auto ret = do_mount(container, root, mount);
         assert(!ret);
 
@@ -2405,7 +2412,7 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 } // namespace
 
 linyaps_box::container::container(status_directory status_dir,
-                                   const create_container_options_t &options)
+                                  const create_container_options_t &options)
     : container_ref(std::move(status_dir), options.ID)
     , bundle(options.bundle)
 {
