@@ -224,8 +224,6 @@ set(linyaps-box_LIBRARY_SOURCE
 set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
 
 if(NOT linyaps-box_MAKE_RELEASE)
-  message(STATUS "make dev build")
-
   execute_process(
     COMMAND git rev-parse --short=7 HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -233,6 +231,7 @@ if(NOT linyaps-box_MAKE_RELEASE)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   set(LINYAPS_BOX_VERSION "${LINYAPS_BOX_VERSION}-dev-${GIT_COMMIT_HASH}")
+  message(STATUS "make dev build: ${LINYAPS_BOX_VERSION}")
 endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/linyaps_box/version.h.in
