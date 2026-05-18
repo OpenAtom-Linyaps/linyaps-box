@@ -65,6 +65,7 @@ enum class sync_message : std::uint8_t {
     CREATERUNTIME_HOOKS_EXECUTED,
     CREATECONTAINER_HOOKS_EXECUTED,
     STARTCONTAINER_HOOKS_EXECUTED,
+    ERROR,
 };
 
 struct security_status
@@ -98,6 +99,9 @@ std::ostream &operator<<(std::ostream &os, const sync_message message)
     } break;
     case sync_message::STARTCONTAINER_HOOKS_EXECUTED: {
         os << "START_CONTAINER_HOOKS_EXECUTED";
+    } break;
+    case sync_message::ERROR: {
+        os << "ERROR";
     } break;
     default: {
         LINYAPS_BOX_ERR() << "Invalid sync_message value: " << static_cast<uint8_t>(message);
@@ -171,6 +175,26 @@ public:
     {
     }
 };
+
+class child_process_error : public std::runtime_error
+{
+public:
+    explicit child_process_error(const std::string &what)
+        : std::runtime_error(what)
+    {
+    }
+};
+
+auto read_sync_message(linyaps_box::unix_socket &socket) -> sync_message
+{
+    std::byte byte{ };
+    socket >> byte;
+    auto message = sync_message(byte);
+    if (message == sync_message::ERROR) {
+        throw child_process_error("container process failed");
+    }
+    return message;
+}
 
 void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook,
                   const linyaps_box::container_status_t &state)
@@ -1855,12 +1879,36 @@ try {
     execute_process(config);
 } catch (const std::system_error &e) {
     LINYAPS_BOX_ERR() << "clone failed: " << e.what();
+
+    try {
+        auto &args = *static_cast<clone_fn_args *>(data);
+        args.socket << std::byte(sync_message::ERROR);
+    } catch (const std::exception &e) {
+        LINYAPS_BOX_ERR() << "failed to write data to socket: " << e.what();
+    }
+
     return -1;
 } catch (const std::exception &e) {
     LINYAPS_BOX_ERR() << "clone failed: " << e.what();
+
+    try {
+        auto &args = *static_cast<clone_fn_args *>(data);
+        args.socket << std::byte(sync_message::ERROR);
+    } catch (const std::exception &e) {
+        LINYAPS_BOX_ERR() << "failed to write data to socket: " << e.what();
+    }
+
     return -1;
 } catch (...) {
     LINYAPS_BOX_ERR() << "clone failed: unknown error";
+
+    try {
+        auto &args = *static_cast<clone_fn_args *>(data);
+        args.socket << std::byte(sync_message::ERROR);
+    } catch (const std::exception &e) {
+        LINYAPS_BOX_ERR() << "failed to write data to socket: " << e.what();
+    }
+
     return -1;
 }
 
@@ -2265,13 +2313,9 @@ void configure_container_namespaces(linyaps_box::container &container,
     LINYAPS_BOX_DEBUG()
             << "Waiting OCI runtime in container namespace to request configure namespace";
 
-    std::byte byte{ };
-    socket >> byte;
-    {
-        auto message = sync_message(byte);
-        if (message != sync_message::REQUEST_CONFIGURE_NAMESPACE) {
-            throw unexpected_sync_message(sync_message::REQUEST_CONFIGURE_NAMESPACE, message);
-        }
+    auto message = read_sync_message(socket);
+    if (message != sync_message::REQUEST_CONFIGURE_NAMESPACE) {
+        throw unexpected_sync_message(sync_message::REQUEST_CONFIGURE_NAMESPACE, message);
     }
 
     LINYAPS_BOX_DEBUG() << "Start configure namespaces";
@@ -2306,8 +2350,7 @@ void configure_container_namespaces(linyaps_box::container &container,
 
     LINYAPS_BOX_DEBUG() << "Container namespaces configured";
 
-    byte = std::byte(sync_message::NAMESPACE_CONFIGURED);
-    socket << byte;
+    socket << std::byte(sync_message::NAMESPACE_CONFIGURED);
 
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
@@ -2320,9 +2363,7 @@ void prestart_hooks(const linyaps_box::container &container, linyaps_box::unix_s
 
     LINYAPS_BOX_DEBUG() << "Waiting request to execute prestart hooks";
 
-    std::byte byte{ };
-    socket >> byte;
-    auto message = sync_message(byte);
+    auto message = read_sync_message(socket);
     if (message != sync_message::REQUEST_PRESTART_HOOKS) {
         throw unexpected_sync_message(sync_message::REQUEST_PRESTART_HOOKS, message);
     }
@@ -2349,9 +2390,7 @@ void create_runtime_hooks(const linyaps_box::container &container, linyaps_box::
 
     LINYAPS_BOX_DEBUG() << "Waiting request to execute create runtime hooks";
 
-    std::byte byte{ };
-    socket >> byte;
-    auto message = sync_message(byte);
+    auto message = read_sync_message(socket);
     if (message != sync_message::REQUEST_CREATERUNTIME_HOOKS) {
         throw unexpected_sync_message(sync_message::REQUEST_CREATERUNTIME_HOOKS, message);
     }
@@ -2380,9 +2419,7 @@ void wait_create_container_result(const linyaps_box::container &container,
     LINYAPS_BOX_DEBUG()
             << "Waiting OCI runtime in container namespace send create container hooks result";
 
-    std::byte byte{ };
-    socket >> byte;
-    auto message = sync_message(byte);
+    auto message = read_sync_message(socket);
     if (message == sync_message::CREATECONTAINER_HOOKS_EXECUTED) {
         LINYAPS_BOX_DEBUG() << "Create container hooks executed";
         return;
@@ -2403,6 +2440,10 @@ try {
     std::byte byte;
     LINYAPS_BOX_DEBUG() << "Waiting socket close";
     socket >> byte;
+    auto message = sync_message(byte);
+    if (message == sync_message::ERROR) {
+        throw child_process_error("container process failed");
+    }
 } catch (const linyaps_box::utils::file_descriptor_closed_exception &e) {
     LINYAPS_BOX_DEBUG() << "Socket closed";
     return;
