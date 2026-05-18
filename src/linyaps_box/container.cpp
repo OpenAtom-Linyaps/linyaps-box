@@ -273,7 +273,7 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook,
             auto sig = sigtimedwait(&mask, &info, &ts);
             if (sig >= 0) {
                 if (info.si_pid != pid) {
-                    throw std::runtime_error("sigtimedwait received signal from another process");
+                    continue;
                 }
 
                 auto ret = waitpid(pid, &status, 0);
