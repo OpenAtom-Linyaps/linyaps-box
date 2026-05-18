@@ -29,6 +29,7 @@ struct defer
 {
     explicit defer(Fn &&fn) noexcept
         : fn_(std::move(fn))
+        , uncaught_count(std::uncaught_exceptions())
     {
     }
 
@@ -37,6 +38,7 @@ struct defer
 
     defer(defer &&other) noexcept
         : fn_(std::move(other.fn_))
+        , uncaught_count(other.uncaught_count)
         , cancelled(other.cancelled)
     {
         other.cancelled = true;
@@ -44,17 +46,15 @@ struct defer
 
     defer &operator=(defer &&other) noexcept
     {
-        if (this == &other) {
-            return *this;
-        }
+        if (this != &other) {
+            defer temp{ std::move(*this) };
 
-        if (!cancelled) {
-            execute();
-        }
+            fn_ = std::move(other.fn_);
+            uncaught_count = other.uncaught_count;
+            cancelled = other.cancelled;
 
-        fn_ = std::move(other.fn_);
-        cancelled = other.cancelled;
-        other.cancelled = true;
+            other.cancelled = true;
+        }
 
         return *this;
     }
@@ -66,7 +66,7 @@ struct defer
         }
     }
 
-    void cancel() noexcept { cancelled = true; }
+    auto cancel() noexcept -> void { cancelled = true; }
 
     [[nodiscard]] auto is_cancelled() const noexcept -> bool { return cancelled; }
 
@@ -76,13 +76,14 @@ private:
         if constexpr (Policy == defer_policy::always) {
             fn_();
         } else if constexpr (Policy == defer_policy::on_error) {
-            if (std::uncaught_exceptions() > 0) {
+            if (std::uncaught_exceptions() > uncaught_count) {
                 fn_();
             }
         }
     }
 
     Fn fn_;
+    int uncaught_count;
     bool cancelled{ false };
 };
 
