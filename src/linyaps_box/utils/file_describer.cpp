@@ -38,8 +38,6 @@ linyaps_box::utils::file_descriptor::file_descriptor(int fd, bool auto_close)
         throw file_descriptor_invalid_exception("invalid file descriptor");
     }
 
-    fd_ = fd;
-
     auto flag = fcntl(*this, F_GETFL);
     if ((flag & O_NONBLOCK) != 0) {
         nonblock_ = true;
@@ -197,7 +195,7 @@ auto linyaps_box::utils::file_descriptor::proc_path() const -> std::filesystem::
             / std::to_string(fd_);
 }
 
-auto linyaps_box::utils::file_descriptor::current_path() const noexcept -> std::filesystem::path
+auto linyaps_box::utils::file_descriptor::current_path() const -> std::filesystem::path
 {
     check_valid();
 
