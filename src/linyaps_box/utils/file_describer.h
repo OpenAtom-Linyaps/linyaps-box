@@ -75,7 +75,7 @@ public:
 
     [[nodiscard]] auto proc_path() const -> std::filesystem::path;
 
-    [[nodiscard]] auto current_path() const noexcept -> std::filesystem::path;
+    [[nodiscard]] auto current_path() const -> std::filesystem::path;
 
     static auto cwd() -> file_descriptor;
 
