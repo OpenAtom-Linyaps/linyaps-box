@@ -245,20 +245,17 @@ to_linux_file_type(std::filesystem::file_type type) noexcept -> int
         return 0;
     }
     case std::filesystem::file_type::none: {
-        LINYAPS_BOX_DEBUG() << "Try to convert none type to linux file type";
-        assert(false);
-        return -1;
+        LINYAPS_BOX_ERR() << "Invalid file type 'none' in to_linux_file_type";
+        std::terminate();
     }
     case std::filesystem::file_type::not_found: {
-        LINYAPS_BOX_WARNING() << "Try to convert not_found type to linux file type";
-        assert(false);
-        return -1;
+        LINYAPS_BOX_ERR() << "Invalid file type 'not_found' in to_linux_file_type";
+        std::terminate();
     }
     default: {
-        LINYAPS_BOX_ERR() << "Try to convert unhandled file type " << static_cast<int>(type)
-                          << " to linux file type";
-        assert(false);
-        return -1;
+        LINYAPS_BOX_ERR() << "Unhandled file type " << static_cast<int>(type)
+                          << " in to_linux_file_type";
+        std::terminate();
     }
     }
 }

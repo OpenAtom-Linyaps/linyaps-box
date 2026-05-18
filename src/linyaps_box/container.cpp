@@ -100,8 +100,8 @@ std::ostream &operator<<(std::ostream &os, const sync_message message)
         os << "START_CONTAINER_HOOKS_EXECUTED";
     } break;
     default: {
-        assert(false);
-        os << "UNKNOWN " << static_cast<uint8_t>(message);
+        LINYAPS_BOX_ERR() << "Invalid sync_message value: " << static_cast<uint8_t>(message);
+        std::terminate();
     } break;
     }
     return os;
@@ -415,8 +415,12 @@ struct remount_t
 
 void do_remount(const remount_t &mount)
 {
-    assert(mount.destination_fd.get() != -1);
-    assert(mount.flags & (MS_BIND | MS_REMOUNT | MS_RDONLY));
+    if (mount.destination_fd.get() == -1) {
+        throw std::invalid_argument("remount: invalid destination file descriptor");
+    }
+    if ((mount.flags & (MS_BIND | MS_REMOUNT | MS_RDONLY)) == 0) {
+        throw std::invalid_argument("remount: flags must include BIND|REMOUNT|RDONLY");
+    }
 
     auto destination = mount.destination_fd.current_path();
     const auto *data_ptr = mount.data.empty() ? nullptr : mount.data.c_str();
@@ -554,7 +558,9 @@ ensure_mount_destination(bool isDir,
                          const linyaps_box::utils::file_descriptor &root,
                          const linyaps_box::config::mount_t &mount)
 try {
-    assert(mount.destination.has_value());
+    if (!mount.destination.has_value()) {
+        throw std::invalid_argument("mount destination is required");
+    }
     auto open_flag = O_PATH | O_CLOEXEC;
     LINYAPS_BOX_DEBUG() << "Opening " << (isDir ? "directory " : "file ")
                         << mount.destination.value() << " under " << root.current_path();
@@ -584,7 +590,9 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
 {
     LINYAPS_BOX_DEBUG() << "mount propagation flags";
 
-    assert(destination.get() != -1);
+    if (destination.get() == -1) {
+        throw std::invalid_argument("invalid destination file descriptor for propagation mount");
+    }
 
     if (flags == 0) {
         return;
@@ -596,9 +604,15 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
 [[nodiscard]] linyaps_box::utils::file_descriptor do_bind_mount(
         const linyaps_box::utils::file_descriptor &root, const linyaps_box::config::mount_t &mount)
 {
-    assert(mount.flags & MS_BIND);
-    assert(mount.source.has_value());
-    assert(mount.destination.has_value());
+    if ((mount.flags & MS_BIND) == 0) {
+        throw std::invalid_argument("bind mount requires MS_BIND flag");
+    }
+    if (!mount.source.has_value()) {
+        throw std::invalid_argument("bind mount requires source");
+    }
+    if (!mount.destination.has_value()) {
+        throw std::invalid_argument("bind mount requires destination");
+    }
 
     auto open_flag = O_PATH;
     if ((mount.flags & LINGYAPS_MS_NOSYMFOLLOW) != 0) {
@@ -817,7 +831,9 @@ public:
         mount.flags = MS_BIND | MS_REC;
         mount.propagation_flags = MS_PRIVATE | MS_REC;
         auto ret = do_mount(container, root, mount);
-        assert(!ret);
+        if (ret) {
+            do_remount(ret.value());
+        }
 
         // reopen rootfs after mount
         root = linyaps_box::utils::open(root.current_path(), O_PATH | O_CLOEXEC | O_DIRECTORY);
@@ -911,8 +927,10 @@ public:
             LINYAPS_BOX_DEBUG() << "make readonly path " << path << " with "
                                 << dump_mount_flags(mount.flags);
             auto delay_mount = do_mount(container, root, mount);
-            // we do rbind for this path, so remount will be done after finalize
-            assert(delay_mount);
+            if (!delay_mount) {
+                throw std::runtime_error("mount " + path.string()
+                                         + " did not produce a remount entry");
+            }
             remounts.emplace_back(std::move(delay_mount).value());
         }
     }
@@ -954,7 +972,10 @@ public:
 
                 LINYAPS_BOX_DEBUG() << "mask directory " << path;
                 auto delay_mount = do_mount(container, root, mount);
-                assert(delay_mount);
+                if (!delay_mount) {
+                    throw std::runtime_error("mask directory " + path.string()
+                                             + " did not produce a remount entry");
+                }
                 remounts.emplace_back(std::move(delay_mount).value());
                 continue;
             }
@@ -964,7 +985,10 @@ public:
 
             LINYAPS_BOX_DEBUG() << "mask file " << path;
             auto delay_mount = do_mount(container, root, mount);
-            assert(delay_mount);
+            if (!delay_mount) {
+                throw std::runtime_error("mask file " + path.string()
+                                         + " did not produce a remount entry");
+            }
             remounts.emplace_back(std::move(delay_mount).value());
         }
     }
@@ -1123,7 +1147,9 @@ private:
                           uid_t uid,
                           gid_t gid)
     {
-        assert(destination.is_absolute());
+        if (!destination.is_absolute()) {
+            throw std::invalid_argument("destination must be an absolute path");
+        }
 
         if (type != std::filesystem::file_type::character
             && type != std::filesystem::file_type::block
@@ -1320,7 +1346,9 @@ void configure_mounts(linyaps_box::container &container, const std::filesystem::
 
     LINYAPS_BOX_DEBUG() << "Execute container process:" << [&process]() -> std::string {
         std::stringstream ss;
-        assert(!process.args.empty());
+        if (process.args.empty()) {
+            throw std::invalid_argument("process.args must not be empty");
+        }
 
         ss << " " << process.args.at(0);
         std::for_each(process.args.cbegin() + 1, process.args.cend(), [&ss](const auto &arg) {
@@ -1772,7 +1800,9 @@ try {
 
     auto &args = *static_cast<clone_fn_args *>(data);
 
-    assert(args.socket.fd().get() >= 0);
+    if (args.socket.fd().get() < 0) {
+        throw std::runtime_error("clone_fn: invalid socket fd");
+    }
     std::set<uint> except_fds{
         STDIN_FILENO,
         STDOUT_FILENO,
@@ -1898,7 +1928,6 @@ public:
         }
 
         LINYAPS_BOX_ERR() << "munmap child stack failed: " << strerror(errno);
-        assert(false);
     }
 
     [[nodiscard]] auto top() const noexcept -> void *
@@ -2505,7 +2534,10 @@ int linyaps_box::container::run(run_container_options_t options)
 
         {
             auto status = this->status();
-            assert(status.status == container_status_t::runtime_status::CREATING);
+            if (status.status != container_status_t::runtime_status::CREATING) {
+                throw std::runtime_error("unexpected container status before creating: "
+                                         + std::to_string(static_cast<int>(status.status)));
+            }
             status.PID = child_pid;
             status.status = container_status_t::runtime_status::CREATED;
             this->status_dir().write(status);
@@ -2520,7 +2552,10 @@ int linyaps_box::container::run(run_container_options_t options)
 
         {
             auto status = this->status();
-            assert(status.status == container_status_t::runtime_status::CREATED);
+            if (status.status != container_status_t::runtime_status::CREATED) {
+                throw std::runtime_error("unexpected container status before running: "
+                                         + std::to_string(static_cast<int>(status.status)));
+            }
             status.PID = child_pid;
             status.status = container_status_t::runtime_status::RUNNING;
             this->status_dir().write(status);

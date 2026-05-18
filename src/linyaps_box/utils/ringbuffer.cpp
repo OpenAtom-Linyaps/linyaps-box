@@ -29,7 +29,7 @@ auto ring_buffer::deleter::operator()(ring_buffer *rb) const noexcept -> void
         munmap(reinterpret_cast<std::byte *>(rb), total_size); // NOLINT
     } catch (const std::system_error &e) {
         LINYAPS_BOX_ERR() << "Failed to munmap ring buffer: " << e.what();
-        assert(false);
+        // Memory leak, but will be cleaned up by OS on process exit
     }
 }
 
