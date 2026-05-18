@@ -85,8 +85,7 @@ auto unix_socket::recv_fd(std::string &payload) const -> utils::file_descriptor
                         << utils::inspect_fd(socket_.native_handle());
 
     constexpr auto batch_size = 4096;
-    payload.clear();
-    payload.reserve(batch_size);
+    payload.resize(batch_size);
 
     struct msghdr msg{ };
     struct iovec iov{ payload.data(), batch_size };
