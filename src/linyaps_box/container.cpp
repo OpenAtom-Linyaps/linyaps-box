@@ -188,17 +188,18 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook,
         parent.close();
 
         const auto *bin = hook.path.c_str();
-        std::vector<const char *> c_args{ nullptr };
+        std::vector<const char *> c_args;
         if (hook.args) {
-            c_args.reserve(hook.args.value().size() + 1);
             const auto &args = hook.args.value();
-            std::for_each(args.crbegin(), args.crend(), [&c_args](const std::string &arg) {
-                c_args.insert(c_args.begin(), arg.c_str());
-            });
+            c_args.reserve(args.size() + 1);
+            for (const auto &arg : args) {
+                c_args.push_back(arg.c_str());
+            }
         }
+        c_args.push_back(nullptr);
 
         std::vector<std::string> env_storage;
-        std::vector<const char *> c_env{ nullptr };
+        std::vector<const char *> c_env;
         if (hook.env) {
             env_storage.reserve(hook.env.value().size());
             for (const auto &[key, value] : hook.env.value()) {
@@ -206,12 +207,11 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook,
             }
 
             c_env.reserve(env_storage.size() + 1);
-            std::for_each(env_storage.crbegin(),
-                          env_storage.crend(),
-                          [&c_env](const std::string &env) {
-                              c_env.insert(c_env.begin(), env.c_str());
-                          });
+            for (const auto &env : env_storage) {
+                c_env.push_back(env.c_str());
+            }
         }
+        c_env.push_back(nullptr);
 
         execvpe(bin,
                 const_cast<char *const *>(c_args.data()), // NOLINT
