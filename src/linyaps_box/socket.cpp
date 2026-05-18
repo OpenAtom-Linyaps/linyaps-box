@@ -97,8 +97,8 @@ auto socket::listen(int backlog) const -> void
 
 auto socket::accept(socketAddress *peer_addr) const -> socket
 {
-    socklen_t *plen = peer_addr == nullptr ? peer_addr->size() : nullptr;
-    sockaddr *paddr = peer_addr == nullptr ? peer_addr->get() : nullptr;
+    socklen_t *plen = peer_addr != nullptr ? peer_addr->size() : nullptr;
+    sockaddr *paddr = peer_addr != nullptr ? peer_addr->get() : nullptr;
 
     auto client_fd = ::accept4(fd_.get(), paddr, plen, SOCK_CLOEXEC);
     if (client_fd == -1) {
