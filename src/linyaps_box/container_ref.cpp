@@ -79,7 +79,9 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
         auto config_str = status_dir_.read_config();
         auto config = nlohmann::json::parse(config_str);
         const auto &linux = config.at("linux");
-        assert(!linux.is_null());
+        if (linux.is_null()) {
+            throw std::runtime_error("container config missing linux section");
+        }
 
         // FIXME: we assume that container always unshare some namespaces for now
         // support exec commands without setns in the future
