@@ -386,7 +386,7 @@ set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD_REQUIRED ON)
 target_compile_definitions(
   "${linyaps-box_APP}"
   PRIVATE "LINYAPS_BOX_DEFAULT_LOG_LEVEL=${linyaps-box_DEFAULT_LOG_LEVEL}"
-  PRIVATE "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_AVTIVE_LOG_LEVEL}")
+          "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
 target_compile_options("${linyaps-box_APP}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 
@@ -405,7 +405,7 @@ endif()
 if(linyaps-box_ENABLE_CPACK)
   set(CPACK_PACKAGING_INSTALL_PREFIX
       "${linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX}")
-  set(CPACK_PACKAGE_CONTACT "chenlinxuan@uniontech.com")
+  set(CPACK_PACKAGE_CONTACT "heyuming@uniontech.com")
   set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
   set(CPACK_RPM_PACKAGE_AUTOREQ ON)
   include(CPack)
