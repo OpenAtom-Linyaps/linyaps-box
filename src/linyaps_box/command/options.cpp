@@ -26,11 +26,12 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
 
     linyaps_box::command::options options;
 
-    auto default_root = std::filesystem::current_path().root_path() / "run" / "user"
-            / std::to_string(geteuid()) / "linglong" / "box";
-
+    std::filesystem::path default_root;
     if (auto *env = getenv("XDG_RUNTIME_DIR"); env != nullptr) {
         default_root = std::filesystem::path{ env } / "linglong" / "box";
+    } else {
+        default_root = std::filesystem::current_path().root_path() / "run" / "user"
+                / std::to_string(geteuid()) / "linglong" / "box";
     }
 
     app.add_option("--root", options.global.root, "Root directory for storage of container state")
@@ -150,13 +151,13 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     }
 
     if (cmd_list->parsed()) {
-        options.subcommand_opt = list_opt;
+        options.subcommand_opt = std::move(list_opt);
     } else if (cmd_run->parsed()) {
-        options.subcommand_opt = run_opt;
+        options.subcommand_opt = std::move(run_opt);
     } else if (cmd_exec->parsed()) {
-        options.subcommand_opt = exec_opt;
+        options.subcommand_opt = std::move(exec_opt);
     } else if (cmd_kill->parsed()) {
-        options.subcommand_opt = kill_opt;
+        options.subcommand_opt = std::move(kill_opt);
     }
 
     return options;

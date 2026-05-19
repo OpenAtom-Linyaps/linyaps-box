@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "utils.h"
+
 #include <sys/prctl.h>
 
 #include <cstdint>
@@ -27,11 +29,17 @@ struct WaitResult
 auto waitpid(pid_t pid, int options) -> WaitResult;
 
 template<typename... Args>
-auto prctl(int option, Args... args) -> uint
+[[nodiscard]] auto prctl(int option, Args... args) -> int
 {
     auto ret = ::prctl(option, std::forward<Args>(args)...);
     if (ret < 0) {
-        throw std::system_error(errno, std::system_category(), "prctl");
+        auto msg = "prctl op " + std::to_string(option) + " with args: [";
+
+        bool first = true;
+        ((msg += (first ? "" : ", ") + stringify_arg(args), first = false), ...);
+        msg.push_back(']');
+
+        throw std::system_error(errno, std::system_category(), msg);
     }
 
     return ret;

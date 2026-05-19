@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -29,7 +29,7 @@ auto create_pty_pair() -> std::pair<terminal_master, terminal_slave>
 
 auto terminal_master::resize(struct winsize size) -> void
 {
-    utils::ioctl(master_, TIOCSWINSZ, &size);
+    std::ignore = utils::ioctl(master_, TIOCSWINSZ, &size);
 }
 
 terminal_slave::terminal_slave(terminal_slave &&other) noexcept
@@ -53,20 +53,20 @@ terminal_slave &terminal_slave::operator=(terminal_slave &&other) noexcept
 auto terminal_slave::setup_stdio() -> void
 {
     LINYAPS_BOX_DEBUG() << "Setup stdio";
-    slave_.duplicate_to(utils::fileno(stdin), 0);
-    slave_.duplicate_to(utils::fileno(stdout), 0);
-    slave_.duplicate_to(utils::fileno(stderr), 0);
-    utils::ioctl(slave_, TIOCSCTTY, 0);
+    slave_.duplicate_to(STDIN_FILENO, 0);
+    slave_.duplicate_to(STDOUT_FILENO, 0);
+    slave_.duplicate_to(STDERR_FILENO, 0);
+    std::ignore = utils::ioctl(slave_, TIOCSCTTY, 0);
 }
 
 auto terminal_slave::set_size(struct winsize size) -> void
 {
     if (size.ws_col == 0 || size.ws_row == 0) {
         auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
-        utils::ioctl(default_tty, TIOCGWINSZ, &size);
+        std::ignore = utils::ioctl(default_tty, TIOCGWINSZ, &size);
     }
 
-    utils::ioctl(slave_, TIOCSWINSZ, &size);
+    std::ignore = utils::ioctl(slave_, TIOCSWINSZ, &size);
 }
 
 auto terminal_slave::set_raw() -> void
@@ -77,7 +77,7 @@ auto terminal_slave::set_raw() -> void
 
     LINYAPS_BOX_DEBUG() << "Set terminal " << slave_.get() << " to raw mode";
 
-    struct termios orig_term{};
+    struct termios orig_term{ };
     utils::tcgetattr(slave_, orig_term);
 
     auto raw = orig_term;
@@ -90,8 +90,8 @@ auto terminal_slave::set_raw() -> void
 
 auto terminal_slave::get_size() -> struct winsize
 {
-    struct winsize size{};
-    utils::ioctl(slave_, TIOCGWINSZ, &size);
+    struct winsize size{ };
+    std::ignore = utils::ioctl(slave_, TIOCGWINSZ, &size);
     return size;
 }
 

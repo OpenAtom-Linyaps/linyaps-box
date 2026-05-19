@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -50,14 +50,14 @@ auto Forwarder::pull() -> Status
 
     last_pull_again = false;
     while (!rb->full()) {
-        auto vecs = rb->get_write_vecs();
-        const auto iov_cnt = (vecs[1].iov_len > 0) ? 2U : 1U;
+        auto *ptr = rb->get_write_ptr();
+        const utils::span<std::byte> span(ptr, rb->free_space());
 
         std::size_t bytes_read{ 0 };
-        auto status = src_.fd->read_vecs({ vecs.data(), iov_cnt }, bytes_read);
+        auto status = src_.fd->read_span(span, bytes_read);
 
         if (bytes_read > 0) {
-            rb->advance_tail(bytes_read);
+            rb->advance_head(bytes_read);
         }
 
         if (status == utils::file_descriptor::IOStatus::TryAgain) {
@@ -91,14 +91,15 @@ auto Forwarder::push() -> Status
 
     last_push_again = false;
     while (!rb->empty()) {
-        auto vecs = rb->get_read_vecs();
-        const auto iov_cnt = (vecs[1].iov_len > 0) ? 2U : 1U;
+        auto *ptr = rb->get_read_ptr();
 
+        const utils::span<const std::byte> span(ptr, rb->size());
         std::size_t bytes_write{ 0 };
-        auto status = dst_.fd->write_vecs({ vecs.data(), iov_cnt }, bytes_write);
+
+        auto status = dst_.fd->write_span(span, bytes_write);
 
         if (bytes_write > 0) {
-            rb->advance_head(bytes_write);
+            rb->advance_tail(bytes_write);
         }
 
         if (status == utils::file_descriptor::IOStatus::TryAgain) {

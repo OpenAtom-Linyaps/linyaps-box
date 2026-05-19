@@ -4,6 +4,6 @@ if(TARGET CLI11::CLI11)
   # Set version variables
   set(CLI11_VERSION_MAJOR 2)
   set(CLI11_VERSION_MINOR 6)
-  set(CLI11_VERSION_PATCH 1)
-  set(CLI11_VERSION "2.6.1")
+  set(CLI11_VERSION_PATCH 2)
+  set(CLI11_VERSION "2.6.2")
 endif()

@@ -152,15 +152,13 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/container_ref.cpp
     src/linyaps_box/container_ref.h
     src/linyaps_box/container_status.cpp
-    src/linyaps_box/container_status.h
-    src/linyaps_box/impl/disabled_cgroup_manager.cpp
-    src/linyaps_box/impl/disabled_cgroup_manager.h
-    src/linyaps_box/impl/json_printer.cpp
-    src/linyaps_box/impl/json_printer.h
-    src/linyaps_box/impl/status_directory.cpp
-    src/linyaps_box/impl/status_directory.h
-    src/linyaps_box/impl/table_printer.cpp
-    src/linyaps_box/impl/table_printer.h
+     src/linyaps_box/container_status.h
+     src/linyaps_box/impl/disabled_cgroup_manager.cpp
+     src/linyaps_box/impl/disabled_cgroup_manager.h
+     src/linyaps_box/impl/json_printer.cpp
+     src/linyaps_box/impl/json_printer.h
+     src/linyaps_box/impl/table_printer.cpp
+     src/linyaps_box/impl/table_printer.h
     src/linyaps_box/interface.cpp
     src/linyaps_box/interface.h
     src/linyaps_box/io/epoll.cpp
@@ -171,12 +169,16 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/printer.h
     src/linyaps_box/runtime.cpp
     src/linyaps_box/runtime.h
-    src/linyaps_box/status_directory.cpp
-    src/linyaps_box/status_directory.h
+    src/linyaps_box/socket.cpp
+    src/linyaps_box/socket.h
+     src/linyaps_box/status_directory.cpp
+     src/linyaps_box/status_directory.h
+     src/linyaps_box/status_directory_manager.cpp
+     src/linyaps_box/status_directory_manager.h
     src/linyaps_box/terminal.cpp
     src/linyaps_box/terminal.h
-    src/linyaps_box/unixsocket.cpp
-    src/linyaps_box/unixsocket.h
+    src/linyaps_box/unix_socket.cpp
+    src/linyaps_box/unix_socket.h
     src/linyaps_box/utils/atomic_write.cpp
     src/linyaps_box/utils/atomic_write.h
     src/linyaps_box/utils/cgroups.cpp
@@ -199,6 +201,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/mkdir.h
     src/linyaps_box/utils/mknod.cpp
     src/linyaps_box/utils/mknod.h
+    src/linyaps_box/utils/mman.cpp
     src/linyaps_box/utils/platform.cpp
     src/linyaps_box/utils/platform.h
     src/linyaps_box/utils/process.cpp
@@ -211,8 +214,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/session.h
     src/linyaps_box/utils/signal.cpp
     src/linyaps_box/utils/signal.h
-    src/linyaps_box/utils/socket.cpp
-    src/linyaps_box/utils/socket.h
     src/linyaps_box/utils/span.h
     src/linyaps_box/utils/symlink.cpp
     src/linyaps_box/utils/symlink.h
@@ -223,8 +224,6 @@ set(linyaps-box_LIBRARY_SOURCE
 set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
 
 if(NOT linyaps-box_MAKE_RELEASE)
-  message(STATUS "make dev build")
-
   execute_process(
     COMMAND git rev-parse --short=7 HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -232,6 +231,7 @@ if(NOT linyaps-box_MAKE_RELEASE)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   set(LINYAPS_BOX_VERSION "${LINYAPS_BOX_VERSION}-dev-${GIT_COMMIT_HASH}")
+  message(STATUS "make dev build: ${LINYAPS_BOX_VERSION}")
 endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/linyaps_box/version.h.in
@@ -277,7 +277,7 @@ if(linyaps-box_ENABLE_CPM)
     NAME CLI11
     VERSION 2.5.0
     GITHUB_REPOSITORY CLIUtils/CLI11
-    GIT_TAG v2.6.1
+    GIT_TAG v2.6.2
     EXCLUDE_FROM_ALL ON
     OPTIONS "CLI11_BUILD_TESTS OFF")
 endif()

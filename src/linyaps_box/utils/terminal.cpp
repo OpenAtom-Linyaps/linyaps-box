@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -58,16 +58,6 @@ auto isatty(const file_descriptor &fd) -> bool
     }
 
     return ret == 1;
-}
-
-auto fileno(FILE *stream) -> int
-{
-    auto ret = ::fileno(stream);
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category(), "fileno");
-    }
-
-    return ret;
 }
 
 } // namespace linyaps_box::utils

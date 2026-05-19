@@ -11,14 +11,20 @@
 
 namespace linyaps_box::utils {
 
+using request_t = extract_t<decltype(get_n_params_type<1>(::ioctl))>;
+
 template<typename... Args>
-auto ioctl(const file_descriptor &fd,
-           decltype(get_n_params_type<1>(ioctl))::type request,
-           Args... args) -> unsigned int
+[[nodiscard]] auto ioctl(const file_descriptor &fd, request_t request, Args... args) -> int
 {
     auto ret = ::ioctl(fd.get(), request, std::forward<Args>(args)...);
     if (ret != 0) {
-        throw std::system_error(errno, std::system_category(), "ioctl");
+        auto msg =
+                "ioctl fd " + std::to_string(fd.get()) + ", request op " + std::to_string(request);
+        bool first = true;
+        ((msg += (first ? "" : ", ") + stringify_arg(args), first = false), ...);
+        msg.push_back(']');
+
+        throw std::system_error(errno, std::system_category(), msg);
     }
 
     return ret;

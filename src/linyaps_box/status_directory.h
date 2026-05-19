@@ -1,32 +1,31 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #pragma once
 
 #include "linyaps_box/container_status.h"
-#include "linyaps_box/interface.h"
 
-#include <vector>
+#include <filesystem>
+#include <string>
+#include <string_view>
 
 namespace linyaps_box {
-// TODO: place container status into a directory
-class status_directory : public virtual interface
+
+class status_directory
 {
-protected:
-    status_directory() = default;
-
 public:
-    ~status_directory() override;
+    explicit status_directory(std::filesystem::path path);
 
-    status_directory(const status_directory &) = delete;
-    auto operator=(const status_directory &) -> status_directory & = delete;
-    status_directory(status_directory &&) = delete;
-    auto operator=(status_directory &&) -> status_directory & = delete;
+    void write(const container_status_t &status) const;
+    [[nodiscard]] auto read() const -> container_status_t;
+    void remove() const;
 
-    virtual void write(const container_status_t &status) const = 0;
-    [[nodiscard]] virtual auto read(const std::string &id) const -> container_status_t = 0;
-    virtual void remove(const std::string &id) const = 0;
-    [[nodiscard]] virtual auto list() const -> std::vector<std::string> = 0;
+    void write_config(std::string_view config) const;
+    [[nodiscard]] auto read_config() const -> std::string;
+
+private:
+    std::filesystem::path path_;
 };
+
 } // namespace linyaps_box

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022-2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -79,8 +79,7 @@ auto force_log_to_stderr() -> bool
 auto stderr_is_a_tty() -> bool
 {
     static const bool result = [] {
-        auto err = linyaps_box::utils::fileno(stderr);
-        return isatty(file_descriptor{ err, false });
+        return isatty(file_descriptor{ STDERR_FILENO, false });
     }();
     return result;
 }

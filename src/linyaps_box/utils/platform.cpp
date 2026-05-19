@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -93,6 +93,28 @@ auto get_path_max(const std::filesystem::path &fs_dir) noexcept -> std::size_t
     }
 
     return static_cast<std::size_t>(max);
+}
+
+auto get_page_size() noexcept -> std::size_t
+{
+    static const auto page_size = []() noexcept -> std::size_t {
+        errno = 0;
+        const auto sz = ::sysconf(_SC_PAGESIZE);
+
+        if (sz == -1) {
+            if (errno != 0) {
+                auto saved_errno = errno;
+                LINYAPS_BOX_WARNING() << "Failed to get page size: " << ::std::strerror(saved_errno)
+                                      << ", defaulting to 4096";
+            }
+
+            return 4096;
+        }
+
+        return static_cast<std::size_t>(sz);
+    }();
+
+    return page_size;
 }
 
 } // namespace linyaps_box::utils
