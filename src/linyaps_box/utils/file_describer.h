@@ -20,9 +20,9 @@ public:
     file_descriptor_closed_exception(const file_descriptor_closed_exception &) = default;
     file_descriptor_closed_exception(file_descriptor_closed_exception &&) noexcept = default;
     auto operator=(const file_descriptor_closed_exception &)
-            -> file_descriptor_closed_exception & = default;
+      -> file_descriptor_closed_exception & = default;
     auto operator=(file_descriptor_closed_exception &&) noexcept
-            -> file_descriptor_closed_exception & = default;
+      -> file_descriptor_closed_exception & = default;
     ~file_descriptor_closed_exception() noexcept override;
 };
 
@@ -33,9 +33,9 @@ public:
     file_descriptor_invalid_exception(const file_descriptor_invalid_exception &) = default;
     file_descriptor_invalid_exception(file_descriptor_invalid_exception &&) noexcept = default;
     auto operator=(const file_descriptor_invalid_exception &)
-            -> file_descriptor_invalid_exception & = default;
+      -> file_descriptor_invalid_exception & = default;
     auto operator=(file_descriptor_invalid_exception &&) noexcept
-            -> file_descriptor_invalid_exception & = default;
+      -> file_descriptor_invalid_exception & = default;
     ~file_descriptor_invalid_exception() noexcept override;
 };
 
@@ -91,7 +91,7 @@ public:
 
     auto write_vecs(span<const struct iovec> rs, std::size_t &bytes_written) const -> IOStatus;
 
-    template<typename T>
+    template <typename T>
     [[nodiscard]] auto read(T &out) const -> IOStatus
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable for raw read");
@@ -102,14 +102,14 @@ public:
         return read_span(ws, bytes_read);
     }
 
-    template<typename T>
+    template <typename T>
     [[nodiscard]] auto write(const T &in) const -> IOStatus
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
         check_valid();
 
         std::size_t bytes_written{ 0 };
-        auto rs = span<const std::byte>(reinterpret_cast<const std::byte *>(&in), sizeof(T));
+        auto rs = span<const std::byte>(static_cast<const std::byte *>(&in), sizeof(T));
         return write_span(rs, bytes_written);
     }
 

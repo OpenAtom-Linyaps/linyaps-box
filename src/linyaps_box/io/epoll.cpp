@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -21,7 +21,7 @@ Epoll::Epoll(bool close_on_exec)
 
 auto Epoll::add(const utils::file_descriptor &fd, uint32_t events) -> bool
 {
-    struct epoll_event event{};
+    struct epoll_event event{ };
     event.events = events;
     event.data.fd = fd.get();
 
@@ -43,7 +43,7 @@ auto Epoll::add(const utils::file_descriptor &fd, uint32_t events) -> bool
 
 void Epoll::modify(const utils::file_descriptor &fd, uint32_t events)
 {
-    struct epoll_event event{};
+    struct epoll_event event{ };
     event.events = events;
     event.data.fd = fd.get();
 

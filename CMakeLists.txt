@@ -152,13 +152,13 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/container_ref.cpp
     src/linyaps_box/container_ref.h
     src/linyaps_box/container_status.cpp
-     src/linyaps_box/container_status.h
-     src/linyaps_box/impl/disabled_cgroup_manager.cpp
-     src/linyaps_box/impl/disabled_cgroup_manager.h
-     src/linyaps_box/impl/json_printer.cpp
-     src/linyaps_box/impl/json_printer.h
-     src/linyaps_box/impl/table_printer.cpp
-     src/linyaps_box/impl/table_printer.h
+    src/linyaps_box/container_status.h
+    src/linyaps_box/impl/disabled_cgroup_manager.cpp
+    src/linyaps_box/impl/disabled_cgroup_manager.h
+    src/linyaps_box/impl/json_printer.cpp
+    src/linyaps_box/impl/json_printer.h
+    src/linyaps_box/impl/table_printer.cpp
+    src/linyaps_box/impl/table_printer.h
     src/linyaps_box/interface.cpp
     src/linyaps_box/interface.h
     src/linyaps_box/io/epoll.cpp
@@ -171,10 +171,10 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/runtime.h
     src/linyaps_box/socket.cpp
     src/linyaps_box/socket.h
-     src/linyaps_box/status_directory.cpp
-     src/linyaps_box/status_directory.h
-     src/linyaps_box/status_directory_manager.cpp
-     src/linyaps_box/status_directory_manager.h
+    src/linyaps_box/status_directory.cpp
+    src/linyaps_box/status_directory.h
+    src/linyaps_box/status_directory_manager.cpp
+    src/linyaps_box/status_directory_manager.h
     src/linyaps_box/terminal.cpp
     src/linyaps_box/terminal.h
     src/linyaps_box/unix_socket.cpp
@@ -328,9 +328,9 @@ target_compile_definitions(
   "${linyaps-box_LIBRARY}"
   PRIVATE
     "LINYAPS_BOX_CLONE_CHILD_STACK_SIZE=${linyaps-box_CLONE_CHILD_STACK_SIZE}"
-  PRIVATE "LINYAPS_BOX_STACK_GROWTH_DOWN=${linyaps-box_STACK_GROWTH_DOWN}"
-  PRIVATE "LINYAPS_BOX_DEFAULT_LOG_LEVEL=${linyaps-box_DEFAULT_LOG_LEVEL}"
-  PRIVATE "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
+    "LINYAPS_BOX_STACK_GROWTH_DOWN=${linyaps-box_STACK_GROWTH_DOWN}"
+    "LINYAPS_BOX_DEFAULT_LOG_LEVEL=${linyaps-box_DEFAULT_LOG_LEVEL}"
+    "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
 target_compile_options("${linyaps-box_LIBRARY}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 if(linyaps-box_STATIC)

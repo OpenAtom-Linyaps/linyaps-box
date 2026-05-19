@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 auto linyaps_box::utils::mkdir(const file_descriptor &root, std::filesystem::path path, mode_t mode)
-        -> linyaps_box::utils::file_descriptor
+  -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "mkdir " << path << " at " << inspect_fd(root.get());
 
@@ -50,7 +50,7 @@ auto linyaps_box::utils::mkdir(const file_descriptor &root, std::filesystem::pat
             throw std::system_error(errno,
                                     std::system_category(),
                                     "mkdirat: failed to create "
-                                            + (current.current_path() / part).string());
+                                      + (current.current_path() / part).string());
         }
 
         fd = ::openat(current.get(), part.c_str(), O_PATH);
@@ -58,7 +58,7 @@ auto linyaps_box::utils::mkdir(const file_descriptor &root, std::filesystem::pat
             throw std::system_error(errno,
                                     std::system_category(),
                                     "openat: failed to open "
-                                            + (current.current_path() / part).string());
+                                      + (current.current_path() / part).string());
         }
 
         current = file_descriptor(fd);

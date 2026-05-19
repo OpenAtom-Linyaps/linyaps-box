@@ -55,7 +55,7 @@ auto container_monitor::enable_signal_forwarding() -> void
 auto container_monitor::handle_signals() -> void
 {
     while (true) {
-        struct signalfd_siginfo info{};
+        struct signalfd_siginfo info{ };
         auto status = signal_fd.read(info);
 
         if (status == linyaps_box::utils::file_descriptor::IOStatus::TryAgain) {

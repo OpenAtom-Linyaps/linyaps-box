@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -88,7 +88,7 @@ struct options
     }
 
     using subcommand_opt_t =
-            std::variant<std::monostate, list_options, exec_options, run_options, kill_options>;
+      std::variant<std::monostate, list_options, exec_options, run_options, kill_options>;
 
     global_options global;
     subcommand_opt_t subcommand_opt;

@@ -12,17 +12,17 @@
 #include <fstream>
 
 #ifdef LINYAPS_BOX_HAVE_OPENAT2_H
-#include <linux/openat2.h>
+#  include <linux/openat2.h>
 #endif
 
 #include <unistd.h>
 
 #ifndef RESOLVE_IN_ROOT
-#define RESOLVE_IN_ROOT 0x10
+#  define RESOLVE_IN_ROOT 0x10
 #endif
 
 #ifndef __NR_openat2
-#define __NR_openat2 437
+#  define __NR_openat2 437
 #endif
 
 namespace {
@@ -33,7 +33,7 @@ auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
 {
     LINYAPS_BOX_DEBUG() << "fallback openat " << path.c_str() << " at FD=" << root.get() << " with "
                         << linyaps_box::utils::inspect_fcntl_or_open_flags(
-                                   static_cast<size_t>(flag))
+                             static_cast<size_t>(flag))
                         << "\n\t" << linyaps_box::utils::inspect_fd(root.get());
     // TODO: we need implement a compatible fallback
     // currently we just use openat and do some simple check
@@ -50,7 +50,7 @@ auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
 }
 
 auto syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, uint64_t resolve)
-        -> linyaps_box::utils::file_descriptor
+  -> linyaps_box::utils::file_descriptor
 {
     struct openat2_how
     {
@@ -82,7 +82,7 @@ auto read_pseudo_file(const std::filesystem::path &path) -> std::string
 namespace linyaps_box::utils {
 
 auto open(const std::filesystem::path &path, int flag, mode_t mode)
-        -> linyaps_box::utils::file_descriptor
+  -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " with "
                         << inspect_fcntl_or_open_flags(static_cast<size_t>(flag));
@@ -128,11 +128,10 @@ auto open_at(const linyaps_box::utils::file_descriptor &root,
                 break;
             }
 
-            throw std::system_error(
-                    code,
-                    std::system_category(),
-                    std::string{ e.what() } + ": failed to open "
-                            + (root.current_path() / path.relative_path()).string());
+            throw std::system_error(code,
+                                    std::system_category(),
+                                    std::string{ e.what() } + ": failed to open "
+                                      + (root.current_path() / path.relative_path()).string());
         }
     }
 
@@ -141,7 +140,7 @@ auto open_at(const linyaps_box::utils::file_descriptor &root,
 }
 
 auto touch(const file_descriptor &root, const std::filesystem::path &path, int flag, mode_t mode)
-        -> linyaps_box::utils::file_descriptor
+  -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "touch " << path << " at " << inspect_fd(root.get());
     const auto fd = ::openat(root.get(), path.c_str(), flag, mode);
