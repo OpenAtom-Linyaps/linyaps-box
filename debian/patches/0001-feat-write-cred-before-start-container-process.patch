@@ -1,8 +1,8 @@
-diff --git a/src/linyaps_box/container.cpp b/src/linyaps_box/container.cpp
-index 9cca48d..932fc9a 100644
---- a/src/linyaps_box/container.cpp
-+++ b/src/linyaps_box/container.cpp
-@@ -1251,6 +1251,14 @@ void configure_mounts(const linyaps_box::container &container, const std::filesy
+Index: linyaps-box/src/linyaps_box/container.cpp
+===================================================================
+--- linyaps-box.orig/src/linyaps_box/container.cpp
++++ linyaps-box/src/linyaps_box/container.cpp
+@@ -1382,6 +1382,14 @@ void configure_mounts(linyaps_box::conta
          return ss.str();
      }();
  
@@ -14,6 +14,6 @@ index 9cca48d..932fc9a 100644
 +        ofs << "1";
 +    }
 +
-     execvpe(c_args[0],
+     execvpe(c_args.at(0),
              const_cast<char *const *>(c_args.data()), // NOLINT
              const_cast<char *const *>(c_env.data())); // NOLINT
