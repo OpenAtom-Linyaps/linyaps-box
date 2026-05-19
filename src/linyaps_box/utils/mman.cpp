@@ -24,12 +24,8 @@ auto mmap(void *addr,
           std::optional<std::reference_wrapper<const file_descriptor>> fd,
           off_t offset) -> std::byte *
 {
-    auto *result = static_cast<std::byte *>(::mmap(addr,
-                                                   length,
-                                                   prot,
-                                                   flags,
-                                                   fd.has_value() ? fd.value().get().get() : -1,
-                                                   offset));
+    auto *result = static_cast<std::byte *>(
+      ::mmap(addr, length, prot, flags, fd.has_value() ? fd.value().get().get() : -1, offset));
     if (result == MAP_FAILED) {
         throw std::system_error(errno, std::system_category(), "mmap failed");
     }

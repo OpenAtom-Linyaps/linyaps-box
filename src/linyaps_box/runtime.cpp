@@ -10,7 +10,7 @@ linyaps_box::runtime_t::runtime_t(status_directory_manager status_dir_mgr)
 }
 
 auto linyaps_box::runtime_t::containers()
-        -> std::unordered_map<std::string, linyaps_box::container_ref>
+  -> std::unordered_map<std::string, linyaps_box::container_ref>
 {
     auto container_ids = status_dir_mgr_.list();
 
@@ -25,7 +25,7 @@ auto linyaps_box::runtime_t::containers()
 }
 
 auto linyaps_box::runtime_t::create_container(const create_container_options_t &options)
-        -> linyaps_box::container
+  -> linyaps_box::container
 {
     return { status_dir_mgr_.get(options.ID), options };
 }

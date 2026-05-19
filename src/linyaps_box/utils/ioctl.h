@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -13,13 +13,13 @@ namespace linyaps_box::utils {
 
 using request_t = extract_t<decltype(get_n_params_type<1>(::ioctl))>;
 
-template<typename... Args>
+template <typename... Args>
 [[nodiscard]] auto ioctl(const file_descriptor &fd, request_t request, Args... args) -> int
 {
     auto ret = ::ioctl(fd.get(), request, std::forward<Args>(args)...);
     if (ret != 0) {
         auto msg =
-                "ioctl fd " + std::to_string(fd.get()) + ", request op " + std::to_string(request);
+          "ioctl fd " + std::to_string(fd.get()) + ", request op " + std::to_string(request);
         bool first = true;
         ((msg += (first ? "" : ", ") + stringify_arg(args), first = false), ...);
         msg.push_back(']');

@@ -6,15 +6,15 @@
 
 #if LINYAPS_BOX_ENABLE_SECCOMP
 
-#include <gtest/gtest.h>
+#  include <gtest/gtest.h>
 
-#include "container/seccomp.h"
-#include "util/oci_runtime.h"
+#  include "container/seccomp.h"
+#  include "util/oci_runtime.h"
 
-#include <seccomp.h>
-#include <sys/klog.h>
+#  include <seccomp.h>
+#  include <sys/klog.h>
 
-#include <climits>
+#  include <climits>
 
 TEST(OCI, libseccomp)
 {

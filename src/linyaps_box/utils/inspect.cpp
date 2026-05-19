@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -163,7 +163,7 @@ auto inspect_fds() -> std::string
 auto inspect_permissions(int fd) -> std::string
 {
     std::stringstream ss;
-    struct stat buf{};
+    struct stat buf{ };
 
     if (fstat(fd, &buf) == -1) {
         throw std::system_error(errno, std::system_category(), "fstat");

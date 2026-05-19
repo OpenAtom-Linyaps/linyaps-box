@@ -19,16 +19,16 @@ linyaps_box::utils::file_descriptor_closed_exception::file_descriptor_closed_exc
 }
 
 linyaps_box::utils::file_descriptor_closed_exception::~file_descriptor_closed_exception() noexcept =
-        default;
+  default;
 
 linyaps_box::utils::file_descriptor_invalid_exception::file_descriptor_invalid_exception(
-        const std::string &message)
+  const std::string &message)
     : std::runtime_error(message)
 {
 }
 
 linyaps_box::utils::file_descriptor_invalid_exception::
-        ~file_descriptor_invalid_exception() noexcept = default;
+  ~file_descriptor_invalid_exception() noexcept = default;
 
 linyaps_box::utils::file_descriptor::file_descriptor(int fd, bool auto_close)
     : fd_(fd)
@@ -64,7 +64,7 @@ linyaps_box::utils::file_descriptor::file_descriptor(file_descriptor &&other) no
 }
 
 auto linyaps_box::utils::file_descriptor::operator=(file_descriptor &&other) noexcept
-        -> linyaps_box::utils::file_descriptor &
+  -> linyaps_box::utils::file_descriptor &
 {
     if (this == &other) {
         return *this;
@@ -146,7 +146,7 @@ auto linyaps_box::utils::file_descriptor::duplicate_to(int target, int flags) co
 }
 
 auto linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
-        -> linyaps_box::utils::file_descriptor &
+  -> linyaps_box::utils::file_descriptor &
 {
     check_valid();
 
@@ -167,7 +167,7 @@ auto linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
 }
 
 auto linyaps_box::utils::file_descriptor::operator>>(std::byte &byte)
-        -> linyaps_box::utils::file_descriptor &
+  -> linyaps_box::utils::file_descriptor &
 {
     check_valid();
 
@@ -192,7 +192,7 @@ auto linyaps_box::utils::file_descriptor::proc_path() const -> std::filesystem::
     check_valid();
 
     return std::filesystem::current_path().root_path() / "proc" / "self" / "fd"
-            / std::to_string(fd_);
+      / std::to_string(fd_);
 }
 
 auto linyaps_box::utils::file_descriptor::current_path() const -> std::filesystem::path

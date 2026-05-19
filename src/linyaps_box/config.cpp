@@ -59,14 +59,14 @@ static const std::unordered_map<std::string_view, unsigned long> unset_flags_map
 };
 
 static const std::unordered_map<std::string_view, linyaps_box::config::mount_t::extension>
-        extra_flags_map{
-            { "copy-symlink", linyaps_box::config::mount_t::extension::COPY_SYMLINK },
-        };
+  extra_flags_map{
+      { "copy-symlink", linyaps_box::config::mount_t::extension::COPY_SYMLINK },
+  };
 
 // NOLINTEND(cert-err58-cpp)
 
-auto parse_mount_options(const std::vector<std::string> &options) -> std::
-        tuple<unsigned long, unsigned long, linyaps_box::config::mount_t::extension, std::string>
+auto parse_mount_options(const std::vector<std::string> &options)
+  -> std::tuple<unsigned long, unsigned long, linyaps_box::config::mount_t::extension, std::string>
 {
     unsigned long flags = 0;
     auto extra_flags = linyaps_box::config::mount_t::extension::NONE;
@@ -101,15 +101,15 @@ auto parse_mount_options(const std::vector<std::string> &options) -> std::
 }
 
 static const std::unordered_map<std::string_view, linyaps_box::config::linux_t::namespace_t::type>
-        namespace_type_map{
-            { "pid", linyaps_box::config::linux_t::namespace_t::type::PID },
-            { "network", linyaps_box::config::linux_t::namespace_t::type::NET },
-            { "ipc", linyaps_box::config::linux_t::namespace_t::type::IPC },
-            { "uts", linyaps_box::config::linux_t::namespace_t::type::UTS },
-            { "mount", linyaps_box::config::linux_t::namespace_t::type::MOUNT },
-            { "user", linyaps_box::config::linux_t::namespace_t::type::USER },
-            { "cgroup", linyaps_box::config::linux_t::namespace_t::type::CGROUP },
-        };
+  namespace_type_map{
+      { "pid", linyaps_box::config::linux_t::namespace_t::type::PID },
+      { "network", linyaps_box::config::linux_t::namespace_t::type::NET },
+      { "ipc", linyaps_box::config::linux_t::namespace_t::type::IPC },
+      { "uts", linyaps_box::config::linux_t::namespace_t::type::UTS },
+      { "mount", linyaps_box::config::linux_t::namespace_t::type::MOUNT },
+      { "user", linyaps_box::config::linux_t::namespace_t::type::USER },
+      { "cgroup", linyaps_box::config::linux_t::namespace_t::type::CGROUP },
+  };
 
 static const std::unordered_map<std::string_view, unsigned int> rootfs_propagation_map{
     { "shared", MS_SHARED },
@@ -351,7 +351,7 @@ void from_json(const nlohmann::json &j, config::mount_t &v)
     if (auto it = j.find("options"); it != j.end()) {
         auto options = it->get<std::vector<std::string>>();
         std::tie(v.flags, v.propagation_flags, v.extension_flags, v.data) =
-                parse_mount_options(options);
+          parse_mount_options(options);
     }
 }
 

@@ -9,7 +9,7 @@
 
 namespace linyaps_box::utils {
 
-template<typename T>
+template <typename T>
 class span
 {
 public:

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -14,7 +14,7 @@ constexpr auto cgroup_root = "/sys/fs/cgroups";
 auto linyaps_box::utils::get_cgroup_type() -> linyaps_box::utils::cgroup_t
 {
     static auto cgroup_type = []() -> cgroup_t {
-        struct statfs stat{};
+        struct statfs stat{ };
         auto ret = statfs(cgroup_root, &stat);
         if (ret < 0) {
             throw std::system_error(errno,

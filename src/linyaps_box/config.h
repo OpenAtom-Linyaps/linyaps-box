@@ -16,14 +16,14 @@
 #include <sys/types.h>
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
-#include <sys/capability.h>
+#  include <sys/capability.h>
 #endif
 
 // Compatible with linux kernel which is under 5.10
 #ifndef MS_NOSYMFOLLOW
-#define LINGYAPS_MS_NOSYMFOLLOW 256
+#  define LINGYAPS_MS_NOSYMFOLLOW 256
 #else
-#define LINGYAPS_MS_NOSYMFOLLOW MS_NOSYMFOLLOW
+#  define LINGYAPS_MS_NOSYMFOLLOW MS_NOSYMFOLLOW
 #endif
 
 namespace linyaps_box {
@@ -184,16 +184,16 @@ constexpr linyaps_box::config::mount_t::extension
 operator|(linyaps_box::config::mount_t::extension lhs, linyaps_box::config::mount_t::extension rhs)
 {
     return static_cast<linyaps_box::config::mount_t::extension>(
-            static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(lhs)
-            | static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(rhs));
+      static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(lhs)
+      | static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(rhs));
 }
 
 constexpr linyaps_box::config::mount_t::extension
 operator&(linyaps_box::config::mount_t::extension lhs, linyaps_box::config::mount_t::extension rhs)
 {
     return static_cast<linyaps_box::config::mount_t::extension>(
-            static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(lhs)
-            & static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(rhs));
+      static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(lhs)
+      & static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(rhs));
 }
 
 constexpr linyaps_box::config::mount_t::extension &
@@ -217,10 +217,8 @@ operator|(linyaps_box::config::linux_t::namespace_t::type lhs,
           linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
 {
     return static_cast<linyaps_box::config::linux_t::namespace_t::type>(
-            static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(
-                    lhs)
-            | static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(
-                    rhs));
+      static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(lhs)
+      | static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(rhs));
 }
 
 constexpr linyaps_box::config::linux_t::namespace_t::type
@@ -228,10 +226,8 @@ operator&(linyaps_box::config::linux_t::namespace_t::type lhs,
           linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
 {
     return static_cast<linyaps_box::config::linux_t::namespace_t::type>(
-            static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(
-                    lhs)
-            & static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(
-                    rhs));
+      static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(lhs)
+      & static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(rhs));
 }
 
 constexpr linyaps_box::config::linux_t::namespace_t::type &

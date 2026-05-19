@@ -32,8 +32,7 @@ foreach(test ${linyaps-box_SMOKE_TESTS})
     "${test}"
     PROPERTIES
       ENVIRONMENT
-      "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt"
-  )
+      "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt")
 endforeach()
 
 if(NOT linyaps-box_ENABLE_COVERAGE)

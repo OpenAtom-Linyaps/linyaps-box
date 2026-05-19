@@ -16,12 +16,12 @@
 #include <unistd.h>
 
 #ifndef LINYAPS_BOX_LOG_DEFAULT_LEVEL
-#define LINYAPS_BOX_LOG_DEFAULT_LEVEL LOG_DEBUG
+#  define LINYAPS_BOX_LOG_DEFAULT_LEVEL LOG_DEBUG
 #endif
 
 namespace linyaps_box::utils {
 
-template<unsigned int level>
+template <unsigned int level>
 Logger<level>::~Logger() noexcept
 {
     if (level > get_current_log_level()) {
@@ -48,7 +48,7 @@ Logger<level>::~Logger() noexcept
     }
 
     auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch());
+      std::chrono::steady_clock::now().time_since_epoch());
     std::cerr << "TIME=" << now.count() << " "
 #if LINYAPS_BOX_LOG_ENABLE_CONTEXT_PIDNS
               << "PIDNS=" << get_pid_namespace() << " "
@@ -57,7 +57,7 @@ Logger<level>::~Logger() noexcept
 #if LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
               << '\n'
 #endif
-            ;
+      ;
     std::cerr.flush();
 }
 

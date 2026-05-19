@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -21,10 +21,8 @@ auto epoll_wait(const linyaps_box::utils::file_descriptor &efd,
                 int timeout) -> uint
 {
     while (true) {
-        auto ret = ::epoll_wait(efd.get(),
-                                events.data(),
-                                static_cast<int>(events.capacity()),
-                                timeout);
+        auto ret =
+          ::epoll_wait(efd.get(), events.data(), static_cast<int>(events.capacity()), timeout);
         if (ret < 0) {
             if (errno == EINTR) {
                 continue;
