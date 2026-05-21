@@ -22,6 +22,7 @@
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/signal.h"
 #include "linyaps_box/utils/symlink.h"
+#include "utils/defer.h"
 
 #include <linux/magic.h>
 #include <sys/mount.h>
@@ -2609,7 +2610,28 @@ int linyaps_box::container::run(run_container_options_t options)
 
         auto in = utils::file_descriptor{ STDIN_FILENO, false };
         auto out = utils::file_descriptor{ STDOUT_FILENO, false };
-        [&recv_socketpair, &monitor, &in, &out]() -> void {
+
+        bool changed{ false };
+        auto in_flags = in.flags();
+        auto out_flags = out.flags();
+
+        auto restore_if_changed =
+          utils::make_defer([&]() noexcept {
+              if (!changed) {
+                  return;
+              }
+
+              try {
+                  in.set_flags(in_flags);
+                  out.set_flags(out_flags);
+              } catch (const std::exception &e) {
+                  LINYAPS_BOX_ERR()
+                    << "failed to restore stdin/stdout flags, some behavior may be unexpected: "
+                    << e.what();
+              }
+          });
+
+        [&recv_socketpair, &monitor, &in, &out, &changed]() -> void {
             if (!recv_socketpair) {
                 return;
             }
@@ -2621,6 +2643,7 @@ int linyaps_box::container::run(run_container_options_t options)
 
             in.set_nonblock(true);
             out.set_nonblock(true);
+            changed = true;
 
             monitor.enable_io_forwarding(std::move(master), in, out);
         }();

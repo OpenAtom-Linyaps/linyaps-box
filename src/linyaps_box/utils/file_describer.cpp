@@ -41,11 +41,6 @@ linyaps_box::utils::file_descriptor::file_descriptor(int fd, bool auto_close)
     if (UNLIKELY(fd_ < 0)) {
         throw file_descriptor_invalid_exception("invalid file descriptor");
     }
-
-    auto flag = fcntl(*this, F_GETFL);
-    if ((flag & O_NONBLOCK) != 0) {
-        nonblock_ = true;
-    }
 }
 
 linyaps_box::utils::file_descriptor::~file_descriptor() noexcept
@@ -59,12 +54,13 @@ linyaps_box::utils::file_descriptor::~file_descriptor() noexcept
         close();
     } catch (const std::system_error &e) {
         LINYAPS_BOX_ERR() << "close " << fd_ << " failed:" << e.what();
+    } catch (...) {
+        LINYAPS_BOX_ERR() << "close " << fd_ << " failed with unknown error";
     }
 }
 
 linyaps_box::utils::file_descriptor::file_descriptor(file_descriptor &&other) noexcept
     : fd_(other.fd_)
-    , nonblock_(other.nonblock_)
     , auto_close_(other.auto_close_)
 {
     other.fd_ = -1;
@@ -79,7 +75,6 @@ auto linyaps_box::utils::file_descriptor::operator=(file_descriptor &&other) noe
 
     std::swap(this->fd_, other.fd_);
     std::swap(this->auto_close_, other.auto_close_);
-    std::swap(this->nonblock_, other.nonblock_);
     return *this;
 }
 
@@ -166,7 +161,7 @@ auto linyaps_box::utils::file_descriptor::duplicate_to(int target, int flags) co
 auto linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
   -> linyaps_box::utils::file_descriptor &
 {
-    if (UNLIKELY(nonblock_)) {
+    if (UNLIKELY(nonblock())) {
         throw std::logic_error("cannot write to non-blocking fd using operator<<");
     }
 
@@ -187,7 +182,7 @@ auto linyaps_box::utils::file_descriptor::operator<<(const std::byte &byte)
 auto linyaps_box::utils::file_descriptor::operator>>(std::byte &byte)
   -> linyaps_box::utils::file_descriptor &
 {
-    if (UNLIKELY(nonblock_)) {
+    if (UNLIKELY(nonblock())) {
         throw std::logic_error("cannot read from non-blocking fd using operator>>");
     }
 
@@ -236,15 +231,31 @@ auto linyaps_box::utils::file_descriptor::cwd() -> file_descriptor
     return file_descriptor{ AT_FDCWD };
 }
 
-auto linyaps_box::utils::file_descriptor::set_nonblock(bool nonblock) & -> void
+auto linyaps_box::utils::file_descriptor::nonblock() const -> bool
+{
+    auto flags = this->flags();
+    return (flags & O_NONBLOCK) != 0;
+}
+
+auto linyaps_box::utils::file_descriptor::set_nonblock(bool nonblock) const & -> void
 {
     LINYAPS_BOX_DEBUG() << "set fd " << fd_ << " to nonblock: " << std::boolalpha << nonblock;
 
-    auto flags = fcntl(*this, F_GETFL, 0);
-    fcntl(*this,
-          F_SETFL,
-          nonblock ? (flags | O_NONBLOCK) : (flags & ~static_cast<unsigned>(O_NONBLOCK)));
-    nonblock_ = nonblock;
+    auto flags = this->flags();
+    auto new_flags = nonblock ? (flags | O_NONBLOCK) : (flags & ~static_cast<unsigned>(O_NONBLOCK));
+    fcntl(*this, F_SETFL, new_flags);
+}
+
+auto linyaps_box::utils::file_descriptor::flags() const -> unsigned int
+{
+    return fcntl(*this, F_GETFL);
+}
+
+auto linyaps_box::utils::file_descriptor::set_flags(unsigned int flags) const & -> void
+{
+    LINYAPS_BOX_DEBUG() << "set fd " << fd_ << " flags to " << std::hex << flags;
+
+    fcntl(*this, F_SETFL, flags);
 }
 
 auto linyaps_box::utils::file_descriptor::type() const -> std::filesystem::file_type
@@ -275,7 +286,7 @@ auto linyaps_box::utils::file_descriptor::read_span(span<std::byte> ws) const ->
         }
 
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return { nonblock_ ? IOStatus::TryAgain : IOStatus::Timeout, 0 };
+            return { nonblock() ? IOStatus::TryAgain : IOStatus::Timeout, 0 };
         }
 
         if (errno == EIO || errno == ECONNRESET) {
@@ -314,7 +325,7 @@ auto linyaps_box::utils::file_descriptor::write_span(span<const std::byte> rs) c
         }
 
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return { nonblock_ ? IOStatus::TryAgain : IOStatus::Timeout, bytes_written };
+            return { nonblock() ? IOStatus::TryAgain : IOStatus::Timeout, bytes_written };
         }
 
         if (errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN || errno == EIO) {
@@ -357,7 +368,7 @@ auto linyaps_box::utils::file_descriptor::read_vecs(span<struct iovec> ws) const
         }
 
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return { nonblock_ ? IOStatus::TryAgain : IOStatus::Timeout, 0 };
+            return { nonblock() ? IOStatus::TryAgain : IOStatus::Timeout, 0 };
         }
 
         if (errno == EIO || errno == ECONNRESET) {
@@ -441,7 +452,7 @@ auto linyaps_box::utils::file_descriptor::write_vecs(span<const struct iovec> rs
         }
 
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return { nonblock_ ? IOStatus::TryAgain : IOStatus::Timeout, total_bytes_written };
+            return { nonblock() ? IOStatus::TryAgain : IOStatus::Timeout, total_bytes_written };
         }
 
         if (errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN || errno == EIO) {

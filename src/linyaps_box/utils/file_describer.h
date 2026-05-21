@@ -8,6 +8,7 @@
 
 #include <filesystem>
 
+#include <fcntl.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -87,7 +88,13 @@ public:
 
     [[nodiscard]] auto type() const -> std::filesystem::file_type;
 
-    auto set_nonblock(bool nonblock) & -> void;
+    [[nodiscard]] auto flags() const -> unsigned int;
+
+    auto set_flags(unsigned int flags) const & -> void;
+
+    auto set_nonblock(bool nonblock) const & -> void;
+
+    [[nodiscard]] auto nonblock() const -> bool;
 
     [[nodiscard]] auto read_span(span<std::byte> ws) const -> IOResult;
 
@@ -147,7 +154,6 @@ public:
 private:
     // keep this layout, for padding optimization
     int fd_{ -1 };
-    bool nonblock_{ false };
     bool auto_close_{ false };
 };
 
