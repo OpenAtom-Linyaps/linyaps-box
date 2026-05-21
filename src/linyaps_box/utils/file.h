@@ -5,6 +5,7 @@
 #pragma once
 
 #include "linyaps_box/utils/file_describer.h"
+#include "linyaps_box/utils/utils.h"
 
 #include <sys/vfs.h>
 
@@ -19,7 +20,7 @@ template <typename... Args>
 auto fcntl(const file_descriptor &fd, int operation, Args... args) -> unsigned int
 {
     auto ret = ::fcntl(fd.get(), operation, std::forward<Args>(args)...);
-    if (ret == -1) {
+    if (UNLIKELY(ret == -1)) {
         throw std::system_error(errno, std::system_category(), "fcntl");
     }
 
@@ -63,6 +64,6 @@ auto to_string(std::filesystem::file_type type) noexcept -> std::string_view;
 
 auto read_all(const std::filesystem::path &path) -> std::string;
 
-auto read_all(const file_descriptor &fd, std::size_t size) -> std::string;
+auto read_exact(const file_descriptor &fd, std::size_t size) -> std::string;
 
 } // namespace linyaps_box::utils

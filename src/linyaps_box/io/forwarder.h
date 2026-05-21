@@ -13,8 +13,6 @@ namespace linyaps_box::io {
 class Forwarder
 {
 public:
-    enum class Status : uint8_t { Continue, Blocked, Finished };
-
     explicit Forwarder(Epoll &poller, std::size_t buffer_size = BUFSIZ);
 
     Forwarder(const Forwarder &) = delete;
@@ -26,34 +24,41 @@ public:
 
     auto set_src(const utils::file_descriptor &src) -> void;
 
-    [[nodiscard]] auto src() const -> const utils::file_descriptor & { return *src_.fd; }
+    [[nodiscard]] auto src() const noexcept -> const utils::file_descriptor & { return *src_.fd; }
 
     auto set_dst(const utils::file_descriptor &dst) -> void;
 
-    [[nodiscard]] auto dst() const -> const utils::file_descriptor & { return *dst_.fd; }
+    [[nodiscard]] auto dst() const noexcept -> const utils::file_descriptor & { return *dst_.fd; }
 
-    auto pull() -> Status;
+    auto mark_src_eof() noexcept -> void { src_eof = true; }
 
-    [[nodiscard]] auto push() -> Status;
+    auto mark_dst_failed() noexcept -> void { dst_failed = true; }
+
+    [[nodiscard]] auto is_finished() const noexcept -> bool
+    {
+        return (src_eof && buffer_empty()) || dst_failed;
+    }
+
+    auto drive() -> bool;
+
+    [[nodiscard]] auto buffer_empty() const noexcept -> bool { return rb ? rb->empty() : true; }
 
 private:
     struct FdContext
     {
         const utils::file_descriptor *fd{ nullptr };
-        uint32_t last_events{ 0 };
         bool pollable{ false };
     };
 
-    auto update_event(FdContext &ctx, bool on) -> void;
+    [[nodiscard]] auto pull(std::size_t &bytes_quota) -> bool;
+    [[nodiscard]] auto push(std::size_t &bytes_quota) -> bool;
 
-    bool src_eof{ false };
-    bool last_pull_again{ false };
-    bool last_push_again{ false };
-
-    std::reference_wrapper<Epoll> poller;
+    utils::ring_buffer::ptr rb;
     FdContext src_;
     FdContext dst_;
-    utils::ring_buffer::ptr rb;
+    std::reference_wrapper<Epoll> poller;
+    bool src_eof{ false };
+    bool dst_failed{ false };
 };
 
 } // namespace linyaps_box::io

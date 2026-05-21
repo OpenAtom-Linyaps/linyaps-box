@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -20,7 +20,7 @@ public:
     container_monitor &operator=(const container_monitor &) = delete;
     container_monitor(container_monitor &&) = delete;
     container_monitor &operator=(container_monitor &&) = delete;
-    ~container_monitor() = default;
+    ~container_monitor() noexcept = default;
 
     auto enable_signal_forwarding() -> void;
     auto enable_io_forwarding(terminal_master master,

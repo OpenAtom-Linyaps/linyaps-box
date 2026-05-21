@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -23,7 +23,7 @@ auto waitpid(pid_t pid, int options) -> WaitResult
             return { WaitStatus::None };
         }
 
-        if (errno == EINTR || errno == EAGAIN) {
+        if (errno == EINTR) {
             continue;
         }
 

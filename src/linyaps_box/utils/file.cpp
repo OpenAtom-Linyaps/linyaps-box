@@ -331,18 +331,47 @@ auto read_all(const std::filesystem::path &path) -> std::string
     if (stat.st_size == 0) {
         return read_pseudo_file(path);
     }
-    return read_all(fd, stat.st_size);
+
+    return read_exact(fd, stat.st_size);
 }
 
-auto read_all(const file_descriptor &fd, std::size_t size) -> std::string
+auto read_exact(const file_descriptor &fd, std::size_t size) -> std::string
 {
     std::string content;
+    if (size == 0) {
+        return content;
+    }
+
     content.resize(size);
-    std::size_t bytes_read{ 0 };
-    const span<std::byte> buffer(reinterpret_cast<std::byte *>(content.data()), size);
-    auto status = fd.read_span(buffer, bytes_read);
-    if (status != utils::file_descriptor::IOStatus::Success) {
-        throw std::runtime_error("Failed to read file: " + fd.current_path().string());
+    std::size_t total_bytes_read{ 0 };
+
+    const span<std::byte> full_buffer(reinterpret_cast<std::byte *>(content.data()), size);
+    while (total_bytes_read < size) {
+        auto [status, bytes_read] = fd.read_span(full_buffer.subspan(total_bytes_read));
+
+        if (status == utils::IOStatus::Success) {
+            total_bytes_read += bytes_read;
+            continue;
+        }
+
+        if (status == utils::IOStatus::Eof) {
+            content.resize(total_bytes_read);
+            throw std::runtime_error("Unexpected EOF before reading requested size: "
+                                     + fd.current_path().string());
+        }
+
+        if (status == utils::IOStatus::Closed) {
+            throw std::runtime_error("Connection closed by peer during read_all: "
+                                     + fd.current_path().string());
+        }
+
+        if (status == utils::IOStatus::TryAgain || status == utils::IOStatus::Timeout) {
+            throw std::runtime_error("Read blocking/timeout on non-ready socket: "
+                                     + fd.current_path().string());
+        }
+
+        throw std::runtime_error("Failed to read file due to internal error: "
+                                 + fd.current_path().string());
     }
 
     return content;
