@@ -259,10 +259,10 @@ void execute_hook(const linyaps_box::config::hooks_t::hook_t &hook,
     auto state_json = linyaps_box::status_to_json(state).dump();
     const auto *data = reinterpret_cast<const std::byte *>(state_json.data());
     auto remaining = state_json.size();
-    std::size_t bytes_written{ 0 };
+
     auto ws = linyaps_box::utils::span<const std::byte>(data, remaining);
-    auto ret = child.fd().write_span(ws, bytes_written);
-    if (ret != linyaps_box::utils::file_descriptor::IOStatus::Success) {
+    auto [ret, bytes_written] = child.fd().write_span(ws);
+    if (ret != linyaps_box::utils::IOStatus::Success) {
         LINYAPS_BOX_WARNING() << "failed to write state to hook stdin";
     }
     child.close();
@@ -2605,6 +2605,8 @@ int linyaps_box::container::run(run_container_options_t options)
         runtime_ns::poststart_hooks(*this);
 
         container_monitor monitor(child_pid);
+        monitor.enable_signal_forwarding();
+
         auto in = utils::file_descriptor{ STDIN_FILENO, false };
         auto out = utils::file_descriptor{ STDOUT_FILENO, false };
         [&recv_socketpair, &monitor, &in, &out]() -> void {
@@ -2622,8 +2624,6 @@ int linyaps_box::container::run(run_container_options_t options)
 
             monitor.enable_io_forwarding(std::move(master), in, out);
         }();
-
-        monitor.enable_signal_forwarding();
 
         // TODO: support detach from the parent's process
         // Now we wait for the container process to exit

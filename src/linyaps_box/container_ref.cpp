@@ -121,11 +121,11 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
         _exit(EXIT_FAILURE);
     }
 
+    container_monitor monitor{ child };
+    monitor.enable_signal_forwarding();
+
     auto in = utils::file_descriptor{ STDIN_FILENO, false };
     auto out = utils::file_descriptor{ STDOUT_FILENO, false };
-
-    container_monitor monitor{ child };
-
     [&recv_socketpair, &monitor, &in, &out]() {
         if (!recv_socketpair) {
             return;
@@ -144,7 +144,6 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
         monitor.enable_io_forwarding(std::move(master), in, out);
     }();
 
-    monitor.enable_signal_forwarding();
     return monitor.wait_container_exit();
 }
 

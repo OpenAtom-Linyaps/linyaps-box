@@ -76,6 +76,12 @@ public:
 
     [[nodiscard]] auto capacity() const noexcept -> std::size_t { return mask_ + 1; }
 
+    auto clear() noexcept -> void
+    {
+        head_ = 0;
+        tail_ = 0;
+    }
+
 private:
     explicit ring_buffer(std::size_t cap, std::byte *data_base)
         : data_ptr_(data_base)

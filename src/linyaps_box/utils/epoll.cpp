@@ -6,23 +6,23 @@
 
 namespace linyaps_box::utils {
 
-auto epoll_create1(int flags) -> linyaps_box::utils::file_descriptor
+auto epoll_create1(int flags) -> file_descriptor
 {
     auto ret = ::epoll_create1(flags);
     if (ret < 0) {
         throw std::system_error(errno, std::system_category(), "epoll_create1");
     }
 
-    return linyaps_box::utils::file_descriptor{ ret };
+    return file_descriptor{ ret };
 }
 
-auto epoll_wait(const linyaps_box::utils::file_descriptor &efd,
-                std::vector<struct epoll_event> &events,
+auto epoll_wait(const file_descriptor &efd,
+                struct epoll_event *events,
+                std::size_t maxevents,
                 int timeout) -> uint
 {
     while (true) {
-        auto ret =
-          ::epoll_wait(efd.get(), events.data(), static_cast<int>(events.capacity()), timeout);
+        auto ret = ::epoll_wait(efd.get(), events, static_cast<int>(maxevents), timeout);
         if (ret < 0) {
             if (errno == EINTR) {
                 continue;
@@ -35,9 +35,9 @@ auto epoll_wait(const linyaps_box::utils::file_descriptor &efd,
     }
 }
 
-auto epoll_ctl(const linyaps_box::utils::file_descriptor &efd,
+auto epoll_ctl(const file_descriptor &efd,
                epoll_operation op,
-               const linyaps_box::utils::file_descriptor &fd,
+               const file_descriptor &fd,
                struct epoll_event *event) -> void
 {
     auto ret = ::epoll_ctl(efd.get(), static_cast<int>(op), fd.get(), event);
