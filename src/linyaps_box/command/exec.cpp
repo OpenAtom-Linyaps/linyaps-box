@@ -23,7 +23,7 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
     option.proc.args = options.command;
     option.proc.terminal = options.tty;
     option.proc.no_new_privileges = options.no_new_privs;
-    option.proc.env = options.envs.value_or(std::vector<std::string>{});
+    option.proc.env = options.envs.value_or(std::vector<std::string>{ });
     option.preserve_fds = options.preserve_fds;
 
     if (option.proc.terminal && options.console_socket) {
@@ -35,17 +35,17 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
         const auto &caps = options.caps.value();
         auto transform_cap = [&caps](std::vector<cap_value_t> &cap_set) {
             std::transform(
-                    caps.cbegin(),
-                    caps.cend(),
-                    std::back_inserter(cap_set),
-                    [](const std::string &cap) {
-                        cap_value_t val{0};
-                        if (cap_from_name(cap.c_str(), &val) < 0) {
-                            throw std::system_error(errno, std::system_category(), "cap_from_name");
-                        }
+              caps.cbegin(),
+              caps.cend(),
+              std::back_inserter(cap_set),
+              [](const std::string &cap) {
+                  cap_value_t val{ 0 };
+                  if (cap_from_name(cap.c_str(), &val) < 0) {
+                      throw std::system_error(errno, std::system_category(), "cap_from_name");
+                  }
 
-                        return val;
-                    });
+                  return val;
+              });
         };
 
         transform_cap(option.proc.capabilities.effective);

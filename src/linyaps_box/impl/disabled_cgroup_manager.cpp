@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -11,9 +11,9 @@ namespace linyaps_box {
 }
 
 auto disabled_cgroup_manager::create_cgroup([[maybe_unused]] const cgroup_options &options)
-        -> cgroup_status
+  -> cgroup_status
 {
-    cgroup_status status{};
+    cgroup_status status{ };
     set_manager(status, type());
     return status;
 }

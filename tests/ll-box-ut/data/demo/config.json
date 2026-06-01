@@ -172,191 +172,180 @@
     }
   ],
   "linux": {
-    "devices": [
-      {
-        "path": "/dev/fuse",
-        "type": "c",
-        "major": 10,
-        "minor": 229,
-        "fileMode": 438,
-        "uid": 0,
-        "gid": 0
-      },
-      {
-        "path": "/dev/sda",
-        "type": "b",
-        "major": 8,
-        "minor": 0,
-        "fileMode": 432,
-        "uid": 0,
-        "gid": 0
-      }
-    ],
-    "uidMappings": [
-      {
-        "hostID": 0,
-        "containerID": 0,
-        "size": 32000
-      }
-    ],
-    "gidMappings": [
-      {
-        "hostID": 0,
-        "containerID": 0,
-        "size": 32000
-      }
-    ],
-    "sysctl": {
-      "net.ipv4.ip_forward": "1",
-      "net.core.somaxconn": "256"
-    },
-    "cgroupsPath": "/myRuntime/myContainer",
-    "resources": {
-      "network": {
-        "classID": 1048577,
-        "priorities": [
-          {
-            "name": "eth0",
-            "priority": 500
-          },
-          {
-            "name": "eth1",
-            "priority": 1000
-          }
-        ]
-      },
-      "pids": {
-        "limit": 32771
-      },
-      "hugepageLimits": [
-        {
-          "pageSize": "2MB",
-          "limit": 9223372036854772000
-        }
-      ],
-      "memory": {
-        "limit": 536870912,
-        "reservation": 536870912,
-        "swap": 536870912,
-        "kernel": -1,
-        "kernelTCP": -1,
-        "swappiness": 0,
-        "disableOOMKiller": false
-      },
-      "cpu": {
-        "shares": 1024,
-        "quota": 1000000,
-        "period": 500000,
-        "realtimeRuntime": 950000,
-        "realtimePeriod": 1000000,
-        "cpus": "2-3",
-        "mems": "0-7"
-      },
-      "devices": [
-        {
-          "allow": false,
-          "access": "rwm"
-        },
-        {
-          "allow": true,
-          "type": "c",
-          "major": 10,
-          "minor": 229,
-          "access": "rw"
-        },
-        {
-          "allow": true,
-          "type": "b",
-          "major": 8,
-          "minor": 0,
-          "access": "r"
-        }
-      ],
-      "blockIO": {
-        "weight": 10,
-        "leafWeight": 10,
-        "weightDevice": [
-          {
-            "major": 8,
-            "minor": 0,
-            "weight": 500,
-            "leafWeight": 300
-          },
-          {
-            "major": 8,
-            "minor": 16,
-            "weight": 500
-          }
-        ],
-        "throttleReadBpsDevice": [
-          {
-            "major": 8,
-            "minor": 0,
-            "rate": 600
-          }
-        ],
-        "throttleWriteIOPSDevice": [
-          {
-            "major": 8,
-            "minor": 16,
-            "rate": 300
-          }
-        ]
-      }
-    },
-    "rootfsPropagation": "slave",
-    "seccomp": {
-      "defaultAction": "SCMP_ACT_ALLOW",
-      "architectures": [
-        "SCMP_ARCH_X86",
-        "SCMP_ARCH_X32"
-      ],
-      "syscalls": [
-        {
-          "names": [
-            "getcwd",
-            "chmod"
-          ],
-          "action": "SCMP_ACT_ERRNO"
-        }
-      ]
-    },
-    "namespaces": [
-      {
-        "type": "pid"
-      },
-      {
-        "type": "ipc"
-      },
-      {
-        "type": "uts"
-      },
-      {
-        "type": "mount"
-      },
-      {
-        "type": "cgroup"
-      }
-    ],
-    "maskedPaths": [
-      "/proc/kcore",
-      "/proc/latency_stats",
-      "/proc/timer_stats",
-      "/proc/sched_debug"
-    ],
-    "readonlyPaths": [
-      "/proc/asound",
-      "/proc/bus",
-      "/proc/fs",
-      "/proc/irq",
-      "/proc/sys",
-      "/proc/sysrq-trigger"
-    ],
-    "mountLabel": "system_u:object_r:svirt_sandbox_file_t:s0:c715,c811"
-  },
-  "root": {
-    "path": "/run/user/1000/linglong/ab24ae64edff4ddfa8e6922eb29e2baf",
-    "readonly": false
-  }
+			"devices": [
+				{
+					"path": "/dev/fuse",
+					"type": "c",
+					"major": 10,
+					"minor": 229,
+					"fileMode": 438,
+					"uid": 0,
+					"gid": 0
+				},
+				{
+					"path": "/dev/sda",
+					"type": "b",
+					"major": 8,
+					"minor": 0,
+					"fileMode": 432,
+					"uid": 0,
+					"gid": 0
+				}
+			],
+			"uidMappings": [
+				{
+					"hostID": 0,
+					"containerID": 0,
+					"size": 32000
+				}
+			],
+			"gidMappings": [
+				{
+					"hostID": 0,
+					"containerID": 0,
+					"size": 32000
+				}
+			],
+			"sysctl": {
+				"net.ipv4.ip_forward": "1",
+				"net.core.somaxconn": "256"
+			},
+			"cgroupsPath": "/myRuntime/myContainer",
+			"resources": {
+				"network": {
+					"classID": 1048577,
+					"priorities": [
+						{
+							"name": "eth0",
+							"priority": 500
+						},
+						{
+							"name": "eth1",
+							"priority": 1000
+						}
+					]
+				},
+				"pids": {
+					"limit": 32771
+				},
+				"hugepageLimits": [
+					{
+						"pageSize": "2MB",
+						"limit": 9223372036854772000
+					}
+				],
+				"memory": {
+					"limit": 536870912,
+					"reservation": 536870912,
+					"swap": 536870912,
+					"kernel": -1,
+					"kernelTCP": -1,
+					"swappiness": 0,
+					"disableOOMKiller": false
+				},
+				"cpu": {
+					"shares": 1024,
+					"quota": 1000000,
+					"period": 500000,
+					"realtimeRuntime": 950000,
+					"realtimePeriod": 1000000,
+					"cpus": "2-3",
+					"mems": "0-7"
+				},
+				"devices": [
+					{
+						"allow": false,
+						"access": "rwm"
+					},
+					{
+						"allow": true,
+						"type": "c",
+						"major": 10,
+						"minor": 229,
+						"access": "rw"
+					},
+					{
+						"allow": true,
+						"type": "b",
+						"major": 8,
+						"minor": 0,
+						"access": "r"
+					}
+				],
+				"blockIO": {
+					"weight": 10,
+					"leafWeight": 10,
+					"weightDevice": [
+						{
+							"major": 8,
+							"minor": 0,
+							"weight": 500,
+							"leafWeight": 300
+						},
+						{
+							"major": 8,
+							"minor": 16,
+							"weight": 500
+						}
+					],
+					"throttleReadBpsDevice": [
+						{
+							"major": 8,
+							"minor": 0,
+							"rate": 600
+						}
+					],
+					"throttleWriteIOPSDevice": [
+						{
+							"major": 8,
+							"minor": 16,
+							"rate": 300
+						}
+					]
+				}
+			},
+			"rootfsPropagation": "slave",
+			"seccomp": {
+				"defaultAction": "SCMP_ACT_ALLOW",
+				"architectures": ["SCMP_ARCH_X86", "SCMP_ARCH_X32"],
+				"syscalls": [
+					{
+						"names": ["getcwd", "chmod"],
+						"action": "SCMP_ACT_ERRNO"
+					}
+				]
+			},
+			"namespaces": [
+				{
+					"type": "pid"
+				},
+				{
+					"type": "ipc"
+				},
+				{
+					"type": "uts"
+				},
+				{
+					"type": "mount"
+				},
+				{
+					"type": "cgroup"
+				}
+			],
+			"maskedPaths": [
+				"/proc/kcore",
+				"/proc/latency_stats",
+				"/proc/timer_stats",
+				"/proc/sched_debug"
+			],
+			"readonlyPaths": [
+				"/proc/asound",
+				"/proc/bus",
+				"/proc/fs",
+				"/proc/irq",
+				"/proc/sys",
+				"/proc/sysrq-trigger"
+			],
+			"mountLabel": "system_u:object_r:svirt_sandbox_file_t:s0:c715,c811"
+		}
 }
-

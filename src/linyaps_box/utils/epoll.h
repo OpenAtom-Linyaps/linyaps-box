@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -8,8 +8,6 @@
 
 #include <sys/epoll.h>
 
-#include <vector>
-
 namespace linyaps_box::utils {
 
 enum class epoll_operation : uint8_t {
@@ -18,15 +16,16 @@ enum class epoll_operation : uint8_t {
     remove = EPOLL_CTL_DEL
 };
 
-auto epoll_create1(int flags) -> linyaps_box::utils::file_descriptor;
+auto epoll_create1(int flags) -> file_descriptor;
 
-[[nodiscard]] auto epoll_wait(const linyaps_box::utils::file_descriptor &efd,
-                              std::vector<struct epoll_event> &events,
+[[nodiscard]] auto epoll_wait(const file_descriptor &efd,
+                              struct epoll_event *events,
+                              std::size_t maxevents,
                               int timeout) -> uint;
 
-auto epoll_ctl(const linyaps_box::utils::file_descriptor &efd,
+auto epoll_ctl(const file_descriptor &efd,
                epoll_operation op,
-               const linyaps_box::utils::file_descriptor &fd,
+               const file_descriptor &fd,
                struct epoll_event *event = nullptr) -> void;
 
 } // namespace linyaps_box::utils

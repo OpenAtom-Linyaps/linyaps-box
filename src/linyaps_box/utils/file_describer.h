@@ -8,6 +8,7 @@
 
 #include <filesystem>
 
+#include <fcntl.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -20,9 +21,9 @@ public:
     file_descriptor_closed_exception(const file_descriptor_closed_exception &) = default;
     file_descriptor_closed_exception(file_descriptor_closed_exception &&) noexcept = default;
     auto operator=(const file_descriptor_closed_exception &)
-            -> file_descriptor_closed_exception & = default;
+      -> file_descriptor_closed_exception & = default;
     auto operator=(file_descriptor_closed_exception &&) noexcept
-            -> file_descriptor_closed_exception & = default;
+      -> file_descriptor_closed_exception & = default;
     ~file_descriptor_closed_exception() noexcept override;
 };
 
@@ -33,17 +34,23 @@ public:
     file_descriptor_invalid_exception(const file_descriptor_invalid_exception &) = default;
     file_descriptor_invalid_exception(file_descriptor_invalid_exception &&) noexcept = default;
     auto operator=(const file_descriptor_invalid_exception &)
-            -> file_descriptor_invalid_exception & = default;
+      -> file_descriptor_invalid_exception & = default;
     auto operator=(file_descriptor_invalid_exception &&) noexcept
-            -> file_descriptor_invalid_exception & = default;
+      -> file_descriptor_invalid_exception & = default;
     ~file_descriptor_invalid_exception() noexcept override;
+};
+
+enum class IOStatus : uint8_t { Success, TryAgain, Eof, Closed, Timeout };
+
+struct IOResult
+{
+    IOStatus status;
+    std::size_t bytes;
 };
 
 class file_descriptor
 {
 public:
-    enum class IOStatus : uint8_t { Success, TryAgain, Eof, Closed };
-
     file_descriptor() = default;
     explicit file_descriptor(int fd, bool auto_close = true);
 
@@ -81,49 +88,72 @@ public:
 
     [[nodiscard]] auto type() const -> std::filesystem::file_type;
 
-    auto set_nonblock(bool nonblock) & -> void;
+    [[nodiscard]] auto flags() const -> unsigned int;
 
-    auto read_span(span<std::byte> ws, std::size_t &bytes_read) const -> IOStatus;
+    auto set_flags(unsigned int flags) const & -> void;
 
-    auto write_span(span<const std::byte> rs, std::size_t &bytes_written) const -> IOStatus;
+    auto set_nonblock(bool nonblock) const & -> void;
 
-    auto read_vecs(span<struct iovec> ws, std::size_t &bytes_read) const -> IOStatus;
+    [[nodiscard]] auto nonblock() const -> bool;
 
-    auto write_vecs(span<const struct iovec> rs, std::size_t &bytes_written) const -> IOStatus;
+    [[nodiscard]] auto read_span(span<std::byte> ws) const -> IOResult;
 
-    template<typename T>
-    [[nodiscard]] auto read(T &out) const -> IOStatus
+    [[nodiscard]] auto write_span(span<const std::byte> rs) const -> IOResult;
+
+    [[nodiscard]] auto read_vecs(span<struct iovec> ws) const -> IOResult;
+
+    [[nodiscard]] auto write_vecs(span<const struct iovec> rs) const -> IOResult;
+
+    template <typename T>
+    [[nodiscard]] auto read(T &out) const -> IOResult
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable for raw read");
-        check_valid();
+        auto ws =
+          linyaps_box::utils::span<std::byte>(reinterpret_cast<std::byte *>(&out), sizeof(T));
 
-        std::size_t bytes_read{ 0 };
-        auto ws = span<std::byte>(reinterpret_cast<std::byte *>(&out), sizeof(T));
-        return read_span(ws, bytes_read);
+        std::size_t total_bytes{ 0 };
+        while (total_bytes < sizeof(T)) {
+            auto [status, bytes] = read_span(ws.subspan(total_bytes));
+            total_bytes += bytes;
+
+            if (status != IOStatus::Success) {
+                return { status, total_bytes };
+            }
+
+            if (bytes == 0) {
+                return { IOStatus::Eof, total_bytes };
+            }
+        }
+
+        return { IOStatus::Success, total_bytes };
     }
 
-    template<typename T>
-    [[nodiscard]] auto write(const T &in) const -> IOStatus
+    template <typename T>
+    [[nodiscard]] auto write(const T &in) const -> IOResult
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
-        check_valid();
-
-        std::size_t bytes_written{ 0 };
         auto rs = span<const std::byte>(reinterpret_cast<const std::byte *>(&in), sizeof(T));
-        return write_span(rs, bytes_written);
+
+        std::size_t total_bytes{ 0 };
+        while (total_bytes < sizeof(T)) {
+            auto [status, bytes] = write_span(rs.subspan(total_bytes));
+            total_bytes += bytes;
+
+            if (status != IOStatus::Success) {
+                return { status, total_bytes };
+            }
+
+            if (bytes == 0) {
+                return { IOStatus::TryAgain, total_bytes };
+            }
+        }
+
+        return { IOStatus::Success, total_bytes };
     }
 
 private:
-    void check_valid() const
-    {
-        if (!valid()) {
-            throw file_descriptor_invalid_exception("invalid fd");
-        }
-    }
-
     // keep this layout, for padding optimization
     int fd_{ -1 };
-    bool nonblock_{ false };
     bool auto_close_{ false };
 };
 

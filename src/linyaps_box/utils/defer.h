@@ -12,7 +12,7 @@
 namespace linyaps_box::utils {
 
 // Type constraints for defer, the cleanup function should not throw exceptions
-template<typename Fn>
+template <typename Fn>
 constexpr bool compatible_defer = std::is_nothrow_invocable_r_v<void, Fn>;
 
 // Execution policies for defer
@@ -22,9 +22,9 @@ enum class defer_policy : std::uint8_t {
 };
 
 // defer executes the function based on the specified policy when the object is destroyed
-template<typename Fn,
-         defer_policy Policy = defer_policy::always,
-         std::enable_if_t<compatible_defer<Fn>, bool> = true>
+template <typename Fn,
+          defer_policy Policy = defer_policy::always,
+          std::enable_if_t<compatible_defer<Fn>, bool> = true>
 struct defer
 {
     explicit defer(Fn &&fn) noexcept
@@ -88,7 +88,7 @@ private:
 };
 
 // Helper functions to create defer objects
-template<typename Fn>
+template <typename Fn>
 auto make_defer(Fn &&fn) noexcept
 {
     return defer<std::decay_t<Fn>>(std::forward<Fn>(fn));
@@ -97,7 +97,7 @@ auto make_defer(Fn &&fn) noexcept
 // This project use exception to indicate the failure of a function, so we provide a way to create
 // a defer object that executes the cleanup function only when an exception is active during
 // destruction
-template<typename Fn>
+template <typename Fn>
 auto make_errdefer(Fn &&fn) noexcept
 {
     return defer<std::decay_t<Fn>, defer_policy::on_error>(std::forward<Fn>(fn));

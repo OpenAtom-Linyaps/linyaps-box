@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -105,8 +105,8 @@ const std::string &linyaps_box::utils::semver::build() const
 std::string linyaps_box::utils::semver::to_string() const
 {
     return std::to_string(this->major_) + "." + std::to_string(this->minor_) + "."
-            + std::to_string(this->patch_) + (this->prerelease_.empty() ? "" : "-")
-            + this->prerelease_ + (this->build_.empty() ? "" : "+") + this->build_;
+      + std::to_string(this->patch_) + (this->prerelease_.empty() ? "" : "-") + this->prerelease_
+      + (this->build_.empty() ? "" : "+") + this->build_;
 }
 
 bool linyaps_box::utils::semver::is_compatible_with(const semver &other) const

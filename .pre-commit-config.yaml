@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: None
+#
+# SPDX-License-Identifier: CC0-1.0
+
+exclude: |
+  (?x)^(
+    external/|
+    cmake/|
+    LICENSES/|
+    .obs/
+  )
+
+ci:
+  autofix_prs: false
+  autoupdate_schedule: 'monthly'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+
+  - repo: https://github.com/cpp-linter/cpp-linter-hooks
+    rev: v1.4.1
+    hooks:
+      - id: clang-format
+        name: clang-format (C/C++)
+        files: \.(c|cc|cpp|cxx|h|hpp|hxx)$
+        args: ['--style=file']
+
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+        name: cmake-format
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+        args: ['-i', '2', '-ci', '-sr']

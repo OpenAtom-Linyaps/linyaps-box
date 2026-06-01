@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -28,7 +28,7 @@ struct WaitResult
 
 auto waitpid(pid_t pid, int options) -> WaitResult;
 
-template<typename... Args>
+template <typename... Args>
 [[nodiscard]] auto prctl(int option, Args... args) -> int
 {
     auto ret = ::prctl(option, std::forward<Args>(args)...);

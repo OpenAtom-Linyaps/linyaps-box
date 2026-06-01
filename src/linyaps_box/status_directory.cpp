@@ -40,7 +40,8 @@ auto read_status(const std::filesystem::path &path) -> linyaps_box::container_st
         if (errno == ESRCH) {
             ret.status = linyaps_box::container_status_t::runtime_status::STOPPED;
         } else if (errno != EPERM) {
-            throw std::system_error(errno, std::system_category(),
+            throw std::system_error(errno,
+                                    std::system_category(),
                                     "kill(" + std::to_string(ret.PID) + ", 0)");
         }
         // EPERM: process exists but we lack permission, keep status from JSON

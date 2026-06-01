@@ -52,7 +52,11 @@ auto ring_buffer::create(std::size_t requested_capacity) -> ptr
 
     auto *addr = mmap(nullptr, total_vma, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, std::nullopt, 0);
     auto mem_guard = utils::make_errdefer([addr, total_vma]() noexcept {
-        munmap(addr, total_vma);
+        try {
+            munmap(addr, total_vma);
+        } catch (const std::system_error &e) {
+            LINYAPS_BOX_INFO() << "Failed to munmap ring buffer after mmap failure: " << e.what();
+        }
     });
 
     mmap(addr,

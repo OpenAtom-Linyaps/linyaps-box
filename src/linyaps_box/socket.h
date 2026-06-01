@@ -89,7 +89,7 @@ public:
 
     auto set_nonblock(bool nonblock) & -> void { fd_.set_nonblock(nonblock); }
 
-    template<typename T>
+    template <typename T>
     auto set_option(int level, int optname, const T &value) const -> void
     {
         if (::setsockopt(fd_.get(), level, optname, &value, sizeof(T)) == -1) {

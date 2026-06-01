@@ -48,4 +48,3 @@ syscalls:
         value: 0xFFFFFFFF
         valueTwo: 0x5412
         op: SCMP_CMP_MASKED_EQ
-

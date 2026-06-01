@@ -12,17 +12,17 @@
 #include <fstream>
 
 #ifdef LINYAPS_BOX_HAVE_OPENAT2_H
-#include <linux/openat2.h>
+#  include <linux/openat2.h>
 #endif
 
 #include <unistd.h>
 
 #ifndef RESOLVE_IN_ROOT
-#define RESOLVE_IN_ROOT 0x10
+#  define RESOLVE_IN_ROOT 0x10
 #endif
 
 #ifndef __NR_openat2
-#define __NR_openat2 437
+#  define __NR_openat2 437
 #endif
 
 namespace {
@@ -33,7 +33,7 @@ auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
 {
     LINYAPS_BOX_DEBUG() << "fallback openat " << path.c_str() << " at FD=" << root.get() << " with "
                         << linyaps_box::utils::inspect_fcntl_or_open_flags(
-                                   static_cast<size_t>(flag))
+                             static_cast<size_t>(flag))
                         << "\n\t" << linyaps_box::utils::inspect_fd(root.get());
     // TODO: we need implement a compatible fallback
     // currently we just use openat and do some simple check
@@ -50,7 +50,7 @@ auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
 }
 
 auto syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, uint64_t resolve)
-        -> linyaps_box::utils::file_descriptor
+  -> linyaps_box::utils::file_descriptor
 {
     struct openat2_how
     {
@@ -82,7 +82,7 @@ auto read_pseudo_file(const std::filesystem::path &path) -> std::string
 namespace linyaps_box::utils {
 
 auto open(const std::filesystem::path &path, int flag, mode_t mode)
-        -> linyaps_box::utils::file_descriptor
+  -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " with "
                         << inspect_fcntl_or_open_flags(static_cast<size_t>(flag));
@@ -128,11 +128,10 @@ auto open_at(const linyaps_box::utils::file_descriptor &root,
                 break;
             }
 
-            throw std::system_error(
-                    code,
-                    std::system_category(),
-                    std::string{ e.what() } + ": failed to open "
-                            + (root.current_path() / path.relative_path()).string());
+            throw std::system_error(code,
+                                    std::system_category(),
+                                    std::string{ e.what() } + ": failed to open "
+                                      + (root.current_path() / path.relative_path()).string());
         }
     }
 
@@ -141,7 +140,7 @@ auto open_at(const linyaps_box::utils::file_descriptor &root,
 }
 
 auto touch(const file_descriptor &root, const std::filesystem::path &path, int flag, mode_t mode)
-        -> linyaps_box::utils::file_descriptor
+  -> linyaps_box::utils::file_descriptor
 {
     LINYAPS_BOX_DEBUG() << "touch " << path << " at " << inspect_fd(root.get());
     const auto fd = ::openat(root.get(), path.c_str(), flag, mode);
@@ -332,18 +331,47 @@ auto read_all(const std::filesystem::path &path) -> std::string
     if (stat.st_size == 0) {
         return read_pseudo_file(path);
     }
-    return read_all(fd, stat.st_size);
+
+    return read_exact(fd, stat.st_size);
 }
 
-auto read_all(const file_descriptor &fd, std::size_t size) -> std::string
+auto read_exact(const file_descriptor &fd, std::size_t size) -> std::string
 {
     std::string content;
+    if (size == 0) {
+        return content;
+    }
+
     content.resize(size);
-    std::size_t bytes_read{ 0 };
-    const span<std::byte> buffer(reinterpret_cast<std::byte *>(content.data()), size);
-    auto status = fd.read_span(buffer, bytes_read);
-    if (status != utils::file_descriptor::IOStatus::Success) {
-        throw std::runtime_error("Failed to read file: " + fd.current_path().string());
+    std::size_t total_bytes_read{ 0 };
+
+    const span<std::byte> full_buffer(reinterpret_cast<std::byte *>(content.data()), size);
+    while (total_bytes_read < size) {
+        auto [status, bytes_read] = fd.read_span(full_buffer.subspan(total_bytes_read));
+
+        if (status == utils::IOStatus::Success) {
+            total_bytes_read += bytes_read;
+            continue;
+        }
+
+        if (status == utils::IOStatus::Eof) {
+            content.resize(total_bytes_read);
+            throw std::runtime_error("Unexpected EOF before reading requested size: "
+                                     + fd.current_path().string());
+        }
+
+        if (status == utils::IOStatus::Closed) {
+            throw std::runtime_error("Connection closed by peer during read_all: "
+                                     + fd.current_path().string());
+        }
+
+        if (status == utils::IOStatus::TryAgain || status == utils::IOStatus::Timeout) {
+            throw std::runtime_error("Read blocking/timeout on non-ready socket: "
+                                     + fd.current_path().string());
+        }
+
+        throw std::runtime_error("Failed to read file due to internal error: "
+                                 + fd.current_path().string());
     }
 
     return content;

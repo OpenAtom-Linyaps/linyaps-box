@@ -7,6 +7,7 @@
 #include "linyaps_box/container_monitor.h"
 #include "linyaps_box/socket.h"
 #include "linyaps_box/terminal.h"
+#include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/process.h"
 #include "linyaps_box/utils/session.h"
@@ -121,12 +122,32 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
         _exit(EXIT_FAILURE);
     }
 
+    container_monitor monitor{ child };
+    monitor.enable_signal_forwarding();
+
     auto in = utils::file_descriptor{ STDIN_FILENO, false };
     auto out = utils::file_descriptor{ STDOUT_FILENO, false };
 
-    container_monitor monitor{ child };
+    bool changed{ false };
+    auto in_flags = in.flags();
+    auto out_flags = out.flags();
 
-    [&recv_socketpair, &monitor, &in, &out]() {
+    auto restore_if_changed = utils::make_defer([&]() noexcept {
+        if (!changed) {
+            return;
+        }
+
+        try {
+            in.set_flags(in_flags);
+            out.set_flags(out_flags);
+        } catch (const std::exception &e) {
+            LINYAPS_BOX_ERR()
+              << "failed to restore stdin/stdout flags, some behavior may be unexpected: "
+              << e.what();
+        }
+    });
+
+    [&recv_socketpair, &monitor, &in, &out, &changed]() {
         if (!recv_socketpair) {
             return;
         }
@@ -140,11 +161,11 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
 
         in.set_nonblock(true);
         out.set_nonblock(true);
+        changed = true;
 
         monitor.enable_io_forwarding(std::move(master), in, out);
     }();
 
-    monitor.enable_signal_forwarding();
     return monitor.wait_container_exit();
 }
 
