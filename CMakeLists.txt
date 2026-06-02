@@ -30,7 +30,7 @@ endif()
 
 option(linyaps-box_STATIC "Build linyaps-box as statically-linked binary." OFF)
 
-option(linyaps-box_ENABLE_SECCOMP "Build linyaps-box with seccomp support." OFF)
+option(linyaps-box_ENABLE_SECCOMP "Build linyaps-box with seccomp support." ON)
 
 option(linyaps-box_ENABLE_CAP "Build linyaps-box with capability support" ON)
 
