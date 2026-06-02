@@ -1195,27 +1195,33 @@ private:
                 return;
             }
 
+            // In user namespace, mknodat fails with EPERM because CAP_MKNOD is
+            // not available. Fallback to bind mount the host device.
+            if (ec == std::errc::operation_not_permitted) {
+                LINYAPS_BOX_DEBUG() << "fallback to bind mount device";
+                linyaps_box::config::mount_t mount;
+                mount.source = destination;
+                mount.destination = destination;
+                mount.type = "bind";
+                mount.flags = MS_BIND | MS_PRIVATE | MS_NOEXEC | MS_NOSUID;
+                this->mount(mount);
+                return;
+            }
+
             throw std::system_error(ec, "mknodat");
         }
 
-        auto new_dev = linyaps_box::utils::open_at(root, path);
-        path = new_dev.proc_path();
-        if (UNLIKELY(chmod(path.c_str(), mode) < 0)) {
-            throw std::system_error(errno, std::system_category(), "chmod");
-        }
+        {
+            auto new_dev = linyaps_box::utils::open_at(root, path);
+            auto new_path = new_dev.proc_path();
+            if (UNLIKELY(chmod(new_path.c_str(), mode) < 0)) {
+                throw std::system_error(errno, std::system_category(), "chmod");
+            }
 
-        if (UNLIKELY(chown(path.c_str(), uid, gid) < 0)) {
-            throw std::system_error(errno, std::system_category(), "chown");
+            if (UNLIKELY(chown(new_path.c_str(), uid, gid) < 0)) {
+                throw std::system_error(errno, std::system_category(), "chown");
+            }
         }
-
-        // NOTE: fallback to bind mount host device into container
-        LINYAPS_BOX_DEBUG() << "fallback to bind mount device";
-        linyaps_box::config::mount_t mount;
-        mount.source = destination;
-        mount.destination = destination;
-        mount.type = "bind";
-        mount.flags = MS_BIND | MS_PRIVATE | MS_NOEXEC | MS_NOSUID;
-        this->mount(mount);
     }
 
     // https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#default-devices
