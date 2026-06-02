@@ -5,11 +5,13 @@
 
 #include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/log.h"
+#include "linyaps_box/utils/symlink.h"
 
 #include <sys/syscall.h>
 
 #include <cassert>
 #include <fstream>
+#include <optional>
 
 #ifdef LINYAPS_BOX_HAVE_OPENAT2_H
 #  include <linux/openat2.h>
@@ -26,6 +28,98 @@
 #endif
 
 namespace {
+
+// see: https://man7.org/linux/man-pages/man7/path_resolution.7.html
+constexpr auto MAX_SYMLINK_DEPTH = 40;
+
+auto stat_same_inode(const struct stat &a, const struct stat &b) noexcept -> bool
+{
+    return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+}
+
+auto check_not_above_root(const linyaps_box::utils::file_descriptor &current,
+                          const linyaps_box::utils::file_descriptor &root) -> void
+{
+    auto cur_stat = linyaps_box::utils::fstat(current);
+    auto root_stat = linyaps_box::utils::fstat(root);
+    if (stat_same_inode(cur_stat, root_stat)) {
+        throw std::system_error(EACCES,
+                                std::system_category(),
+                                "path escape detected: attempted to go above root");
+    }
+}
+
+auto walk_component(linyaps_box::utils::file_descriptor &dir_fd,
+                    const std::string &component,
+                    const linyaps_box::utils::file_descriptor &root,
+                    int symlink_depth) -> void;
+
+auto resolve_symlink_component(linyaps_box::utils::file_descriptor &dir_fd,
+                               linyaps_box::utils::file_descriptor &link_fd,
+                               const linyaps_box::utils::file_descriptor &root,
+                               int symlink_depth) -> void
+{
+    if (UNLIKELY(symlink_depth > MAX_SYMLINK_DEPTH)) {
+        throw std::system_error(ELOOP, std::system_category(), "too many symlinks");
+    }
+
+    auto target = linyaps_box::utils::readlinkat(link_fd, "");
+    LINYAPS_BOX_DEBUG() << "resolve symlink -> " << target;
+
+    if (target.is_absolute()) {
+        dir_fd = root.duplicate();
+    }
+
+    for (const auto &part : target.relative_path()) {
+        walk_component(dir_fd, part.string(), root, symlink_depth);
+    }
+}
+
+auto walk_component(linyaps_box::utils::file_descriptor &dir_fd,
+                    const std::string &component,
+                    const linyaps_box::utils::file_descriptor &root,
+                    int symlink_depth) -> void
+{
+    if (component == ".") {
+        return;
+    }
+
+    if (component == "..") {
+        check_not_above_root(dir_fd, root);
+        auto fd = ::openat(dir_fd.get(), "..", O_PATH | O_CLOEXEC | O_NOFOLLOW);
+        if (UNLIKELY(fd < 0)) {
+            throw std::system_error(errno,
+                                    std::system_category(),
+                                    "openat: failed to open parent directory");
+        }
+
+        linyaps_box::utils::file_descriptor parent_fd{ fd };
+        dir_fd = std::move(parent_fd);
+        return;
+    }
+
+    auto fd = ::openat(dir_fd.get(), component.c_str(), O_PATH | O_CLOEXEC | O_NOFOLLOW);
+    if (UNLIKELY(fd < 0)) {
+        throw std::system_error(errno,
+                                std::system_category(),
+                                std::string{ "openat: failed to open component " } + component);
+    }
+
+    linyaps_box::utils::file_descriptor child_fd{ fd };
+    auto child_stat = linyaps_box::utils::fstat(child_fd);
+
+    if (S_ISLNK(child_stat.st_mode)) {
+        resolve_symlink_component(dir_fd, child_fd, root, symlink_depth + 1);
+        return;
+    }
+
+    if (UNLIKELY(!S_ISDIR(child_stat.st_mode))) {
+        throw std::system_error(ENOTDIR, std::system_category(), "not a directory: " + component);
+    }
+
+    dir_fd = std::move(child_fd);
+}
+
 auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
                       const std::filesystem::path &path,
                       int flag,
@@ -35,23 +129,65 @@ auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
                         << linyaps_box::utils::inspect_fcntl_or_open_flags(
                              static_cast<size_t>(flag))
                         << "\n\t" << linyaps_box::utils::inspect_fd(root.get());
-    // TODO: we need implement a compatible fallback
-    // currently we just use openat and do some simple check
-    const auto &file_path = path.relative_path();
-    const auto fd = ::openat(root.get(), file_path.c_str(), flag, mode);
-    if (fd < 0) {
-        auto full_path = root.current_path() / path.relative_path();
+
+    auto current = root.duplicate();
+    const auto &parts = path.relative_path();
+
+    auto it = parts.begin();
+    auto end = parts.end();
+    size_t index{ 0 };
+    auto total = std::distance(it, end);
+
+    for (; it != end; ++it, ++index) {
+        auto component = it->string();
+        auto is_last = (index + 1 == static_cast<size_t>(total));
+
+        if (component == ".") {
+            continue;
+        }
+
+        if (component == "..") {
+            walk_component(current, component, root, 0);
+            continue;
+        }
+
+        if (is_last) {
+            auto fd = ::openat(current.get(), component.c_str(), flag, mode);
+            if (UNLIKELY(fd < 0)) {
+                auto full_path = root.current_path() / path.relative_path();
+                throw std::system_error(errno,
+                                        std::system_category(),
+                                        std::string{ "openat: failed to open " }
+                                          + full_path.string());
+            }
+
+            return linyaps_box::utils::file_descriptor{ fd };
+        }
+
+        walk_component(current, component, root, 0);
+    }
+
+    auto fd = ::openat(current.get(), ".", flag, mode);
+    if (UNLIKELY(fd < 0)) {
         throw std::system_error(errno,
                                 std::system_category(),
-                                std::string{ "openat: failed to open " } + full_path.string());
+                                "openat: failed to open resolved path");
     }
 
     return linyaps_box::utils::file_descriptor{ fd };
 }
 
-auto syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, uint64_t resolve)
-  -> linyaps_box::utils::file_descriptor
+// TODO: use expected for better error handling
+auto syscall_openat2(int dirfd,
+                     const char *path,
+                     uint64_t flag,
+                     uint64_t mode,
+                     uint64_t resolve,
+                     std::error_code &ec) noexcept
+  -> std::optional<linyaps_box::utils::file_descriptor>
 {
+    ec.clear();
+
     struct openat2_how
     {
         uint64_t flags;
@@ -60,8 +196,9 @@ auto syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, 
     } how{ flag, mode, resolve };
 
     const auto ret = syscall(__NR_openat2, dirfd, path, &how, sizeof(openat2_how), 0);
-    if (ret < 0) {
-        throw std::system_error(errno, std::system_category(), "openat2");
+    if (UNLIKELY(ret < 0)) {
+        ec.assign(errno, std::system_category());
+        return std::nullopt;
     }
 
     return linyaps_box::utils::file_descriptor{ static_cast<int>(ret) };
@@ -70,7 +207,7 @@ auto syscall_openat2(int dirfd, const char *path, uint64_t flag, uint64_t mode, 
 auto read_pseudo_file(const std::filesystem::path &path) -> std::string
 {
     std::ifstream ifs(path, std::ios::in | std::ios::binary);
-    if (!ifs) {
+    if (UNLIKELY(!ifs)) {
         throw std::runtime_error("Can't open pseudo file " + path.string());
     }
 
@@ -87,7 +224,7 @@ auto open(const std::filesystem::path &path, int flag, mode_t mode)
     LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " with "
                         << inspect_fcntl_or_open_flags(static_cast<size_t>(flag));
     const auto fd = ::open(path.c_str(), flag, mode);
-    if (fd == -1) {
+    if (UNLIKELY(fd == -1)) {
         throw std::system_error(errno,
                                 std::system_category(),
                                 "open: failed to open " + path.string());
@@ -105,34 +242,38 @@ auto open_at(const linyaps_box::utils::file_descriptor &root,
                         << inspect_fcntl_or_open_flags(static_cast<size_t>(flag)) << "\n\t"
                         << inspect_fd(root.get());
 
+    // currently box is running in single thread, so use bool is safe
     static bool support_openat2{ true };
     while (support_openat2) {
-        try {
-            return syscall_openat2(root.get(),
+        std::error_code ec;
+
+        auto ret = syscall_openat2(root.get(),
                                    path.c_str(),
                                    static_cast<uint64_t>(flag),
                                    mode,
-                                   RESOLVE_IN_ROOT);
-        } catch (const std::system_error &e) {
-            const auto code = e.code().value();
-            if (code == EINTR || code == EAGAIN) {
+                                   RESOLVE_IN_ROOT,
+                                   ec);
+        if (ec) {
+            auto val = ec.value();
+            if (val == EINTR || val == EAGAIN) {
                 continue;
             }
 
-            if (code == ENOSYS) {
+            if (val == ENOSYS) {
                 support_openat2 = false;
                 break;
             }
 
-            if (code == EINVAL || code == EPERM) {
-                break;
+            if (val == EINVAL || val == E2BIG) {
+                // EINVAL can be an unknown flag or invalid value was specified in how.
+                // E2BIG can be an extension that this kernel does not support was specified in how
+                return open_at_fallback(root, path, flag, mode);
             }
 
-            throw std::system_error(code,
-                                    std::system_category(),
-                                    std::string{ e.what() } + ": failed to open "
-                                      + (root.current_path() / path.relative_path()).string());
+            throw std::system_error(ec, "failed to openat2 " + path.string());
         }
+
+        return std::move(*ret);
     }
 
     // NOTE: openat2 only available after linux 5.15
@@ -144,7 +285,7 @@ auto touch(const file_descriptor &root, const std::filesystem::path &path, int f
 {
     LINYAPS_BOX_DEBUG() << "touch " << path << " at " << inspect_fd(root.get());
     const auto fd = ::openat(root.get(), path.c_str(), flag, mode);
-    if (fd == -1) {
+    if (UNLIKELY(fd == -1)) {
         throw std::system_error(errno,
                                 std::system_category(),
                                 "openat: " + (root.current_path() / path.relative_path()).string());
@@ -157,7 +298,7 @@ auto fstat(const file_descriptor &fd) -> struct stat
 {
     struct stat statbuf{ };
     auto ret = ::fstat(fd.get(), &statbuf);
-    if (ret == -1) {
+    if (UNLIKELY(ret == -1)) {
         throw std::system_error(errno, std::system_category(), "fstat");
     }
 
@@ -170,7 +311,7 @@ auto fstatat(const file_descriptor &fd, const std::filesystem::path &path, int f
 {
     struct stat statbuf{ };
     auto ret = ::fstatat(fd.get(), path.c_str(), &statbuf, flag);
-    if (ret == -1) {
+    if (UNLIKELY(ret == -1)) {
         throw std::system_error(errno, std::system_category(), "fstatat");
     }
 
@@ -197,7 +338,7 @@ auto lstat(const std::filesystem::path &path) -> struct stat
 {
     struct stat statbuf{ };
     auto ret = ::lstat(path.c_str(), &statbuf);
-    if (ret == -1) {
+    if (UNLIKELY(ret == -1)) {
         throw std::system_error(errno,
                                 std::system_category(),
                                 "lstat " + path.string() + " failed:");
@@ -212,7 +353,7 @@ auto statfs(const file_descriptor &fd) -> struct statfs
 {
     struct statfs statbuf{ };
     auto ret = ::statfs(fd.proc_path().c_str(), &statbuf);
-    if (ret == -1) {
+    if (UNLIKELY(ret == -1)) {
         throw std::system_error(errno, std::system_category(), "statfs");
     }
 
