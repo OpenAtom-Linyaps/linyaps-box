@@ -23,7 +23,7 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
     option.proc.args = options.command;
     option.proc.terminal = options.tty;
     option.proc.no_new_privileges = options.no_new_privs;
-    option.proc.env = options.envs.value_or(std::vector<std::string>{ });
+    option.proc.env = options.envs;
     option.preserve_fds = options.preserve_fds;
 
     if (option.proc.terminal && options.console_socket) {
@@ -33,11 +33,20 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
 #ifdef LINYAPS_BOX_ENABLE_CAP
     if (options.caps) {
         const auto &caps = options.caps.value();
-        auto transform_cap = [&caps](std::vector<cap_value_t> &cap_set) {
+        if (!option.proc.capabilities) {
+            option.proc.capabilities.emplace();
+        }
+
+        auto transform_cap = [&caps](std::optional<std::vector<cap_value_t>> &cap_set) {
+            if (!cap_set) {
+                cap_set.emplace();
+            }
+
+            cap_set->reserve(caps.size());
             std::transform(
               caps.cbegin(),
               caps.cend(),
-              std::back_inserter(cap_set),
+              std::back_inserter(*cap_set),
               [](const std::string &cap) {
                   cap_value_t val{ 0 };
                   if (cap_from_name(cap.c_str(), &val) < 0) {
@@ -48,10 +57,10 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
               });
         };
 
-        transform_cap(option.proc.capabilities.effective);
-        transform_cap(option.proc.capabilities.ambient);
-        transform_cap(option.proc.capabilities.bounding);
-        transform_cap(option.proc.capabilities.permitted);
+        transform_cap(option.proc.capabilities->effective);
+        transform_cap(option.proc.capabilities->ambient);
+        transform_cap(option.proc.capabilities->bounding);
+        transform_cap(option.proc.capabilities->permitted);
     }
 #endif
 

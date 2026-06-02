@@ -112,9 +112,11 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
         argv.push_back(nullptr);
 
         std::vector<const char *> c_env;
-        c_env.reserve(option.proc.env.size());
-        for (const auto &env : option.proc.env) {
-            c_env.push_back(env.c_str());
+        if (option.proc.env) {
+            c_env.reserve(option.proc.env->size());
+            for (const auto &env : *option.proc.env) {
+                c_env.push_back(env.c_str());
+            }
         }
         c_env.push_back(nullptr);
 
