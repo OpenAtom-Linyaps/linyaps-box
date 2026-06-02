@@ -518,4 +518,41 @@ auto read_exact(const file_descriptor &fd, std::size_t size) -> std::string
     return content;
 }
 
+void unlink_at(const file_descriptor &root, const std::filesystem::path &path)
+{
+    LINYAPS_BOX_DEBUG() << "Unlink " << path << " at " << root.current_path();
+
+    auto ret = ::unlinkat(root.get(), path.c_str(), 0);
+    if (UNLIKELY(ret != 0)) {
+        throw std::system_error(errno, std::system_category(), "unlinkat");
+    }
+}
+
+void unlink_at(const file_descriptor &root,
+               const std::filesystem::path &path,
+               std::error_code &ec) noexcept
+{
+    LINYAPS_BOX_DEBUG() << "Unlink " << path << " at " << root.current_path();
+
+    ec.clear();
+    auto ret = ::unlinkat(root.get(), path.c_str(), 0);
+    if (UNLIKELY(ret != 0)) {
+        ec.assign(errno, std::system_category());
+    }
+}
+
+auto rename_at(const file_descriptor &old_dir,
+               const std::filesystem::path &old_path,
+               const file_descriptor &new_dir,
+               const std::filesystem::path &new_path) -> void
+{
+    LINYAPS_BOX_DEBUG() << "Rename " << old_path << " at " << old_dir.current_path() << " to "
+                        << new_path << " at " << new_dir.current_path();
+
+    auto ret = ::renameat(old_dir.get(), old_path.c_str(), new_dir.get(), new_path.c_str());
+    if (UNLIKELY(ret != 0)) {
+        throw std::system_error(errno, std::system_category(), "renameat");
+    }
+}
+
 } // namespace linyaps_box::utils

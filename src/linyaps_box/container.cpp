@@ -610,16 +610,16 @@ try {
 }
 
 void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination,
-                          const unsigned long &flags)
+                          unsigned long flags)
 {
     LINYAPS_BOX_DEBUG() << "mount propagation flags";
 
-    if (destination.get() == -1) {
-        throw std::invalid_argument("invalid destination file descriptor for propagation mount");
-    }
-
     if (flags == 0) {
         return;
+    }
+
+    if (UNLIKELY(!destination.valid())) {
+        throw std::invalid_argument("invalid destination file descriptor for propagation mount");
     }
 
     syscall_mount(nullptr, destination.current_path().c_str(), nullptr, flags, nullptr);
@@ -1241,14 +1241,47 @@ private:
         this->configure_device("/dev/urandom", default_mode, default_type, makedev(1, 9), uid, gid);
         this->configure_device("/dev/tty", default_mode, default_type, makedev(5, 0), uid, gid);
 
-        // bind mount /dev/pts/ptmx to /dev/ptmx
         // https://docs.kernel.org/filesystems/devpts.html
-        linyaps_box::config::mount_t mount;
-        mount.source = root.current_path() / "dev/pts/ptmx";
-        mount.destination = "/dev/ptmx";
-        mount.type = "bind";
-        mount.flags = MS_BIND | MS_PRIVATE | MS_NOEXEC | MS_NOSUID;
-        this->mount(mount);
+        // TODO: Record "mounted_ptmx": "true" in state.json annotations when falling back to
+        // bind-mount.
+        // WARNING: Without this state, host-side teardown (rm -rf rootfs) will fail
+        // with EBUSY due to VFS reference leaks if the container's mount namespace is not
+        // immediately or fully released.
+        try {
+            auto ptmx =
+              linyaps_box::utils::open_at(root, "dev/ptmx", O_PATH | O_NOFOLLOW | O_CLOEXEC);
+            auto ptmx_stat = linyaps_box::utils::fstat(ptmx);
+
+            if (S_ISREG(ptmx_stat.st_mode)) {
+                // /dev/ptmx is a regular file: bind mount /dev/pts/ptmx over it
+                linyaps_box::config::mount_t mount;
+                mount.source = root.current_path() / "dev/pts/ptmx";
+                mount.destination = "/dev/ptmx";
+                mount.type = "bind";
+                mount.flags = MS_BIND | MS_PRIVATE | MS_NOEXEC | MS_NOSUID;
+                this->mount(mount);
+            } else if (S_ISLNK(ptmx_stat.st_mode)) {
+                // /dev/ptmx is a symlink: check if it points to pts/ptmx
+                auto link_target = linyaps_box::utils::readlinkat(ptmx, "");
+                if (link_target != "pts/ptmx" && link_target != "/dev/pts/ptmx") {
+                    // Atomically replace the symlink using a temp + rename
+                    std::error_code ec;
+                    linyaps_box::utils::symlink_at("pts/ptmx", root, "dev/.ptmx.tmp", ec);
+                    if (ec) {
+                        throw std::system_error(ec, "symlink_at .ptmx.tmp");
+                    }
+
+                    linyaps_box::utils::rename_at(root, "dev/.ptmx.tmp", root, "dev/ptmx");
+                }
+            }
+        } catch (const std::system_error &e) {
+            if (e.code().value() != ENOENT) {
+                throw;
+            }
+
+            // /dev/ptmx does not exist, create symlink pts/ptmx
+            linyaps_box::utils::symlink_at("pts/ptmx", root, "dev/ptmx");
+        }
     }
 
     // https://github.com/opencontainers/runtime-spec/blob/main/runtime-linux.md
