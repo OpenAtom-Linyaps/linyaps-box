@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -15,4 +15,10 @@ void mknodat(const file_descriptor &root,
              const std::filesystem::path &path,
              mode_t mode,
              dev_t dev);
+
+void mknodat(const file_descriptor &root,
+             const std::filesystem::path &path,
+             mode_t mode,
+             dev_t dev,
+             std::error_code &ec) noexcept;
 } // namespace linyaps_box::utils
