@@ -27,9 +27,7 @@
 
 // Compatible with linux kernel which is under 5.10
 #ifndef MS_NOSYMFOLLOW
-#  define LINGYAPS_MS_NOSYMFOLLOW 256
-#else
-#  define LINGYAPS_MS_NOSYMFOLLOW MS_NOSYMFOLLOW
+#  define MS_NOSYMFOLLOW 256
 #endif
 
 namespace linyaps_box {
