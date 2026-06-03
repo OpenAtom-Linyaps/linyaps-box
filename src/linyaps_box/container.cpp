@@ -128,7 +128,7 @@ constexpr std::array<MountFlag, 27> mount_flags{
     { MS_REMOUNT, "MS_REMOUNT" },
     { MS_MANDLOCK, "MS_MANDLOCK" },
     { MS_DIRSYNC, "MS_DIRSYNC" },
-    { LINGYAPS_MS_NOSYMFOLLOW, "MS_NOSYMFOLLOW" },
+    { MS_NOSYMFOLLOW, "MS_NOSYMFOLLOW" },
     { MS_NOATIME, "MS_NOATIME" },
     { MS_NODIRATIME, "MS_NODIRATIME" },
     { MS_BIND, "MS_BIND" },
@@ -632,18 +632,14 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
         throw std::invalid_argument("bind mount requires source");
     }
 
-    uint open_flag = O_PATH;
-    if ((mount.flags & LINGYAPS_MS_NOSYMFOLLOW) != 0) {
-        open_flag |= O_NOFOLLOW;
-    }
-    auto source_fd = linyaps_box::utils::open(mount.source.value(), static_cast<int>(open_flag));
-    auto source_stat = linyaps_box::utils::lstatat(source_fd, "");
+    auto source_fd = linyaps_box::utils::open(mount.source.value());
+    auto source_stat = linyaps_box::utils::fstatat(source_fd, "");
 
     auto sourceIsDir = S_ISDIR(source_stat.st_mode);
     auto destination_fd = ensure_mount_destination(sourceIsDir, root, mount);
 
-    auto dest_stat = linyaps_box::utils::lstatat(destination_fd, "");
-    if (S_ISDIR(source_stat.st_mode) != S_ISDIR(dest_stat.st_mode)) {
+    auto dest_stat = linyaps_box::utils::fstatat(destination_fd, "");
+    if (sourceIsDir != S_ISDIR(dest_stat.st_mode)) {
         throw std::invalid_argument("bind mount source/destination type mismatch: "
                                     + mount.source.value() + " (" + (sourceIsDir ? "dir" : "file")
                                     + ") and " + mount.destination.string() + " ("
@@ -665,7 +661,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
         throw;
     }
 
-    return linyaps_box::utils::open_at(root, mount.destination, static_cast<int>(open_flag));
+    return linyaps_box::utils::open_at(root, mount.destination);
 }
 
 [[noreturn]] void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor &root,

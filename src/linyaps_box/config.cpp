@@ -67,24 +67,12 @@ static const std::vector<std::pair<std::string_view, unsigned long>> propagation
 };
 
 static const std::vector<std::pair<std::string_view, unsigned long>> flags_map{
-    { "bind", MS_BIND },
-    { "defaults", 0 },
-    { "dirsync", MS_DIRSYNC },
-    { "iversion", MS_I_VERSION },
-    { "lazytime", MS_LAZYTIME },
-    { "mand", MS_MANDLOCK },
-    { "noatime", MS_NOATIME },
-    { "nodev", MS_NODEV },
-    { "nodiratime", MS_NODIRATIME },
-    { "noexec", MS_NOEXEC },
-    { "nosuid", MS_NOSUID },
-    { "nosymfollow", LINGYAPS_MS_NOSYMFOLLOW },
-    { "rbind", MS_BIND | MS_REC },
-    { "relatime", MS_RELATIME },
-    { "remount", MS_REMOUNT },
-    { "ro", MS_RDONLY },
-    { "silent", MS_SILENT },
-    { "strictatime", MS_STRICTATIME },
+    { "bind", MS_BIND },           { "defaults", 0 },           { "dirsync", MS_DIRSYNC },
+    { "iversion", MS_I_VERSION },  { "lazytime", MS_LAZYTIME }, { "mand", MS_MANDLOCK },
+    { "noatime", MS_NOATIME },     { "nodev", MS_NODEV },       { "nodiratime", MS_NODIRATIME },
+    { "noexec", MS_NOEXEC },       { "nosuid", MS_NOSUID },     { "nosymfollow", MS_NOSYMFOLLOW },
+    { "rbind", MS_BIND | MS_REC }, { "relatime", MS_RELATIME }, { "remount", MS_REMOUNT },
+    { "ro", MS_RDONLY },           { "silent", MS_SILENT },     { "strictatime", MS_STRICTATIME },
     { "sync", MS_SYNCHRONOUS },
 };
 
@@ -102,7 +90,7 @@ static const std::vector<std::pair<std::string_view, unsigned long>> unset_flags
     { "nostrictatime", MS_STRICTATIME },
     { "rw", MS_RDONLY },
     { "suid", MS_NOSUID },
-    { "symfollow", LINGYAPS_MS_NOSYMFOLLOW },
+    { "symfollow", MS_NOSYMFOLLOW },
 };
 
 static const std::vector<std::pair<std::string_view, linyaps_box::config::mount_t::extension>>
@@ -130,7 +118,7 @@ static const std::vector<std::pair<unsigned long, std::string_view>> flags_to_na
     { MS_NODIRATIME, "nodiratime" },
     { MS_NOEXEC, "noexec" },
     { MS_NOSUID, "nosuid" },
-    { LINGYAPS_MS_NOSYMFOLLOW, "nosymfollow" },
+    { MS_NOSYMFOLLOW, "nosymfollow" },
     { MS_RDONLY, "ro" },
     { MS_RELATIME, "relatime" },
     { MS_REMOUNT, "remount" },
