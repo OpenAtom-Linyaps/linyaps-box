@@ -19,7 +19,7 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     app.set_version_flag("-v,--version", [] {
         std::stringstream ss;
         ss << "ll-box version " << LINYAPS_BOX_VERSION << "\n";
-        ss << "spec " << linyaps_box::config::oci_version;
+        ss << "spec " << linyaps_box::Config::oci_version;
         return ss.str();
     });
     app.require_subcommand();
@@ -155,7 +155,7 @@ linyaps_box::command::options linyaps_box::command::parse(int argc, char *argv[]
     }
 
     if (cmd_list->parsed()) {
-        options.subcommand_opt = std::move(list_opt);
+        options.subcommand_opt = list_opt;
     } else if (cmd_run->parsed()) {
         options.subcommand_opt = std::move(run_opt);
     } else if (cmd_exec->parsed()) {

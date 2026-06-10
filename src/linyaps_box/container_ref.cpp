@@ -11,7 +11,6 @@
 #include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/process.h"
 #include "linyaps_box/utils/session.h"
-#include "nlohmann/json.hpp"
 
 #include <csignal> // IWYU pragma: keep
 #include <utility>
@@ -49,7 +48,7 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
 {
     auto target = std::to_string(this->status().PID);
 
-    std::ignore = utils::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
+    std::ignore = utils::prctl(PR_SET_CHILD_SUBREAPER, 1L, 0L, 0L, 0L);
 
     std::optional<unix_socket> recv_socketpair;
     if (option.proc.terminal && !option.console_socket) {
@@ -77,31 +76,41 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
 
         std::vector<const char *> argv{ "nsenter", "--target", target.c_str() };
 
-        auto config_str = status_dir_.read_config();
-        auto config = nlohmann::json::parse(config_str);
-        const auto &linux = config.at("linux");
-        if (linux.is_null()) {
+        auto path = status_dir_.config();
+        auto config = Config::parse(path);
+        const auto &linux = config.linux;
+        if (!linux) {
             throw std::runtime_error("container config missing linux section");
         }
 
         // FIXME: we assume that container always unshare some namespaces for now
         // support exec commands without setns in the future
-        for (const auto &ns : linux.at("namespaces")) {
-            const auto &type = ns.at("type");
-            if (type == "pid") {
-                argv.push_back("--pid");
-            } else if (type == "mount") {
-                argv.push_back("--mount");
-            } else if (type == "uts") {
-                argv.push_back("--uts");
-            } else if (type == "ipc") {
+        for (const auto &ns : linux->namespaces.value()) {
+            switch (ns.type_) {
+            case Config::linux_t::namespace_t::type::IPC: {
                 argv.push_back("--ipc");
-            } else if (type == "network") {
+            } break;
+            case Config::linux_t::namespace_t::type::UTS: {
+                argv.push_back("--uts");
+            } break;
+            case Config::linux_t::namespace_t::type::MOUNT: {
+                argv.push_back("--mount");
+            } break;
+            case Config::linux_t::namespace_t::type::PID: {
+                argv.push_back("--pid");
+            } break;
+            case Config::linux_t::namespace_t::type::NET: {
                 argv.push_back("--net");
-            } else if (type == "user") {
+            } break;
+            case Config::linux_t::namespace_t::type::USER: {
                 argv.push_back("--user");
-            } else if (type == "cgroup") {
+            } break;
+            case Config::linux_t::namespace_t::type::CGROUP: {
                 argv.push_back("--cgroup");
+            } break;
+            case Config::linux_t::namespace_t::type::TIME: {
+                argv.push_back("--time");
+            } break;
             }
         }
         argv.push_back("--preserve-credentials");

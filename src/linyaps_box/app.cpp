@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -44,22 +44,22 @@ try {
         return opts.global.return_code;
     }
 
-    return std::visit(utils::Overload{ [](const command::list_options &options) {
+    return std::visit(utils::Overload{ [](const command::list_options &options) -> int {
                                           command::list(options);
                                           return 0;
                                       },
                                        [](const command::exec_options &options) -> int {
                                            return command::exec(options);
                                        },
-                                       [](const command::kill_options &options) {
+                                       [](const command::kill_options &options) -> int {
                                            command::kill(options);
                                            return 0;
                                        },
-                                       [](const command::run_options &options) {
+                                       [](const command::run_options &options) -> int {
                                            return command::run(options);
                                        },
-                                       [](const std::monostate &) {
-                                           return 0;
+                                       [](const std::monostate &) -> int {
+                                           __builtin_unreachable();
                                        } },
                       opts.subcommand_opt);
 } catch (const std::exception &e) {

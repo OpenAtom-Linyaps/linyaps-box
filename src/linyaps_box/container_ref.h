@@ -16,7 +16,7 @@ namespace linyaps_box {
 struct exec_container_option
 {
     int preserve_fds;
-    config::process_t proc;
+    Config::process_t proc;
     std::optional<unix_socket> console_socket;
 };
 

@@ -7,6 +7,10 @@
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory_manager.h"
 
+#ifdef LINYAPS_BOX_ENABLE_CAP
+#  include <sys/capability.h>
+#endif
+
 auto linyaps_box::command::exec(const struct exec_options &options) -> int
 {
     status_directory_manager mgr(options.global_.get().root);
@@ -37,30 +41,21 @@ auto linyaps_box::command::exec(const struct exec_options &options) -> int
             option.proc.capabilities.emplace();
         }
 
-        auto transform_cap = [&caps](std::optional<std::vector<cap_value_t>> &cap_set) {
-            if (!cap_set) {
-                cap_set.emplace();
+        std::vector<cap_value_t> parsed;
+        parsed.reserve(caps.size());
+        for (const auto &name : caps) {
+            cap_value_t val{ };
+            if (cap_from_name(name.c_str(), &val) < 0) {
+                throw std::system_error(errno, std::system_category(), "cap_from_name");
             }
 
-            cap_set->reserve(caps.size());
-            std::transform(
-              caps.cbegin(),
-              caps.cend(),
-              std::back_inserter(*cap_set),
-              [](const std::string &cap) {
-                  cap_value_t val{ 0 };
-                  if (cap_from_name(cap.c_str(), &val) < 0) {
-                      throw std::system_error(errno, std::system_category(), "cap_from_name");
-                  }
+            parsed.push_back(val);
+        }
 
-                  return val;
-              });
-        };
-
-        transform_cap(option.proc.capabilities->effective);
-        transform_cap(option.proc.capabilities->ambient);
-        transform_cap(option.proc.capabilities->bounding);
-        transform_cap(option.proc.capabilities->permitted);
+        option.proc.capabilities->effective = parsed;
+        option.proc.capabilities->ambient = parsed;
+        option.proc.capabilities->bounding = parsed;
+        option.proc.capabilities->permitted = parsed;
     }
 #endif
 
