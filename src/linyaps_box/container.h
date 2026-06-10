@@ -5,14 +5,13 @@
 #pragma once
 
 #include "linyaps_box/cgroup_manager.h"
+#include "linyaps_box/config.h"
 #include "linyaps_box/container_ref.h"
 #include "linyaps_box/status_directory.h"
 #include "linyaps_box/unix_socket.h"
 #include "linyaps_box/utils/file_describer.h"
 
 namespace linyaps_box {
-
-struct container_data;
 
 struct create_container_options_t
 {
@@ -38,7 +37,7 @@ public:
     container(container &&) = delete;
     auto operator=(container &&) -> container & = delete;
 
-    [[nodiscard]] auto get_config() const -> const linyaps_box::config &;
+    [[nodiscard]] auto get_config() const -> const linyaps_box::Config &;
     [[nodiscard]] auto get_bundle() const -> const std::filesystem::path &;
     [[nodiscard]] auto run(run_container_options_t options) -> int;
 
@@ -56,7 +55,7 @@ public:
 
     [[nodiscard]] auto rootfs_propagation() const noexcept { return rootfs_propagation_; }
 
-    auto set_rootfs_propagation(unsigned int propagation) noexcept
+    auto set_rootfs_propagation(unsigned long propagation) noexcept
     {
         rootfs_propagation_ = propagation;
     }
@@ -67,10 +66,10 @@ public:
 
 private:
     void cgroup_preenter(const cgroup_options &options, utils::file_descriptor &dirfd);
-    linyaps_box::config config;
+    linyaps_box::Config config;
     std::filesystem::path bundle;
     std::unique_ptr<cgroup_manager> manager;
-    unsigned int rootfs_propagation_{ 0 };
+    unsigned long rootfs_propagation_{ 0 };
     gid_t host_gid_;
     uid_t host_uid_;
     bool deny_setgroups_{ false };

@@ -251,9 +251,11 @@ find_package(PkgConfig REQUIRED)
 if(linyaps-box_ENABLE_SECCOMP)
   pkg_check_modules(libseccomp REQUIRED IMPORTED_TARGET libseccomp>=2.3.3)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libseccomp)
+  #TODO: detect seccomp_arch_resolve_name and use if available
 endif()
 
 if(linyaps-box_ENABLE_CAP)
+  #TODO: remove libcap and implement it by ourself
   pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap>=2.25)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
 endif()
@@ -341,6 +343,10 @@ endif()
 if(linyaps-box_ENABLE_SECCOMP)
   target_compile_definitions("${linyaps-box_LIBRARY}"
                              PUBLIC LINYAPS_BOX_ENABLE_SECCOMP)
+  if(linyaps-box_HAVE_SECCOMP_ARCH_RESOLVE_NAME)
+    target_compile_definitions("${linyaps-box_LIBRARY}"
+                               PUBLIC SECCOMP_ARCH_RESOLVE_NAME=1)
+  endif()
 endif()
 
 if(linyaps-box_ENABLE_CAP)

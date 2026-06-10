@@ -5,47 +5,53 @@
 #pragma once
 
 #include <linux/ioprio.h>
-#include <numaif.h>
+#include <linux/mempolicy.h>
+#include <linux/sched.h>
 #include <sys/mount.h>
 
 #include <filesystem>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 #include <sys/resource.h>
 #include <sys/types.h>
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
-#  include <sys/capability.h>
-#endif
-
 #ifdef LINYAPS_BOX_ENABLE_SECCOMP
 #  include <seccomp.h>
 #endif
 
-// Compatible with linux kernel which is under 5.10
-#ifndef MS_NOSYMFOLLOW
-#  define MS_NOSYMFOLLOW 256
+#ifdef LINYAPS_BOX_ENABLE_CAP
+#  include <sys/capability.h>
 #endif
+
+#include "linyaps_box/utils/enum_traits.h"
+#include "nlohmann/json_fwd.hpp"
+
+// clang-format off
+#include "linyaps_box/config/kernel_fallbacks.h"
+// clang-format on
 
 namespace linyaps_box {
 
-struct config
+struct Config
 {
     static constexpr auto oci_version = "1.3.0";
 
-    static auto parse(std::string_view content) -> config;
+    static auto parse(std::string_view content) -> Config;
+    static auto parse(const std::filesystem::path &path) -> Config;
 
     struct process_t
     {
-        bool terminal{ false };
+        std::optional<bool> terminal;
 
         struct console_size_t
         {
-            unsigned short height{ 0 };
-            unsigned short width{ 0 };
+            unsigned short height;
+            unsigned short width;
         };
 
         std::optional<console_size_t> console_size;
@@ -62,6 +68,7 @@ struct config
                 CPU = RLIMIT_CPU,
                 DATA = RLIMIT_DATA,
                 FSIZE = RLIMIT_FSIZE,
+                LOCKS = RLIMIT_LOCKS,
                 MEMLOCK = RLIMIT_MEMLOCK,
                 MSGQUEUE = RLIMIT_MSGQUEUE,
                 NICE = RLIMIT_NICE,
@@ -82,7 +89,6 @@ struct config
         std::optional<std::vector<rlimit_t>> rlimits;
         std::optional<std::string> apparmor_profile;
 
-        // TODO: not use cap_value_t directly
 #ifdef LINYAPS_BOX_ENABLE_CAP
         struct capabilities_t
         {
@@ -94,7 +100,7 @@ struct config
         };
 
         std::optional<capabilities_t> capabilities;
-#endif
+#endif // LINYAPS_BOX_ENABLE_CAP
 
         std::optional<bool> no_new_privileges;
         std::optional<int> oom_score_adj;
@@ -106,7 +112,7 @@ struct config
                 FIFO = SCHED_FIFO,
                 RR = SCHED_RR,
                 BATCH = SCHED_BATCH,
-                ISO = SCHED_ISO,
+                ISO = kernel::sched_iso,
                 IDLE = SCHED_IDLE,
                 DEADLINE = SCHED_DEADLINE,
             };
@@ -121,10 +127,11 @@ struct config
                 DL_OVERRUN = SCHED_FLAG_DL_OVERRUN,
                 KEEP_POLICY = SCHED_FLAG_KEEP_POLICY,
                 KEEP_PARAMS = SCHED_FLAG_KEEP_PARAMS,
-                UTIL_CLAMP_MIN = SCHED_FLAG_UTIL_CLAMP_MIN,
-                UTIL_CLAMP_MAX = SCHED_FLAG_UTIL_CLAMP_MAX,
+                UTIL_CLAMP_MIN = static_cast<uint8_t>(kernel::sched_flag_util_clamp_min),
+                UTIL_CLAMP_MAX = static_cast<uint8_t>(kernel::sched_flag_util_clamp_max),
             };
-            std::optional<int> flags;
+
+            std::optional<flag_t> flags;
 
             std::optional<uint64_t> runtime;
             std::optional<uint64_t> deadline;
@@ -164,21 +171,72 @@ struct config
             std::optional<std::vector<gid_t>> additional_gids;
         };
 
+        // TODO: maybe user should be optional?
         user_t user;
     };
 
-    // this is required when start is called
-    process_t process;
+    std::optional<process_t> process;
 
     std::optional<std::string> hostname;
     std::optional<std::string> domainname;
+
+    struct id_mapping_t
+    {
+        uid_t host_id;
+        uid_t container_id;
+        size_t size;
+    };
+
+    struct mount_t
+    {
+        enum class extension : std::uint8_t {
+            NONE = 0,
+            COPY_SYMLINK = (1U << 0U),
+            TMPCOPYUP = (1U << 1U),
+        };
+
+        enum class idmap_type : std::uint8_t { IDMAP, RIDMAP };
+
+        // VFS mount(2) flags — passed directly to mount()'s 4th argument.
+        // Does NOT contain propagation flags; see propagation_flags.
+        unsigned long vfs_flags{ 0 };
+
+        // Propagation flags — applied via separate mount(2) call after the main mount.
+        // Bitmask of MS_PRIVATE, MS_SHARED, MS_SLAVE, MS_UNBINDABLE, optionally OR-ed with MS_REC.
+        unsigned long propagation_flags{ 0 };
+
+        // Recursive mount_setattr attributes — applied via mount_setattr(AT_RECURSIVE).
+        // TODO: implement mount_setattr.
+        struct recursive_attr
+        {
+            uint64_t set{ 0 };
+            uint64_t clr{ 0 };
+        };
+
+        std::optional<recursive_attr> rec_attr;
+
+        // Runtime extension flags — bitmap of extension values.
+        extension extension_flags{ extension::NONE };
+
+        // ID mapping type — idmap/ridmap, mutually exclusive.
+        std::optional<idmap_type> idmap;
+
+        std::optional<std::string> source;
+        std::filesystem::path destination;
+        std::optional<std::string> type;
+        std::string data;
+
+        std::optional<std::vector<Config::id_mapping_t>> uid_mappings;
+        std::optional<std::vector<Config::id_mapping_t>> gid_mappings;
+    };
+
+    std::vector<mount_t> mounts;
 
     struct linux_t
     {
         struct namespace_t
         {
             enum class type : unsigned int {
-                NONE = 0,
                 IPC = CLONE_NEWIPC,
                 UTS = CLONE_NEWUTS,
                 MOUNT = CLONE_NEWNS,
@@ -186,7 +244,7 @@ struct config
                 NET = CLONE_NEWNET,
                 USER = CLONE_NEWUSER,
                 CGROUP = CLONE_NEWCGROUP,
-                TIME = CLONE_NEWTIME,
+                TIME = kernel::clone_newtime,
             };
 
             type type_;
@@ -195,15 +253,8 @@ struct config
 
         std::optional<std::vector<namespace_t>> namespaces;
 
-        struct id_mapping_t
-        {
-            uid_t host_id;
-            uid_t container_id;
-            size_t size;
-        };
-
-        std::optional<std::vector<id_mapping_t>> uid_mappings;
-        std::optional<std::vector<id_mapping_t>> gid_mappings;
+        std::optional<std::vector<Config::id_mapping_t>> uid_mappings;
+        std::optional<std::vector<Config::id_mapping_t>> gid_mappings;
 
         struct time_offset_t
         {
@@ -217,7 +268,6 @@ struct config
         {
             std::string type;
             std::filesystem::path path;
-            // REQUIRED unless type is 'p'
             std::optional<uint32_t> major;
             std::optional<uint32_t> minor;
             std::optional<uint32_t> mode;
@@ -232,120 +282,125 @@ struct config
             std::optional<std::string> name;
         };
 
-        std::optional<std::vector<network_device_t>> network_devices;
+        std::optional<std::unordered_map<std::string, network_device_t>> network_devices;
         std::optional<std::string> cgroups_path;
 
-        struct allowed_device_t
+        struct resources_t
         {
-            bool allow;
-            std::optional<std::string> type;
-            std::optional<int64_t> major;
-            std::optional<int64_t> minor;
-            std::optional<std::string> access;
-        };
-
-        std::optional<std::vector<allowed_device_t>> allowed_devices;
-
-        struct memory_t
-        {
-            std::optional<int64_t> limit;
-            std::optional<int64_t> reservation;
-            std::optional<int64_t> swap;
-            std::optional<int64_t> kernel;
-            std::optional<int64_t> kernel_tcp;
-            std::optional<uint64_t> swappiness;
-            std::optional<bool> disable_OOM_killer;
-            std::optional<bool> use_hierarchy;
-            std::optional<bool> check_before_update;
-        };
-
-        std::optional<memory_t> memory;
-
-        struct cpu_t
-        {
-            enum class idle_t : uint8_t { NONE = 0, IDLE = 1 };
-            std::optional<uint64_t> shares;
-            std::optional<int64_t> quota;
-            std::optional<uint64_t> burst;
-            std::optional<uint64_t> period;
-            std::optional<int64_t> realtime_runtime;
-            std::optional<uint64_t> realtime_period;
-            std::optional<std::vector<uint>> cpus;
-            std::optional<std::string> mems;
-            std::optional<idle_t> idle;
-        };
-
-        std::optional<cpu_t> cpu;
-
-        struct block_io_t
-        {
-            std::optional<uint16_t> weight;
-            std::optional<uint16_t> leaf_weight;
-
-            struct weight_device_t
+            struct device_t
             {
-                int64_t major;
-                int64_t minor;
+                bool allow;
+                std::optional<std::string> type;
+                std::optional<int64_t> major;
+                std::optional<int64_t> minor;
+                std::optional<std::string> access;
+            };
+
+            std::optional<std::vector<device_t>> devices;
+
+            struct memory_t
+            {
+                std::optional<int64_t> limit;
+                std::optional<int64_t> reservation;
+                std::optional<int64_t> swap;
+                std::optional<int64_t> kernel;
+                std::optional<int64_t> kernel_tcp;
+                std::optional<uint64_t> swappiness;
+                std::optional<bool> disable_OOM_killer;
+                std::optional<bool> use_hierarchy;
+                std::optional<bool> check_before_update;
+            };
+
+            std::optional<memory_t> memory;
+
+            struct cpu_t
+            {
+                enum class idle_t : uint8_t { NONE = 0, IDLE = 1 };
+                std::optional<uint64_t> shares;
+                std::optional<int64_t> quota;
+                std::optional<uint64_t> burst;
+                std::optional<uint64_t> period;
+                std::optional<int64_t> realtime_runtime;
+                std::optional<uint64_t> realtime_period;
+                std::optional<std::vector<unsigned int>> cpus;
+                std::optional<std::vector<unsigned int>> mems;
+                std::optional<idle_t> idle;
+            };
+
+            std::optional<cpu_t> cpu;
+
+            struct block_io_t
+            {
                 std::optional<uint16_t> weight;
                 std::optional<uint16_t> leaf_weight;
+
+                struct weight_device_t
+                {
+                    int64_t major;
+                    int64_t minor;
+                    std::optional<uint16_t> weight;
+                    std::optional<uint16_t> leaf_weight;
+                };
+
+                std::optional<std::vector<weight_device_t>> weight_devices;
+
+                struct throttle_device_t
+                {
+                    int64_t major;
+                    int64_t minor;
+                    uint64_t rate;
+                };
+
+                std::optional<std::vector<throttle_device_t>> throttle_read_bps_device;
+                std::optional<std::vector<throttle_device_t>> throttle_write_bps_device;
+                std::optional<std::vector<throttle_device_t>> throttle_read_iops_device;
+                std::optional<std::vector<throttle_device_t>> throttle_write_iops_device;
             };
 
-            std::optional<std::vector<weight_device_t>> weight_devices;
+            std::optional<block_io_t> block_io;
 
-            struct throttle_device_t
+            struct hugepage_limit_t
             {
-                int64_t major;
-                int64_t minor;
-                uint64_t rate;
+                std::string page_size;
+                uint64_t limit;
             };
 
-            std::optional<std::vector<throttle_device_t>> throttle_read_bps_device;
-            std::optional<std::vector<throttle_device_t>> throttle_write_bps_device;
-            std::optional<std::vector<throttle_device_t>> throttle_read_iops_device;
-            std::optional<std::vector<throttle_device_t>> throttle_write_iops_device;
-        };
+            std::optional<std::vector<hugepage_limit_t>> hugepage_limits;
 
-        std::optional<block_io_t> block_io;
-
-        struct hugepage_limit_t
-        {
-            std::string page_size;
-            uint64_t limit;
-        };
-
-        std::optional<std::vector<hugepage_limit_t>> hugepage_limits;
-
-        struct network_t
-        {
-            std::optional<uint32_t> class_id;
-
-            struct priority_t
+            struct network_t
             {
-                std::string name;
-                uint32_t priority;
+                std::optional<uint32_t> class_id;
+
+                struct priority_t
+                {
+                    std::string name;
+                    uint32_t priority;
+                };
+
+                std::optional<std::vector<priority_t>> priorities;
             };
 
-            std::optional<std::vector<priority_t>> priorities;
+            std::optional<network_t> network;
+
+            struct pids_t
+            {
+                std::optional<int64_t> limit;
+            };
+
+            std::optional<pids_t> pids;
+
+            struct rdma_t
+            {
+                std::optional<uint32_t> hca_handles;
+                std::optional<uint32_t> hca_objects;
+            };
+
+            std::optional<std::unordered_map<std::string, rdma_t>> rdma;
+
+            std::optional<std::unordered_map<std::string, std::string>> unified;
         };
 
-        std::optional<network_t> network;
-
-        struct pids_t
-        {
-            std::optional<int64_t> limit;
-        };
-
-        std::optional<pids_t> pids;
-
-        struct rdma_t
-        {
-            std::optional<uint32_t> hca_handles;
-            std::optional<uint32_t> hca_objects;
-        };
-
-        std::optional<std::unordered_map<std::string, rdma_t>> rdma;
-
-        std::optional<std::unordered_map<std::string, std::string>> unified;
+        std::optional<resources_t> resources;
 
         struct intel_rdt_t
         {
@@ -364,19 +419,19 @@ struct config
                 DEFAULT = MPOL_DEFAULT,
                 BIND = MPOL_BIND,
                 INTERLEAVE = MPOL_INTERLEAVE,
-                WEIGHTED_INTERLEAVE = MPOL_WEIGHTED_INTERLEAVE,
+                WEIGHTED_INTERLEAVE = static_cast<int>(kernel::mpol_weighted_interleave),
                 PREFERRED = MPOL_PREFERRED,
-                PREFERRED_MANY = MPOL_PREFERRED_MANY,
+                PREFERRED_MANY = static_cast<int>(kernel::mpol_preferred_many),
                 LOCAL = MPOL_LOCAL,
             };
 
             mode_t mode;
-            std::optional<std::vector<int>> nodes;
+            std::optional<std::vector<unsigned int>> nodes;
 
             enum class flag_t : uint16_t {
-                NUMA_BALANCING = MPOL_F_NUMA_BALANCING,
-                RELATIVE_NODES = MPOL_F_RELATIVE_NODES,
-                STATIC_NODES = MPOL_F_STATIC_NODES,
+                NUMA_BALANCING = static_cast<uint16_t>(kernel::mpol_f_numa_balancing),
+                RELATIVE_NODES = static_cast<uint16_t>(MPOL_F_RELATIVE_NODES),
+                STATIC_NODES = static_cast<uint16_t>(MPOL_F_STATIC_NODES),
             };
             std::optional<flag_t> flags;
         };
@@ -388,41 +443,56 @@ struct config
 #ifdef LINYAPS_BOX_ENABLE_SECCOMP
         struct seccomp_t
         {
-            std::string default_action;
+            enum class action_t : std::uint32_t {
+                ALLOW = SCMP_ACT_ALLOW,
+                ERRNO = SCMP_ACT_ERRNO(0),
+                KILL = SCMP_ACT_KILL,
+                KILL_PROCESS = static_cast<std::uint32_t>(kernel::scmp_act_kill_process),
+                KILL_THREAD = static_cast<std::uint32_t>(kernel::scmp_act_kill_thread),
+                LOG = static_cast<std::uint32_t>(kernel::scmp_act_log),
+                NOTIFY = static_cast<std::uint32_t>(kernel::scmp_act_notify),
+                TRACE = SCMP_ACT_TRACE(0),
+                TRAP = SCMP_ACT_TRAP
+            };
+
+            action_t default_action;
             std::optional<uint> default_errno_ret;
 
-            enum class arch_t : uint32_t {
-                X86 = SCMP_ARCH_X86,
-                X86_64 = SCMP_ARCH_X86_64,
-                X32 = SCMP_ARCH_X32,
-                ARM = SCMP_ARCH_ARM,
-                AARCH64 = SCMP_ARCH_AARCH64,
-                MIPS = SCMP_ARCH_MIPS,
-                MIPS64 = SCMP_ARCH_MIPS64,
-                MIPS64N32 = SCMP_ARCH_MIPS64N32,
-                MIPSEL = SCMP_ARCH_MIPSEL,
-                MIPSEL64 = SCMP_ARCH_MIPSEL64,
-                MIPSEL64N32 = SCMP_ARCH_MIPSEL64N32,
-                PPC = SCMP_ARCH_PPC,
-                PPC64 = SCMP_ARCH_PPC64,
-                PPC64LE = SCMP_ARCH_PPC64LE,
-                S390 = SCMP_ARCH_S390,
-                S390X = SCMP_ARCH_S390X,
-                PARISC = SCMP_ARCH_PARISC,
-                PARISC64 = SCMP_ARCH_PARISC64,
-                RISCV64 = SCMP_ARCH_RISCV64,
-                LOONGARCH64 = SCMP_ARCH_LOONGARCH64,
-                M68K = SCMP_ARCH_M68K,
-                SH = SCMP_ARCH_SH,
-                SHEB = SCMP_ARCH_SHEB
+            // TODO: currently we only parsing seccomp flags
+            // using it when we supports seccomp fully
+            enum class arch_t : uint8_t {
+                X86,
+                X86_64,
+                X32,
+                ARM,
+                AARCH64,
+                MIPS,
+                MIPS64,
+                MIPS64N32,
+                MIPSEL,
+                MIPSEL64,
+                MIPSEL64N32,
+                PPC,
+                PPC64,
+                PPC64LE,
+                S390,
+                S390X,
+                PARISC,
+                PARISC64,
+                RISCV64,
+                LOONGARCH64,
+                M68K,
+                SH,
+                SHEB,
             };
             std::optional<std::vector<arch_t>> architectures;
 
             enum class flag_t : std::uint8_t {
                 TSYNC = SECCOMP_FILTER_FLAG_TSYNC,
-                LOG = SECCOMP_FILTER_FLAG_LOG,
-                SPEC_ALLOW = SECCOMP_FILTER_FLAG_SPEC_ALLOW,
-                WAIT_KILLABLE_RECV = SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV,
+                LOG = static_cast<std::uint8_t>(kernel::seccomp_filter_flag_log),
+                SPEC_ALLOW = static_cast<std::uint8_t>(kernel::seccomp_filter_flag_spec_allow),
+                WAIT_KILLABLE_RECV =
+                  static_cast<std::uint8_t>(kernel::seccomp_filter_flag_wait_killable_recv),
             };
             std::optional<flag_t> flags;
 
@@ -431,15 +501,15 @@ struct config
 
             struct syscall_t
             {
-                std::vector<std::string> name;
-                std::string action;
+                std::vector<std::string> names;
+                action_t action;
                 std::optional<uint> errno_ret;
 
                 struct arg_t
                 {
                     uint index;
                     uint64_t value;
-                    uint64_t value_two;
+                    std::optional<uint64_t> value_two;
 
                     enum class op_t : uint8_t {
                         EQ = SCMP_CMP_EQ,
@@ -448,7 +518,7 @@ struct config
                         LE = SCMP_CMP_LE,
                         GT = SCMP_CMP_GT,
                         GE = SCMP_CMP_GE,
-                        MASKED_EQ = SCMP_CMP_MASKED_EQ
+                        MASKED_EQ = SCMP_CMP_MASKED_EQ,
                     };
                     op_t op;
                 };
@@ -461,13 +531,8 @@ struct config
 
         std::optional<seccomp_t> seccomp;
 #endif
-        enum class rootfs_propagation_t : uint {
-            PRIVATE = MS_PRIVATE,
-            SHARED = MS_SHARED,
-            SLAVE = MS_SLAVE,
-            UNBINDABLE = MS_UNBINDABLE
-        };
-        std::optional<rootfs_propagation_t> rootfs_propagation;
+
+        unsigned long rootfs_propagation{ 0 };
 
         std::optional<std::vector<std::filesystem::path>> masked_paths;
         std::optional<std::vector<std::filesystem::path>> readonly_paths;
@@ -493,7 +558,7 @@ struct config
         {
             std::filesystem::path path;
             std::optional<std::vector<std::string>> args;
-            std::optional<std::unordered_map<std::string, std::string>> env;
+            std::optional<std::vector<std::string>> env;
             std::optional<int> timeout;
         };
 
@@ -507,107 +572,58 @@ struct config
 
     std::optional<hooks_t> hooks;
 
-    struct mount_t
-    {
-        enum class extension : std::uint8_t { NONE = 0, COPY_SYMLINK };
-
-        std::optional<std::string> source;
-        std::filesystem::path destination;
-        std::optional<std::string> type;
-        std::string data;
-
-        // for id mapped mount
-        std::optional<std::vector<linux_t::id_mapping_t>> uid_mappings;
-        std::optional<std::vector<linux_t::id_mapping_t>> gid_mappings;
-        unsigned long flags{ 0 };
-        unsigned long propagation_flags{ 0 };
-        extension extension_flags{ 0 };
-    };
-
-    std::vector<mount_t> mounts;
-
     struct root_t
     {
         std::filesystem::path path;
         bool readonly{ false };
     };
 
-    root_t root;
+    std::optional<root_t> root;
 
     std::optional<std::unordered_map<std::string, std::string>> annotations;
 };
 
-auto to_string_view(linyaps_box::config::linux_t::namespace_t::type type) noexcept
-  -> std::string_view;
-auto to_string_view(linyaps_box::config::process_t::rlimit_t::type_t type) noexcept
-  -> std::string_view;
+auto to_string_view(Config::linux_t::namespace_t::type type) noexcept -> std::string_view;
 
-void validate_namespace_path(const linyaps_box::config::linux_t::namespace_t &ns);
+auto to_string_view(Config::process_t::rlimit_t::type_t type) noexcept -> std::string_view;
+
+void validate_namespace_path(const Config::linux_t::namespace_t &ns);
+
+void from_json(const nlohmann::json &j, Config &v);
+
+template <>
+struct utils::is_bitmask_enum<Config::linux_t::namespace_t::type> : std::true_type
+{
+};
+
+template <>
+struct utils::is_bitmask_enum<Config::mount_t::extension> : std::true_type
+{
+};
+
+template <>
+struct utils::is_bitmask_enum<Config::process_t::scheduler_t::flag_t> : std::true_type
+{
+};
+
+template <>
+struct utils::is_bitmask_enum<Config::linux_t::memory_policy_t::flag_t> : std::true_type
+{
+};
+
+#ifdef LINYAPS_BOX_ENABLE_SECCOMP
+template <>
+struct utils::is_bitmask_enum<Config::linux_t::seccomp_t::flag_t> : std::true_type
+{
+};
+#endif
+
+using utils::operator|;
+using utils::operator&;
+using utils::operator^;
+using utils::operator~;
+using utils::operator|=;
+using utils::operator&=;
+using utils::operator^=;
 
 } // namespace linyaps_box
-
-constexpr linyaps_box::config::mount_t::extension
-operator|(linyaps_box::config::mount_t::extension lhs, linyaps_box::config::mount_t::extension rhs)
-{
-    return static_cast<linyaps_box::config::mount_t::extension>(
-      static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(lhs)
-      | static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(rhs));
-}
-
-constexpr linyaps_box::config::mount_t::extension
-operator&(linyaps_box::config::mount_t::extension lhs, linyaps_box::config::mount_t::extension rhs)
-{
-    return static_cast<linyaps_box::config::mount_t::extension>(
-      static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(lhs)
-      & static_cast<std::underlying_type_t<linyaps_box::config::mount_t::extension>>(rhs));
-}
-
-constexpr linyaps_box::config::mount_t::extension &
-operator|=(linyaps_box::config::mount_t::extension &lhs,
-           linyaps_box::config::mount_t::extension rhs) noexcept
-{
-    lhs = lhs | rhs;
-    return lhs;
-}
-
-constexpr linyaps_box::config::mount_t::extension &
-operator&=(linyaps_box::config::mount_t::extension &lhs,
-           linyaps_box::config::mount_t::extension rhs) noexcept
-{
-    lhs = lhs & rhs;
-    return lhs;
-}
-
-constexpr linyaps_box::config::linux_t::namespace_t::type
-operator|(linyaps_box::config::linux_t::namespace_t::type lhs,
-          linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
-{
-    return static_cast<linyaps_box::config::linux_t::namespace_t::type>(
-      static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(lhs)
-      | static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(rhs));
-}
-
-constexpr linyaps_box::config::linux_t::namespace_t::type
-operator&(linyaps_box::config::linux_t::namespace_t::type lhs,
-          linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
-{
-    return static_cast<linyaps_box::config::linux_t::namespace_t::type>(
-      static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(lhs)
-      & static_cast<std::underlying_type_t<linyaps_box::config::linux_t::namespace_t::type>>(rhs));
-}
-
-constexpr linyaps_box::config::linux_t::namespace_t::type &
-operator|=(linyaps_box::config::linux_t::namespace_t::type &lhs,
-           linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
-{
-    lhs = lhs | rhs;
-    return lhs;
-}
-
-constexpr linyaps_box::config::linux_t::namespace_t::type &
-operator&=(linyaps_box::config::linux_t::namespace_t::type &lhs,
-           linyaps_box::config::linux_t::namespace_t::type rhs) noexcept
-{
-    lhs = lhs & rhs;
-    return lhs;
-}

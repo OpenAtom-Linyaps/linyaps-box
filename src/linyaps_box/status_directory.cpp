@@ -97,20 +97,17 @@ void linyaps_box::status_directory::remove() const
     std::filesystem::remove_all(path_);
 }
 
-void linyaps_box::status_directory::write_config(std::string_view config) const
+auto linyaps_box::status_directory::write_config(std::string_view config) const -> void
 {
     utils::atomic_write(path_ / "config.json", config);
 }
 
-auto linyaps_box::status_directory::read_config() const -> std::string
+auto linyaps_box::status_directory::save_config(const std::filesystem::path &src) const -> void
 {
-    auto config_path = path_ / "config.json";
-    std::ifstream istrm(config_path);
-    if (istrm.fail()) {
-        throw std::system_error(errno,
-                                std::system_category(),
-                                "failed to open config file: " + config_path.string());
-    }
+    std::filesystem::copy(src, path_ / "config.json");
+}
 
-    return { std::istreambuf_iterator<char>(istrm), std::istreambuf_iterator<char>() };
+auto linyaps_box::status_directory::config() const -> std::filesystem::path
+{
+    return path_ / "config.json";
 }

@@ -11,7 +11,7 @@
 
 namespace linyaps_box::io {
 
-static constexpr std::size_t default_bytes_quota{ static_cast<const std::size_t>(16 * 1024) };
+static constexpr std::size_t default_bytes_quota{ static_cast<std::size_t>(16 * 1024) };
 
 Forwarder::Forwarder(Epoll &poller, std::size_t buffer_size)
     : rb(utils::ring_buffer::create(buffer_size))
