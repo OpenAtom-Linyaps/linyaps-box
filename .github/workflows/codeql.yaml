@@ -1,0 +1,48 @@
+name: 'CodeQL Security Scan'
+
+on:
+  push:
+    branches: ['master']
+  pull_request:
+    branches: ['master']
+  schedule:
+    - cron: '39 22 * * 5'
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['cpp']
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: manual
+          queries: security-extended
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build build-essential pkgconf libcap-dev libseccomp-dev nlohmann-json3-dev libcli11-dev libgtest-dev
+
+      - name: Configure and Build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -Dlinyaps-box_ENABLE_CPM=OFF -Dlinyaps-box_DEFAULT_LOG_LEVEL=7 -Dlinyaps-box_ACTIVE_LOG_LEVEL=7
+          ninja -C build
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
