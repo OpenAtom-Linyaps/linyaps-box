@@ -59,7 +59,7 @@ try {
                                            return command::run(options);
                                        },
                                        [](const std::monostate &) -> int {
-                                           __builtin_unreachable();
+                                           return 0;
                                        } },
                       opts.subcommand_opt);
 } catch (const std::exception &e) {
