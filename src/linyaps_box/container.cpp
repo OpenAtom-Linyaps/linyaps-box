@@ -1408,8 +1408,30 @@ void create_container_hooks(const linyaps_box::container &container,
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
 
-void do_pivot_root(const linyaps_box::container &container, const std::filesystem::path &rootfs)
+void do_pivot_root(const linyaps_box::container &container,
+                   const std::filesystem::path &rootfs,
+                   bool has_mount_ns)
 {
+    if (!has_mount_ns) {
+        LINYAPS_BOX_DEBUG() << "no mount namespace, fallback to chroot";
+        auto ret = chdir(rootfs.c_str());
+        if (ret < 0) {
+            throw std::system_error(errno, std::system_category(), "chdir to rootfs");
+        }
+
+        ret = chroot(".");
+        if (ret < 0) {
+            throw std::system_error(errno, std::system_category(), "chroot");
+        }
+
+        ret = chdir("/");
+        if (ret < 0) {
+            throw std::system_error(errno, std::system_category(), "chdir to /");
+        }
+
+        return;
+    }
+
     LINYAPS_BOX_DEBUG() << "start pivot root";
     LINYAPS_BOX_DEBUG() << linyaps_box::utils::inspect_fds();
     auto old_root = linyaps_box::utils::open("/", O_DIRECTORY | O_PATH | O_CLOEXEC);
@@ -1430,7 +1452,25 @@ void do_pivot_root(const linyaps_box::container &container, const std::filesyste
                         << linyaps_box::utils::inspect_fd(new_root.get());
     ret = syscall(__NR_pivot_root, ".", ".");
     if (ret < 0) {
-        throw std::system_error(errno, std::system_category(), "pivot_root");
+        LINYAPS_BOX_DEBUG() << "pivot_root failed (" << errno
+                            << "), fallback to move_root + chroot";
+        // fallback: MS_MOVE + chroot
+        ret = mount(rootfs.c_str(), "/", "", MS_MOVE, nullptr);
+        if (ret < 0) {
+            throw std::system_error(errno, std::system_category(), "mount MS_MOVE");
+        }
+
+        ret = chroot(".");
+        if (ret < 0) {
+            throw std::system_error(errno, std::system_category(), "chroot after MS_MOVE");
+        }
+
+        ret = chdir("/");
+        if (ret < 0) {
+            throw std::system_error(errno, std::system_category(), "chdir to /");
+        }
+
+        return;
     }
 
     ret = fchdir(old_root.get());
@@ -1829,7 +1869,13 @@ try {
     auto status = container.status();
     create_container_hooks(container, status, socket);
     // TODO: selinux label/apparmor profile
-    do_pivot_root(container, rootfs);
+    auto has_mount_ns = config.linux && config.linux->namespaces
+      && std::any_of(config.linux->namespaces->cbegin(),
+                     config.linux->namespaces->cend(),
+                     [](const auto &ns) {
+                         return ns.type_ == linyaps_box::Config::linux_t::namespace_t::type::MOUNT;
+                     });
+    do_pivot_root(container, rootfs, has_mount_ns);
 
     linyaps_box::utils::setsid();
     if (args.console_socket) {
