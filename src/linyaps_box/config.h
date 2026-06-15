@@ -7,18 +7,16 @@
 #include <linux/ioprio.h>
 #include <linux/mempolicy.h>
 #include <linux/sched.h>
-#include <sys/mount.h>
+#include <nlohmann/json_fwd.hpp>
 
 #include <filesystem>
 #include <optional>
 #include <string>
-#include <string_view>
-#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
+#include <sched.h>
 #include <sys/resource.h>
-#include <sys/types.h>
 
 #ifdef LINYAPS_BOX_ENABLE_SECCOMP
 #  include <seccomp.h>
@@ -29,7 +27,6 @@
 #endif
 
 #include "linyaps_box/utils/enum_traits.h"
-#include "nlohmann/json_fwd.hpp"
 
 // clang-format off
 #include "linyaps_box/config/kernel_fallbacks.h"
@@ -37,12 +34,12 @@
 
 namespace linyaps_box {
 
-struct Config
+struct oci_config
 {
-    static constexpr auto oci_version = "1.3.0";
+    static constexpr auto version = "1.3.0";
 
-    static auto parse(std::string_view content) -> Config;
-    static auto parse(const std::filesystem::path &path) -> Config;
+    static auto parse(std::string_view content) -> oci_config;
+    static auto parse(const std::filesystem::path &path) -> oci_config;
 
     struct process_t
     {
@@ -226,8 +223,8 @@ struct Config
         std::optional<std::string> type;
         std::string data;
 
-        std::optional<std::vector<Config::id_mapping_t>> uid_mappings;
-        std::optional<std::vector<Config::id_mapping_t>> gid_mappings;
+        std::optional<std::vector<oci_config::id_mapping_t>> uid_mappings;
+        std::optional<std::vector<oci_config::id_mapping_t>> gid_mappings;
     };
 
     std::vector<mount_t> mounts;
@@ -253,8 +250,8 @@ struct Config
 
         std::optional<std::vector<namespace_t>> namespaces;
 
-        std::optional<std::vector<Config::id_mapping_t>> uid_mappings;
-        std::optional<std::vector<Config::id_mapping_t>> gid_mappings;
+        std::optional<std::vector<oci_config::id_mapping_t>> uid_mappings;
+        std::optional<std::vector<oci_config::id_mapping_t>> gid_mappings;
 
         struct time_offset_t
         {
@@ -583,37 +580,37 @@ struct Config
     std::optional<std::unordered_map<std::string, std::string>> annotations;
 };
 
-auto to_string_view(Config::linux_t::namespace_t::type type) noexcept -> std::string_view;
+auto to_string_view(oci_config::linux_t::namespace_t::type type) noexcept -> std::string_view;
 
-auto to_string_view(Config::process_t::rlimit_t::type_t type) noexcept -> std::string_view;
+auto to_string_view(oci_config::process_t::rlimit_t::type_t type) noexcept -> std::string_view;
 
-void validate_namespace_path(const Config::linux_t::namespace_t &ns);
+void validate_namespace_path(const oci_config::linux_t::namespace_t &ns);
 
-void from_json(const nlohmann::json &j, Config &v);
+void from_json(const nlohmann::json &j, oci_config &v);
 
 template <>
-struct utils::is_bitmask_enum<Config::linux_t::namespace_t::type> : std::true_type
+struct utils::is_bitmask_enum<oci_config::linux_t::namespace_t::type> : std::true_type
 {
 };
 
 template <>
-struct utils::is_bitmask_enum<Config::mount_t::extension> : std::true_type
+struct utils::is_bitmask_enum<oci_config::mount_t::extension> : std::true_type
 {
 };
 
 template <>
-struct utils::is_bitmask_enum<Config::process_t::scheduler_t::flag_t> : std::true_type
+struct utils::is_bitmask_enum<oci_config::process_t::scheduler_t::flag_t> : std::true_type
 {
 };
 
 template <>
-struct utils::is_bitmask_enum<Config::linux_t::memory_policy_t::flag_t> : std::true_type
+struct utils::is_bitmask_enum<oci_config::linux_t::memory_policy_t::flag_t> : std::true_type
 {
 };
 
 #ifdef LINYAPS_BOX_ENABLE_SECCOMP
 template <>
-struct utils::is_bitmask_enum<Config::linux_t::seccomp_t::flag_t> : std::true_type
+struct utils::is_bitmask_enum<oci_config::linux_t::seccomp_t::flag_t> : std::true_type
 {
 };
 #endif
@@ -625,5 +622,7 @@ using utils::operator~;
 using utils::operator|=;
 using utils::operator&=;
 using utils::operator^=;
+
+void from_json(const nlohmann::json &j, oci_config::process_t &v);
 
 } // namespace linyaps_box

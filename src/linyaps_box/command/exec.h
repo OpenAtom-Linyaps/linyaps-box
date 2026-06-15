@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -8,6 +8,6 @@
 
 namespace linyaps_box::command {
 
-[[nodiscard]] auto exec(const exec_options &options) -> int;
+[[nodiscard]] auto exec(exec_options options, const global_options &global) noexcept -> int;
 
 } // namespace linyaps_box::command

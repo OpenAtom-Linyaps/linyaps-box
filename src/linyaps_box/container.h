@@ -37,7 +37,7 @@ public:
     container(container &&) = delete;
     auto operator=(container &&) -> container & = delete;
 
-    [[nodiscard]] auto get_config() const -> const linyaps_box::Config &;
+    [[nodiscard]] auto get_config() const -> const linyaps_box::oci_config &;
     [[nodiscard]] auto get_bundle() const -> const std::filesystem::path &;
     [[nodiscard]] auto run(run_container_options_t options) -> int;
 
@@ -66,7 +66,7 @@ public:
 
 private:
     void cgroup_preenter(const cgroup_options &options, utils::file_descriptor &dirfd);
-    linyaps_box::Config config;
+    linyaps_box::oci_config config;
     std::filesystem::path bundle;
     std::unique_ptr<cgroup_manager> manager;
     unsigned long rootfs_propagation_{ 0 };

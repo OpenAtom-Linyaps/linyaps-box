@@ -21,11 +21,11 @@ namespace linyaps_box {
 // Extended commands and options should be compatible with crun.
 auto main(int argc, char **argv) noexcept -> int
 try {
-    LINYAPS_BOX_DEBUG() << "linyaps box called with" << [=]() -> std::string {
+    LINYAPS_BOX_DEBUG() << "linyaps box called with" << [argc, argv]() -> std::string {
         std::stringstream result;
         for (int i = 0; i < argc; ++i) {
             result << " \"";
-            for (const auto ch : std::string_view(argv[i])) { // NOLINT
+            for (const auto ch : std::string_view(argv[i])) {
                 if (ch == '\\') {
                     result << "\\\\";
                 } else if (ch == '"') {
@@ -39,24 +39,23 @@ try {
         return result.str();
     }();
 
-    auto opts = command::parse(argc, argv);
-    if (opts.global.return_code != 0) {
-        return opts.global.return_code;
+    auto result = command::parse(argc, argv);
+    if (!result) {
+        return EXIT_FAILURE;
     }
 
-    return std::visit(utils::Overload{ [](const command::list_options &options) -> int {
-                                          command::list(options);
-                                          return 0;
+    auto &opts = *result;
+    return std::visit(utils::Overload{ [&opts](const command::list_options &list) -> int {
+                                          return command::list(list, opts.global);
                                       },
-                                       [](const command::exec_options &options) -> int {
-                                           return command::exec(options);
+                                       [&opts](command::exec_options &exec) -> int {
+                                           return command::exec(std::move(exec), opts.global);
                                        },
-                                       [](const command::kill_options &options) -> int {
-                                           command::kill(options);
-                                           return 0;
+                                       [&opts](const command::kill_options &kill) -> int {
+                                           return command::kill(kill, opts.global);
                                        },
-                                       [](const command::run_options &options) -> int {
-                                           return command::run(options);
+                                       [&opts](const command::run_options &run) -> int {
+                                           return command::run(run, opts.global);
                                        },
                                        [](const std::monostate &) -> int {
                                            return 0;

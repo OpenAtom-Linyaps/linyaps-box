@@ -5,7 +5,6 @@
 #include "linyaps_box/container_monitor.h"
 
 #include "linyaps_box/utils/file.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/process.h"
 #include "linyaps_box/utils/signal.h"
 #include "linyaps_box/utils/terminal.h"
@@ -16,6 +15,61 @@
 #include <algorithm>
 
 namespace linyaps_box {
+namespace {
+
+// Detect a local terminal to mirror window-resize events from.
+// Prefers stdin, then stdout; falls back to /dev/tty, then /dev/console.
+auto detect_host_tty(const linyaps_box::utils::file_descriptor &in,
+                     const linyaps_box::utils::file_descriptor &out)
+  -> std::optional<terminal_slave>
+{
+    if (utils::isatty(in)) {
+        return terminal_slave{ in.duplicate() };
+    }
+
+    if (utils::isatty(out)) {
+        return terminal_slave{ out.duplicate() };
+    }
+
+    // No controlling terminal — try /dev/tty, then /dev/console as last resort.
+    for (const auto *path : { "/dev/tty", "/dev/console" }) {
+        try {
+            return terminal_slave{ utils::open(path, O_RDWR | O_CLOEXEC) };
+        } catch (const std::system_error &) {
+            continue;
+        }
+    }
+
+    return std::nullopt;
+}
+
+// Dispatch EPOLLERR / EPOLLHUP on a forwarder's src/dst fds.
+void handle_fd_error(const struct epoll_event &ev,
+                     std::optional<io::Forwarder> &in_fwd,
+                     std::optional<io::Forwarder> &out_fwd)
+{
+    if ((ev.events & (EPOLLERR | EPOLLHUP)) == 0) {
+        return;
+    }
+
+    auto mark = [fd = ev.data.fd](io::Forwarder &fwd) {
+        if (fwd.src().get() == fd) {
+            fwd.mark_src_eof();
+        }
+        if (fwd.dst().get() == fd) {
+            fwd.mark_dst_failed();
+        }
+    };
+
+    if (in_fwd) {
+        mark(*in_fwd);
+    }
+    if (out_fwd) {
+        mark(*out_fwd);
+    }
+}
+
+} // anonymous namespace
 
 auto container_monitor::enable_signal_forwarding() -> void
 {
@@ -25,25 +79,20 @@ auto container_monitor::enable_signal_forwarding() -> void
 
     signal_fd = utils::create_signalfd(set);
 
-    // try to reap child process. Child process may exit before we create signalfd and it wouldn't
-    // receive SIGCHLD anymore. If we don't do this, the child process (or its children) will be
-    // zombie process
-
+    // Reap any children that exited before signalfd was installed.
+    // Without this they'd become zombies — signalfd only delivers SIGCHLD
+    // for future events.
     while (true) {
         auto ret = linyaps_box::utils::waitpid(-1, WNOHANG);
-        if (ret.status == linyaps_box::utils::WaitStatus::Reaped) {
-            if (ret.pid == pid) {
-                // maybe child exited and output something, we should't exit here immediately
-                LINYAPS_BOX_DEBUG() << "child exited early with code " << ret.exit_code;
-                child_exited = true;
-                exit_code = WIFSIGNALED(ret.exit_code) ? 128 + WTERMSIG(ret.exit_code)
-                                                       : WEXITSTATUS(ret.exit_code);
-            }
-
-            continue;
+        if (ret.status != linyaps_box::utils::WaitStatus::Reaped) {
+            break;
         }
 
-        break;
+        if (ret.pid == pid) {
+            child_exited = true;
+            exit_code = WIFSIGNALED(ret.exit_code) ? 128 + WTERMSIG(ret.exit_code)
+                                                   : WEXITSTATUS(ret.exit_code);
+        }
     }
 
     auto signalfd_pollable = epoll.add(signal_fd, EPOLLIN);
@@ -99,19 +148,16 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
                                              const linyaps_box::utils::file_descriptor &in,
                                              const linyaps_box::utils::file_descriptor &out) -> void
 {
-    if (utils::isatty(in)) {
-        host_tty.emplace(in.duplicate());
-    } else if (utils::isatty(out)) {
-        host_tty.emplace(out.duplicate());
-    } else {
-        auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
-        host_tty.emplace(std::move(default_tty));
+    host_tty = detect_host_tty(in, out);
+    if (host_tty) {
+        host_tty->set_raw();
     }
-
-    host_tty->set_raw();
 
     this->master = std::move(master);
 
+    // The PTY master fd is used bidirectionally: we write stdin into it AND
+    // read its output back to stdout.  epoll needs two independent fd
+    // registrations, so we duplicate the master fd here.
     this->master->get().set_nonblock(true);
     master_out = this->master.value().get().duplicate();
     master_out->set_nonblock(true);
@@ -129,33 +175,32 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
     out_fwd->set_src(master_out.value());
     out_fwd->set_dst(out);
 
-    if (in_fwd) {
-        in_fwd->drive();
-    }
+    // Prime the IO loop — drain any data already buffered.
+    auto drive_and_cleanup = [](std::optional<io::Forwarder> &fwd) {
+        if (!fwd) {
+            return;
+        }
+        fwd->drive();
+        if (fwd->is_finished()) {
+            fwd.reset();
+        }
+    };
 
-    if (out_fwd) {
-        out_fwd->drive();
-    }
-
-    if (in_fwd && in_fwd->is_finished()) {
-        in_fwd.reset();
-    }
-
-    if (out_fwd && out_fwd->is_finished()) {
-        out_fwd.reset();
-    }
+    drive_and_cleanup(in_fwd);
+    drive_and_cleanup(out_fwd);
 }
 
 auto container_monitor::wait_container_exit() -> int
 {
-    // After we enable io forwarding, there may be some data in
-    // the buffers, we should try to forward them immediately before waiting for epoll events.
+    // After IO forwarding is set up, there may already be data in flight.
+    // Spin once with timeout=0 to drain it without blocking.
     bool need_immediate_spin{ true };
+
     while (!child_exited || out_fwd) {
-        auto timeout = need_immediate_spin ? 0 : -1;
+        const auto timeout = need_immediate_spin ? 0 : -1;
         const auto events = epoll.wait(timeout);
 
-        // handle signals at first to avoid unnecessary latency
+        // Handle signals before data forwarding to keep latency low.
         const auto *triggered_signal = std::find_if(events.cbegin(),
                                                     events.cend(),
                                                     [signal_fd = signal_fd.get()](const auto &e) {
@@ -165,11 +210,13 @@ auto container_monitor::wait_container_exit() -> int
         if (triggered_signal != events.cend()) {
             handle_signals();
 
+            // Once the child has exited, the PTY will shut down soon.
+            // Mark the forwarders so the event loop can drain remaining
+            // output and then terminate.
             if (child_exited) {
                 if (in_fwd) {
                     in_fwd->mark_dst_failed();
                 }
-
                 if (out_fwd) {
                     out_fwd->mark_src_eof();
                 }
@@ -180,28 +227,7 @@ auto container_monitor::wait_container_exit() -> int
             if (ev.data.fd == signal_fd.get()) {
                 continue;
             }
-
-            if ((ev.events & (EPOLLERR | EPOLLHUP)) != 0) {
-                if (in_fwd) {
-                    if (ev.data.fd == in_fwd->src().get()) {
-                        in_fwd->mark_src_eof();
-                    }
-
-                    if (ev.data.fd == in_fwd->dst().get()) {
-                        in_fwd->mark_dst_failed();
-                    }
-                }
-
-                if (out_fwd) {
-                    if (ev.data.fd == out_fwd->src().get()) {
-                        out_fwd->mark_src_eof();
-                    }
-
-                    if (ev.data.fd == out_fwd->dst().get()) {
-                        out_fwd->mark_dst_failed();
-                    }
-                }
-            }
+            handle_fd_error(ev, in_fwd, out_fwd);
         }
 
         bool in_work{ false };
@@ -210,17 +236,17 @@ auto container_monitor::wait_container_exit() -> int
         if (in_fwd) {
             in_work = in_fwd->drive();
         }
-
         if (out_fwd) {
             out_work = out_fwd->drive();
         }
 
         need_immediate_spin = in_work || out_work;
 
+        // Release finished forwarders so the loop exit condition can
+        // eventually be satisfied.
         if (in_fwd && in_fwd->is_finished()) {
             in_fwd.reset();
         }
-
         if (out_fwd && out_fwd->is_finished()) {
             out_fwd.reset();
         }

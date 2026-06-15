@@ -9,9 +9,9 @@
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory_manager.h"
 
-void linyaps_box::command::list(const struct list_options &options)
+auto linyaps_box::command::list(const list_options &options, const global_options &global) -> int
 {
-    status_directory_manager mgr(options.global_.get().root);
+    status_directory_manager mgr(global.root);
     runtime_t runtime(std::move(mgr));
 
     std::unique_ptr<printer> printer;
@@ -21,7 +21,7 @@ void linyaps_box::command::list(const struct list_options &options)
         printer = std::make_unique<impl::table_printer>();
     }
 
-    auto containers = runtime.containers();
+    const auto &containers = runtime.containers();
     std::vector<container_status_t> statuses;
     statuses.reserve(containers.size());
     for (const auto &[_, container] : containers) {
@@ -29,4 +29,6 @@ void linyaps_box::command::list(const struct list_options &options)
     }
 
     printer->print_statuses(statuses);
+
+    return 0;
 }

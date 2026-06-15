@@ -22,6 +22,8 @@ public:
     [[nodiscard]] auto get(std::string_view id) const -> status_directory;
 
 private:
+    static auto validate_id(std::string_view id) -> void;
+
     std::filesystem::path root_;
 };
 

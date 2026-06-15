@@ -90,10 +90,10 @@ void linyaps_box::utils::close_range(uint first, uint last, int flags)
         std::stringstream ss;
         ss << '[';
         if ((static_cast<uint>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
-            ss << "CLOSE_RANGE_CLOEXEC ";
+            ss << " CLOSE_RANGE_CLOEXEC";
         }
         if ((static_cast<uint>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
-            ss << "CLOSE_RANGE_UNSHARE ";
+            ss << " CLOSE_RANGE_UNSHARE ";
         }
         ss << ']';
         return ss.str();
