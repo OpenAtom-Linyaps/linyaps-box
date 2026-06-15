@@ -144,7 +144,7 @@ auto read_sync_message(linyaps_box::unix_socket &socket) -> sync_message
     return message;
 }
 
-void execute_hook(const linyaps_box::Config::hooks_t::hook_t &hook,
+void execute_hook(const linyaps_box::oci_config::hooks_t::hook_t &hook,
                   const linyaps_box::container_status_t &state)
 {
     auto [parent, child] = linyaps_box::unix_socket::pair();
@@ -291,7 +291,8 @@ struct clone_fn_args
 // NOTE: All function in this namespace are running in the container namespace.
 namespace container_ns {
 
-void initialize_container(const linyaps_box::Config &config, linyaps_box::unix_socket &socket)
+void initialize_container(const linyaps_box::oci_config &oci_config,
+                          linyaps_box::unix_socket &socket)
 {
     LINYAPS_BOX_DEBUG() << "Request OCI runtime in runtime namespace to configure namespace";
 
@@ -305,8 +306,8 @@ void initialize_container(const linyaps_box::Config &config, linyaps_box::unix_s
 
     LINYAPS_BOX_DEBUG() << "Container namespaces configured from runtime namespace";
 
-    if (config.process->oom_score_adj) {
-        auto score = std::to_string(config.process->oom_score_adj.value());
+    if (oci_config.process->oom_score_adj) {
+        auto score = std::to_string(oci_config.process->oom_score_adj.value());
         LINYAPS_BOX_DEBUG() << "Set oom score to " << score;
 
         std::ofstream ofs("/proc/self/oom_score_adj");
@@ -521,7 +522,7 @@ create_destination_symlink(const linyaps_box::utils::file_descriptor &root,
 [[nodiscard]] linyaps_box::utils::file_descriptor
 ensure_mount_destination(bool isDir,
                          const linyaps_box::utils::file_descriptor &root,
-                         const linyaps_box::Config::mount_t &mount)
+                         const linyaps_box::oci_config::mount_t &mount)
 try {
     auto open_flag = O_PATH | O_CLOEXEC;
     LINYAPS_BOX_DEBUG() << "Opening " << (isDir ? "directory " : "file ") << mount.destination
@@ -564,7 +565,7 @@ auto do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
 }
 
 [[nodiscard]] linyaps_box::utils::file_descriptor do_bind_mount(
-  const linyaps_box::utils::file_descriptor &root, const linyaps_box::Config::mount_t &mount)
+  const linyaps_box::utils::file_descriptor &root, const linyaps_box::oci_config::mount_t &mount)
 {
     if (UNLIKELY(!mount.source)) {
         throw std::invalid_argument("bind mount requires source");
@@ -604,7 +605,7 @@ auto do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
 }
 
 [[noreturn]] void do_cgroup_mount([[maybe_unused]] const linyaps_box::utils::file_descriptor &root,
-                                  [[maybe_unused]] const linyaps_box::Config::mount_t &mount,
+                                  [[maybe_unused]] const linyaps_box::oci_config::mount_t &mount,
                                   [[maybe_unused]] std::string_view unified_cgroup_path)
 {
     // TODO: implement
@@ -613,7 +614,7 @@ auto do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
 
 [[nodiscard]] std::optional<remount_t> do_mount(linyaps_box::container &container,
                                                 linyaps_box::utils::file_descriptor &root,
-                                                const linyaps_box::Config::mount_t &mount)
+                                                const linyaps_box::oci_config::mount_t &mount)
 {
     // FIXME: this is a workaround, it should be fixed in the future
     static auto is_sys_rbind{ false };
@@ -636,8 +637,8 @@ auto do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
             auto unshared_cgroup_ns = std::find_if(
               namespaces->cbegin(),
               namespaces->cend(),
-              [](const linyaps_box::Config::linux_t::namespace_t &ns) -> bool {
-                  return ns.type_ == linyaps_box::Config::linux_t::namespace_t::type::CGROUP;
+              [](const linyaps_box::oci_config::linux_t::namespace_t &ns) -> bool {
+                  return ns.type_ == linyaps_box::oci_config::linux_t::namespace_t::type::CGROUP;
               });
             if (mount.destination == "/sys/fs/cgroup" && is_sys_rbind) {
                 if (unshared_cgroup_ns != namespaces->cend()) {
@@ -694,6 +695,10 @@ auto do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
     // https://web.git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=69879c01a0c3f70e0887cfb4d9ff439814361e46
     if (!mount.data.empty() && mount.type == "proc") {
         need_remount = true;
+    }
+
+    if (mount.destination == "/") {
+        root = linyaps_box::utils::open(root.current_path(), O_PATH | O_DIRECTORY | O_CLOEXEC);
     }
 
     if (!need_remount) {
@@ -760,14 +765,14 @@ public:
 
     void configure_rootfs()
     {
-        const auto &config = container.get().get_config();
+        const auto &oci_config = container.get().get_config();
 
-        auto has_mount_ns = config.linux && config.linux->namespaces
-          && std::any_of(config.linux->namespaces->begin(),
-                         config.linux->namespaces->end(),
+        auto has_mount_ns = oci_config.linux && oci_config.linux->namespaces
+          && std::any_of(oci_config.linux->namespaces->begin(),
+                         oci_config.linux->namespaces->end(),
                          [](const auto &ns) {
                              return ns.type_
-                               == linyaps_box::Config::linux_t::namespace_t::type::MOUNT;
+                               == linyaps_box::oci_config::linux_t::namespace_t::type::MOUNT;
                          });
         if (!has_mount_ns) {
             LINYAPS_BOX_DEBUG() << "no unshared mount namespace";
@@ -775,8 +780,8 @@ public:
         }
 
         // we will pivot root later
-        LINYAPS_BOX_DEBUG() << "configure rootfs";
-        auto prop = config.linux->rootfs_propagation;
+        LINYAPS_BOX_DEBUG() << "Configure rootfs";
+        auto prop = oci_config.linux->rootfs_propagation;
         if (prop == 0) {
             prop = MS_REC | MS_PRIVATE;
         }
@@ -796,7 +801,7 @@ public:
 
         LINYAPS_BOX_DEBUG() << "rebind container rootfs";
 
-        linyaps_box::Config::mount_t mount;
+        linyaps_box::oci_config::mount_t mount;
         mount.source = root.current_path();
         mount.destination = ".";
         mount.vfs_flags = MS_BIND | MS_REC;
@@ -809,7 +814,7 @@ public:
         // reopen rootfs after mount
         root = linyaps_box::utils::open(root.current_path(), O_PATH | O_CLOEXEC | O_DIRECTORY);
 
-        if (config.root->readonly) {
+        if (oci_config.root->readonly) {
             LINYAPS_BOX_DEBUG() << "remount bind rootfs to readonly";
             remount_t mount;
             mount.destination_fd = root.duplicate();
@@ -825,10 +830,10 @@ public:
         }
     }
 
-    void mount(const linyaps_box::Config::mount_t &mount)
+    void mount(const linyaps_box::oci_config::mount_t &mount)
     {
-        if ((mount.extension_flags & linyaps_box::Config::mount_t::extension::COPY_SYMLINK)
-            == linyaps_box::Config::mount_t::extension::COPY_SYMLINK) {
+        if ((mount.extension_flags & linyaps_box::oci_config::mount_t::extension::COPY_SYMLINK)
+            == linyaps_box::oci_config::mount_t::extension::COPY_SYMLINK) {
             auto ret = create_destination_symlink(root, mount.source.value(), mount.destination);
             return;
         }
@@ -876,7 +881,7 @@ public:
             // readonly path is not mounted yet
             vfs_flag &= ~MS_REMOUNT;
 
-            linyaps_box::Config::mount_t mount{ };
+            linyaps_box::oci_config::mount_t mount{ };
             mount.destination = path;
             mount.source = dst.proc_path();
             mount.vfs_flags = vfs_flag;
@@ -918,7 +923,7 @@ public:
             }
 
             auto ret = linyaps_box::utils::fstatat(dst, "");
-            auto mount = linyaps_box::Config::mount_t{ };
+            auto mount = linyaps_box::oci_config::mount_t{ };
 
             mount.destination = path;
             mount.vfs_flags = MS_RDONLY;
@@ -972,10 +977,10 @@ private:
     linyaps_box::utils::file_descriptor root;
     std::vector<remount_t> remounts;
 
-    // https://github.com/opencontainers/runtime-spec/blob/09fcb39bb7185b46dfb206bc8f3fea914c674779/config-linux.md#default-filesystems
+    // https://github.com/opencontainers/runtime-spec/blob/09fcb39bb7185b46dfb206bc8f3fea914c674779/oci_config-linux.md#default-filesystems
     void configure_default_filesystems()
     {
-        LINYAPS_BOX_DEBUG() << "configure default filesystems";
+        LINYAPS_BOX_DEBUG() << "Configure default filesystems";
 
         do {
             auto proc = linyaps_box::utils::open_at(root, "proc");
@@ -991,7 +996,7 @@ private:
                 break;
             }
 
-            linyaps_box::Config::mount_t mount;
+            linyaps_box::oci_config::mount_t mount;
             mount.source = "proc";
             mount.type = "proc";
             mount.destination = "/proc";
@@ -1011,7 +1016,7 @@ private:
                 break;
             }
 
-            linyaps_box::Config::mount_t mount;
+            linyaps_box::oci_config::mount_t mount;
             mount.source = "sysfs";
             mount.type = "sysfs";
             mount.destination = "/sys";
@@ -1050,7 +1055,7 @@ private:
                 break;
             }
 
-            linyaps_box::Config::mount_t mount;
+            linyaps_box::oci_config::mount_t mount;
             mount.source = "tmpfs";
             mount.destination = "/dev";
             mount.type = "tmpfs";
@@ -1069,7 +1074,7 @@ private:
                 }
             }
 
-            linyaps_box::Config::mount_t mount;
+            linyaps_box::oci_config::mount_t mount;
             mount.source = "devpts";
             mount.destination = "/dev/pts";
             mount.type = "devpts";
@@ -1088,7 +1093,7 @@ private:
                 }
             }
 
-            linyaps_box::Config::mount_t mount;
+            linyaps_box::oci_config::mount_t mount;
             mount.source = "shm";
             mount.destination = "/dev/shm";
             mount.type = "tmpfs";
@@ -1138,7 +1143,7 @@ private:
             // not available. Fallback to bind mount the host device.
             if (ec == std::errc::operation_not_permitted) {
                 LINYAPS_BOX_DEBUG() << "fallback to bind mount device";
-                linyaps_box::Config::mount_t mount;
+                linyaps_box::oci_config::mount_t mount;
                 mount.source = destination;
                 mount.destination = destination;
                 mount.type = "bind";
@@ -1164,7 +1169,7 @@ private:
         }
     }
 
-    // https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#default-devices
+    // https://github.com/opencontainers/runtime-spec/blob/main/oci_config-linux.md#default-devices
     void configure_default_devices()
     {
         LINYAPS_BOX_DEBUG() << "Configure default devices";
@@ -1194,7 +1199,7 @@ private:
 
             if (S_ISREG(ptmx_stat.st_mode)) {
                 // /dev/ptmx is a regular file: bind mount /dev/pts/ptmx over it
-                linyaps_box::Config::mount_t mount;
+                linyaps_box::oci_config::mount_t mount;
                 mount.source = root.current_path() / "dev/pts/ptmx";
                 mount.destination = "/dev/ptmx";
                 mount.type = "bind";
@@ -1252,9 +1257,9 @@ void configure_mounts(linyaps_box::container &container, const std::filesystem::
 {
     LINYAPS_BOX_DEBUG() << "Configure mounts";
 
-    const auto &config = container.get_config();
+    const auto &oci_config = container.get_config();
 
-    if (config.mounts.empty()) {
+    if (oci_config.mounts.empty()) {
         LINYAPS_BOX_DEBUG() << "Nothing to do";
         return;
     }
@@ -1276,46 +1281,9 @@ void configure_mounts(linyaps_box::container &container, const std::filesystem::
     LINYAPS_BOX_DEBUG() << "Mounts configured";
 }
 
-[[noreturn]] void execute_process(const linyaps_box::Config &config)
+[[noreturn]] void execute_process(const linyaps_box::oci_config &oci_config)
 {
-    const auto &process = *config.process;
-    std::vector<const char *> c_args;
-    c_args.reserve(process.args.size());
-    for (const auto &arg : process.args) {
-        c_args.push_back(arg.c_str());
-    }
-    c_args.push_back(nullptr);
-
-    std::vector<const char *> c_env;
-    if (process.env) {
-        c_env.reserve(process.env->size());
-        for (const auto &env : *process.env) {
-            c_env.push_back(env.c_str());
-        }
-    }
-    c_env.push_back(nullptr);
-
-    auto ret = chdir(process.cwd.c_str());
-    if (ret != 0) {
-        throw std::system_error(errno, std::system_category(), "chdir");
-    }
-
-    ret = setgid(process.user.gid);
-    if (ret != 0) {
-        throw std::system_error(errno, std::system_category(), "setgid");
-    }
-
-    if (process.user.additional_gids) {
-        ret = setgroups(process.user.additional_gids->size(), process.user.additional_gids->data());
-        if (ret != 0) {
-            throw std::system_error(errno, std::system_category(), "setgroups");
-        }
-    }
-
-    ret = setuid(process.user.uid);
-    if (ret != 0) {
-        throw std::system_error(errno, std::system_category(), "setuid");
-    }
+    const auto &process = *oci_config.process;
 
     LINYAPS_BOX_DEBUG() << "All opened file describers:\n" << linyaps_box::utils::inspect_fds();
 
@@ -1329,16 +1297,38 @@ void configure_mounts(linyaps_box::container &container, const std::filesystem::
         return ss.str();
     }();
 
-    execvpe(c_args.at(0),
-            const_cast<char *const *>(c_args.data()), // NOLINT
-            const_cast<char *const *>(c_env.data())); // NOLINT
+    std::vector<const char *> c_args;
+    c_args.reserve(process.args.size() + 1);
+    for (const auto &arg : process.args) {
+        c_args.push_back(arg.c_str());
+    }
+    c_args.push_back(nullptr);
+
+    std::vector<const char *> c_env;
+    if (process.env) {
+        c_env.reserve(process.env->size() + 1);
+        for (const auto &env : *process.env) {
+            c_env.push_back(env.c_str());
+        }
+    }
+    c_env.push_back(nullptr);
+
+    auto ret = ::chdir(process.cwd.c_str());
+    if (ret != 0) {
+        throw std::system_error(errno, std::system_category(), "chdir");
+    }
+
+    ::execvpe(c_args.at(0),
+              const_cast<char *const *>(c_args.data()),
+              const_cast<char *const *>(c_env.data()));
 
     throw std::system_error(errno, std::system_category(), "execvpe");
 }
 
-void wait_prestart_hooks_result(const linyaps_box::Config &config, linyaps_box::unix_socket &socket)
+void wait_prestart_hooks_result(const linyaps_box::oci_config &oci_config,
+                                linyaps_box::unix_socket &socket)
 {
-    if (!config.hooks || !config.hooks->prestart) {
+    if (!oci_config.hooks || !oci_config.hooks->prestart) {
         return;
     }
 
@@ -1361,9 +1351,10 @@ void wait_prestart_hooks_result(const linyaps_box::Config &config, linyaps_box::
     throw unexpected_sync_message(sync_message::PRESTART_HOOKS_EXECUTED, message);
 }
 
-void wait_create_runtime_result(const linyaps_box::Config &config, linyaps_box::unix_socket &socket)
+void wait_create_runtime_result(const linyaps_box::oci_config &oci_config,
+                                linyaps_box::unix_socket &socket)
 {
-    if (!config.hooks || !config.hooks->create_runtime) {
+    if (!oci_config.hooks || !oci_config.hooks->create_runtime) {
         return;
     }
 
@@ -1390,14 +1381,14 @@ void create_container_hooks(const linyaps_box::container &container,
                             const linyaps_box::container_status_t &status,
                             linyaps_box::unix_socket &socket)
 {
-    const auto &config = container.get_config();
-    if (!config.hooks || !config.hooks->create_container) {
+    const auto &oci_config = container.get_config();
+    if (!oci_config.hooks || !oci_config.hooks->create_container) {
         return;
     }
 
     LINYAPS_BOX_DEBUG() << "Execute create container hooks";
 
-    for (const auto &hook : config.hooks->create_container.value()) {
+    for (const auto &hook : oci_config.hooks->create_container.value()) {
         execute_hook(hook, status);
     }
 
@@ -1479,7 +1470,7 @@ void do_pivot_root(const linyaps_box::container &container,
     }
 
     // make sure that umount event couldn't propagate to host
-    do_propagation_mount(old_root, MS_REC | MS_PRIVATE);
+    container_ns::do_propagation_mount(old_root, MS_REC | MS_PRIVATE);
 
     // umount old root
     ret = umount2(".", MNT_DETACH);
@@ -1547,11 +1538,11 @@ security_status get_runtime_security_status()
     return status;
 }
 
-void set_capabilities(const linyaps_box::Config &config, int last_cap)
+void set_capabilities(const linyaps_box::oci_config &oci_config, int last_cap)
 {
 #ifdef LINYAPS_BOX_ENABLE_CAP
     LINYAPS_BOX_DEBUG() << "Set capabilities";
-    const auto &capabilities = config.process->capabilities;
+    const auto &capabilities = oci_config.process->capabilities;
     if (!capabilities) {
         return;
     }
@@ -1628,15 +1619,22 @@ void set_capabilities(const linyaps_box::Config &config, int last_cap)
     // keep current capabilities, we need these caps on later
     std::ignore = linyaps_box::utils::prctl(PR_SET_KEEPCAPS, 1L, 0L, 0L, 0L);
 
-    const auto &process = *config.process;
-    ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
-    if (UNLIKELY(ret < 0)) {
-        throw std::system_error(errno, std::system_category(), "setresuid");
-    }
-
+    const auto &process = *oci_config.process;
     ret = setresgid(process.user.gid, process.user.gid, process.user.gid);
     if (UNLIKELY(ret < 0)) {
         throw std::system_error(errno, std::system_category(), "setresgid");
+    }
+
+    if (process.user.additional_gids) {
+        ret = setgroups(process.user.additional_gids->size(), process.user.additional_gids->data());
+        if (UNLIKELY(ret < 0)) {
+            throw std::system_error(errno, std::system_category(), "setgroups");
+        }
+    }
+
+    ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
+    if (UNLIKELY(ret < 0)) {
+        throw std::system_error(errno, std::system_category(), "setresuid");
     }
 
     ret = cap_set_proc(caps.get());
@@ -1661,7 +1659,7 @@ void set_capabilities(const linyaps_box::Config &config, int last_cap)
 
 #endif
 
-    if (config.process->no_new_privileges) {
+    if (oci_config.process->no_new_privileges) {
         LINYAPS_BOX_DEBUG() << "Set no new privileges";
         std::ignore = linyaps_box::utils::prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L);
     }
@@ -1671,14 +1669,14 @@ void start_container_hooks(const linyaps_box::container &container,
                            const linyaps_box::container_status_t &status,
                            linyaps_box::unix_socket &socket)
 {
-    const auto &config = container.get_config();
-    if (!config.hooks || !config.hooks->start_container) {
+    const auto &oci_config = container.get_config();
+    if (!oci_config.hooks || !oci_config.hooks->start_container) {
         return;
     }
 
     LINYAPS_BOX_DEBUG() << "Execute start container hooks";
 
-    for (const auto &hook : config.hooks->start_container.value()) {
+    for (const auto &hook : oci_config.hooks->start_container.value()) {
         execute_hook(hook, status);
     }
 
@@ -1689,35 +1687,9 @@ void start_container_hooks(const linyaps_box::container &container,
     LINYAPS_BOX_DEBUG() << "Sync message sent";
 }
 
-void close_other_fds(linyaps_box::utils::span<const int> except_fds)
+void processing_extensions(const linyaps_box::oci_config &oci_config)
 {
-    LINYAPS_BOX_DEBUG() << "Close all fds excepts " << [&]() -> std::string {
-        std::stringstream ss;
-        for (auto fd : except_fds) {
-            ss << fd << " ";
-        }
-        return ss.str();
-    }();
-
-    std::vector<int> sorted;
-    sorted.reserve(except_fds.size() + 1);
-    sorted.assign(except_fds.begin(), except_fds.end());
-    std::sort(sorted.begin(), sorted.end());
-    sorted.push_back(std::numeric_limits<int>::max());
-    for (auto fd = sorted.begin(); std::next(fd) != sorted.end(); ++fd) {
-        auto low = *fd + 1;
-        auto high = *std::next(fd) - 1;
-        if (low >= high) {
-            continue;
-        }
-
-        linyaps_box::utils::close_range(low, high, CLOSE_RANGE_CLOEXEC);
-    }
-}
-
-void processing_extensions(const linyaps_box::Config &config)
-{
-    if (!config.annotations) {
+    if (!oci_config.annotations) {
         return;
     }
 
@@ -1729,8 +1701,8 @@ void processing_extensions(const linyaps_box::Config &config)
     // we use this feature for avoiding two process has the same pid.
     // e.g some application will register a tray through dbus and use the pid as the part of
     // dbus object path, if two process has the same pid, the dbus object path will conflict
-    auto it = config.annotations->find("cn.org.linyaps.runtime.ns_last_pid");
-    while (it != config.annotations->end()) {
+    auto it = oci_config.annotations->find("cn.org.linyaps.runtime.ns_last_pid");
+    while (it != oci_config.annotations->end()) {
         LINYAPS_BOX_DEBUG() << "Processing ns_last_pid extension: " << it->second;
 
         // Validate input is a valid pid_t number
@@ -1796,12 +1768,12 @@ void configure_terminal(const linyaps_box::container &container,
 
     auto root = linyaps_box::utils::open("/", O_PATH | O_CLOEXEC | O_DIRECTORY);
 
-    linyaps_box::Config::mount_t mount{ };
+    linyaps_box::oci_config::mount_t mount{ };
     mount.source = slave.file_describer().current_path();
     mount.destination = "/dev/console";
     mount.vfs_flags = MS_BIND;
 
-    auto dest_fd = do_bind_mount(root, mount);
+    auto dest_fd = container_ns::do_bind_mount(root, mount);
     socket.send_fd(std::move(master).take());
 }
 
@@ -1838,20 +1810,12 @@ try {
         throw std::runtime_error("clone_fn: invalid socket fd");
     }
 
-    std::vector<int> except_fds{
-        STDIN_FILENO,
-        STDOUT_FILENO,
-        STDERR_FILENO,
-    };
-
-    for (auto fd = 0; fd < args.preserve_fds; ++fd) {
-        except_fds.push_back(fd + 3);
-    }
-    except_fds.push_back(static_cast<unsigned int>(args.socket.fd().get()));
-    close_other_fds(linyaps_box::utils::span<const int>(except_fds.data(), except_fds.size()));
+    linyaps_box::utils::close_range(3u + static_cast<unsigned>(args.preserve_fds),
+                                     std::numeric_limits<unsigned>::max(),
+                                     CLOSE_RANGE_CLOEXEC);
 
     auto &container = *args.container;
-    const auto &config = container.get_config();
+    const auto &oci_config = container.get_config();
     auto &socket = args.socket;
 
     auto rootfs = container.get_config().root->path;
@@ -1860,20 +1824,21 @@ try {
         rootfs = std::filesystem::canonical(container.get_bundle() / rootfs);
     }
 
-    initialize_container(container.get_config(), socket);
+    container_ns::initialize_container(container.get_config(), socket);
     auto [runtime_cap] = get_runtime_security_status(); // get runtime status before pivot root
-    configure_mounts(container, rootfs);
-    wait_prestart_hooks_result(config, socket);
-    wait_create_runtime_result(config, socket);
+    container_ns::configure_mounts(container, rootfs);
+    wait_prestart_hooks_result(oci_config, socket);
+    wait_create_runtime_result(oci_config, socket);
 
     auto status = container.status();
     create_container_hooks(container, status, socket);
     // TODO: selinux label/apparmor profile
-    auto has_mount_ns = config.linux && config.linux->namespaces
-      && std::any_of(config.linux->namespaces->cbegin(),
-                     config.linux->namespaces->cend(),
+    auto has_mount_ns = oci_config.linux && oci_config.linux->namespaces
+      && std::any_of(oci_config.linux->namespaces->cbegin(),
+                     oci_config.linux->namespaces->cend(),
                      [](const auto &ns) {
-                         return ns.type_ == linyaps_box::Config::linux_t::namespace_t::type::MOUNT;
+                         return ns.type_
+                           == linyaps_box::oci_config::linux_t::namespace_t::type::MOUNT;
                      });
     do_pivot_root(container, rootfs, has_mount_ns);
 
@@ -1884,8 +1849,8 @@ try {
 
     set_umask(container.get_config().process->user.umask);
     // processing all extensions before drop capabilities
-    processing_extensions(config);
-    set_capabilities(config, runtime_cap);
+    processing_extensions(oci_config);
+    set_capabilities(oci_config, runtime_cap);
 
     // unblock and reset all signals before we execute the target
     sigset_t set;
@@ -1894,7 +1859,7 @@ try {
     linyaps_box::utils::reset_signals(set);
 
     start_container_hooks(container, status, socket);
-    execute_process(config);
+    execute_process(oci_config);
 } catch (const std::exception &e) {
     LINYAPS_BOX_ERR() << "clone failed: " << e.what();
 
@@ -1925,7 +1890,7 @@ try {
 namespace runtime_ns {
 
 [[nodiscard]] unsigned generate_clone_flag(
-  const std::optional<std::vector<linyaps_box::Config::linux_t::namespace_t>> &namespaces)
+  const std::optional<std::vector<linyaps_box::oci_config::linux_t::namespace_t>> &namespaces)
 {
     LINYAPS_BOX_DEBUG() << "Generate clone flags";
 
@@ -1988,11 +1953,11 @@ private:
     void *stack_low;
 };
 
-void set_rlimits(const std::vector<linyaps_box::Config::process_t::rlimit_t> &rlimits)
+void set_rlimits(const std::vector<linyaps_box::oci_config::process_t::rlimit_t> &rlimits)
 {
     std::for_each(rlimits.begin(),
                   rlimits.end(),
-                  [](const linyaps_box::Config::process_t::rlimit_t &rlimit) {
+                  [](const linyaps_box::oci_config::process_t::rlimit_t &rlimit) {
                       const struct rlimit rl{ rlimit.soft, rlimit.hard };
                       auto resource = static_cast<int>(rlimit.type);
                       LINYAPS_BOX_DEBUG()
@@ -2007,7 +1972,7 @@ void set_rlimits(const std::vector<linyaps_box::Config::process_t::rlimit_t> &rl
 std::tuple<int, linyaps_box::unix_socket> start_container_process(
   linyaps_box::container &container, linyaps_box::run_container_options_t &options)
 {
-    const auto &config = container.get_config();
+    const auto &oci_config = container.get_config();
     LINYAPS_BOX_DEBUG() << "All opened file describers before open sockets:\n"
                         << linyaps_box::utils::inspect_fds();
 
@@ -2017,13 +1982,13 @@ std::tuple<int, linyaps_box::unix_socket> start_container_process(
                         << linyaps_box::utils::inspect_fds();
 
     // config rlimits before we enter new user namespace
-    if (const auto &rlimits = config.process->rlimits; rlimits) {
+    if (const auto &rlimits = oci_config.process->rlimits; rlimits) {
         set_rlimits(rlimits.value());
     }
 
-    std::optional<std::vector<linyaps_box::Config::linux_t::namespace_t>> namespaces;
-    if (config.linux && config.linux->namespaces) {
-        namespaces = config.linux->namespaces;
+    std::optional<std::vector<linyaps_box::oci_config::linux_t::namespace_t>> namespaces;
+    if (oci_config.linux && oci_config.linux->namespaces) {
+        namespaces = oci_config.linux->namespaces;
     }
 
     const int clone_flag = runtime_ns::generate_clone_flag(namespaces);
@@ -2137,8 +2102,8 @@ void configure_gid_mapping(pid_t pid, linyaps_box::container &container)
 {
     LINYAPS_BOX_DEBUG() << "Configure GID mappings";
 
-    const auto &config = container.get_config();
-    const auto &gid_mappings = config.linux->gid_mappings;
+    const auto &oci_config = container.get_config();
+    const auto &gid_mappings = oci_config.linux->gid_mappings;
     if (!gid_mappings) {
         LINYAPS_BOX_DEBUG() << "Nothing to do";
         return;
@@ -2218,8 +2183,8 @@ void configure_uid_mapping(pid_t pid, const linyaps_box::container &container)
 {
     LINYAPS_BOX_DEBUG() << "Configure UID mappings";
 
-    const auto &config = container.get_config();
-    const auto &uid_mappings = config.linux->uid_mappings;
+    const auto &oci_config = container.get_config();
+    const auto &uid_mappings = oci_config.linux->uid_mappings;
     if (!uid_mappings) {
         LINYAPS_BOX_DEBUG() << "Nothing to do";
         return;
@@ -2330,9 +2295,9 @@ void configure_container_namespaces(linyaps_box::container &container,
 
             if (std::find_if(namespaces->cbegin(),
                              namespaces->cend(),
-                             [](const linyaps_box::Config::linux_t::namespace_t &ns) -> bool {
+                             [](const linyaps_box::oci_config::linux_t::namespace_t &ns) -> bool {
                                  return ns.type_
-                                   == linyaps_box::Config::linux_t::namespace_t::type::USER;
+                                   == linyaps_box::oci_config::linux_t::namespace_t::type::USER;
                              })
                 != namespaces->end()) {
                 auto pid = container.status().PID;
@@ -2488,17 +2453,17 @@ void poststop_hooks(const linyaps_box::container &container) noexcept
 linyaps_box::container::container(status_directory status_dir,
                                   const create_container_options_t &options)
     : container_ref(std::move(status_dir), options.ID)
-    , bundle(options.bundle)
+    , bundle(std::filesystem::canonical(options.bundle))
 {
     auto config = options.config;
     if (config.is_relative()) {
         config = bundle / config;
     }
 
-    LINYAPS_BOX_DEBUG() << "load config from " << config;
-    this->config = linyaps_box::Config::parse(config);
+    LINYAPS_BOX_DEBUG() << "load oci_config from " << config;
+    this->config = linyaps_box::oci_config::parse(config);
     auto &mount = this->config.mounts;
-    std::for_each(mount.begin(), mount.end(), [this](Config::mount_t &mount) {
+    std::for_each(mount.begin(), mount.end(), [this](oci_config::mount_t &mount) {
         if (mount.destination.is_relative()) {
             throw std::runtime_error("destination of mount point is relative");
         }
@@ -2532,7 +2497,7 @@ linyaps_box::container::container(status_directory status_dir,
 #endif
     {
         container_status_t status;
-        status.oci_version = linyaps_box::Config::oci_version;
+        status.oci_version = linyaps_box::oci_config::version;
         status.ID = options.ID;
         status.PID = getpid();
         status.status = container_status_t::runtime_status::CREATING;
@@ -2558,7 +2523,7 @@ linyaps_box::container::container(status_directory status_dir,
     }
 }
 
-const linyaps_box::Config &linyaps_box::container::get_config() const
+const linyaps_box::oci_config &linyaps_box::container::get_config() const
 {
     return this->config;
 }

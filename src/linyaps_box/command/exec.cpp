@@ -6,58 +6,64 @@
 
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory_manager.h"
+#include "linyaps_box/utils/utils.h"
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
-#  include <sys/capability.h>
-#endif
+#include <nlohmann/json.hpp>
 
-auto linyaps_box::command::exec(const struct exec_options &options) -> int
-{
-    status_directory_manager mgr(options.global_.get().root);
+#include <fstream>
+
+auto linyaps_box::command::exec(exec_options options, const global_options &global) noexcept -> int
+try {
+    status_directory_manager mgr(global.root);
     runtime_t runtime(std::move(mgr));
 
-    auto container_refs = runtime.containers();
+    const auto &container_refs = runtime.containers();
     auto container = container_refs.find(options.ID);
-    if (container == container_refs.end()) {
+    if (UNLIKELY(container == container_refs.cend())) {
         throw std::runtime_error("container not found");
     }
 
     exec_container_option option;
-    option.proc.cwd = options.cwd.value_or("/");
-    option.proc.args = options.command;
-    option.proc.terminal = options.tty;
-    option.proc.no_new_privileges = options.no_new_privs;
-    option.proc.env = options.envs;
     option.preserve_fds = options.preserve_fds;
 
-    if (option.proc.terminal && options.console_socket) {
-        option.console_socket = unix_socket::connect(options.console_socket.value());
+    if (options.process_file) {
+        std::ifstream file(*options.process_file);
+        if (UNLIKELY(!file)) {
+            throw std::runtime_error("cannot open process file: " + options.process_file->string());
+        }
+
+        nlohmann::json j;
+        file >> j;
+        option.proc = j.get<oci_config::process_t>();
+    }
+
+    option.cwd = std::move(options.cwd);
+    if (options.tty) {
+        option.tty = true;
+    }
+
+    if (options.no_new_privs) {
+        option.no_new_privs = true;
+    }
+
+    option.extra_envs = std::move(options.envs);
+    if (options.user) {
+        option.uid = options.user->uid;
+        option.gid = options.user->gid;
+    }
+    option.command = std::move(options.command);
+
+    auto needs_terminal = option.tty.value_or(false) || (option.proc && option.proc->terminal);
+    if (needs_terminal && options.console_socket) {
+        option.console_socket = unix_socket::connect(*options.console_socket);
     }
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
-    if (options.caps) {
-        const auto &caps = options.caps.value();
-        if (!option.proc.capabilities) {
-            option.proc.capabilities.emplace();
-        }
-
-        std::vector<cap_value_t> parsed;
-        parsed.reserve(caps.size());
-        for (const auto &name : caps) {
-            cap_value_t val{ };
-            if (cap_from_name(name.c_str(), &val) < 0) {
-                throw std::system_error(errno, std::system_category(), "cap_from_name");
-            }
-
-            parsed.push_back(val);
-        }
-
-        option.proc.capabilities->effective = parsed;
-        option.proc.capabilities->ambient = parsed;
-        option.proc.capabilities->bounding = parsed;
-        option.proc.capabilities->permitted = parsed;
-    }
+    option.caps = std::move(options.caps);
 #endif
 
     return container->second.exec(std::move(option));
+} catch (const std::exception &e) {
+    LINYAPS_BOX_ERR() << "failed to exec: " << e.what();
+    return -1;
 }

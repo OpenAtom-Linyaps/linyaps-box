@@ -11,12 +11,27 @@
 
 #include <string>
 
+#include <sys/types.h>
+
 namespace linyaps_box {
 
 struct exec_container_option
 {
-    int preserve_fds;
-    Config::process_t proc;
+    int preserve_fds{ 0 };
+    std::optional<oci_config::process_t> proc;
+
+    // Per-field overrides applied on top of option.proc or config.json's process:
+    std::optional<uid_t> uid;
+    std::optional<gid_t> gid;
+    std::optional<std::filesystem::path> cwd;
+    std::optional<bool> tty;
+    std::optional<bool> no_new_privs;
+    std::vector<std::string> extra_envs;
+    std::vector<std::string> command;
+#ifdef LINYAPS_BOX_ENABLE_CAP
+    std::optional<std::vector<cap_value_t>> caps;
+#endif
+
     std::optional<unix_socket> console_socket;
 };
 
@@ -33,7 +48,7 @@ public:
 
     [[nodiscard]] auto status() const -> container_status_t;
     void kill(int signal) const;
-    [[nodiscard]] auto exec(exec_container_option option) -> int;
+    [[nodiscard]] auto exec(exec_container_option option) const -> int;
 
 protected:
     [[nodiscard]] auto status_dir() const -> const status_directory &;

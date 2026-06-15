@@ -212,6 +212,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/semver.h
     src/linyaps_box/utils/session.cpp
     src/linyaps_box/utils/session.h
+    src/linyaps_box/utils/setns.cpp
+    src/linyaps_box/utils/setns.h
     src/linyaps_box/utils/signal.cpp
     src/linyaps_box/utils/signal.h
     src/linyaps_box/utils/span.h

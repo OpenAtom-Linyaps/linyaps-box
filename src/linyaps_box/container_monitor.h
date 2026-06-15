@@ -26,7 +26,7 @@ public:
     auto enable_io_forwarding(terminal_master master,
                               const linyaps_box::utils::file_descriptor &in,
                               const linyaps_box::utils::file_descriptor &out) -> void;
-    auto wait_container_exit() -> int;
+    [[nodiscard]] auto wait_container_exit() -> int;
 
 private:
     auto handle_signals() -> void;

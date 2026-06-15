@@ -8,11 +8,12 @@
 #include "linyaps_box/status_directory_manager.h"
 #include "linyaps_box/utils/utils.h"
 
-auto linyaps_box::command::run(const struct run_options &options) -> int
+auto linyaps_box::command::run(const struct run_options &options, const global_options &global)
+  -> int
 {
-    status_directory_manager mgr(options.global_.get().root);
+    status_directory_manager mgr(global.root);
     runtime_t runtime(std::move(mgr));
-    const create_container_options_t create_container_options{ options.global_.get().manager,
+    const create_container_options_t create_container_options{ global.manager,
                                                                options.ID,
                                                                options.bundle,
                                                                options.config };
@@ -27,7 +28,7 @@ auto linyaps_box::command::run(const struct run_options &options) -> int
     }
 
     if (container.get_config().process->terminal && options.console_socket) {
-        run_options.console_socket = unix_socket::connect(options.console_socket.value());
+        run_options.console_socket = unix_socket::connect(*options.console_socket);
     }
 
     return container.run(std::move(run_options));
