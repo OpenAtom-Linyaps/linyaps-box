@@ -685,6 +685,8 @@ auto do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
     }
 
     bool need_remount{ false };
+    // we will do all bind/ro mount at finalize so we can
+    // create missing destinations
     if ((mount.vfs_flags & (MS_RDONLY | MS_BIND)) != 0) {
         need_remount = true;
     }
@@ -811,7 +813,7 @@ public:
             do_remount(ret.value());
         }
 
-        // reopen rootfs after mount
+        // reopen rootfs after mount to refresh vfs state
         root = linyaps_box::utils::open(root.current_path(), O_PATH | O_CLOEXEC | O_DIRECTORY);
 
         if (oci_config.root->readonly) {
@@ -2122,8 +2124,10 @@ void configure_gid_mapping(pid_t pid, linyaps_box::container &container)
         }
 
         const auto &mapping = gid_mappings_v[0];
-        content.append(std::to_string(mapping.host_id) + " ");
-        content.append(std::to_string(mapping.container_id) + " ");
+        content.append(std::to_string(mapping.host_id));
+        content.push_back(' ');
+        content.append(std::to_string(mapping.container_id));
+        content.push_back(' ');
         content.append(std::to_string(mapping.size));
 
         auto file = linyaps_box::utils::open(self_process / "gid_map",
@@ -2158,8 +2162,10 @@ void configure_gid_mapping(pid_t pid, linyaps_box::container &container)
     content.clear();
     for (std::size_t i = 0; i < len; ++i) {
         const auto &mapping = gid_mappings_v[i];
-        content.append(std::to_string(mapping.host_id) + " ");
-        content.append(std::to_string(mapping.container_id) + " ");
+        content.append(std::to_string(mapping.host_id));
+        content.push_back(' ');
+        content.append(std::to_string(mapping.container_id));
+        content.push_back(' ');
         content.append(std::to_string(mapping.size));
 
         if (i != len - 1) {
@@ -2202,8 +2208,10 @@ void configure_uid_mapping(pid_t pid, const linyaps_box::container &container)
     if (is_single_mapping) {
         const auto &mapping = uid_mappings_v[0];
 
-        content.append(std::to_string(mapping.host_id) + " ");
-        content.append(std::to_string(mapping.container_id) + " ");
+        content.append(std::to_string(mapping.host_id));
+        content.push_back(' ');
+        content.append(std::to_string(mapping.container_id));
+        content.push_back(' ');
         content.append(std::to_string(mapping.size));
 
         auto file = linyaps_box::utils::open(self_process / "uid_map",
@@ -2241,8 +2249,10 @@ void configure_uid_mapping(pid_t pid, const linyaps_box::container &container)
     content.clear();
     for (std::size_t i = 0; i < len; ++i) {
         const auto &mapping = uid_mappings_v[i];
-        content.append(std::to_string(mapping.host_id) + " ");
-        content.append(std::to_string(mapping.container_id) + " ");
+        content.append(std::to_string(mapping.host_id));
+        content.push_back(' ');
+        content.append(std::to_string(mapping.container_id));
+        content.push_back(' ');
         content.append(std::to_string(mapping.size));
 
         if (i != len - 1) {
@@ -2587,6 +2597,7 @@ int linyaps_box::container::run(run_container_options_t options)
                 throw std::runtime_error("unexpected container status before running: "
                                          + std::to_string(static_cast<int>(status.status)));
             }
+
             status.PID = child_pid;
             status.status = container_status_t::runtime_status::RUNNING;
             this->status_dir().write(status);

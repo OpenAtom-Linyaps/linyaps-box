@@ -32,10 +32,10 @@ auto read_status(const std::filesystem::path &path) -> linyaps_box::container_st
 
     linyaps_box::container_status_t ret{ };
 
-    ret.oci_version = j.at("ociVersion");
-    ret.PID = j.at("pid");
-    ret.ID = j.at("id");
-    ret.status = linyaps_box::from_string(j.at("status").get<std::string>());
+    j.at("ociVersion").get_to(ret.oci_version);
+    j.at("pid").get_to(ret.PID);
+    j.at("id").get_to(ret.ID);
+    ret.status = linyaps_box::from_string_view(j.at("status").get<std::string_view>());
     if (::kill(ret.PID, 0) != 0) {
         if (errno == ESRCH) {
             ret.status = linyaps_box::container_status_t::runtime_status::STOPPED;
@@ -47,10 +47,10 @@ auto read_status(const std::filesystem::path &path) -> linyaps_box::container_st
         // EPERM: process exists but we lack permission, keep status from JSON
     }
 
-    ret.bundle = j.at("bundle").get<std::filesystem::path>();
-    ret.created = j.at("created");
-    ret.owner = j.at("owner");
-    ret.annotations = j.at("annotations");
+    j.at("bundle").get_to(ret.bundle);
+    j.at("created").get_to(ret.created);
+    j.at("owner").get_to(ret.owner);
+    j.at("annotations").get_to(ret.annotations);
 
     return ret;
 }
@@ -71,7 +71,7 @@ void linyaps_box::status_directory::write(const container_status_t &status) cons
 {
     auto j = nlohmann::json::object({ { "id", status.ID },
                                       { "pid", status.PID },
-                                      { "status", to_string(status.status) },
+                                      { "status", to_string_view(status.status) },
                                       { "bundle", status.bundle },
                                       { "created", status.created },
                                       { "owner", status.owner },

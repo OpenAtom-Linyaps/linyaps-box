@@ -6,6 +6,7 @@
 
 #include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/log.h"
+#include "linyaps_box/utils/utils.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -44,21 +45,33 @@ auto linyaps_box::utils::mkdir(const file_descriptor &root, std::filesystem::pat
             return current;
         }
 
-        if (::mkdirat(current.get(), part.c_str(), mode) != 0 && errno != EEXIST) {
-            LINYAPS_BOX_DEBUG() << "current path: " << utils::inspect_path(current.get())
-                                << " perm:" << utils::inspect_permissions(current.get());
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    "mkdirat: failed to create "
-                                      + (current.current_path() / part).string());
-        }
-
-        fd = ::openat(current.get(), part.c_str(), O_PATH);
+        // Try openat first – for directories that already exist we save one mkdirat syscall.
+        fd = ::openat(current.get(), part.c_str(), O_PATH | O_CLOEXEC);
         if (fd == -1) {
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    "openat: failed to open "
-                                      + (current.current_path() / part).string());
+            if (UNLIKELY(errno != ENOENT)) {
+                LINYAPS_BOX_DEBUG() << "current path: " << utils::inspect_path(current.get())
+                                    << " perm:" << utils::inspect_permissions(current.get());
+                throw std::system_error(errno,
+                                        std::system_category(),
+                                        "openat: " + (current.current_path() / part).string());
+            }
+
+            if (UNLIKELY(::mkdirat(current.get(), part.c_str(), mode) != 0)) {
+                LINYAPS_BOX_DEBUG() << "current path: " << utils::inspect_path(current.get())
+                                    << " perm:" << utils::inspect_permissions(current.get());
+                throw std::system_error(errno,
+                                        std::system_category(),
+                                        "mkdirat: failed to create "
+                                          + (current.current_path() / part).string());
+            }
+
+            fd = ::openat(current.get(), part.c_str(), O_PATH | O_CLOEXEC);
+            if (UNLIKELY(fd == -1)) {
+                throw std::system_error(errno,
+                                        std::system_category(),
+                                        "openat: failed to open "
+                                          + (current.current_path() / part).string());
+            }
         }
 
         current = file_descriptor(fd);
