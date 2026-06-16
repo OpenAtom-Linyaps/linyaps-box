@@ -1,10 +1,13 @@
-// SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #pragma once
 
+#include <cstddef>
+#include <iosfwd>
 #include <string>
+#include <string_view>
 
 namespace linyaps_box::utils {
 
@@ -15,20 +18,32 @@ public:
            unsigned int minor,
            unsigned int patch,
            std::string prerelease = "",
-           std::string build = "");
+           std::string build = "") noexcept;
 
-    explicit semver(const std::string &str);
+    explicit semver(std::string_view str);
 
-    [[nodiscard]] auto major() const -> unsigned int;
-    [[nodiscard]] auto minor() const -> unsigned int;
-    [[nodiscard]] auto patch() const -> unsigned int;
-    [[nodiscard]] auto prerelease() const -> const std::string &;
-    [[nodiscard]] auto build() const -> const std::string &;
+    [[nodiscard]] unsigned int major() const noexcept;
+    [[nodiscard]] unsigned int minor() const noexcept;
+    [[nodiscard]] unsigned int patch() const noexcept;
+    [[nodiscard]] const std::string &prerelease() const noexcept;
+    [[nodiscard]] const std::string &build() const noexcept;
 
-    [[nodiscard]] auto to_string() const -> std::string;
-    [[nodiscard]] auto is_compatible_with(const semver &other) const -> bool;
+    [[nodiscard]] std::string to_string() const;
+
+    [[nodiscard]] bool is_compatible_with(const semver &other) const noexcept;
+
+    friend bool operator==(const semver &lhs, const semver &rhs) noexcept;
+    friend bool operator!=(const semver &lhs, const semver &rhs) noexcept;
+    friend bool operator<(const semver &lhs, const semver &rhs) noexcept;
+    friend bool operator<=(const semver &lhs, const semver &rhs) noexcept;
+    friend bool operator>(const semver &lhs, const semver &rhs) noexcept;
+    friend bool operator>=(const semver &lhs, const semver &rhs) noexcept;
+
+    friend std::ostream &operator<<(std::ostream &os, const semver &v);
 
 private:
+    static int compare_prerelease(const std::string &a, const std::string &b) noexcept;
+
     unsigned int major_;
     unsigned int minor_;
     unsigned int patch_;
@@ -38,3 +53,13 @@ private:
 };
 
 } // namespace linyaps_box::utils
+
+namespace std {
+
+template <>
+struct hash<linyaps_box::utils::semver>
+{
+    [[nodiscard]] size_t operator()(const linyaps_box::utils::semver &v) const noexcept;
+};
+
+} // namespace std
