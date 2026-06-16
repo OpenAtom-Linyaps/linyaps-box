@@ -16,8 +16,8 @@ namespace {
 
 auto is_valid_id_char(char c) noexcept -> bool
 {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-      || c == '_' || c == '+' || c == '-' || c == '.';
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
+      || c == '+' || c == '-' || c == '.';
 }
 
 } // namespace

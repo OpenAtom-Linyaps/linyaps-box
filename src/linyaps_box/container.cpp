@@ -1811,8 +1811,8 @@ try {
     }
 
     linyaps_box::utils::close_range(3u + static_cast<unsigned>(args.preserve_fds),
-                                     std::numeric_limits<unsigned>::max(),
-                                     CLOSE_RANGE_CLOEXEC);
+                                    std::numeric_limits<unsigned>::max(),
+                                    CLOSE_RANGE_CLOEXEC);
 
     auto &container = *args.container;
     const auto &oci_config = container.get_config();
