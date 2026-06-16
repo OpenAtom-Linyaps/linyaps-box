@@ -155,6 +155,13 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
 
     this->master = std::move(master);
 
+    // Immediately propagate the host terminal size to the PTY master,
+    // so the terminal inside the container starts with the right dimensions
+    // even when the OCI config does not specify consoleSize.
+    if (host_tty && this->master) {
+        this->master->resize(host_tty->get_size());
+    }
+
     // The PTY master fd is used bidirectionally: we write stdin into it AND
     // read its output back to stdout.  epoll needs two independent fd
     // registrations, so we duplicate the master fd here.
