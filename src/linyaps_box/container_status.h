@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 namespace linyaps_box {
@@ -26,8 +27,8 @@ struct container_status_t
     std::unordered_map<std::string, std::string> annotations;
 };
 
-auto to_string(linyaps_box::container_status_t::runtime_status status) -> std::string;
-auto from_string(std::string_view status) -> linyaps_box::container_status_t::runtime_status;
+auto to_string_view(linyaps_box::container_status_t::runtime_status status) -> std::string_view;
+auto from_string_view(std::string_view status) -> linyaps_box::container_status_t::runtime_status;
 auto status_to_json(const linyaps_box::container_status_t &status) -> nlohmann::json;
 
 } // namespace linyaps_box

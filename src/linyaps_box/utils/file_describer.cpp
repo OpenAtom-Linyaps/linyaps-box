@@ -210,8 +210,7 @@ auto linyaps_box::utils::file_descriptor::proc_path() const -> std::filesystem::
         return std::filesystem::current_path();
     }
 
-    return std::filesystem::current_path().root_path() / "proc" / "self" / "fd"
-      / std::to_string(fd_);
+    return "/proc/self/fd/" + std::to_string(fd_);
 }
 
 auto linyaps_box::utils::file_descriptor::current_path() const -> std::filesystem::path
