@@ -1,11 +1,11 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "linyaps_box/container_status.h"
 
 namespace linyaps_box {
-auto to_string(linyaps_box::container_status_t::runtime_status status) -> std::string
+auto to_string_view(linyaps_box::container_status_t::runtime_status status) -> std::string_view
 {
     switch (status) {
     case linyaps_box::container_status_t::runtime_status::CREATING:
@@ -21,7 +21,7 @@ auto to_string(linyaps_box::container_status_t::runtime_status status) -> std::s
     }
 }
 
-auto from_string(std::string_view status) -> linyaps_box::container_status_t::runtime_status
+auto from_string_view(std::string_view status) -> linyaps_box::container_status_t::runtime_status
 {
     if (status == "creating") {
         return linyaps_box::container_status_t::runtime_status::CREATING;
@@ -43,7 +43,7 @@ auto status_to_json(const linyaps_box::container_status_t &status) -> nlohmann::
 {
     return nlohmann::json::object({ { "id", status.ID },
                                     { "pid", status.PID },
-                                    { "status", to_string(status.status) },
+                                    { "status", to_string_view(status.status) },
                                     { "bundle", status.bundle.string() },
                                     { "created", status.created },
                                     { "owner", status.owner },

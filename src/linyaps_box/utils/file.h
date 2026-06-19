@@ -66,4 +66,15 @@ auto read_all(const std::filesystem::path &path) -> std::string;
 
 auto read_exact(const file_descriptor &fd, std::size_t size) -> std::string;
 
+auto unlink_at(const file_descriptor &root, const std::filesystem::path &path) -> void;
+
+auto unlink_at(const file_descriptor &root,
+               const std::filesystem::path &path,
+               std::error_code &ec) noexcept -> void;
+
+auto rename_at(const file_descriptor &old_dir,
+               const std::filesystem::path &old_path,
+               const file_descriptor &new_dir,
+               const std::filesystem::path &new_path) -> void;
+
 } // namespace linyaps_box::utils

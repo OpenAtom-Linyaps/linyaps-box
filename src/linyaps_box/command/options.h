@@ -6,10 +6,17 @@
 
 #include <linyaps_box/cgroup_manager.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <variant>
 #include <vector>
+
+#include <sys/types.h>
+
+#ifdef LINYAPS_BOX_ENABLE_CAP
+#  include <sys/capability.h>
+#endif
 
 namespace linyaps_box::command {
 
@@ -17,76 +24,55 @@ struct global_options
 {
     cgroup_manager_t manager{ cgroup_manager_t::disabled };
     std::filesystem::path root;
-    int return_code{ 0 };
 };
 
 struct list_options
 {
     enum class output_format_t : std::uint8_t { table, json };
 
-    explicit list_options(global_options &global)
-        : global_(global)
-    {
-    }
-
     output_format_t output_format{ output_format_t::table };
-    std::reference_wrapper<global_options> global_;
+};
+
+struct user_spec
+{
+    uid_t uid{ };
+    gid_t gid{ };
 };
 
 struct exec_options
 {
-    explicit exec_options(global_options &global)
-        : global_(global)
-    {
-    }
-
     bool no_new_privs{ false };
     bool tty{ false };
     int preserve_fds{ 0 };
-    std::reference_wrapper<global_options> global_;
     std::vector<std::string> command;
-    std::string user;
-    std::optional<std::vector<std::string>> caps;
+    std::optional<user_spec> user;
+#ifdef LINYAPS_BOX_ENABLE_CAP
+    std::optional<std::vector<cap_value_t>> caps;
+#endif
     std::string ID;
-    std::optional<std::string> cwd;
-    std::optional<std::vector<std::string>> envs;
-    std::optional<std::string> console_socket;
+    std::optional<std::filesystem::path> cwd;
+    std::vector<std::string> envs;
+    std::optional<std::filesystem::path> console_socket;
+    std::optional<std::filesystem::path> process_file;
 };
 
 struct run_options
 {
-    explicit run_options(global_options &global)
-        : global_(global)
-    {
-    }
-
-    std::reference_wrapper<global_options> global_;
     std::string ID;
-    std::string bundle;
-    std::string config;
-    std::optional<std::string> console_socket;
+    std::filesystem::path bundle;
+    std::filesystem::path config;
+    std::optional<std::filesystem::path> console_socket;
     int preserve_fds{ 0 };
 };
 
 struct kill_options
 {
-    explicit kill_options(global_options &global)
-        : global_(global)
-    {
-    }
-
-    std::reference_wrapper<global_options> global_;
     std::string container;
-    std::string signal;
+    int signal{ };
 };
 
 struct options
 {
-    options()
-        : global()
-    {
-    }
-
     using subcommand_opt_t =
       std::variant<std::monostate, list_options, exec_options, run_options, kill_options>;
 
@@ -94,8 +80,6 @@ struct options
     subcommand_opt_t subcommand_opt;
 };
 
-// This function parses the command line arguments.
-// It might print help or usage to stdout or stderr.
-options parse(int argc, char *argv[]); // NOLINT
+auto parse(int argc, char *argv[]) -> std::optional<options>;
 
 } // namespace linyaps_box::command

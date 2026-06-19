@@ -6,29 +6,10 @@
 
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory_manager.h"
-#include "linyaps_box/utils/platform.h"
 
-#include <algorithm>
-
-void linyaps_box::command::kill(const struct kill_options &options)
+auto linyaps_box::command::kill(const kill_options &options, const global_options &global) -> int
 {
-    auto signal{ options.signal };
-    int sig{ -1 };
-    while (true) {
-        if (std::all_of(signal.cbegin(), signal.cend(), ::isdigit)) {
-            sig = std::stoi(signal);
-            break;
-        }
-
-        if (signal.rfind("SIG", 0) == std::string::npos) {
-            signal.insert(0, "SIG");
-        }
-
-        sig = utils::str_to_signal(signal);
-        break;
-    }
-
-    status_directory_manager mgr(options.global_.get().root);
+    status_directory_manager mgr(global.root);
     runtime_t runtime(std::move(mgr));
     const auto &containers = runtime.containers();
     for (const auto &[id, ref] : containers) {
@@ -36,8 +17,8 @@ void linyaps_box::command::kill(const struct kill_options &options)
             continue;
         }
 
-        ref.kill(sig);
-        return;
+        ref.kill(options.signal);
+        return 0;
     }
 
     throw std::runtime_error("container not found");
