@@ -27,7 +27,11 @@ ColumnLimit: 100
 # Disable reflow of some specific comments
 # qdoc comments: indentation rules are different.
 # Translation comments and SPDX license identifiers are also excluded.
-CommentPragmas: "^!|^:|^ SPDX-License-Identifier:"
+#
+# NOTE: '[I]' is used here to obfuscate the 'SPDX-License-Identifier' keyword.
+# Regular 'I' would cause the REUSE compliance tool to misinterpret this configuration
+# line as a valid license expression, leading to a linter parsing error.
+CommentPragmas: "^!|^:|^ SPDX-License-[I]dentifier:"
 
 PointerAlignment: Right
 
