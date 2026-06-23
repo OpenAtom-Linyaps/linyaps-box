@@ -55,3 +55,9 @@ path = ["external/CLI11/include/**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2017-2025 University of Cincinnati, developed by Henry Schreiner under NSF AWARD 1414736."
 SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["external/zeus_expected/include/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2024 zeus-cpp"
+SPDX-License-Identifier = "MIT"

@@ -284,6 +284,13 @@ if(linyaps-box_ENABLE_CPM)
     GIT_TAG v2.6.2
     EXCLUDE_FROM_ALL ON
     OPTIONS "CLI11_BUILD_TESTS OFF")
+  CPMFindPackage(
+    NAME zeus_expected
+    VERSION 1.3.3
+    GITHUB_REPOSITORY zeus-cpp/expected
+    GIT_TAG v1.3.3
+    EXCLUDE_FROM_ALL ON
+    OPTIONS "BUILD_TESTING OFF")
 endif()
 
 # find minimal version
@@ -296,7 +303,7 @@ if(NOT nlohmann_json_FOUND)
   message(STATUS "use vendor nlohmann_json ${nlohmann_json_VERSION}")
 endif()
 
-list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE
      nlohmann_json::nlohmann_json)
 
 find_package(CLI11 2.5.0 QUIET)
@@ -308,7 +315,18 @@ if(NOT CLI11_FOUND)
   message(STATUS "use vendor CLI11 ${CLI11_VERSION}")
 endif()
 
-list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE CLI11::CLI11)
+
+find_package(zeus_expected 1.3.3 QUIET)
+if(NOT zeus_expected_FOUND)
+  add_subdirectory(external/zeus_expected)
+  list(APPEND CMAKE_MODULE_PATH
+       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/zeus_expected")
+  find_package(zeus_expected 1.3.3 REQUIRED)
+  message(STATUS "use vendor zeus_expected ${zeus_expected_VERSION}")
+endif()
+
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE zeus::expected)
 
 add_library("${linyaps-box_LIBRARY}" STATIC ${linyaps-box_LIBRARY_SOURCE})
 target_include_directories("${linyaps-box_LIBRARY}"
