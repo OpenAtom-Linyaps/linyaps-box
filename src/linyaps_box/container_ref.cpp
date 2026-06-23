@@ -221,6 +221,7 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
 void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
                               const linyaps_box::oci_config &config)
 {
+    LINYAPS_BOX_DEBUG() << "apply capabilities";
     // Determine which caps to apply: prefer the exec-specific set, fall back to
     // the container's config.json default if the exec set is entirely empty.
     auto effective_caps =
@@ -396,6 +397,7 @@ try {
         throw std::system_error(errno, std::system_category(), "chdir");
     }
 
+    LINYAPS_BOX_DEBUG() << "exec command";
     ::execvpe(c_args.at(0),
               const_cast<char *const *>(c_args.data()),
               const_cast<char *const *>(c_env.data()));
