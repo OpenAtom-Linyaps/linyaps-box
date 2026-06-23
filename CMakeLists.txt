@@ -92,11 +92,13 @@ set(linyaps-box_ACTIVE_LOG_LEVEL
 
 set(linyaps-box_ENABLE_CPM
     OFF
-    CACHE BOOL "enable CPM")
+    CACHE BOOL "enable CPM"
+)
 
 set(linyaps-box_HARDENING
     ON
-    CACHE BOOL "enable hardening")
+    CACHE BOOL "enable hardening"
+)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -109,7 +111,8 @@ endif()
 # if just want to try local packages at first set CPM_USE_LOCAL_PACKAGES ON
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     OFF
-    CACHE BOOL "use local packages only")
+    CACHE BOOL "use local packages only"
+)
 
 # ==============================================================================
 
@@ -257,7 +260,7 @@ if(linyaps-box_ENABLE_SECCOMP)
 endif()
 
 if(linyaps-box_ENABLE_CAP)
-  # TODO: remove libcap and implement it by ourself
+  # TODO: maybe remove libcap and implement it by ourself ?
   pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap>=2.25)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
 endif()
@@ -291,6 +294,12 @@ if(linyaps-box_ENABLE_CPM)
     GIT_TAG v1.3.3
     EXCLUDE_FROM_ALL ON
     OPTIONS "BUILD_TESTING OFF")
+  CPMFindPackage(
+  NAME fmt
+  VERSION 10.1.0
+  GITHUB_REPOSITORY fmtlib/fmt
+  GIT_TAG 12.2.0
+  EXCLUDE_FROM_ALL ON)
 endif()
 
 # find minimal version
@@ -301,10 +310,11 @@ if(NOT nlohmann_json_FOUND)
        "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/nlohmann_json")
   find_package(nlohmann_json 3.11.3 REQUIRED)
   message(STATUS "use vendor nlohmann_json ${nlohmann_json_VERSION}")
+else()
+  message(STATUS "use system nlohmann_json ${nlohmann_json_VERSION}")
 endif()
 
-list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE
-     nlohmann_json::nlohmann_json)
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES nlohmann_json::nlohmann_json)
 
 find_package(CLI11 2.5.0 QUIET)
 if(NOT CLI11_FOUND)
@@ -313,9 +323,37 @@ if(NOT CLI11_FOUND)
        "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
   find_package(CLI11 2.5.0 REQUIRED)
   message(STATUS "use vendor CLI11 ${CLI11_VERSION}")
+else()
+  message(STATUS "use system CLI11 ${CLI11_VERSION}")
 endif()
 
-list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE CLI11::CLI11)
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES CLI11::CLI11)
+
+set(FMT_TARGET fmt::fmt)
+if(linyaps-box_STATIC)
+  set(FMT_TARGET fmt::fmt-header-only)
+endif()
+
+find_package(fmt 10.1.0 QUIET)
+if (NOT fmt_FOUND)
+  # if fmt is not found in local system. just use fmt::fmt with static linkage
+  # for boosting compiling speed.
+  set(FMT_TARGET fmt::fmt)
+
+  set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+  set(BUILD_SHARED_LIBS OFF)
+
+  list(APPEND CMAKE_MODULE_PATH
+       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/fmt")
+  add_subdirectory(external/fmt)
+
+  set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
+  message(STATUS "use vendor fmt ${fmt_VERSION}")
+else()
+  message(STATUS "use system fmt ${fmt_VERSION}")
+endif()
+
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES ${FMT_TARGET})
 
 find_package(zeus_expected 1.3.3 QUIET)
 if(NOT zeus_expected_FOUND)
@@ -326,7 +364,7 @@ if(NOT zeus_expected_FOUND)
   message(STATUS "use vendor zeus_expected ${zeus_expected_VERSION}")
 endif()
 
-list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE zeus::expected)
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES zeus::expected)
 
 add_library("${linyaps-box_LIBRARY}" STATIC ${linyaps-box_LIBRARY_SOURCE})
 target_include_directories("${linyaps-box_LIBRARY}"

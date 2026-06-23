@@ -61,3 +61,12 @@ path = ["external/zeus_expected/include/**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2024 zeus-cpp"
 SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [
+    "external/fmt/**",
+    "cmake.external/fmt/**"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2012 - present, Victor Zverovich and {fmt} contributors"
+SPDX-License-Identifier = "MIT"
