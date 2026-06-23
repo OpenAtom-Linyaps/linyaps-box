@@ -92,13 +92,11 @@ set(linyaps-box_ACTIVE_LOG_LEVEL
 
 set(linyaps-box_ENABLE_CPM
     OFF
-    CACHE BOOL "enable CPM"
-)
+    CACHE BOOL "enable CPM")
 
 set(linyaps-box_HARDENING
     ON
-    CACHE BOOL "enable hardening"
-)
+    CACHE BOOL "enable hardening")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -111,8 +109,7 @@ endif()
 # if just want to try local packages at first set CPM_USE_LOCAL_PACKAGES ON
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
     OFF
-    CACHE BOOL "use local packages only"
-)
+    CACHE BOOL "use local packages only")
 
 # ==============================================================================
 
@@ -122,10 +119,8 @@ if(linyaps-box_HARDENING)
       "${CMAKE_EXE_LINKER_FLAGS} -pie -Wl,-z,relro -Wl,-z,now")
   add_compile_options(-fstack-protector-strong)
 
-  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(STATUS "Non-Debug build, enabling FORTIFY_SOURCE")
-    add_compile_definitions(_FORTIFY_SOURCE=2)
-  endif()
+  message(STATUS "Non-Debug build, enabling FORTIFY_SOURCE")
+  add_compile_definitions("$<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=2>")
 endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
@@ -295,11 +290,11 @@ if(linyaps-box_ENABLE_CPM)
     EXCLUDE_FROM_ALL ON
     OPTIONS "BUILD_TESTING OFF")
   CPMFindPackage(
-  NAME fmt
-  VERSION 10.1.0
-  GITHUB_REPOSITORY fmtlib/fmt
-  GIT_TAG 12.2.0
-  EXCLUDE_FROM_ALL ON)
+    NAME fmt
+    VERSION 10.1.0
+    GITHUB_REPOSITORY fmtlib/fmt
+    GIT_TAG 12.2.0
+    EXCLUDE_FROM_ALL ON)
 endif()
 
 # find minimal version
@@ -329,13 +324,11 @@ endif()
 
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES CLI11::CLI11)
 
-set(FMT_TARGET fmt::fmt)
-if(linyaps-box_STATIC)
-  set(FMT_TARGET fmt::fmt-header-only)
-endif()
+set(FMT_TARGET
+    "$<IF:$<BOOL:${linyaps-box_STATIC}>,fmt::fmt-header-only,fmt::fmt>")
 
 find_package(fmt 10.1.0 QUIET)
-if (NOT fmt_FOUND)
+if(NOT fmt_FOUND)
   # if fmt is not found in local system. just use fmt::fmt with static linkage
   # for boosting compiling speed.
   set(FMT_TARGET fmt::fmt)
@@ -393,10 +386,9 @@ target_compile_definitions(
     "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
 target_compile_options("${linyaps-box_LIBRARY}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
-if(linyaps-box_STATIC)
-  target_compile_definitions("${linyaps-box_LIBRARY}"
-                             PUBLIC "LINYAPS_BOX_STATIC_LINK")
-endif()
+target_compile_definitions(
+  "${linyaps-box_LIBRARY}"
+  PUBLIC "$<$<BOOL:${linyaps-box_STATIC}>:LINYAPS_BOX_STATIC_LINK>")
 
 if(linyaps-box_ENABLE_SECCOMP)
   target_compile_definitions("${linyaps-box_LIBRARY}"
@@ -413,18 +405,22 @@ if(linyaps-box_ENABLE_CAP)
 endif()
 
 if(linyaps-box_ENABLE_COVERAGE)
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options("${linyaps-box_LIBRARY}"
-                           PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options("${linyaps-box_LIBRARY}" PUBLIC
-                        -fprofile-instr-generate -fcoverage-mapping)
-  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options("${linyaps-box_LIBRARY}" PRIVATE --coverage)
-    target_link_options("${linyaps-box_LIBRARY}" PUBLIC --coverage)
-  else()
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_ID
+                                                   STREQUAL "GNU")
     message(
       FATAL_ERROR "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}.")
   endif()
+  target_compile_options(
+    "${linyaps-box_LIBRARY}"
+    PRIVATE "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fprofile-instr-generate>"
+            "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fcoverage-mapping>"
+            "$<$<CXX_COMPILER_ID:GNU>:--coverage>")
+  target_link_options(
+    "${linyaps-box_LIBRARY}"
+    PUBLIC
+    "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fprofile-instr-generate>"
+    "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fcoverage-mapping>"
+    "$<$<CXX_COMPILER_ID:GNU>:--coverage>")
 endif()
 
 # ==============================================================================
@@ -439,10 +435,10 @@ add_executable("${linyaps-box_APP}" ${linyaps-box_APP_SOURCE})
 target_include_directories("${linyaps-box_APP}"
                            ${linyaps-box_APP_SOURCE_INCLUDE_DIRS})
 target_link_libraries("${linyaps-box_APP}" ${linyaps-box_APP_LINK_LIBRARIES})
-if(linyaps-box_STATIC)
-  target_link_options("${linyaps-box_APP}" PRIVATE -static -static-libgcc
-                      -static-libstdc++)
-endif()
+target_link_options(
+  "${linyaps-box_APP}" PRIVATE "$<$<BOOL:${linyaps-box_STATIC}>:-static>"
+  "$<$<BOOL:${linyaps-box_STATIC}>:-static-libgcc>"
+  "$<$<BOOL:${linyaps-box_STATIC}>:-static-libstdc++>")
 target_compile_features("${linyaps-box_APP}" PRIVATE cxx_std_17)
 set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD 17)
 set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_EXTENSIONS OFF)
