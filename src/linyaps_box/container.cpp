@@ -1467,7 +1467,7 @@ void do_pivot_root(const linyaps_box::container &container, const std::filesyste
     LINYAPS_BOX_DEBUG() << "start pivot root";
     LINYAPS_BOX_DEBUG() << linyaps_box::utils::inspect_fds();
     auto old_root = linyaps_box::utils::open("/", O_DIRECTORY | O_PATH | O_CLOEXEC);
-    auto new_root = linyaps_box::utils::open(rootfs.c_str(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+    auto new_root = linyaps_box::utils::open(rootfs.c_str(), O_DIRECTORY | O_PATH | O_CLOEXEC);
 
     auto old_root_stat = linyaps_box::utils::statfs(old_root);
     LINYAPS_BOX_DEBUG() << "Pivot root old root: " << dump_mount_flags(old_root_stat.f_flags);
@@ -1492,8 +1492,12 @@ void do_pivot_root(const linyaps_box::container &container, const std::filesyste
         throw std::system_error(errno, std::system_category(), "fchdir");
     }
 
-    // make sure that umount event couldn't propagate to host
-    do_propagation_mount(old_root, MS_REC | MS_PRIVATE);
+    // make sure that umount event couldn't propagate to host.
+    // target the old root via cwd "." (set by fchdir(old_root) above); do NOT use
+    // old_root.current_path(); after pivot_root(".", ".") the old_root fd's readlink
+    // resolves to "/" (= new root X), which would recursively privatize X and all
+    // submounts (e.g. /run/media, /sys), overriding their inherited propagation.
+    syscall_mount(nullptr, ".", nullptr, MS_REC | MS_PRIVATE, nullptr);
 
     // umount old root
     ret = umount2(".", MNT_DETACH);
