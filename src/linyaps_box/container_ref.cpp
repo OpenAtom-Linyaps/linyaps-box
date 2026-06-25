@@ -69,7 +69,10 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
             auto [master, slave] = create_pty_pair();
 
             slave.setup_stdio();
-            slave.set_size({ });
+            if (option.proc.console_size) {
+                slave.set_size({ option.proc.console_size->height,
+                                 option.proc.console_size->width, 0, 0 });
+            }
 
             option.console_socket->send_fd(std::move(master).take());
             option.console_socket.reset();
@@ -147,10 +150,8 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
         }
     });
 
-    [&recv_socketpair, &monitor, &in, &out, &changed]() {
-        if (!recv_socketpair) {
-            return;
-        }
+    if (recv_socketpair) {
+        monitor.acquire_host_tty(in, out);
 
         LINYAPS_BOX_DEBUG() << "Container requires a terminal";
 
@@ -159,12 +160,16 @@ auto linyaps_box::container_ref::exec(exec_container_option option) -> int
 
         recv_socketpair->release();
 
+        if (!option.proc.console_size) {
+            master.resize(monitor.host_tty_size());
+        }
+
         in.set_nonblock(true);
         out.set_nonblock(true);
         changed = true;
 
-        monitor.enable_io_forwarding(std::move(master), in, out);
-    }();
+        monitor.attach_terminal(std::move(master), in, out);
+    }
 
     return monitor.wait_container_exit();
 }
