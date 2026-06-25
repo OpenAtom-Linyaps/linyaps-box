@@ -2578,39 +2578,7 @@ int linyaps_box::container::run(run_container_options_t options)
         // TODO: cgroup preenter
         auto [child_pid, socket] = runtime_ns::start_container_process(*this, options);
 
-        {
-            auto status = this->status();
-            if (status.status != container_status_t::runtime_status::CREATING) {
-                throw std::runtime_error("unexpected container status before creating: "
-                                         + std::to_string(static_cast<int>(status.status)));
-            }
-            status.PID = child_pid;
-            status.status = container_status_t::runtime_status::CREATED;
-            this->status_dir().write(status);
-        }
-
-        runtime_ns::configure_container_namespaces(*this, socket);
-        runtime_ns::prestart_hooks(*this, socket);
-        runtime_ns::create_runtime_hooks(*this, socket);
-        runtime_ns::wait_create_container_result(*this, socket);
-
-        runtime_ns::wait_socket_close(socket);
-
-        {
-            auto status = this->status();
-            if (status.status != container_status_t::runtime_status::CREATED) {
-                throw std::runtime_error("unexpected container status before running: "
-                                         + std::to_string(static_cast<int>(status.status)));
-            }
-            status.PID = child_pid;
-            status.status = container_status_t::runtime_status::RUNNING;
-            this->status_dir().write(status);
-        }
-
-        runtime_ns::poststart_hooks(*this);
-
         container_monitor monitor(child_pid);
-        monitor.enable_signal_forwarding();
 
         auto in = utils::file_descriptor{ STDIN_FILENO, false };
         auto out = utils::file_descriptor{ STDOUT_FILENO, false };
@@ -2635,22 +2603,59 @@ int linyaps_box::container::run(run_container_options_t options)
               }
           });
 
-        [&recv_socketpair, &monitor, &in, &out, &changed]() -> void {
-            if (!recv_socketpair) {
-                return;
+        if (recv_socketpair) {
+            monitor.acquire_host_tty(in, out);
+        }
+
+        {
+            auto status = this->status();
+            if (status.status != container_status_t::runtime_status::CREATING) {
+                throw std::runtime_error("unexpected container status before creating: "
+                                         + std::to_string(static_cast<int>(status.status)));
             }
+            status.PID = child_pid;
+            status.status = container_status_t::runtime_status::CREATED;
+            this->status_dir().write(status);
+        }
 
-            LINYAPS_BOX_DEBUG() << "Container requires a terminal";
+        runtime_ns::configure_container_namespaces(*this, socket);
+        runtime_ns::prestart_hooks(*this, socket);
+        runtime_ns::create_runtime_hooks(*this, socket);
+        runtime_ns::wait_create_container_result(*this, socket);
 
-            auto master = runtime_ns::recv_master_tty(recv_socketpair.value());
+        std::optional<terminal_master> early_master;
+        if (recv_socketpair) {
+            early_master = runtime_ns::recv_master_tty(recv_socketpair.value());
             recv_socketpair->release();
+            if (!config.process.console_size) {
+                early_master->resize(monitor.host_tty_size());
+            }
+        }
 
+        runtime_ns::wait_socket_close(socket);
+
+        {
+            auto status = this->status();
+            if (status.status != container_status_t::runtime_status::CREATED) {
+                throw std::runtime_error("unexpected container status before running: "
+                                         + std::to_string(static_cast<int>(status.status)));
+            }
+            status.PID = child_pid;
+            status.status = container_status_t::runtime_status::RUNNING;
+            this->status_dir().write(status);
+        }
+
+        runtime_ns::poststart_hooks(*this);
+
+        monitor.enable_signal_forwarding();
+
+        if (early_master) {
             in.set_nonblock(true);
             out.set_nonblock(true);
             changed = true;
 
-            monitor.enable_io_forwarding(std::move(master), in, out);
-        }();
+            monitor.attach_terminal(std::move(*early_master), in, out);
+        }
 
         // TODO: support detach from the parent's process
         // Now we wait for the container process to exit

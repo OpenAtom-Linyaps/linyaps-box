@@ -29,6 +29,11 @@ auto create_pty_pair() -> std::pair<terminal_master, terminal_slave>
 
 auto terminal_master::resize(struct winsize size) -> void
 {
+    if (size.ws_col == 0 || size.ws_row == 0) {
+        auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
+        std::ignore = utils::ioctl(default_tty, TIOCGWINSZ, &size);
+    }
+
     std::ignore = utils::ioctl(master_, TIOCSWINSZ, &size);
 }
 

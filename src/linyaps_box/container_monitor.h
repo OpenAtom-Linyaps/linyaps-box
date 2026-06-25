@@ -23,6 +23,12 @@ public:
     ~container_monitor() noexcept = default;
 
     auto enable_signal_forwarding() -> void;
+    auto acquire_host_tty(const linyaps_box::utils::file_descriptor &in,
+                          const linyaps_box::utils::file_descriptor &out) -> void;
+    [[nodiscard]] auto host_tty_size() -> struct winsize;
+    auto attach_terminal(terminal_master master,
+                         const linyaps_box::utils::file_descriptor &in,
+                         const linyaps_box::utils::file_descriptor &out) -> void;
     auto enable_io_forwarding(terminal_master master,
                               const linyaps_box::utils::file_descriptor &in,
                               const linyaps_box::utils::file_descriptor &out) -> void;
