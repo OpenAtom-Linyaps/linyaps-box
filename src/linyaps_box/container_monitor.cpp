@@ -95,10 +95,13 @@ auto container_monitor::handle_signals() -> void
     }
 }
 
-auto container_monitor::enable_io_forwarding(terminal_master master,
-                                             const linyaps_box::utils::file_descriptor &in,
-                                             const linyaps_box::utils::file_descriptor &out) -> void
+auto container_monitor::acquire_host_tty(const utils::file_descriptor &in,
+                                         const utils::file_descriptor &out) -> void
 {
+    if (host_tty) {
+        return;
+    }
+
     if (utils::isatty(in)) {
         host_tty.emplace(in.duplicate());
     } else if (utils::isatty(out)) {
@@ -107,8 +110,26 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
         auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
         host_tty.emplace(std::move(default_tty));
     }
+}
 
-    host_tty->set_raw();
+auto container_monitor::host_tty_size() -> struct winsize
+{
+    if (!host_tty) {
+        return { };
+    }
+
+    return host_tty->get_size();
+
+}
+
+auto container_monitor::attach_terminal(terminal_master master,
+                                        const utils::file_descriptor &in,
+                                        const utils::file_descriptor &out) -> void
+
+{
+    if (host_tty) {
+        host_tty->set_raw();
+    }
 
     this->master = std::move(master);
 
@@ -144,6 +165,14 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
     if (out_fwd && out_fwd->is_finished()) {
         out_fwd.reset();
     }
+}
+
+auto container_monitor::enable_io_forwarding(terminal_master master,
+                                             const utils::file_descriptor &in,
+                                             const utils::file_descriptor &out) -> void
+{
+    acquire_host_tty(in, out);
+    attach_terminal(std::move(master), in, out);
 }
 
 auto container_monitor::wait_container_exit() -> int
