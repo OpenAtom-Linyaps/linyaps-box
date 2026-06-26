@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstring>
+#include <numeric>
 #include <vector>
 
 namespace utils = linyaps_box::utils;
@@ -215,6 +216,26 @@ TEST(SpanCTAD, ItEnd)
     static_assert(decltype(s)::extent == utils::dynamic_extent);
 }
 
+TEST(SpanCTAD, Container)
+{
+    std::vector<int> v{ 1, 2, 3 };
+    const utils::span s(v);
+    EXPECT_EQ(s.size(), 3);
+    EXPECT_EQ(s[1], 2);
+    static_assert(std::is_same_v<decltype(s)::element_type, int>);
+    static_assert(decltype(s)::extent == utils::dynamic_extent);
+}
+
+TEST(SpanCTAD, ConstContainer)
+{
+    const std::vector<int> v{ 4, 5 };
+    const utils::span s(v);
+    EXPECT_EQ(s.size(), 2);
+    EXPECT_EQ(s[0], 4);
+    static_assert(std::is_same_v<decltype(s)::element_type, const int>);
+    static_assert(decltype(s)::extent == utils::dynamic_extent);
+}
+
 namespace {
 
 template <typename T, typename = void>
@@ -269,4 +290,209 @@ TEST(SpanBytes, AsWritableBytes)
     EXPECT_EQ(arr[0], 0);
     bytes[0] = std::byte(1);
     EXPECT_EQ(arr[0], 1);
+}
+
+TEST(SpanElementAccess, OperatorIndex)
+{
+    std::array arr{ 1, 2, 3 };
+    const utils::span s(arr);
+    EXPECT_EQ(s[0], 1);
+    EXPECT_EQ(s[2], 3);
+    s[1] = 42;
+    EXPECT_EQ(arr[1], 42);
+}
+
+TEST(SpanElementAccess, FrontBack)
+{
+    std::array arr{ 10, 20, 30 };
+    const utils::span s(arr);
+    EXPECT_EQ(s.front(), 10);
+    EXPECT_EQ(s.back(), 30);
+    s.front() = 1;
+    s.back() = 3;
+    EXPECT_EQ(arr[0], 1);
+    EXPECT_EQ(arr[2], 3);
+}
+
+TEST(SpanElementAccess, FrontBackConstSpan)
+{
+    const std::array arr{ 1, 2, 3 };
+    const utils::span s(arr);
+    EXPECT_EQ(s.front(), 1);
+    EXPECT_EQ(s.back(), 3);
+}
+
+TEST(SpanIterators, ForwardIteration)
+{
+    std::array arr{ 10, 20, 30 };
+    const utils::span s(arr);
+
+    auto sum = std::accumulate(s.cbegin(), s.cend(), 0);
+    EXPECT_EQ(sum, 60);
+
+    int count = 0;
+    for ([[maybe_unused]] auto val : s) {
+        ++count;
+    }
+    EXPECT_EQ(count, 3);
+
+    *s.begin() = 99;
+    EXPECT_EQ(arr[0], 99);
+}
+
+TEST(SpanIterators, ReverseIteration)
+{
+    std::array arr{ 1, 2, 3 };
+    const utils::span s(arr);
+    auto rit = s.rbegin();
+    EXPECT_EQ(*rit, 3);
+    ++rit;
+    EXPECT_EQ(*rit, 2);
+    ++rit;
+    EXPECT_EQ(*rit, 1);
+    ++rit;
+    EXPECT_EQ(rit, s.rend());
+}
+
+TEST(SpanIterators, ConstIterators)
+{
+    const std::array arr{ 1, 2, 3 };
+    const utils::span s(arr);
+    EXPECT_EQ(*s.cbegin(), 1);
+    EXPECT_EQ(s.cend(), s.cbegin() + 3);
+    EXPECT_EQ(*s.crbegin(), 3);
+    EXPECT_EQ(s.crend(), s.crbegin() + 3);
+}
+
+TEST(SpanIterators, ReverseMutate)
+{
+    std::array arr{ 1, 2, 3 };
+    const utils::span s(arr);
+    *s.rbegin() = 99;
+    EXPECT_EQ(arr[2], 99);
+}
+
+TEST(SpanSubviews, TemplateFirst)
+{
+    std::array arr{ 1, 2, 3, 4, 5 };
+    const utils::span s(arr);
+    auto first2 = s.first<2>();
+    EXPECT_EQ(first2.size(), 2);
+    EXPECT_EQ(first2[0], 1);
+    EXPECT_EQ(first2[1], 2);
+    static_assert(decltype(first2)::extent == 2);
+}
+
+TEST(SpanSubviews, TemplateLast)
+{
+    std::array arr{ 1, 2, 3, 4, 5 };
+    const utils::span s(arr);
+    auto last3 = s.last<3>();
+    EXPECT_EQ(last3.size(), 3);
+    EXPECT_EQ(last3[0], 3);
+    EXPECT_EQ(last3[2], 5);
+    static_assert(decltype(last3)::extent == 3);
+}
+
+TEST(SpanSubviews, TemplateSubspan)
+{
+    std::array arr{ 0, 1, 2, 3, 4 };
+    const utils::span s(arr);
+    auto sub = s.subspan<1, 3>();
+    EXPECT_EQ(sub.size(), 3);
+    EXPECT_EQ(sub[0], 1);
+    EXPECT_EQ(sub[2], 3);
+    static_assert(decltype(sub)::extent == 3);
+}
+
+TEST(SpanSubviews, RuntimeFirst)
+{
+    std::array arr{ 1, 2, 3, 4, 5 };
+    const utils::span s(arr);
+    auto first2 = s.first(2);
+    EXPECT_EQ(first2.size(), 2);
+    EXPECT_EQ(first2[0], 1);
+    EXPECT_EQ(first2[1], 2);
+}
+
+TEST(SpanSubviews, RuntimeLast)
+{
+    std::array arr{ 1, 2, 3, 4, 5 };
+    const utils::span s(arr);
+    auto last3 = s.last(3);
+    EXPECT_EQ(last3.size(), 3);
+    EXPECT_EQ(last3[0], 3);
+    EXPECT_EQ(last3[2], 5);
+}
+
+TEST(SpanSubviews, RuntimeSubspanAll)
+{
+    std::array arr{ 0, 1, 2, 3, 4 };
+    const utils::span s(arr);
+    auto sub = s.subspan(0);
+    EXPECT_EQ(sub.size(), 5);
+    EXPECT_EQ(sub[0], 0);
+    EXPECT_EQ(sub[4], 4);
+}
+
+TEST(SpanObservers, SizeBytesAndEmpty)
+{
+    std::array arr{ 1, 2, 3 };
+    const utils::span s(arr);
+    EXPECT_EQ(s.size_bytes(), sizeof(int) * 3);
+    EXPECT_FALSE(s.empty());
+    EXPECT_EQ(s.data(), arr.data());
+
+    const utils::span<int> empty;
+    EXPECT_TRUE(empty.empty());
+    EXPECT_EQ(empty.size_bytes(), 0);
+    EXPECT_EQ(empty.data(), nullptr);
+}
+
+TEST(SpanConstructor, DefaultConstructed)
+{
+    const utils::span<int> s;
+    EXPECT_EQ(s.size(), 0);
+    EXPECT_EQ(s.data(), nullptr);
+    EXPECT_TRUE(s.empty());
+}
+
+TEST(SpanConstructor, ConstConversion)
+{
+    std::array arr{ 1, 2, 3 };
+    const utils::span mutable_s(arr);
+    const utils::span const_s(mutable_s);
+    EXPECT_EQ(const_s.size(), 3);
+    EXPECT_EQ(const_s[0], 1);
+    EXPECT_EQ(const_s[2], 3);
+}
+
+TEST(SpanCopy, CopyConstructor)
+{
+    std::array arr{ 1, 2, 3 };
+    const utils::span s1(arr);
+    const utils::span s2(s1);
+    EXPECT_EQ(s1.size(), s2.size());
+    EXPECT_EQ(s1.data(), s2.data());
+    EXPECT_EQ(s2[1], 2);
+}
+
+TEST(SpanCopy, CopyAssignment)
+{
+    std::array arr{ 1, 2, 3 };
+    const utils::span s1(arr);
+    utils::span<int> s2;
+    s2 = s1;
+    EXPECT_EQ(s1.size(), s2.size());
+    EXPECT_EQ(s1.data(), s2.data());
+    EXPECT_EQ(s2[0], 1);
+}
+
+TEST(SpanBytes, AsBytesFixedExtent)
+{
+    const std::array arr{ 0x01020304 };
+    const utils::span<const int, 1> s(arr);
+    auto bytes = utils::as_bytes(s);
+    EXPECT_EQ(bytes.size(), sizeof(int));
+    static_assert(decltype(bytes)::extent == sizeof(int));
 }
