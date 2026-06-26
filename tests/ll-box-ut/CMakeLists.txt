@@ -1,7 +1,8 @@
 include(GoogleTest)
 
 set(linyaps-box_UNIT_TESTS ll-box-ut)
-set(linyaps-box_UNIT_TESTS_SOURCE ./src/test.cpp ./src/semver_test.cpp)
+set(linyaps-box_UNIT_TESTS_SOURCE ./src/test.cpp ./src/semver_test.cpp
+                                  ./src/span_test.cpp)
 set(linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
 set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
