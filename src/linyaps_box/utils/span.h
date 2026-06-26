@@ -4,7 +4,7 @@
 
 #pragma once
 
-// from stdc++20's std::span, compatible with c++17
+// from STL std::span, compatible with c++17
 
 #include <array>
 #include <cassert>
@@ -16,9 +16,72 @@
 namespace linyaps_box::utils {
 
 namespace detail {
-// std::remove_cvref was introduced at c++20
 template <typename T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+template <typename T>
+struct type_identity
+{
+    using type = T;
+};
+
+template <typename T>
+using type_identity_t = typename type_identity<T>::type;
+
+template <typename To, typename From>
+using is_array_convertible = std::is_convertible<From (*)[], To (*)[]>;
+
+template <typename To, typename From>
+inline constexpr bool is_array_convertible_v = is_array_convertible<To, From>::value;
+
+template <typename T>
+constexpr T *to_address(T *p) noexcept
+{
+    return p;
+}
+
+template <typename Ptr, typename = void>
+struct has_pointer_traits_to_address : std::false_type
+{
+};
+
+template <typename Ptr>
+struct has_pointer_traits_to_address<
+  Ptr,
+  std::void_t<decltype(std::pointer_traits<Ptr>::to_address(std::declval<const Ptr &>()))>>
+    : std::true_type
+{
+};
+
+template <typename Ptr>
+constexpr auto to_address(const Ptr &p) noexcept
+{
+    if constexpr (has_pointer_traits_to_address<Ptr>::value) {
+        return std::pointer_traits<Ptr>::to_address(p);
+    } else {
+        return to_address(p.operator->());
+    }
+}
+
+template <typename It, typename T, typename = void>
+struct is_span_compatible_iter : std::false_type
+{
+};
+
+template <typename It, typename T>
+struct is_span_compatible_iter<It,
+                               T,
+                               std::void_t<decltype(*std::declval<It &>()),
+                                           decltype(std::declval<It &>() - std::declval<It &>()),
+                                           decltype(detail::to_address(std::declval<It &>()))>>
+    : std::conjunction<
+        is_array_convertible<T, std::remove_reference_t<decltype(*std::declval<It &>())>>,
+        std::is_convertible<decltype(detail::to_address(std::declval<It &>())), T *>>
+{
+};
+
+template <typename It, typename T>
+inline constexpr bool is_span_compatible_iter_v = is_span_compatible_iter<It, T>::value;
 
 struct view_base
 {
@@ -57,8 +120,7 @@ struct is_compatible_container<Container,
                                T,
                                std::void_t<decltype(std::declval<Container &>().data()),
                                            decltype(std::declval<Container &>().size())>>
-    : std::is_convertible<std::remove_pointer_t<decltype(std::declval<Container &>().data())> (*)[],
-                          T (*)[]>
+    : is_array_convertible<T, std::remove_pointer_t<decltype(std::declval<Container &>().data())>>
 {
 };
 
@@ -160,24 +222,78 @@ public:
     {
     }
 
+    template <std::size_t E = Extent, std::enable_if_t<E == dynamic_extent> * = nullptr>
     constexpr span(pointer ptr, size_type count) noexcept
         : storage_(ptr, count)
     {
-        if constexpr (Extent != dynamic_extent) {
-            assert(count == Extent);
-        }
     }
 
+    template <std::size_t E = Extent, std::enable_if_t<E != dynamic_extent> * = nullptr>
+    constexpr explicit span(pointer ptr, size_type count) noexcept
+        : storage_(ptr, count)
+    {
+        assert(count == E);
+    }
+
+    template <std::size_t E = Extent, std::enable_if_t<E == dynamic_extent> * = nullptr>
     constexpr span(pointer first, pointer last) noexcept
         : storage_(first, static_cast<size_type>(last - first))
     {
-        if constexpr (Extent != dynamic_extent) {
-            assert(static_cast<size_type>(last - first) == Extent);
-        }
+    }
+
+    template <std::size_t E = Extent, std::enable_if_t<E != dynamic_extent> * = nullptr>
+    constexpr explicit span(pointer first, pointer last) noexcept
+        : storage_(first, static_cast<size_type>(last - first))
+    {
+        assert(static_cast<size_type>(last - first) == E);
+    }
+
+    // (It, count) for dynamic extent — implicit
+    template <
+      typename It,
+      std::size_t E = Extent,
+      std::enable_if_t<E == dynamic_extent && detail::is_span_compatible_iter_v<It, T>> * = nullptr>
+    constexpr span(It first, size_type count) noexcept
+        : storage_(detail::to_address(first), count)
+    {
+    }
+
+    // (It, count) for fixed extent — explicit
+    template <
+      typename It,
+      std::size_t E = Extent,
+      std::enable_if_t<E != dynamic_extent && detail::is_span_compatible_iter_v<It, T>> * = nullptr>
+    constexpr explicit span(It first, size_type count) noexcept
+        : storage_(detail::to_address(first), count)
+    {
+        assert(count == E);
+    }
+
+    // (It, End) for dynamic extent — implicit
+    template <typename It,
+              typename End,
+              std::size_t E = Extent,
+              std::enable_if_t<E == dynamic_extent && !std::is_convertible_v<End, size_type>
+                               && detail::is_span_compatible_iter_v<It, T>> * = nullptr>
+    constexpr span(It first, End last) noexcept
+        : storage_(detail::to_address(first), static_cast<size_type>(last - first))
+    {
+    }
+
+    // (It, End) for fixed extent — explicit
+    template <typename It,
+              typename End,
+              std::size_t E = Extent,
+              std::enable_if_t<E != dynamic_extent && !std::is_convertible_v<End, size_type>
+                               && detail::is_span_compatible_iter_v<It, T>> * = nullptr>
+    constexpr explicit span(It first, End last) noexcept
+        : storage_(detail::to_address(first), static_cast<size_type>(last - first))
+    {
+        assert(static_cast<size_type>(last - first) == E);
     }
 
     template <std::size_t N, typename = std::enable_if_t<Extent == dynamic_extent || Extent == N>>
-    constexpr explicit span(T (&arr)[N]) noexcept
+    constexpr span(detail::type_identity_t<element_type> (&arr)[N]) noexcept
         : storage_(arr, N)
     {
     }
@@ -185,8 +301,8 @@ public:
     template <typename U,
               std::size_t N,
               typename = std::enable_if_t<(Extent == dynamic_extent || Extent == N)
-                                          && std::is_convertible_v<U (*)[], T (*)[]>>>
-    constexpr explicit span(std::array<U, N> &arr) noexcept
+                                          && detail::is_array_convertible_v<T, U>>>
+    constexpr span(std::array<U, N> &arr) noexcept
         : storage_(arr.data(), N)
     {
     }
@@ -194,38 +310,61 @@ public:
     template <typename U,
               std::size_t N,
               typename = std::enable_if_t<(Extent == dynamic_extent || Extent == N)
-                                          && std::is_convertible_v<const U (*)[], T (*)[]>>>
-    constexpr explicit span(const std::array<U, N> &arr) noexcept
+                                          && detail::is_array_convertible_v<T, const U>>>
+    constexpr span(const std::array<U, N> &arr) noexcept
         : storage_(arr.data(), N)
     {
     }
 
-    template <
-      typename Container,
-      typename = std::enable_if_t<!std::is_same_v<detail::remove_cvref_t<Container>, span>
-                                  && !std::is_array_v<std::remove_reference_t<Container>>
-                                  && detail::is_compatible_container<Container, T>::value
-                                  && (std::is_lvalue_reference_v<Container>
-                                      || detail::is_view_v<detail::remove_cvref_t<Container>>)>>
+    template <typename Container,
+              std::enable_if_t<!std::is_same_v<detail::remove_cvref_t<Container>, span>
+                               && !std::is_array_v<std::remove_reference_t<Container>>
+                               && detail::is_compatible_container<Container, T>::value
+                               && (std::is_lvalue_reference_v<Container>
+                                   || detail::is_view_v<detail::remove_cvref_t<Container>>)
+                               && Extent == dynamic_extent> * = nullptr>
+    constexpr span(Container &&cont)
+        : storage_(std::forward<Container>(cont).data(), std::forward<Container>(cont).size())
+    {
+    }
+
+    template <typename Container,
+              std::enable_if_t<!std::is_same_v<detail::remove_cvref_t<Container>, span>
+                               && !std::is_array_v<std::remove_reference_t<Container>>
+                               && detail::is_compatible_container<Container, T>::value
+                               && (std::is_lvalue_reference_v<Container>
+                                   || detail::is_view_v<detail::remove_cvref_t<Container>>)
+                               && Extent != dynamic_extent> * = nullptr>
     constexpr explicit span(Container &&cont)
         : storage_(std::forward<Container>(cont).data(), std::forward<Container>(cont).size())
     {
-        if constexpr (Extent != dynamic_extent) {
-            assert(cont.size() == Extent);
-        }
+        assert(cont.size() == Extent);
     }
 
     template <typename U,
               std::size_t OtherExtent,
-              typename = std::enable_if_t<(Extent == dynamic_extent || OtherExtent == dynamic_extent
-                                           || Extent == OtherExtent)
-                                          && std::is_convertible_v<U (*)[], T (*)[]>>>
-    constexpr explicit span(const span<U, OtherExtent> &other) noexcept
+              std::enable_if_t<
+                (Extent == dynamic_extent || OtherExtent == dynamic_extent || Extent == OtherExtent)
+                && detail::is_array_convertible_v<T, U>
+                && (Extent == dynamic_extent || OtherExtent != dynamic_extent)> * = nullptr>
+    constexpr span(const span<U, OtherExtent> &other) noexcept
         : storage_(other.data(), other.size())
     {
         if constexpr (Extent != dynamic_extent) {
             assert(other.size() == Extent);
         }
+    }
+
+    template <typename U,
+              std::size_t OtherExtent,
+              std::enable_if_t<
+                (Extent == dynamic_extent || OtherExtent == dynamic_extent || Extent == OtherExtent)
+                && detail::is_array_convertible_v<T, U>
+                && (Extent != dynamic_extent && OtherExtent == dynamic_extent)> * = nullptr>
+    constexpr explicit span(const span<U, OtherExtent> &other) noexcept
+        : storage_(other.data(), other.size())
+    {
+        assert(other.size() == Extent);
     }
 
     ~span() = default;
@@ -366,5 +505,38 @@ public:
 private:
     span_storage<T, Extent> storage_;
 };
+
+template <typename T, std::size_t N>
+span(T (&)[N]) -> span<T, N>;
+
+template <typename T, std::size_t N>
+span(std::array<T, N> &) -> span<T, N>;
+
+template <typename T, std::size_t N>
+span(const std::array<T, N> &) -> span<const T, N>;
+
+template <typename It>
+span(It, std::size_t) -> span<std::remove_reference_t<decltype(*std::declval<It &>())>>;
+
+template <typename It, typename End>
+span(It, End) -> span<std::remove_reference_t<decltype(*std::declval<It &>())>>;
+
+template <typename T, std::size_t Extent, std::enable_if_t<!std::is_volatile_v<T>, int> = 0>
+[[nodiscard]] constexpr auto as_bytes(span<T, Extent> s) noexcept
+{
+    using ReturnType =
+      span<const std::byte, Extent == dynamic_extent ? dynamic_extent : Extent * sizeof(T)>;
+    return ReturnType(reinterpret_cast<const std::byte *>(s.data()), s.size_bytes());
+}
+
+template <typename T,
+          std::size_t Extent,
+          std::enable_if_t<!std::is_const_v<T> && !std::is_volatile_v<T>, int> = 0>
+[[nodiscard]] constexpr auto as_writable_bytes(span<T, Extent> s) noexcept
+{
+    using ReturnType =
+      span<std::byte, Extent == dynamic_extent ? dynamic_extent : Extent * sizeof(T)>;
+    return ReturnType(reinterpret_cast<std::byte *>(s.data()), s.size_bytes());
+}
 
 } // namespace linyaps_box::utils
