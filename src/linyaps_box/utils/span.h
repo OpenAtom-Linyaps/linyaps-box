@@ -83,6 +83,47 @@ struct is_span_compatible_iter<It,
 template <typename It, typename T>
 inline constexpr bool is_span_compatible_iter_v = is_span_compatible_iter<It, T>::value;
 
+template <typename It, typename = void>
+struct is_contiguous_iterator : std::false_type
+{
+};
+
+template <typename It>
+struct is_contiguous_iterator<It,
+                              std::void_t<decltype(*std::declval<It &>()),
+                                          decltype(std::declval<It &>() - std::declval<It &>()),
+                                          decltype(detail::to_address(std::declval<It &>()))>>
+    : std::true_type
+{
+};
+
+template <typename It>
+inline constexpr bool is_contiguous_iterator_v = is_contiguous_iterator<It>::value;
+
+template <typename It, typename = void>
+struct has_data_and_size : std::false_type
+{
+};
+
+template <typename It>
+struct has_data_and_size<
+  It,
+  std::void_t<decltype(std::data(std::declval<It &>())), decltype(std::size(std::declval<It &>()))>>
+    : std::true_type
+{
+};
+
+template <typename It>
+inline constexpr bool has_data_and_size_v = has_data_and_size<It>::value;
+
+template <typename It>
+constexpr auto span_to_address(It &&it) noexcept
+{
+    static_assert(is_contiguous_iterator_v<std::decay_t<It>>,
+                  "span: It must be a contiguous iterator");
+    return detail::to_address(std::forward<It>(it));
+}
+
 struct view_base
 {
 };
@@ -118,9 +159,10 @@ struct is_compatible_container : std::false_type
 template <typename Container, typename T>
 struct is_compatible_container<Container,
                                T,
-                               std::void_t<decltype(std::declval<Container &>().data()),
-                                           decltype(std::declval<Container &>().size())>>
-    : is_array_convertible<T, std::remove_pointer_t<decltype(std::declval<Container &>().data())>>
+                               std::void_t<decltype(std::data(std::declval<Container &>())),
+                                           decltype(std::size(std::declval<Container &>()))>>
+    : is_array_convertible<T,
+                           std::remove_pointer_t<decltype(std::data(std::declval<Container &>()))>>
 {
 };
 
@@ -178,15 +220,6 @@ template <typename T, std::size_t Extent>
 class span : public detail::view_base
 {
 private:
-    struct internal_static_construct_tag
-    {
-    };
-
-    constexpr span(T *ptr, [[maybe_unused]] internal_static_construct_tag tag) noexcept
-        : storage_(ptr, Extent)
-    {
-    }
-
     template <std::size_t Offset, std::size_t Count>
     static constexpr std::size_t subspan_extent()
     {
@@ -202,13 +235,12 @@ private:
 public:
     using element_type = T;
     using value_type = std::remove_cv_t<T>;
-    using pointer = T *;
-    using const_pointer = const T *;
-    using reference = T &;
-    using const_reference = const T &;
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
-
+    using pointer = element_type *;
+    using const_pointer = const element_type *;
+    using reference = element_type &;
+    using const_reference = const element_type &;
     using iterator = T *;
     using const_iterator = const T *;
     using reverse_iterator = std::reverse_iterator<iterator>;
@@ -226,119 +258,169 @@ public:
     constexpr span(pointer ptr, size_type count) noexcept
         : storage_(ptr, count)
     {
+        assert((count == 0 || ptr != nullptr) && "span: null pointer with non-zero count");
     }
 
     template <std::size_t E = Extent, std::enable_if_t<E != dynamic_extent> * = nullptr>
     constexpr explicit span(pointer ptr, size_type count) noexcept
         : storage_(ptr, count)
     {
-        assert(count == E);
+        assert(count == E && "span: size mismatch for fixed-extent span");
+        assert((count == 0 || ptr != nullptr) && "span: null pointer with non-zero count");
     }
 
     template <std::size_t E = Extent, std::enable_if_t<E == dynamic_extent> * = nullptr>
     constexpr span(pointer first, pointer last) noexcept
         : storage_(first, static_cast<size_type>(last - first))
     {
+        assert(first <= last && "span: (first,last) last precedes first");
     }
 
     template <std::size_t E = Extent, std::enable_if_t<E != dynamic_extent> * = nullptr>
     constexpr explicit span(pointer first, pointer last) noexcept
         : storage_(first, static_cast<size_type>(last - first))
     {
-        assert(static_cast<size_type>(last - first) == E);
+        assert(first <= last && "span: (first,last) last precedes first");
+        assert(static_cast<size_type>(last - first) == E
+               && "span: size mismatch for fixed-extent span");
     }
 
     // (It, count) for dynamic extent — implicit
-    template <
-      typename It,
-      std::size_t E = Extent,
-      std::enable_if_t<E == dynamic_extent && detail::is_span_compatible_iter_v<It, T>> * = nullptr>
+    template <typename It,
+              std::size_t E = Extent,
+              std::enable_if_t<E == dynamic_extent> * = nullptr>
     constexpr span(It first, size_type count) noexcept
-        : storage_(detail::to_address(first), count)
+        : storage_(detail::span_to_address(first), count)
     {
+        static_assert(
+          detail::is_array_convertible_v<T,
+                                         std::remove_reference_t<decltype(*std::declval<It &>())>>,
+          "span: iterator value type is not compatible");
+        static_assert(
+          std::is_convertible_v<decltype(detail::to_address(std::declval<It &>())), T *>,
+          "span: iterator to_address result is not convertible to span pointer");
+        assert((count == 0 || detail::to_address(first) != nullptr)
+               && "span: null pointer with non-zero count");
     }
 
     // (It, count) for fixed extent — explicit
-    template <
-      typename It,
-      std::size_t E = Extent,
-      std::enable_if_t<E != dynamic_extent && detail::is_span_compatible_iter_v<It, T>> * = nullptr>
+    template <typename It,
+              std::size_t E = Extent,
+              std::enable_if_t<E != dynamic_extent> * = nullptr>
     constexpr explicit span(It first, size_type count) noexcept
-        : storage_(detail::to_address(first), count)
+        : storage_(detail::span_to_address(first), count)
     {
-        assert(count == E);
+        static_assert(
+          detail::is_array_convertible_v<T,
+                                         std::remove_reference_t<decltype(*std::declval<It &>())>>,
+          "span: iterator value type is not compatible");
+        static_assert(
+          std::is_convertible_v<decltype(detail::to_address(std::declval<It &>())), T *>,
+          "span: iterator to_address result is not convertible to span pointer");
+        assert(count == E && "span: size mismatch for fixed-extent span");
+        assert((count == 0 || detail::to_address(first) != nullptr)
+               && "span: null pointer with non-zero count");
     }
 
     // (It, End) for dynamic extent — implicit
-    template <typename It,
-              typename End,
-              std::size_t E = Extent,
-              std::enable_if_t<E == dynamic_extent && !std::is_convertible_v<End, size_type>
-                               && detail::is_span_compatible_iter_v<It, T>> * = nullptr>
-    constexpr span(It first, End last) noexcept
-        : storage_(detail::to_address(first), static_cast<size_type>(last - first))
+    template <
+      typename It,
+      typename End,
+      std::size_t E = Extent,
+      std::enable_if_t<E == dynamic_extent && !std::is_convertible_v<End, size_type>> * = nullptr>
+    constexpr span(It first, End last) noexcept(noexcept(last - first))
+        : storage_(detail::span_to_address(first), static_cast<size_type>(last - first))
     {
+        static_assert(
+          detail::is_array_convertible_v<T,
+                                         std::remove_reference_t<decltype(*std::declval<It &>())>>,
+          "span: iterator value type is not compatible");
+        static_assert(
+          std::is_convertible_v<decltype(detail::to_address(std::declval<It &>())), T *>,
+          "span: iterator to_address result is not convertible to span pointer");
+        assert((last - first >= 0) && "span: (It,End) last precedes first");
     }
 
     // (It, End) for fixed extent — explicit
-    template <typename It,
-              typename End,
-              std::size_t E = Extent,
-              std::enable_if_t<E != dynamic_extent && !std::is_convertible_v<End, size_type>
-                               && detail::is_span_compatible_iter_v<It, T>> * = nullptr>
-    constexpr explicit span(It first, End last) noexcept
-        : storage_(detail::to_address(first), static_cast<size_type>(last - first))
+    template <
+      typename It,
+      typename End,
+      std::size_t E = Extent,
+      std::enable_if_t<E != dynamic_extent && !std::is_convertible_v<End, size_type>> * = nullptr>
+    constexpr explicit span(It first, End last) noexcept(noexcept(last - first))
+        : storage_(detail::span_to_address(first), static_cast<size_type>(last - first))
     {
-        assert(static_cast<size_type>(last - first) == E);
+        static_assert(
+          detail::is_array_convertible_v<T,
+                                         std::remove_reference_t<decltype(*std::declval<It &>())>>,
+          "span: iterator value type is not compatible");
+        static_assert(
+          std::is_convertible_v<decltype(detail::to_address(std::declval<It &>())), T *>,
+          "span: iterator to_address result is not convertible to span pointer");
+        assert((last - first >= 0) && "span: (It,End) last precedes first");
+        assert(static_cast<size_type>(last - first) == E
+               && "span: size mismatch for fixed-extent span");
     }
 
-    template <std::size_t N, typename = std::enable_if_t<Extent == dynamic_extent || Extent == N>>
+    template <std::size_t N>
     constexpr span(detail::type_identity_t<element_type> (&arr)[N]) noexcept
         : storage_(arr, N)
     {
+        static_assert(Extent == dynamic_extent || Extent == N,
+                      "span: array size does not match fixed extent");
     }
 
     template <typename U,
               std::size_t N,
-              typename = std::enable_if_t<(Extent == dynamic_extent || Extent == N)
-                                          && detail::is_array_convertible_v<T, U>>>
+              typename = std::enable_if_t<Extent == dynamic_extent || Extent == N>>
     constexpr span(std::array<U, N> &arr) noexcept
         : storage_(arr.data(), N)
     {
+        static_assert(detail::is_array_convertible_v<T, U>,
+                      "span: array element type is not compatible");
     }
 
     template <typename U,
               std::size_t N,
-              typename = std::enable_if_t<(Extent == dynamic_extent || Extent == N)
-                                          && detail::is_array_convertible_v<T, const U>>>
+              typename = std::enable_if_t<Extent == dynamic_extent || Extent == N>>
     constexpr span(const std::array<U, N> &arr) noexcept
         : storage_(arr.data(), N)
     {
+        static_assert(detail::is_array_convertible_v<T, const U>,
+                      "span: array element type is not compatible");
     }
 
     template <typename Container,
               std::enable_if_t<!std::is_same_v<detail::remove_cvref_t<Container>, span>
                                && !std::is_array_v<std::remove_reference_t<Container>>
-                               && detail::is_compatible_container<Container, T>::value
+                               && detail::has_data_and_size_v<Container>
                                && (std::is_lvalue_reference_v<Container>
                                    || detail::is_view_v<detail::remove_cvref_t<Container>>)
                                && Extent == dynamic_extent> * = nullptr>
     constexpr span(Container &&cont)
         : storage_(std::forward<Container>(cont).data(), std::forward<Container>(cont).size())
     {
+        static_assert(detail::is_array_convertible_v<
+                        T,
+                        std::remove_pointer_t<decltype(std::data(std::declval<Container &>()))>>,
+                      "span: container element type is not compatible");
     }
 
     template <typename Container,
               std::enable_if_t<!std::is_same_v<detail::remove_cvref_t<Container>, span>
                                && !std::is_array_v<std::remove_reference_t<Container>>
-                               && detail::is_compatible_container<Container, T>::value
+                               && detail::has_data_and_size_v<Container>
                                && (std::is_lvalue_reference_v<Container>
                                    || detail::is_view_v<detail::remove_cvref_t<Container>>)
                                && Extent != dynamic_extent> * = nullptr>
     constexpr explicit span(Container &&cont)
         : storage_(std::forward<Container>(cont).data(), std::forward<Container>(cont).size())
     {
-        assert(cont.size() == Extent);
+        static_assert(detail::is_array_convertible_v<
+                        T,
+                        std::remove_pointer_t<decltype(std::data(std::declval<Container &>()))>>,
+                      "span: container element type is not compatible");
+        assert(cont.size() == Extent && "span: container size mismatch for fixed-extent span");
     }
 
     template <typename U,
@@ -351,7 +433,7 @@ public:
         : storage_(other.data(), other.size())
     {
         if constexpr (Extent != dynamic_extent) {
-            assert(other.size() == Extent);
+            assert(other.size() == Extent && "span: span size mismatch for fixed-extent span");
         }
     }
 
@@ -364,7 +446,7 @@ public:
     constexpr explicit span(const span<U, OtherExtent> &other) noexcept
         : storage_(other.data(), other.size())
     {
-        assert(other.size() == Extent);
+        assert(other.size() == Extent && "span: span size mismatch for fixed-extent span");
     }
 
     ~span() = default;
@@ -386,7 +468,7 @@ public:
 
     [[nodiscard]] constexpr reference operator[](size_type idx) const noexcept
     {
-        assert(idx < size());
+        assert(idx < size() && "span: index out of range");
         return data()[idx];
     }
 
@@ -400,13 +482,13 @@ public:
 
     [[nodiscard]] constexpr reference front() const noexcept
     {
-        assert(!empty());
+        assert(!empty() && "span: front() called on empty span");
         return data()[0];
     }
 
     [[nodiscard]] constexpr reference back() const noexcept
     {
-        assert(!empty());
+        assert(!empty() && "span: back() called on empty span");
         return data()[size() - 1];
     }
 
@@ -428,28 +510,38 @@ public:
         return reverse_iterator(begin());
     }
 
+    [[nodiscard]] constexpr const_reverse_iterator crbegin() const noexcept
+    {
+        return const_reverse_iterator(end());
+    }
+
+    [[nodiscard]] constexpr const_reverse_iterator crend() const noexcept
+    {
+        return const_reverse_iterator(begin());
+    }
+
     template <std::size_t Count>
     [[nodiscard]] constexpr span<element_type, Count> first() const noexcept
     {
         if constexpr (Extent == dynamic_extent) {
-            assert(Count <= size());
+            assert(Count <= size() && "span::first<Count>(): Count out of range");
         } else {
             static_assert(Count <= Extent, "Count out of bounds in span::first()");
         }
 
-        return { data(), internal_static_construct_tag{ } };
+        return span<element_type, Count>(data(), Count);
     }
 
     template <std::size_t Count>
     [[nodiscard]] constexpr span<element_type, Count> last() const noexcept
     {
         if constexpr (Extent == dynamic_extent) {
-            assert(Count <= size());
+            assert(Count <= size() && "span::last<Count>(): Count out of range");
         } else {
             static_assert(Count <= Extent, "Count out of bounds in span::last()");
         }
 
-        return { data() + (size() - Count), internal_static_construct_tag{ } };
+        return span<element_type, Count>(data() + (size() - Count), Count);
     }
 
     template <std::size_t Offset, std::size_t Count = dynamic_extent>
@@ -457,7 +549,7 @@ public:
       -> span<element_type, subspan_extent<Offset, Count>()>
     {
         if constexpr (Extent == dynamic_extent) {
-            assert(Offset <= size());
+            assert(Offset <= size() && "span::subspan<Offset,Count>(): Offset out of range");
         } else {
             static_assert(Offset <= Extent, "Offset out of bounds in span::subspan()");
         }
@@ -466,13 +558,14 @@ public:
 
         if constexpr (E != dynamic_extent) {
             if constexpr (Extent == dynamic_extent && Count != dynamic_extent) {
-                assert(Count <= (size() - Offset));
+                assert(Count <= (size() - Offset)
+                       && "span::subspan<Offset,Count>(): Count out of range");
             } else if constexpr (Extent != dynamic_extent) {
                 static_assert(Count == dynamic_extent || Count <= (Extent - Offset),
                               "Count out of bounds");
             }
 
-            return { data() + Offset, internal_static_construct_tag{ } };
+            return span<element_type, E>(data() + Offset, E);
         } else {
             return { data() + Offset, Count == dynamic_extent ? size() - Offset : Count };
         }
@@ -480,25 +573,25 @@ public:
 
     [[nodiscard]] constexpr span<element_type, dynamic_extent> first(size_type count) const noexcept
     {
-        assert(count <= size());
+        assert(count <= size() && "span::first(count): count out of range");
         return { data(), count };
     }
 
     [[nodiscard]] constexpr span<element_type, dynamic_extent> last(size_type count) const noexcept
     {
-        assert(count <= size());
+        assert(count <= size() && "span::last(count): count out of range");
         return { data() + (size() - count), count };
     }
 
     [[nodiscard]] constexpr span<element_type, dynamic_extent>
     subspan(size_type offset, size_type count = dynamic_extent) const noexcept
     {
-        assert(offset <= size());
+        assert(offset <= size() && "span::subspan(offset,count): offset out of range");
         if (count == dynamic_extent) {
             return { data() + offset, size() - offset };
         }
 
-        assert(offset + count <= size());
+        assert(count <= size() - offset && "span::subspan(offset,count): count out of range");
         return { data() + offset, count };
     }
 
@@ -520,6 +613,9 @@ span(It, std::size_t) -> span<std::remove_reference_t<decltype(*std::declval<It 
 
 template <typename It, typename End>
 span(It, End) -> span<std::remove_reference_t<decltype(*std::declval<It &>())>>;
+
+template <typename Container>
+span(Container &&) -> span<std::remove_pointer_t<decltype(std::data(std::declval<Container &>()))>>;
 
 template <typename T, std::size_t Extent, std::enable_if_t<!std::is_volatile_v<T>, int> = 0>
 [[nodiscard]] constexpr auto as_bytes(span<T, Extent> s) noexcept
