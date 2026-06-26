@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstddef>
 #include <iterator>
+#include <stdexcept>
 #include <type_traits>
 
 namespace linyaps_box::utils {
@@ -247,6 +248,14 @@ public:
     [[nodiscard]] constexpr reference operator[](size_type idx) const noexcept
     {
         assert(idx < size());
+        return data()[idx];
+    }
+
+    [[nodiscard]] constexpr reference at(size_type idx) const
+    {
+        if (idx >= size()) {
+            throw std::out_of_range("span::at: index out of range");
+        }
         return data()[idx];
     }
 
