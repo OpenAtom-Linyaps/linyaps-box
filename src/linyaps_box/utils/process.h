@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include "utils.h"
-
+#include <fmt/ranges.h>
 #include <sys/prctl.h>
 
 #include <cstdint>
@@ -33,11 +32,9 @@ template <typename... Args>
 {
     auto ret = ::prctl(option, std::forward<Args>(args)...);
     if (ret < 0) {
-        auto msg = "prctl op " + std::to_string(option) + " with args: [";
-
-        bool first = true;
-        ((msg += (first ? "" : ", ") + stringify_arg(args), first = false), ...);
-        msg.push_back(']');
+        auto msg = fmt::format("prctl op {} with args: [{}]",
+                               option,
+                               fmt::join(std::forward_as_tuple(std::forward<Args>(args)...), ", "));
 
         throw std::system_error(errno, std::system_category(), msg);
     }
