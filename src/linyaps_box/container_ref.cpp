@@ -5,6 +5,7 @@
 #include "linyaps_box/container_ref.h"
 
 #include "linyaps_box/container_monitor.h"
+#include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/defer.h"
@@ -13,10 +14,11 @@
 #include "linyaps_box/utils/process.h"
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/setns.h"
+#include "linyaps_box/utils/utils.h"
 
 #include <algorithm>
+#include <cassert>
 #include <csignal> // IWYU pragma: keep
-#include <cstdint>
 #include <fstream>
 #include <limits>
 #include <utility>
@@ -29,17 +31,7 @@
 
 namespace {
 
-enum class SyncType : uint8_t {
-    GrandchildPid,
-    ConsoleFd,
-    Proceed,
-};
-
-struct SyncMessage
-{
-    SyncType type;
-    pid_t pid;
-};
+namespace protocol = linyaps_box::protocol;
 
 auto resolve_final_process(linyaps_box::exec_container_option &option,
                            const linyaps_box::oci_config &config)
@@ -105,23 +97,8 @@ auto resolve_final_process(linyaps_box::exec_container_option &option,
     return proc;
 }
 
-auto has_pid_namespace(const linyaps_box::oci_config &config) -> bool
-{
-    if (!config.linux || !config.linux->namespaces) {
-        return false;
-    }
-
-    return std::any_of(config.linux->namespaces->cbegin(),
-                       config.linux->namespaces->cend(),
-                       [](const auto &ns) {
-                           return ns.type_
-                             == linyaps_box::oci_config::linux_t::namespace_t::type::PID;
-                       });
-}
-
 void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
-                          linyaps_box::unix_socket &child_sock,
-                          const linyaps_box::exec_container_option &option)
+                          protocol::child_message_channel &sync)
 {
     if (!proc.terminal) {
         return;
@@ -134,12 +111,10 @@ void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
         slave.set_size({ proc.console_size->height, proc.console_size->width, 0, 0 });
     }
 
-    if (option.console_socket) {
-        option.console_socket->send_fd(std::move(master).take());
-    } else {
-        child_sock.send_msg_with_fd(std::move(master).take(),
-                                    SyncMessage{ SyncType::ConsoleFd, 0 });
-    }
+    auto console_fd = std::move(master).take();
+    std::vector<linyaps_box::utils::file_descriptor> fds;
+    fds.emplace_back(std::move(console_fd));
+    sync.send(protocol::msg::console_fd{ }, fds);
 }
 
 void child_apply_credentials(const linyaps_box::oci_config::process_t &proc)
@@ -326,99 +301,134 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
 [[noreturn]] void exec_child_process(pid_t target_pid,
                                      const linyaps_box::oci_config &config,
                                      const linyaps_box::oci_config::process_t &proc,
-                                     const linyaps_box::exec_container_option &option,
-                                     linyaps_box::unix_socket child_sock)
-try {
-    bool pid_ns{ false };
-    if (config.linux && config.linux->namespaces) {
-        linyaps_box::utils::join_container_namespaces(target_pid, *config.linux);
-        pid_ns = has_pid_namespace(config);
-    }
+                                     int preserve_fds,
+                                     linyaps_box::infra::unix_socket sync_sock)
+{
+    auto sync = protocol::child_message_channel(std::move(sync_sock));
 
-    // Double-fork for PID namespace
-    if (pid_ns) {
-        auto grandchild = ::fork();
-        if (grandchild < 0) {
-            _exit(EXIT_FAILURE);
+    try {
+        bool pid_ns{ false };
+        if (config.linux && config.linux->namespaces) {
+            linyaps_box::utils::join_container_namespaces(target_pid, *config.linux);
+            pid_ns = std::any_of(config.linux->namespaces->cbegin(),
+                                 config.linux->namespaces->cend(),
+                                 [](const auto &ns) {
+                                     return ns.type_
+                                       == linyaps_box::oci_config::linux_t::namespace_t::type::PID;
+                                 });
         }
 
-        if (grandchild > 0) {
-            child_sock.send_msg(SyncMessage{ SyncType::GrandchildPid, grandchild });
-            _exit(EXIT_SUCCESS);
+        if (pid_ns) {
+            auto grandchild = ::fork();
+            if (UNLIKELY(grandchild < 0)) {
+                throw std::system_error(errno, std::system_category(), "fork grandchild failed");
+            }
+
+            if (grandchild > 0) {
+                sync.send(protocol::msg::pid_report{ static_cast<pid_t>(grandchild) });
+                _exit(EXIT_SUCCESS);
+            }
+        } else {
+            sync.send(protocol::msg::pid_report{ ::getpid() });
         }
-    } else {
-        child_sock.send_msg(SyncMessage{ SyncType::GrandchildPid, ::getpid() });
-    }
 
-    linyaps_box::utils::setsid();
+        sync.wait_for_proceed();
 
-    child_setup_terminal(proc, child_sock, option);
+        linyaps_box::utils::setsid();
 
-    // Sync socket is no longer needed — close before fd cleanup and exec.
-    child_sock.close();
+        if (proc.terminal) {
+            child_setup_terminal(proc, sync);
+        }
 
-    child_apply_environment(proc, config);
+        child_apply_environment(proc, config);
 
-    child_apply_rlimits(proc);
+        child_apply_rlimits(proc);
 
-    linyaps_box::utils::close_range(3U + static_cast<unsigned>(option.preserve_fds),
-                                    std::numeric_limits<unsigned>::max(),
-                                    CLOSE_RANGE_CLOEXEC);
+        linyaps_box::utils::close_range(3U + static_cast<unsigned>(preserve_fds),
+                                        std::numeric_limits<unsigned>::max(),
+                                        CLOSE_RANGE_CLOEXEC);
 
-    child_apply_credentials(proc);
+        child_apply_credentials(proc);
 
-    if (proc.no_new_privileges) {
-        LINYAPS_BOX_DEBUG() << "Set no new privileges";
-        std::ignore = linyaps_box::utils::prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
-    }
+        if (proc.no_new_privileges) {
+            LINYAPS_BOX_DEBUG() << "Set no new privileges";
+            std::ignore = linyaps_box::utils::prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+        }
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
-    child_apply_capabilities(proc, config);
+        child_apply_capabilities(proc, config);
 #endif
 
-    std::vector<const char *> c_args;
-    c_args.reserve(proc.args.size() + 1);
-    for (const auto &arg : proc.args) {
-        c_args.push_back(arg.c_str());
-    }
-    c_args.push_back(nullptr);
-
-    std::vector<const char *> c_env;
-    if (proc.env) {
-        c_env.reserve(proc.env->size() + 1);
-        for (const auto &env : *proc.env) {
-            c_env.push_back(env.c_str());
+        std::vector<const char *> c_args;
+        c_args.reserve(proc.args.size() + 1);
+        for (const auto &arg : proc.args) {
+            c_args.push_back(arg.c_str());
         }
+        c_args.push_back(nullptr);
+
+        std::vector<const char *> c_env;
+        if (proc.env) {
+            c_env.reserve(proc.env->size() + 1);
+            for (const auto &env : *proc.env) {
+                c_env.push_back(env.c_str());
+            }
+        }
+        c_env.push_back(nullptr);
+
+        auto ret = ::chdir(proc.cwd.c_str());
+        if (UNLIKELY(ret != 0)) {
+            throw std::system_error(errno, std::system_category(), "chdir");
+        }
+
+        LINYAPS_BOX_DEBUG() << "exec command";
+
+        sync.send_stage(protocol::stage::type::exec_ready);
+
+        ::execvpe(c_args.at(0),
+                  const_cast<char *const *>(c_args.data()),
+                  const_cast<char *const *>(c_env.data()));
+
+        throw std::system_error(errno, std::system_category(), "execvpe");
+    } catch (const std::system_error &e) {
+        sync.report_error(e.code().value(), e.what());
+    } catch (const std::exception &e) {
+        sync.report_error(EIO, e.what());
+    } catch (...) {
+        sync.report_error(EINVAL, "unknown error");
     }
-    c_env.push_back(nullptr);
 
-    auto ret = ::chdir(proc.cwd.c_str());
-    if (ret != 0) {
-        throw std::system_error(errno, std::system_category(), "chdir");
-    }
-
-    LINYAPS_BOX_DEBUG() << "exec command";
-    ::execvpe(c_args.at(0),
-              const_cast<char *const *>(c_args.data()),
-              const_cast<char *const *>(c_env.data()));
-
-    throw std::system_error(errno, std::system_category(), "execvpe");
-} catch (const std::exception &e) {
-    LINYAPS_BOX_ERR() << "child process fatal error: " << e.what();
     _exit(EXIT_FAILURE);
 }
 
-auto exec_parent_process(linyaps_box::unix_socket &parent_sock,
-                         const linyaps_box::oci_config::process_t &proc,
-                         const linyaps_box::exec_container_option &option) -> int
+auto exec_parent_process(protocol::parent_message_channel sync,
+                         bool expect_console_fd,
+                         std::optional<linyaps_box::infra::unix_socket> external_console_socket)
+  -> int
 {
-    auto pid_msg = parent_sock.recv_msg<SyncMessage>();
-    if (pid_msg.type != SyncType::GrandchildPid) {
-        throw std::runtime_error("unexpected sync message type");
-    }
+    assert(!external_console_socket || expect_console_fd);
 
-    linyaps_box::container_monitor monitor{ pid_msg.pid };
+    auto inc = sync.recv();
+    pid_t pid{ };
+    std::visit(linyaps_box::utils::Overload{
+                 [&](const protocol::msg::pid_report &p) {
+                     pid = p.value;
+                 },
+                 [&](const protocol::msg::die &d) {
+                     throw std::system_error(d.errnum, std::system_category(), d.message);
+                 },
+                 [&](const auto &) {
+                     throw std::runtime_error("expected pid_report during exec");
+                 },
+               },
+               inc.body);
+
+    linyaps_box::container_monitor monitor{ pid };
     monitor.enable_signal_forwarding();
+
+    // Unblock the grandchild so it can proceed with terminal setup and exec.
+    // In the future, cgroup/scheduler setup with the real pid goes here,
+    // between pid_report and proceed.
+    sync.send(protocol::msg::proceed{ });
 
     auto in = linyaps_box::utils::file_descriptor{ STDIN_FILENO, false };
     auto out = linyaps_box::utils::file_descriptor{ STDOUT_FILENO, false };
@@ -442,20 +452,37 @@ auto exec_parent_process(linyaps_box::unix_socket &parent_sock,
         }
     });
 
-    if (proc.terminal && !option.console_socket) {
-        auto [msg, master_fd] = parent_sock.recv_msg_with_fd<SyncMessage>();
-        if (msg.type != SyncType::ConsoleFd) {
-            throw std::runtime_error("unexpected sync message type");
-        }
+    if (expect_console_fd) {
+        auto console_inc = sync.recv();
+        std::visit(linyaps_box::utils::Overload{
+                     [&](const protocol::msg::die &d) {
+                         throw std::system_error(d.errnum, std::system_category(), d.message);
+                     },
+                     [&](const protocol::msg::console_fd &) {
+                         auto fds = console_inc.take_fds();
+                         auto master_fd = std::move(fds.front());
 
-        in.set_nonblock(true);
-        out.set_nonblock(true);
-        changed = true;
+                         if (external_console_socket) {
+                             external_console_socket->send_fd(master_fd);
+                         } else {
+                             in.set_nonblock(true);
+                             out.set_nonblock(true);
+                             changed = true;
 
-        monitor.enable_io_forwarding(linyaps_box::terminal_master{ std::move(master_fd) }, in, out);
+                             monitor.enable_io_forwarding(
+                               linyaps_box::terminal_master{ std::move(master_fd) },
+                               in,
+                               out);
+                         }
+                     },
+                     [&](const auto &) {
+                         throw std::runtime_error("expected console_fd during exec");
+                     },
+                   },
+                   console_inc.body);
     }
 
-    parent_sock.close();
+    sync.wait_for_exec();
 
     return monitor.wait_container_exit();
 }
@@ -500,7 +527,7 @@ auto container_ref::exec(exec_container_option option) const -> int
     auto config = oci_config::parse(status_dir_.config());
     auto &proc = resolve_final_process(option, config);
 
-    auto [parent_sock, child_sock] = unix_socket::pair();
+    auto [raw_parent, raw_child] = infra::unix_socket::create_socketpair();
 
     auto child = ::fork();
     if (UNLIKELY(child < 0)) {
@@ -508,13 +535,17 @@ auto container_ref::exec(exec_container_option option) const -> int
     }
 
     if (child == 0) {
-        parent_sock.close();
-        exec_child_process(target_pid, config, proc, option, std::move(child_sock));
+        raw_parent.close();
+        option.console_socket.reset();
+
+        exec_child_process(target_pid, config, proc, option.preserve_fds, std::move(raw_child));
     }
 
-    child_sock.close();
-
-    return exec_parent_process(parent_sock, proc, option);
+    raw_child.close();
+    auto sync = protocol::parent_message_channel(std::move(raw_parent));
+    return exec_parent_process(std::move(sync),
+                               static_cast<bool>(proc.terminal),
+                               std::move(option.console_socket));
 }
 
 const status_directory &container_ref::status_dir() const

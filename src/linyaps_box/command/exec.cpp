@@ -6,6 +6,7 @@
 
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory_manager.h"
+#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <nlohmann/json.hpp>
@@ -55,7 +56,7 @@ try {
 
     auto needs_terminal = option.tty.value_or(false) || (option.proc && option.proc->terminal);
     if (needs_terminal && options.console_socket) {
-        option.console_socket = unix_socket::connect(*options.console_socket);
+        option.console_socket = infra::unix_socket::connect(*options.console_socket);
     }
 
 #ifdef LINYAPS_BOX_ENABLE_CAP

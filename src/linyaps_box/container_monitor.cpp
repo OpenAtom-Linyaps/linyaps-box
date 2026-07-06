@@ -144,7 +144,7 @@ auto container_monitor::handle_signals() -> void
     }
 }
 
-auto container_monitor::enable_io_forwarding(terminal_master master,
+auto container_monitor::enable_io_forwarding(terminal_master pty,
                                              const linyaps_box::utils::file_descriptor &in,
                                              const linyaps_box::utils::file_descriptor &out) -> void
 {
@@ -153,20 +153,20 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
         host_tty->set_raw();
     }
 
-    this->master = std::move(master);
+    master = std::move(pty);
 
     // Immediately propagate the host terminal size to the PTY master,
     // so the terminal inside the container starts with the right dimensions
     // even when the OCI config does not specify consoleSize.
-    if (host_tty && this->master) {
-        this->master->resize(host_tty->get_size());
+    if (host_tty && master) {
+        master->resize(host_tty->get_size());
     }
 
     // The PTY master fd is used bidirectionally: we write stdin into it AND
     // read its output back to stdout.  epoll needs two independent fd
     // registrations, so we duplicate the master fd here.
-    this->master->get().set_nonblock(true);
-    master_out = this->master.value().get().duplicate();
+    master->fd().set_nonblock(true);
+    master_out = master.value().fd().duplicate();
     master_out->set_nonblock(true);
 
     // Linux TTY buffer is hardcoded to 4K (N_TTY_BUF_SIZE). Using an 8K buffer
@@ -175,7 +175,7 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
     if (!child_exited) {
         in_fwd.emplace(epoll, buffer_size);
         in_fwd->set_src(in);
-        in_fwd->set_dst(this->master->get());
+        in_fwd->set_dst(master->fd());
     }
 
     out_fwd.emplace(epoll, buffer_size);
