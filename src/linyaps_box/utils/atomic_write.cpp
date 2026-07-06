@@ -24,6 +24,7 @@ void linyaps_box::utils::atomic_write(const std::filesystem::path &path, std::st
         }
     });
 
+    // FIXME: do not overwrite status file
     std::ofstream temp_file;
     temp_file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
     temp_file.open(temp_path);
