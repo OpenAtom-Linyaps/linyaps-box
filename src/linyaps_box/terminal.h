@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -30,9 +30,9 @@ public:
 
     [[nodiscard]] auto take() && -> utils::file_descriptor { return std::move(master_); }
 
-    [[nodiscard]] auto get() const & noexcept -> const utils::file_descriptor & { return master_; }
+    [[nodiscard]] auto fd() const & noexcept -> const utils::file_descriptor & { return master_; }
 
-    [[nodiscard]] auto get() & noexcept -> utils::file_descriptor & { return master_; }
+    [[nodiscard]] auto fd() & noexcept -> utils::file_descriptor & { return master_; }
 
     auto resize(struct winsize size) -> void;
 
@@ -62,10 +62,7 @@ public:
 
     [[nodiscard]] auto take() && -> utils::file_descriptor { return std::move(slave_); }
 
-    [[nodiscard]] auto file_describer() const & noexcept -> const utils::file_descriptor &
-    {
-        return slave_;
-    }
+    [[nodiscard]] auto fd() const & noexcept -> const utils::file_descriptor & { return slave_; }
 
     auto set_raw() -> void;
 

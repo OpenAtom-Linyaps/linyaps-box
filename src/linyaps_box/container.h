@@ -7,8 +7,8 @@
 #include "linyaps_box/cgroup_manager.h"
 #include "linyaps_box/config.h"
 #include "linyaps_box/container_ref.h"
+#include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/status_directory.h"
-#include "linyaps_box/unix_socket.h"
 #include "linyaps_box/utils/file_describer.h"
 
 namespace linyaps_box {
@@ -24,7 +24,7 @@ struct create_container_options_t
 struct run_container_options_t
 {
     int preserve_fds;
-    std::optional<unix_socket> console_socket;
+    std::optional<infra::unix_socket> console_socket;
 };
 
 class container final : public container_ref
