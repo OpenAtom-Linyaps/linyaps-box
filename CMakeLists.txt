@@ -175,6 +175,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/status_directory_manager.h
     src/linyaps_box/terminal.cpp
     src/linyaps_box/terminal.h
+    src/linyaps_box/os/socket.cpp
+    src/linyaps_box/os/socket.h
     src/linyaps_box/unix_socket.cpp
     src/linyaps_box/unix_socket.h
     src/linyaps_box/utils/atomic_write.cpp
