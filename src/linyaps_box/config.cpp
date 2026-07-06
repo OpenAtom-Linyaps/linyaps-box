@@ -1241,16 +1241,22 @@ void from_json(const nlohmann::json &j, oci_config::linux_t &v)
     if (auto it = j.find("rootfsPropagation"); it != j.end() && !it->is_null()) {
         auto prop_name = it->get<std::string_view>();
 
-        struct
+        struct propagation_entry_t
         {
-            const char *name;
+            std::string_view name;
             unsigned long value;
-        } const table[]{
-            { "private", MS_PRIVATE },       { "rprivate", MS_PRIVATE | MS_REC },
-            { "shared", MS_SHARED },         { "rshared", MS_SHARED | MS_REC },
-            { "slave", MS_SLAVE },           { "rslave", MS_SLAVE | MS_REC },
-            { "unbindable", MS_UNBINDABLE }, { "runbindable", MS_UNBINDABLE | MS_REC },
         };
+
+        const std::array<propagation_entry_t, 8> table{ {
+          { "private", MS_PRIVATE },
+          { "rprivate", MS_PRIVATE | MS_REC },
+          { "shared", MS_SHARED },
+          { "rshared", MS_SHARED | MS_REC },
+          { "slave", MS_SLAVE },
+          { "rslave", MS_SLAVE | MS_REC },
+          { "unbindable", MS_UNBINDABLE },
+          { "runbindable", MS_UNBINDABLE | MS_REC },
+        } };
 
         bool found = false;
         for (const auto &entry : table) {
@@ -1275,7 +1281,7 @@ void from_json(const nlohmann::json &j, oci_config::linux_t &v)
     if (auto it = j.find("timeOffsets"); it != j.end() && !it->is_null()) {
         auto &offsets = v.time_offsets.emplace();
         for (const auto &[clock_name, offset_json] : it->items()) {
-            auto [it, ignored] =
+            auto [iter, ignored] =
               offsets.try_emplace(clock_name,
                                   offset_json.get<oci_config::linux_t::time_offset_t>());
             if (UNLIKELY(!ignored)) {
