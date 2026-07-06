@@ -7,6 +7,7 @@
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <fmt/ranges.h>
 #include <sys/ioctl.h>
 
 namespace linyaps_box::utils {
@@ -18,10 +19,11 @@ template <typename... Args>
 {
     auto ret = ::ioctl(fd.get(), request, std::forward<Args>(args)...);
     if (ret != 0) {
-        auto msg =
-          "ioctl fd " + std::to_string(fd.get()) + ", request op " + std::to_string(request);
-        bool first = true;
-        ((msg += (first ? "" : ", ") + stringify_arg(args), first = false), ...);
+        auto msg = fmt::format("ioctl fd {}, request op {}, args: [", fd.get(), request);
+
+        bool first{ true };
+        (append_arg(msg, first, std::forward<Args>(args)), ...);
+
         msg.push_back(']');
 
         throw std::system_error(errno, std::system_category(), msg);
