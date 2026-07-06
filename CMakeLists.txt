@@ -165,10 +165,13 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/io/forwarder.h
     src/linyaps_box/printer.cpp
     src/linyaps_box/printer.h
+    src/linyaps_box/protocol/message.cpp
+    src/linyaps_box/protocol/message.h
+    src/linyaps_box/protocol/message_channel.cpp
+    src/linyaps_box/protocol/message_channel.h
+    src/linyaps_box/protocol/stage.h
     src/linyaps_box/runtime.cpp
     src/linyaps_box/runtime.h
-    src/linyaps_box/socket.cpp
-    src/linyaps_box/socket.h
     src/linyaps_box/status_directory.cpp
     src/linyaps_box/status_directory.h
     src/linyaps_box/status_directory_manager.cpp
@@ -177,8 +180,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/terminal.h
     src/linyaps_box/os/socket.cpp
     src/linyaps_box/os/socket.h
-    src/linyaps_box/unix_socket.cpp
-    src/linyaps_box/unix_socket.h
+    src/linyaps_box/infra/unix_socket.cpp
+    src/linyaps_box/infra/unix_socket.h
     src/linyaps_box/utils/atomic_write.cpp
     src/linyaps_box/utils/atomic_write.h
     src/linyaps_box/utils/cgroups.cpp
