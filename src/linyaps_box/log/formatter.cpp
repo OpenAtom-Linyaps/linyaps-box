@@ -115,7 +115,8 @@ auto log_context_to_json_string(const log_context &ctx) -> std::string
 void format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_style style)
 {
     // Format time into a local buffer first to avoid writing raw bytes to output
-    fmt::memory_buffer time_buf;
+    thread_local fmt::memory_buffer time_buf;
+    time_buf.clear();
     fmt::format_to(std::back_inserter(time_buf),
                    "{:%Y-%m-%dT%H:%M:%S}.{:09d}Z",
                    ctx.utc_tm(),
@@ -156,7 +157,7 @@ void format_log(fmt::memory_buffer &buf,
         format_text(buf, ctx, style);
         break;
     case output_format::json:
-        fmt::format_to(std::back_inserter(buf), "{}\n", log_context_to_json_string(ctx));
+        fmt::format_to(std::back_inserter(buf), "{}", log_context_to_json_string(ctx));
         break;
     }
 }

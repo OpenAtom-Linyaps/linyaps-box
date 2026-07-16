@@ -46,7 +46,8 @@ try {
         }
     }
 
-    fmt::memory_buffer buf;
+    thread_local fmt::memory_buffer buf;
+    buf.clear();
     format_log(buf, ctx, global_logger::instance().get_format(), style);
 
     auto bytes = utils::as_bytes(utils::span(buf.data(), buf.size()));
