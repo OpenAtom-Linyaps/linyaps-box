@@ -2587,6 +2587,13 @@ int linyaps_box::container::run(run_container_options_t options)
 
         container_process_exit_code = monitor->wait_container_exit();
 
+        {
+            auto status = this->status();
+            status.PID = child_pid;
+            status.status = container_status_t::runtime_status::STOPPED;
+            this->status_dir().write(status);
+        }
+
         runtime_ns::poststop_hooks(*this);
     } catch (const std::exception &e) {
         if (monitor) {
