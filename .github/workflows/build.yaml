@@ -19,18 +19,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build build-essential pkgconf libcap-dev \
-                                  libseccomp-dev nlohmann-json3-dev libcli11-dev libgtest-dev
+                                  libseccomp-dev nlohmann-json3-dev libcli11-dev libgtest-dev \
+                                  libsystemd-dev
 
-      - name: Configure CMake
-        env:
-          CXX: ${{ matrix.compiler.cxx }}
+      - name: Configure and Build Project
         run: |
-          cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -Dlinyaps-box_ENABLE_CPM=OFF \
-            -Dlinyaps-box_DEFAULT_LOG_LEVEL=7 \
-            -Dlinyaps-box_ACTIVE_LOG_LEVEL=7
-
-      - name: Build Project
-        run: |
-          cmake --build build --parallel $(nproc)
+          cmake --workflow --preset=ci
