@@ -45,7 +45,7 @@ auto make_log(log_lvl::level lvl = log_lvl::level::fatal,
 {
     return {
         lvl,
-        std::string{ message },
+        message,
         std::chrono::system_clock::time_point{
           std::chrono::duration_cast<std::chrono::system_clock::duration>(time) },
         pid,

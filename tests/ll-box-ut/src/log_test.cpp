@@ -23,19 +23,19 @@
 namespace {
 
 auto make_ctx(linyaps_box::log::level lvl = linyaps_box::log::level::error,
-              std::string msg = "test",
-              std::string file = "test.cpp",
-              std::string function = "fn",
+              std::string_view msg = "test",
+              std::string_view file = "test.cpp",
+              std::string_view function = "fn",
               int line = 1) -> linyaps_box::log::log_context
 {
     return { lvl,
-             std::move(msg),
+             msg,
              { },
              0,
              0,
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-             std::move(file),
-             std::move(function),
+             file,
+             function,
              line
 #endif
     };
@@ -525,21 +525,21 @@ TEST_F(LogFixture, ErrnoPropagationJson)
 
 auto make_ctx_with_time(std::chrono::system_clock::time_point tp,
                         linyaps_box::log::level lvl,
-                        std::string msg,
-                        [[maybe_unused]] std::string file = "test.cpp",
-                        [[maybe_unused]] std::string function = "fn",
+                        std::string_view msg,
+                        [[maybe_unused]] std::string_view file = "test.cpp",
+                        [[maybe_unused]] std::string_view function = "fn",
                         [[maybe_unused]] int line = 1,
                         int errno_val = 0) -> linyaps_box::log::log_context
 {
     linyaps_box::log::log_context ctx{ };
     ctx.lvl = lvl;
-    ctx.msg = std::move(msg);
+    ctx.msg = msg;
     ctx.wall_time = tp;
     ctx.pid = 0;
     ctx.errno_ = errno_val;
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    ctx.file = std::move(file);
-    ctx.function = std::move(function);
+    ctx.file = file;
+    ctx.function = function;
     ctx.line = line;
 #endif
     return ctx;
