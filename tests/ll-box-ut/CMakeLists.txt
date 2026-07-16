@@ -3,7 +3,7 @@ include(GoogleTest)
 set(linyaps-box_UNIT_TESTS ll-box-ut)
 set(linyaps-box_UNIT_TESTS_SOURCE
     ./src/test.cpp ./src/semver_test.cpp ./src/span_test.cpp
-    ./src/message_channel_test.cpp)
+    ./src/message_channel_test.cpp ./src/log_test.cpp)
 set(linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
 set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -21,12 +21,7 @@ add_executable("${linyaps-box_UNIT_TESTS}" ${linyaps-box_UNIT_TESTS_SOURCE})
 target_include_directories("${linyaps-box_UNIT_TESTS}"
                            ${linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS})
 target_link_libraries("${linyaps-box_UNIT_TESTS}"
-                      ${linyaps-box_UNIT_TESTS_LINK_LIBRARIES})
-target_compile_features("${linyaps-box_UNIT_TESTS}" PRIVATE cxx_std_17)
-set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD 17)
-set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_EXTENSIONS OFF)
-set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD_REQUIRED
-                                                         ON)
+                      PRIVATE ${linyaps-box_UNIT_TESTS_LINK_LIBRARIES})
 target_compile_options("${linyaps-box_UNIT_TESTS}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 

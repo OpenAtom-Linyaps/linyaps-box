@@ -68,40 +68,40 @@ TEST(Semver, ConstructFromString)
     EXPECT_EQ(v9.prerelease(), "alpha-.-beta");
 }
 
-TEST(SemverDeathTest, RejectsLeadingZeros)
+TEST(Semver, RejectsLeadingZeros)
 {
     EXPECT_THROW(semver::semver("01.2.3"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.02.3"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.2.03"), std::invalid_argument);
 }
 
-TEST(SemverDeathTest, RejectsNegativeNumbers)
+TEST(Semver, RejectsNegativeNumbers)
 {
     EXPECT_THROW(semver::semver("-1.2.3"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.-2.3"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.2.-3"), std::invalid_argument);
 }
 
-TEST(SemverDeathTest, RejectsMissingSegments)
+TEST(Semver, RejectsMissingSegments)
 {
     EXPECT_THROW(semver::semver("1.2"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1"), std::invalid_argument);
     EXPECT_THROW(semver::semver(""), std::invalid_argument);
 }
 
-TEST(SemverDeathTest, RejectsTrailingGarbage)
+TEST(Semver, RejectsTrailingGarbage)
 {
     EXPECT_THROW(semver::semver("1.2.3abc"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.2.3.4"), std::invalid_argument);
 }
 
-TEST(SemverDeathTest, RejectsEmptyTag)
+TEST(Semver, RejectsEmptyTag)
 {
     EXPECT_THROW(semver::semver("1.2.3-"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.2.3+"), std::invalid_argument);
 }
 
-TEST(SemverDeathTest, RejectsInvalidTagChars)
+TEST(Semver, RejectsInvalidTagChars)
 {
     EXPECT_THROW(semver::semver("1.2.3-alpha$"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.2.3-alpha space"), std::invalid_argument);
@@ -109,19 +109,19 @@ TEST(SemverDeathTest, RejectsInvalidTagChars)
     EXPECT_THROW(semver::semver("1.2.3+build$"), std::invalid_argument);
 }
 
-TEST(SemverDeathTest, RejectsNumericLeadingZerosInTags)
+TEST(Semver, RejectsNumericLeadingZerosInTags)
 {
     EXPECT_THROW(semver::semver("1.2.3-01"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.2.3-alpha.01"), std::invalid_argument);
     EXPECT_THROW(semver::semver("1.2.3+01"), std::invalid_argument);
 }
 
-TEST(SemverDeathTest, RejectsOverflow)
+TEST(Semver, RejectsOverflow)
 {
     EXPECT_THROW(semver::semver("9999999999.0.0"), std::invalid_argument);
 }
 
-TEST(SemverDeathTest, RejectsInvalidPrefix)
+TEST(Semver, RejectsInvalidPrefix)
 {
     EXPECT_THROW(semver::semver("v1.2.3"), std::invalid_argument);
     EXPECT_THROW(semver::semver(" 1.2.3"), std::invalid_argument);
