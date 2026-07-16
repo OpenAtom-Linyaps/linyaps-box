@@ -4,7 +4,7 @@
 
 #include "linyaps_box/utils/symlink.h"
 
-#include "linyaps_box/utils/log.h"
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/platform.h"
 #include "linyaps_box/utils/utils.h"
 
@@ -13,7 +13,7 @@
 void linyaps_box::utils::symlink(const std::filesystem::path &target,
                                  const std::filesystem::path &link_path)
 {
-    LINYAPS_BOX_DEBUG() << "Create symlink " << link_path << " point to " << target;
+    LINYAPS_BOX_LOG_DEBUG("Create symlink {} point to {}", link_path, target);
 
     std::error_code ec;
     std::filesystem::create_symlink(target, link_path, ec);
@@ -26,8 +26,10 @@ void linyaps_box::utils::symlink_at(const std::filesystem::path &target,
                                     const file_descriptor &dirfd,
                                     const std::filesystem::path &link_path)
 {
-    LINYAPS_BOX_DEBUG() << "Create symlink " << link_path << " which under " << dirfd.current_path()
-                        << " point to " << target;
+    LINYAPS_BOX_LOG_DEBUG("Create symlink {} which under {} point to {}",
+                          link_path,
+                          dirfd.current_path(),
+                          target);
 
     const auto ret = ::symlinkat(target.c_str(), dirfd.get(), link_path.c_str());
     if (ret == -1) {
@@ -40,8 +42,10 @@ void linyaps_box::utils::symlink_at(const std::filesystem::path &target,
                                     const std::filesystem::path &link_path,
                                     std::error_code &ec) noexcept
 {
-    LINYAPS_BOX_DEBUG() << "Create symlink " << link_path << " which under " << dirfd.current_path()
-                        << " point to " << target;
+    LINYAPS_BOX_LOG_DEBUG("Create symlink {} which under {} point to {}",
+                          link_path,
+                          dirfd.current_path(),
+                          target);
 
     ec.clear();
     const auto ret = ::symlinkat(target.c_str(), dirfd.get(), link_path.c_str());

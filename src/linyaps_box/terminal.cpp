@@ -4,9 +4,9 @@
 
 #include "linyaps_box/terminal.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/file.h"
 #include "linyaps_box/utils/ioctl.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/terminal.h"
 
 #include <utility>
@@ -52,7 +52,7 @@ terminal_slave &terminal_slave::operator=(terminal_slave &&other) noexcept
 
 auto terminal_slave::setup_stdio() -> void
 {
-    LINYAPS_BOX_DEBUG() << "Setup stdio";
+    LINYAPS_BOX_LOG_DEBUG("Setup stdio");
     slave_.duplicate_to(STDIN_FILENO, 0);
     slave_.duplicate_to(STDOUT_FILENO, 0);
     slave_.duplicate_to(STDERR_FILENO, 0);
@@ -75,7 +75,7 @@ auto terminal_slave::set_raw() -> void
         return;
     }
 
-    LINYAPS_BOX_DEBUG() << "Set terminal " << slave_.get() << " to raw mode";
+    LINYAPS_BOX_LOG_DEBUG("Set terminal {} to raw mode", slave_.get());
 
     struct termios orig_term{ };
     utils::tcgetattr(slave_, orig_term);
@@ -101,12 +101,10 @@ try {
     if (termios && slave_.valid()) {
         utils::tcsetattr(slave_, TCSANOW, termios.value());
     }
-} catch (std::system_error &e) {
-    LINYAPS_BOX_ERR() << "Failed to restore terminal:" << e.what();
 } catch (std::exception &e) {
-    LINYAPS_BOX_ERR() << "Failed to restore terminal:" << e.what();
+    LINYAPS_BOX_LOG_ERROR("Failed to restore terminal:{}", e.what());
 } catch (...) {
-    LINYAPS_BOX_ERR() << "Failed to restore terminal: unknown exception";
+    LINYAPS_BOX_LOG_ERROR("Failed to restore terminal: unknown exception");
 }
 
 } // namespace linyaps_box

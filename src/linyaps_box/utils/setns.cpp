@@ -4,8 +4,8 @@
 
 #include "linyaps_box/utils/setns.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/file.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <system_error>
@@ -100,7 +100,7 @@ void join_container_namespaces(pid_t target_pid, const oci_config::linux_t &linu
             join_namespace(fd, type);
         } catch (const std::system_error &e) {
             if (e.code().value() == EINVAL) {
-                LINYAPS_BOX_WARNING() << "setns for " << to_string_view(type) << " not supported";
+                LINYAPS_BOX_LOG_WARN("setns for {} not supported", to_string_view(type));
                 continue;
             }
 
