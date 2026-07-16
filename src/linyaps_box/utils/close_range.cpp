@@ -8,6 +8,7 @@
 #include "linyaps_box/utils/defer.h"
 
 #include <cstring>
+#include <sstream>
 #include <system_error>
 
 #include <dirent.h>

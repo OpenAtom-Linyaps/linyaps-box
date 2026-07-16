@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/log/logger.h" // IWYU pragma: keep
+#include "linyaps_box/log/log_api.h" // IWYU pragma: keep
 
 #ifndef LINYAPS_BOX_ACTIVE_LOG_LEVEL_NAME
 #  error "LINYAPS_BOX_ACTIVE_LOG_LEVEL_NAME must be defined at preprocessing time"
@@ -54,44 +54,41 @@
                                   __VA_ARGS__);                               \
     } while (false)
 
-#define LINYAPS_BOX_LOG_WARN(...)                                                    \
-    do {                                                                             \
-        if constexpr (LINYAPS_BOX_LOG_ACTIVE_LEVEL                                   \
-                      >= static_cast<int>(::linyaps_box::log::level::warn)) {        \
-            if (::linyaps_box::log::global_logger::instance().get_level()            \
-                >= ::linyaps_box::log::level::warn) {                                \
-                ::linyaps_box::log::warn(::linyaps_box::log::log_basename(__FILE__), \
-                                         __func__,                                   \
-                                         __LINE__,                                   \
-                                         __VA_ARGS__);                               \
-            }                                                                        \
-        }                                                                            \
+#define LINYAPS_BOX_LOG_WARN(...)                                                                 \
+    do {                                                                                          \
+        if constexpr (LINYAPS_BOX_LOG_ACTIVE_LEVEL                                                \
+                      >= static_cast<int>(::linyaps_box::log::level::warn)) {                     \
+            if (::linyaps_box::log::get_current_log_level() >= ::linyaps_box::log::level::warn) { \
+                ::linyaps_box::log::warn(::linyaps_box::log::log_basename(__FILE__),              \
+                                         __func__,                                                \
+                                         __LINE__,                                                \
+                                         __VA_ARGS__);                                            \
+            }                                                                                     \
+        }                                                                                         \
     } while (false)
 
-#define LINYAPS_BOX_LOG_INFO(...)                                                    \
-    do {                                                                             \
-        if constexpr (LINYAPS_BOX_LOG_ACTIVE_LEVEL                                   \
-                      >= static_cast<int>(::linyaps_box::log::level::info)) {        \
-            if (::linyaps_box::log::global_logger::instance().get_level()            \
-                >= ::linyaps_box::log::level::info) {                                \
-                ::linyaps_box::log::info(::linyaps_box::log::log_basename(__FILE__), \
-                                         __func__,                                   \
-                                         __LINE__,                                   \
-                                         __VA_ARGS__);                               \
-            }                                                                        \
-        }                                                                            \
+#define LINYAPS_BOX_LOG_INFO(...)                                                                 \
+    do {                                                                                          \
+        if constexpr (LINYAPS_BOX_LOG_ACTIVE_LEVEL                                                \
+                      >= static_cast<int>(::linyaps_box::log::level::info)) {                     \
+            if (::linyaps_box::log::get_current_log_level() >= ::linyaps_box::log::level::info) { \
+                ::linyaps_box::log::info(::linyaps_box::log::log_basename(__FILE__),              \
+                                         __func__,                                                \
+                                         __LINE__,                                                \
+                                         __VA_ARGS__);                                            \
+            }                                                                                     \
+        }                                                                                         \
     } while (false)
 
-#define LINYAPS_BOX_LOG_DEBUG(...)                                                    \
-    do {                                                                              \
-        if constexpr (LINYAPS_BOX_LOG_ACTIVE_LEVEL                                    \
-                      >= static_cast<int>(::linyaps_box::log::level::debug)) {        \
-            if (::linyaps_box::log::global_logger::instance().get_level()             \
-                >= ::linyaps_box::log::level::debug) {                                \
-                ::linyaps_box::log::debug(::linyaps_box::log::log_basename(__FILE__), \
-                                          __func__,                                   \
-                                          __LINE__,                                   \
-                                          __VA_ARGS__);                               \
-            }                                                                         \
-        }                                                                             \
+#define LINYAPS_BOX_LOG_DEBUG(...)                                                                 \
+    do {                                                                                           \
+        if constexpr (LINYAPS_BOX_LOG_ACTIVE_LEVEL                                                 \
+                      >= static_cast<int>(::linyaps_box::log::level::debug)) {                     \
+            if (::linyaps_box::log::get_current_log_level() >= ::linyaps_box::log::level::debug) { \
+                ::linyaps_box::log::debug(::linyaps_box::log::log_basename(__FILE__),              \
+                                          __func__,                                                \
+                                          __LINE__,                                                \
+                                          __VA_ARGS__);                                            \
+            }                                                                                      \
+        }                                                                                          \
     } while (false)

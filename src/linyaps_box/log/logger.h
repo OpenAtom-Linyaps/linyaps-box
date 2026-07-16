@@ -4,9 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/log/log_api.h"
 #include "linyaps_box/log/sink.h"
-
-#include <fmt/format.h>
 
 #include <vector>
 
@@ -77,94 +76,5 @@ using sink_spec = std::variant<stderr_spec,
 
 auto parse_log_to(std::string_view spec) -> sink_spec;
 auto make_sink(sink_spec spec) -> sink_variant;
-
-template <typename... Args>
-inline void fatal(std::string_view file,
-                  std::string_view function,
-                  int line,
-                  fmt::format_string<Args...> fmt,
-                  Args &&...args)
-{
-    global_logger::instance()
-      .dispatch_log(level::fatal, fmt.get(), fmt::make_format_args(args...), file, function, line);
-}
-
-template <typename... Args>
-inline void fatal(std::string_view file,
-                  std::string_view function,
-                  int line,
-                  int errno_val,
-                  fmt::format_string<Args...> fmt,
-                  Args &&...args)
-{
-    global_logger::instance().dispatch_log(level::fatal,
-                                           errno_val,
-                                           fmt.get(),
-                                           fmt::make_format_args(args...),
-                                           file,
-                                           function,
-                                           line);
-}
-
-template <typename... Args>
-inline void error(std::string_view file,
-                  std::string_view function,
-                  int line,
-                  fmt::format_string<Args...> fmt,
-                  Args &&...args)
-{
-    global_logger::instance()
-      .dispatch_log(level::error, fmt.get(), fmt::make_format_args(args...), file, function, line);
-}
-
-template <typename... Args>
-inline void error(std::string_view file,
-                  std::string_view function,
-                  int line,
-                  int errno_val,
-                  fmt::format_string<Args...> fmt,
-                  Args &&...args)
-{
-    global_logger::instance().dispatch_log(level::error,
-                                           errno_val,
-                                           fmt.get(),
-                                           fmt::make_format_args(args...),
-                                           file,
-                                           function,
-                                           line);
-}
-
-template <typename... Args>
-inline void warn(std::string_view file,
-                 std::string_view function,
-                 int line,
-                 fmt::format_string<Args...> fmt,
-                 Args &&...args)
-{
-    global_logger::instance()
-      .dispatch_log(level::warn, fmt.get(), fmt::make_format_args(args...), file, function, line);
-}
-
-template <typename... Args>
-inline void info(std::string_view file,
-                 std::string_view function,
-                 int line,
-                 fmt::format_string<Args...> fmt,
-                 Args &&...args)
-{
-    global_logger::instance()
-      .dispatch_log(level::info, fmt.get(), fmt::make_format_args(args...), file, function, line);
-}
-
-template <typename... Args>
-inline void debug(std::string_view file,
-                  std::string_view function,
-                  int line,
-                  fmt::format_string<Args...> fmt,
-                  Args &&...args)
-{
-    global_logger::instance()
-      .dispatch_log(level::debug, fmt.get(), fmt::make_format_args(args...), file, function, line);
-}
 
 } // namespace linyaps_box::log

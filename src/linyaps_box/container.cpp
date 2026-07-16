@@ -8,6 +8,7 @@
 #include "linyaps_box/container_monitor.h"
 #include "linyaps_box/impl/disabled_cgroup_manager.h"
 #include "linyaps_box/infra/unix_socket.h"
+#include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/protocol/message_channel.h"

@@ -64,6 +64,32 @@ auto make_sink(sink_spec spec) -> sink_variant
                       std::move(spec));
 }
 
+auto get_current_log_level() noexcept -> level
+{
+    return global_logger::instance().get_level();
+}
+
+void dispatch(level lvl,
+              fmt::string_view fmt_str,
+              fmt::format_args args,
+              std::string_view file,
+              std::string_view function,
+              int line)
+{
+    global_logger::instance().dispatch_log(lvl, fmt_str, args, file, function, line);
+}
+
+void dispatch(level lvl,
+              int errno_val,
+              fmt::string_view fmt_str,
+              fmt::format_args args,
+              std::string_view file,
+              std::string_view function,
+              int line)
+{
+    global_logger::instance().dispatch_log(lvl, errno_val, fmt_str, args, file, function, line);
+}
+
 global_logger &global_logger::instance() noexcept
 {
     static global_logger logger;

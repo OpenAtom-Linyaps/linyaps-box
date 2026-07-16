@@ -7,6 +7,7 @@
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/defer.h"
 
+#include <filesystem>
 #include <fstream>
 #include <system_error>
 
