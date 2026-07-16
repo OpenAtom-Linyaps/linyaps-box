@@ -23,7 +23,8 @@ file_sink::file_sink(const file_spec &spec)
 
 auto file_sink::log(const log_context &ctx) const -> void
 try {
-    fmt::memory_buffer buf;
+    thread_local fmt::memory_buffer buf;
+    buf.clear();
     format_log(buf, ctx, global_logger::instance().get_format(), { });
 
     auto bytes = utils::as_bytes(utils::span(buf.data(), buf.size()));

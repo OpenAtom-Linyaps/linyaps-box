@@ -144,7 +144,8 @@ void global_logger::dispatch_log(level lvl,
         return;
     }
 
-    fmt::memory_buffer buf;
+    thread_local fmt::memory_buffer buf;
+    buf.clear();
     fmt::vformat_to(std::back_inserter(buf), fmt::locale_ref{ }, fmt_str, args);
 
     const log_context ctx{
@@ -174,7 +175,8 @@ void global_logger::dispatch_log(level lvl,
         return;
     }
 
-    fmt::memory_buffer buf;
+    thread_local fmt::memory_buffer buf;
+    buf.clear();
     fmt::vformat_to(std::back_inserter(buf), fmt::locale_ref{ }, fmt_str, args);
 
     const log_context ctx{
