@@ -28,15 +28,9 @@ auto make_ctx(linyaps_box::log::level lvl = linyaps_box::log::level::error,
               std::string_view function = "fn",
               int line = 1) -> linyaps_box::log::log_context
 {
-    return { lvl,
-             msg,
-             { },
-             0,
-             0,
+    return { lvl,  msg,      { }, 0, 0,
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-             file,
-             function,
-             line
+             file, function, line
 #endif
     };
 }

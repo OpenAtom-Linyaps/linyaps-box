@@ -117,18 +117,17 @@ auto message_channel_base::send_stage(stage::type s) const -> void
 
 auto message_channel_base::send_log(const linyaps_box::log::log_context &ctx) const -> void
 {
-    const msg::log m{
-        std::string{ ctx.msg },
+    const msg::log m{ std::string{ ctx.msg },
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        std::string{ ctx.file },
-        std::string{ ctx.function },
-        ctx.line,
+                      std::string{ ctx.file },
+                      std::string{ ctx.function },
+                      ctx.line,
 #endif
-        ctx.errno_,
-        std::chrono::duration_cast<std::chrono::nanoseconds>(ctx.wall_time.time_since_epoch()),
-        ctx.pid,
-        ctx.lvl
-    };
+                      ctx.errno_,
+                      std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        ctx.wall_time.time_since_epoch()),
+                      ctx.pid,
+                      ctx.lvl };
 
     auto buffer = msg::serialize_log(m);
     send_raw(socket_, utils::span(buffer), { });
@@ -151,15 +150,9 @@ void forward_log_to_parent(msg::log l)
     };
 
     const linyaps_box::log::log_context ctx{
-        l.lvl,
-        l.message,
-        tp,
-        l.pid,
-        l.errno_,
+        l.lvl,  l.message,  tp,     l.pid, l.errno_,
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        l.file,
-        l.function,
-        l.line,
+        l.file, l.function, l.line,
 #endif
     };
     linyaps_box::log::global_logger::instance().dispatch_raw(ctx);
