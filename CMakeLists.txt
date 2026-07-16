@@ -44,6 +44,9 @@ option(linyaps-box_ENABLE_SMOKE_TESTS "Enable smoke tests." OFF)
 
 option(linyaps-box_MAKE_RELEASE "Make release build." OFF)
 
+option(linyaps-box_ENABLE_SANITIZER
+       "Enable address and undefined behavior sanitizers" OFF)
+
 if(linyaps-box_ENABLE_SMOKE_TESTS OR linyaps-box_ENABLE_UNIT_TESTS)
   set(linyaps-box_ENABLE_TESTING ON)
 endif()
@@ -113,14 +116,22 @@ set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
 
 # ==============================================================================
 
-if(linyaps-box_HARDENING)
+if(linyaps-box_MAKE_RELEASE AND linyaps-box_HARDENING)
   message(STATUS "applying harden settings")
   set(CMAKE_EXE_LINKER_FLAGS
       "${CMAKE_EXE_LINKER_FLAGS} -pie -Wl,-z,relro -Wl,-z,now")
   add_compile_options(-fstack-protector-strong)
-
-  message(STATUS "Non-Debug build, enabling FORTIFY_SOURCE")
   add_compile_definitions("$<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=2>")
+endif()
+
+if(linyaps-box_ENABLE_SANITIZER)
+  if(linyaps-box_MAKE_RELEASE)
+    message(WARNING "enable sanitizer while making a release build")
+  endif()
+
+  message(STATUS "enable address and undefined sanitizer")
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g3)
+  add_link_options(-fsanitize=address,undefined)
 endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
