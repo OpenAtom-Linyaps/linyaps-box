@@ -15,7 +15,7 @@ namespace linyaps_box {
 class container_monitor
 {
 public:
-    explicit container_monitor(pid_t pid)
+    explicit container_monitor(pid_t pid) noexcept
         : pid(pid) { };
     container_monitor(const container_monitor &) = delete;
     container_monitor &operator=(const container_monitor &) = delete;
@@ -28,6 +28,8 @@ public:
                               const linyaps_box::utils::file_descriptor &in,
                               const linyaps_box::utils::file_descriptor &out) -> void;
     [[nodiscard]] auto wait_container_exit() -> int;
+
+    auto kill_child() noexcept -> int;
 
 private:
     auto handle_signals() -> void;

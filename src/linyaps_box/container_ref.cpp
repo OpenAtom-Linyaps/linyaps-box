@@ -5,13 +5,13 @@
 #include "linyaps_box/container_ref.h"
 
 #include "linyaps_box/container_monitor.h"
+#include "linyaps_box/log/macro.h"
+#include "linyaps_box/os/process.h"
 #include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/defer.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/platform.h"
-#include "linyaps_box/utils/process.h"
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/utils.h"
@@ -29,9 +29,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace {
+namespace linyaps_box {
 
-namespace protocol = linyaps_box::protocol;
+namespace {
 
 auto resolve_final_process(linyaps_box::exec_container_option &option,
                            const linyaps_box::oci_config &config)
@@ -196,7 +196,7 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
 void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
                               const linyaps_box::oci_config &config)
 {
-    LINYAPS_BOX_DEBUG() << "apply capabilities";
+    LINYAPS_BOX_LOG_DEBUG("apply capabilities");
     // Determine which caps to apply: prefer the exec-specific set, fall back to
     // the container's config.json default if the exec set is entirely empty.
     auto effective_caps =
@@ -232,7 +232,7 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
         return;
     }
 
-    LINYAPS_BOX_DEBUG() << "Set capabilities for exec";
+    LINYAPS_BOX_LOG_DEBUG("Set capabilities for exec");
 
     // Drop every cap not in the bounding set.
     if (effective_caps->bounding) {
@@ -282,19 +282,20 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
         throw std::system_error(errno, std::system_category(), "cap_set_proc");
     }
 
-    std::ignore = linyaps_box::utils::prctl(PR_SET_KEEPCAPS, 1);
+    os::throw_if_error(os::prctl(PR_SET_KEEPCAPS, 1L, 0L, 0L, 0L));
 
     if (cap_set_proc(caps.get()) < 0) {
         throw std::system_error(errno, std::system_category(), "cap_set_proc");
     }
 
-    std::ignore = linyaps_box::utils::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L);
-    if (effective_caps->ambient) {
-        for (const auto &ambient : *effective_caps->ambient) {
-            std::ignore =
-              linyaps_box::utils::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, ambient, 0L, 0L);
-        }
+#  ifdef PR_CAP_AMBIENT
+    os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L));
+    if (const auto &ambient_set = effective_caps->ambient; ambient_set) {
+        std::for_each(ambient_set->cbegin(), ambient_set->cend(), [](cap_value_t cap) {
+            os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap, 0L, 0L));
+        });
     }
+#  endif
 }
 #endif // LINYAPS_BOX_ENABLE_CAP
 
@@ -307,6 +308,10 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
     auto sync = protocol::child_message_channel(std::move(sync_sock));
 
     try {
+        auto &logger = linyaps_box::log::global_logger::instance();
+        logger.unset_sink();
+        logger.set_sink(linyaps_box::log::sync_socket_sink(sync));
+
         bool pid_ns{ false };
         if (config.linux && config.linux->namespaces) {
             linyaps_box::utils::join_container_namespaces(target_pid, *config.linux);
@@ -351,8 +356,8 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
         child_apply_credentials(proc);
 
         if (proc.no_new_privileges) {
-            LINYAPS_BOX_DEBUG() << "Set no new privileges";
-            std::ignore = linyaps_box::utils::prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+            LINYAPS_BOX_LOG_DEBUG("Set no new privileges");
+            os::throw_if_error(os::prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L));
         }
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
@@ -380,7 +385,7 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
             throw std::system_error(errno, std::system_category(), "chdir");
         }
 
-        LINYAPS_BOX_DEBUG() << "exec command";
+        LINYAPS_BOX_LOG_DEBUG("exec command");
 
         sync.send_stage(protocol::stage::type::exec_ready);
 
@@ -389,12 +394,16 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
                   const_cast<char *const *>(c_env.data()));
 
         throw std::system_error(errno, std::system_category(), "execvpe");
-    } catch (const std::system_error &e) {
-        sync.report_error(e.code().value(), e.what());
+        // NOTE: Child process errors are intentionally logged and then swallowed here.
+        // The parent process is NOT notified via a typed error message.  This is by
+        // design: the child's error boundary is isolated from the parent so that
+        // child failures cannot propagate as C++ exceptions into the parent's
+        // control flow.  The parent detects the failure via the socket close and
+        // the presence of forwarded fatal log messages during wait_for_close().
     } catch (const std::exception &e) {
-        sync.report_error(EIO, e.what());
+        LINYAPS_BOX_LOG_FATAL("child process error: {}", e.what());
     } catch (...) {
-        sync.report_error(EINVAL, "unknown error");
+        LINYAPS_BOX_LOG_FATAL("child process error: unknown error");
     }
 
     _exit(EXIT_FAILURE);
@@ -407,14 +416,11 @@ auto exec_parent_process(protocol::parent_message_channel sync,
 {
     assert(!external_console_socket || expect_console_fd);
 
-    auto inc = sync.recv();
+    auto inc = sync.drain_logs();
     pid_t pid{ };
     std::visit(linyaps_box::utils::Overload{
                  [&](const protocol::msg::pid_report &p) {
                      pid = p.value;
-                 },
-                 [&](const protocol::msg::die &d) {
-                     throw std::system_error(d.errnum, std::system_category(), d.message);
                  },
                  [&](const auto &) {
                      throw std::runtime_error("expected pid_report during exec");
@@ -446,50 +452,51 @@ auto exec_parent_process(protocol::parent_message_channel sync,
             in.set_flags(in_flags);
             out.set_flags(out_flags);
         } catch (const std::exception &e) {
-            LINYAPS_BOX_ERR()
-              << "failed to restore stdin/stdout flags, some behavior may be unexpected: "
-              << e.what();
+            LINYAPS_BOX_LOG_ERROR(
+              "failed to restore stdin/stdout flags, some behavior may be unexpected: {}",
+              e.what());
         }
     });
 
-    if (expect_console_fd) {
-        auto console_inc = sync.recv();
-        std::visit(linyaps_box::utils::Overload{
-                     [&](const protocol::msg::die &d) {
-                         throw std::system_error(d.errnum, std::system_category(), d.message);
-                     },
-                     [&](const protocol::msg::console_fd &) {
-                         auto fds = console_inc.take_fds();
-                         auto master_fd = std::move(fds.front());
+    try {
+        if (expect_console_fd) {
+            auto console_inc = sync.drain_logs();
+            std::visit(linyaps_box::utils::Overload{
+                         [&](const protocol::msg::console_fd &) {
+                             auto fds = console_inc.take_fds();
+                             auto master_fd = std::move(fds.front());
 
-                         if (external_console_socket) {
-                             external_console_socket->send_fd(master_fd);
-                         } else {
-                             in.set_nonblock(true);
-                             out.set_nonblock(true);
-                             changed = true;
+                             if (external_console_socket) {
+                                 external_console_socket->send_fd(master_fd);
+                             } else {
+                                 in.set_nonblock(true);
+                                 out.set_nonblock(true);
+                                 changed = true;
 
-                             monitor.enable_io_forwarding(
-                               linyaps_box::terminal_master{ std::move(master_fd) },
-                               in,
-                               out);
-                         }
-                     },
-                     [&](const auto &) {
-                         throw std::runtime_error("expected console_fd during exec");
-                     },
-                   },
-                   console_inc.body);
+                                 monitor.enable_io_forwarding(
+                                   linyaps_box::terminal_master{ std::move(master_fd) },
+                                   in,
+                                   out);
+                             }
+                         },
+                         [&](const auto &) {
+                             throw std::runtime_error("expected console_fd during exec");
+                         },
+                       },
+                       console_inc.body);
+        }
+
+        sync.wait_for(protocol::stage::type::exec_ready);
+        sync.wait_for_close();
+
+        return monitor.wait_container_exit();
+    } catch (...) {
+        monitor.kill_child();
+        throw;
     }
-
-    sync.wait_for_exec();
-
-    return monitor.wait_container_exit();
 }
 
 } // anonymous namespace
-
-namespace linyaps_box {
 
 container_ref::container_ref(status_directory status_dir, std::string id)
     : id_(std::move(id))
@@ -508,7 +515,7 @@ void container_ref::kill(int signal) const
 {
     auto pid = this->status().PID;
 
-    LINYAPS_BOX_DEBUG() << "kill process " << pid << " with signal " << signal;
+    LINYAPS_BOX_LOG_DEBUG("kill process {} with signal {}", pid, signal);
     if (::kill(pid, signal) == 0) {
         return;
     }
@@ -522,7 +529,7 @@ auto container_ref::exec(exec_container_option option) const -> int
 {
     auto target_pid = this->status().PID;
 
-    std::ignore = utils::prctl(PR_SET_CHILD_SUBREAPER, 1L, 0L, 0L, 0L);
+    os::throw_if_error(os::prctl(PR_SET_CHILD_SUBREAPER, 1L, 0L, 0L, 0L));
 
     auto config = oci_config::parse(status_dir_.config());
     auto &proc = resolve_final_process(option, config);
