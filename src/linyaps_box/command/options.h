@@ -4,11 +4,14 @@
 
 #pragma once
 
+#include "linyaps_box/log/utils.h"
+
 #include <linyaps_box/cgroup_manager.h>
 
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -24,6 +27,10 @@ struct global_options
 {
     cgroup_manager_t manager{ cgroup_manager_t::disabled };
     std::filesystem::path root;
+    std::vector<std::string> log;
+    log::level log_level;
+    log::output_format log_format;
+    bool cee_syslog{ false };
 };
 
 struct list_options
@@ -80,6 +87,6 @@ struct options
     subcommand_opt_t subcommand_opt;
 };
 
-auto parse(int argc, char *argv[]) -> std::optional<options>;
+auto parse(int argc, char *argv[]) noexcept -> std::optional<options>;
 
 } // namespace linyaps_box::command

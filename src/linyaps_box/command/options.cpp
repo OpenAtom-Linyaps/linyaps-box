@@ -5,6 +5,7 @@
 #include "linyaps_box/command/options.h"
 
 #include "linyaps_box/config.h"
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/file.h"
 #include "linyaps_box/utils/platform.h"
 #include "linyaps_box/version.h"
@@ -79,6 +80,74 @@ auto register_global(CLI::App &app, linyaps_box::command::global_options &opts) 
       ->type_name("MANAGER")
       ->transform(CLI::CheckedTransformer(cgroup_managers))
       ->default_val(linyaps_box::cgroup_manager_t::disabled);
+
+    static constexpr std::array level_map{
+        std::pair{ "fatal", linyaps_box::log::level::fatal },
+        std::pair{ "error", linyaps_box::log::level::error },
+        std::pair{ "warn", linyaps_box::log::level::warn },
+        std::pair{ "info", linyaps_box::log::level::info },
+        std::pair{ "debug", linyaps_box::log::level::debug },
+    };
+
+    app.add_option("--log-level", opts.log_level, "Set log level (fatal/error/warn/info/debug)")
+      ->type_name("LEVEL")
+      ->transform(CLI::CheckedTransformer(level_map, CLI::ignore_case))
+      ->envname("LINYAPS_BOX_LOG_LEVEL")
+      ->default_val(LINYAPS_BOX_LOG_DEFAULT_LEVEL);
+
+    static constexpr std::array format_map{
+        std::pair{ "text", linyaps_box::log::output_format::text },
+        std::pair{ "json", linyaps_box::log::output_format::json },
+    };
+
+    app.add_option("--log-format", opts.log_format, "Set log format: text (default) or json")
+      ->type_name("FORMAT")
+      ->transform(CLI::CheckedTransformer(format_map, CLI::ignore_case))
+      ->default_val(linyaps_box::log::output_format::text);
+
+    std::string help = "Log destinations (stderr, [file:]PATH, syslog:ID";
+#ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
+    help += ", journald:ID";
+#endif
+    help += ")";
+
+    app.add_option("--log", opts.log, std::move(help))
+      ->type_name("SINK")
+      ->check([](const std::string &s) -> std::string {
+          if (s.empty()) {
+              return "empty log destination";
+          }
+
+          if (s == "stderr") {
+              return "";
+          }
+
+          const std::string_view sv{ s };
+          auto idx = sv.find(':');
+          if (idx == std::string_view::npos) {
+              return "";
+          }
+
+          auto scheme = sv.substr(0, idx);
+          auto content = sv.substr(idx + 1);
+          if (content.empty()) {
+              return fmt::format("empty {} destination", scheme);
+          }
+
+          bool ok = (scheme == "file" || scheme == "syslog");
+#ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
+          ok = ok || (scheme == "journald");
+#endif
+          if (ok) {
+              return "";
+          }
+
+          return "unknown log destination: " + s;
+      });
+
+    app.add_flag("--cee-syslog",
+                 opts.cee_syslog,
+                 "Prefix syslog messages with @cee: when --log-format=json");
 }
 
 auto register_list(CLI::App &app, linyaps_box::command::list_options &opts) -> CLI::App *
@@ -277,10 +346,11 @@ auto convert_result(cli_app_data &data) -> linyaps_box::command::options
 
 } // namespace
 
-auto linyaps_box::command::parse(int argc, char **argv) -> std::optional<options>
+auto linyaps_box::command::parse(int argc, char **argv) noexcept -> std::optional<options>
 {
     cli_app_data data;
     build_cli_app(data);
+
     try {
         run_parse(data.app, argc, argv);
     } catch (const CLI::ParseError &e) {
@@ -289,7 +359,8 @@ auto linyaps_box::command::parse(int argc, char **argv) -> std::optional<options
             return std::nullopt;
         }
 
-        std::exit(EXIT_SUCCESS);
+        // Help/version — return success with monostate subcommand
+        return linyaps_box::command::options{ data.global, std::monostate{ } };
     }
 
     return convert_result(data);
