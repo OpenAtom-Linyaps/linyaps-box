@@ -4,8 +4,8 @@
 
 #include "linyaps_box/utils/mkdir.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/inspect.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fcntl.h>
@@ -16,7 +16,7 @@
 auto linyaps_box::utils::mkdir(const file_descriptor &root, std::filesystem::path path, mode_t mode)
   -> linyaps_box::utils::file_descriptor
 {
-    LINYAPS_BOX_DEBUG() << "mkdir " << path << " at " << inspect_fd(root.get());
+    LINYAPS_BOX_LOG_DEBUG("mkdir {} at {}", path, inspect_fd(root.get()));
 
     auto current = root.duplicate();
     if (path.empty()) {
@@ -35,7 +35,7 @@ auto linyaps_box::utils::mkdir(const file_descriptor &root, std::filesystem::pat
     int fd{ -1 };
     int depth{ 0 };
     for (const auto &part : path) {
-        LINYAPS_BOX_DEBUG() << "part=" << part << " mode=0" << std::oct << mode;
+        LINYAPS_BOX_LOG_DEBUG("part={} mode=0{:o}", part, mode);
 
         if (part == "..") {
             --depth;
@@ -49,16 +49,18 @@ auto linyaps_box::utils::mkdir(const file_descriptor &root, std::filesystem::pat
         fd = ::openat(current.get(), part.c_str(), O_PATH | O_CLOEXEC);
         if (fd == -1) {
             if (UNLIKELY(errno != ENOENT)) {
-                LINYAPS_BOX_DEBUG() << "current path: " << utils::inspect_path(current.get())
-                                    << " perm:" << utils::inspect_permissions(current.get());
+                LINYAPS_BOX_LOG_DEBUG("current path: {} perm:{}",
+                                      utils::inspect_path(current.get()),
+                                      utils::inspect_permissions(current.get()));
                 throw std::system_error(errno,
                                         std::system_category(),
                                         "openat: " + (current.current_path() / part).string());
             }
 
             if (UNLIKELY(::mkdirat(current.get(), part.c_str(), mode) != 0)) {
-                LINYAPS_BOX_DEBUG() << "current path: " << utils::inspect_path(current.get())
-                                    << " perm:" << utils::inspect_permissions(current.get());
+                LINYAPS_BOX_LOG_DEBUG("current path: {} perm:{}",
+                                      utils::inspect_path(current.get()),
+                                      utils::inspect_permissions(current.get()));
                 throw std::system_error(errno,
                                         std::system_category(),
                                         "mkdirat: failed to create "

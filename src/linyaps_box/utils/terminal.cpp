@@ -50,14 +50,4 @@ auto tcsetattr(const file_descriptor &fd, int action, const struct termios &term
     }
 }
 
-auto isatty(const file_descriptor &fd) -> bool
-{
-    auto ret = ::isatty(fd.get());
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category(), "isatty");
-    }
-
-    return ret == 1;
-}
-
 } // namespace linyaps_box::utils

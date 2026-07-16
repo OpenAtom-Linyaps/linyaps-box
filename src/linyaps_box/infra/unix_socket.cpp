@@ -4,16 +4,15 @@
 
 #include "linyaps_box/infra/unix_socket.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/socket.h"
 #include "linyaps_box/utils/inspect.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
 
 #include <algorithm>
 #include <cerrno>
-#include <charconv>
 #include <cstring>
 #include <iterator>
 #include <stdexcept>
@@ -118,8 +117,9 @@ auto unix_socket::send(utils::span<const std::byte> data) const -> void
 
 auto unix_socket::send_fd(const utils::file_descriptor &fd) const -> void
 {
-    LINYAPS_BOX_DEBUG() << "Send fd " << utils::inspect_fd(fd.get()) << " to socket "
-                        << utils::inspect_fd(fd_.get());
+    LINYAPS_BOX_LOG_DEBUG("Send fd {} to socket {}",
+                          utils::inspect_fd(fd.get()),
+                          utils::inspect_fd(fd_.get()));
     std::byte placeholder{ };
     send_data_with_fds(utils::span(&placeholder, 1), utils::span(&fd, 1));
 }
@@ -134,10 +134,8 @@ auto unix_socket::recv_fd() const -> utils::file_descriptor
     }
 
     if (UNLIKELY(fds.size() != 1)) {
-        char buf[64];
-        auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), fds.size());
-        auto size_str = std::string(buf, ptr);
-        throw std::logic_error("recv_fd: expected exactly 1 file descriptor but got " + size_str);
+        throw std::logic_error(
+          fmt::format("recv_fd: expected exactly 1 file descriptor but got {}", fds.size()));
     }
 
     return std::move(fds.front());
@@ -155,8 +153,10 @@ auto unix_socket::send_data_with_fds(utils::span<const std::byte> data,
         return;
     }
 
-    LINYAPS_BOX_DEBUG() << "Send " << fds.size() << " fd(s) with " << data.size()
-                        << " data bytes to socket " << utils::inspect_fd(fd_.get());
+    LINYAPS_BOX_LOG_DEBUG("Send {} fd(s) with {} data bytes to socket {}",
+                          fds.size(),
+                          data.size(),
+                          utils::inspect_fd(fd_.get()));
 
     std::vector<int> raw_fds;
     raw_fds.reserve(fds.size());
@@ -187,7 +187,7 @@ auto unix_socket::send_data_with_fds(utils::span<const std::byte> data,
 auto unix_socket::recv_data_with_fds(utils::span<std::byte> data) const
   -> std::pair<std::vector<utils::file_descriptor>, std::size_t>
 {
-    LINYAPS_BOX_DEBUG() << "Receive data with fd from socket " << utils::inspect_fd(fd_.get());
+    LINYAPS_BOX_LOG_DEBUG("Receive data with fd from socket {}", utils::inspect_fd(fd_.get()));
 
     struct iovec iov{ data.data(), data.size() };
     alignas(struct cmsghdr) std::array<std::byte, CMSG_SPACE(kMaxScmFds * sizeof(int))> cmsg_buf{ };
@@ -202,11 +202,10 @@ auto unix_socket::recv_data_with_fds(utils::span<std::byte> data) const
         throw std::system_error(result.error, std::system_category(), "recvmsg");
     }
 
-    if (result.bytes == 0) {
-        throw std::runtime_error("socket closed by peer");
-    }
-
-    if (UNLIKELY(msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC))) {
+    // On SOCK_SEQPACKET, recv_raw already handles peer-close detection via
+    // zero-byte MSG_PEEK.  By the time we get here, a non-zero peek was
+    // observed, so recvmsg cannot return 0 — the datagram is already queued.
+    if (UNLIKELY((msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) != 0)) {
         throw std::runtime_error("message or control data truncated during recvmsg");
     }
 

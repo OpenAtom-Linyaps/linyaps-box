@@ -4,7 +4,7 @@
 
 #include "linyaps_box/io/forwarder.h"
 
-#include "linyaps_box/utils/log.h"
+#include "linyaps_box/log/macro.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -26,8 +26,7 @@ auto Forwarder::set_src(const utils::file_descriptor &src) -> void
 
     src_.pollable = poller.get().add(*src_.fd, ev);
 
-    LINYAPS_BOX_DEBUG() << "Forwarder: Source fd: " << src_.fd->get()
-                        << ", pollable: " << std::boolalpha << src_.pollable;
+    LINYAPS_BOX_LOG_DEBUG("Forwarder: Source fd: {}, pollable: {}", src_.fd->get(), src_.pollable);
 }
 
 auto Forwarder::set_dst(const utils::file_descriptor &dst) -> void
@@ -37,8 +36,9 @@ auto Forwarder::set_dst(const utils::file_descriptor &dst) -> void
 
     dst_.pollable = poller.get().add(*dst_.fd, ev);
 
-    LINYAPS_BOX_DEBUG() << "Forwarder: Destination fd: " << dst_.fd->get()
-                        << ", pollable: " << std::boolalpha << dst_.pollable;
+    LINYAPS_BOX_LOG_DEBUG("Forwarder: Destination fd: {}, pollable: {}",
+                          dst_.fd->get(),
+                          dst_.pollable);
 }
 
 auto Forwarder::drive() -> bool
@@ -144,8 +144,9 @@ Forwarder::~Forwarder() noexcept
             this->poller.get().remove(*src_.fd);
         }
     } catch (const std::exception &e) {
-        LINYAPS_BOX_ERR() << "Failed to remove source fd " << src_.fd->get()
-                          << " from epoll: " << e.what();
+        LINYAPS_BOX_LOG_ERROR("Failed to remove source fd {} from epoll: {}",
+                              src_.fd->get(),
+                              e.what());
     }
 
     try {
@@ -153,8 +154,9 @@ Forwarder::~Forwarder() noexcept
             this->poller.get().remove(*dst_.fd);
         }
     } catch (const std::exception &e) {
-        LINYAPS_BOX_ERR() << "Failed to remove destination fd " << dst_.fd->get()
-                          << " from epoll: " << e.what();
+        LINYAPS_BOX_LOG_ERROR("Failed to remove destination fd {} from epoll: {}",
+                              dst_.fd->get(),
+                              e.what());
     }
 }
 
