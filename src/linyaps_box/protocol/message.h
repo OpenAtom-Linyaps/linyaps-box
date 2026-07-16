@@ -4,12 +4,14 @@
 
 #pragma once
 
+#include "linyaps_box/log/utils.h"
 #include "linyaps_box/protocol/stage.h"
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/span.h"
 
 #include <fmt/std.h>
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -21,7 +23,7 @@
 namespace linyaps_box::protocol {
 
 enum class msg_id : uint8_t {
-    die,
+    log,
     stage,
     pid_report,
     console_fd,
@@ -32,11 +34,20 @@ enum class msg_id : uint8_t {
 
 namespace linyaps_box::protocol::msg {
 
-struct die
+struct log
 {
-    static constexpr msg_id id = msg_id::die;
-    int errnum{ };
+    static constexpr msg_id id = msg_id::log;
+
     std::string message;
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    std::string file;
+    std::string function;
+    int line{ };
+#endif
+    int errno_{ 0 };
+    std::chrono::nanoseconds time{ };
+    pid_t pid{ };
+    linyaps_box::log::level lvl{ };
 };
 
 struct stage
@@ -61,7 +72,7 @@ struct proceed
     static constexpr msg_id id = msg_id::proceed;
 };
 
-using message = std::variant<die, stage, pid_report, console_fd, proceed>;
+using message = std::variant<log, stage, pid_report, console_fd, proceed>;
 
 struct datagram
 {
@@ -73,14 +84,30 @@ struct datagram
 [[nodiscard]] auto serialize(const message &msg) -> std::vector<std::byte>;
 [[nodiscard]] auto deserialize(utils::span<const std::byte> wire) -> message;
 
+[[nodiscard]] auto serialize_log(const msg::log &m) -> std::vector<std::byte>;
+
 } // namespace linyaps_box::protocol::msg
 
 template <>
-struct fmt::formatter<linyaps_box::protocol::msg::die> : fmt::formatter<std::string>
+struct fmt::formatter<linyaps_box::protocol::msg::log> : fmt::formatter<std::string>
 {
-    auto format(const linyaps_box::protocol::msg::die &d, fmt::format_context &ctx) const
+    auto format(const linyaps_box::protocol::msg::log &l, fmt::format_context &ctx) const
     {
-        return fmt::format_to(ctx.out(), "die{{errnum={}, message=\"{}\"}}", d.errnum, d.message);
+        return fmt::format_to(ctx.out(),
+                              "log{{lvl={}, message=\"{}\""
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+                              ", file={}, line={}, function={}"
+#endif
+                              ", errno={}, pid={}}}",
+                              linyaps_box::log::level_name(l.lvl),
+                              l.message,
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+                              l.file,
+                              l.line,
+                              l.function,
+#endif
+                              l.errno_,
+                              l.pid);
     }
 };
 

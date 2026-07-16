@@ -5,10 +5,16 @@
 #include <gtest/gtest.h>
 
 #include "linyaps_box/infra/unix_socket.h"
+#include "linyaps_box/log/logger.h"
+#include "linyaps_box/log/macro.h"
+#include "linyaps_box/log/sinks/sync_socket_sink.h"
+#include "linyaps_box/log/utils.h"
 #include "linyaps_box/protocol/message.h"
 #include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/utils/span.h"
 
+#include <chrono>
+#include <optional>
 #include <thread>
 
 #include <sys/stat.h>
@@ -16,71 +22,189 @@
 
 namespace {
 
-TEST(MessageChannel, SerializeDie)
+namespace proto = linyaps_box::protocol;
+namespace msg = linyaps_box::protocol::msg;
+namespace log_lvl = linyaps_box::log;
+
+auto make_log(log_lvl::level lvl = log_lvl::level::fatal,
+              std::string_view message = "test",
+              pid_t pid = 0,
+              std::chrono::nanoseconds time = { }) -> msg::log
 {
-    linyaps_box::protocol::msg::die original{ 13, "permission denied" };
-    auto bytes =
-      linyaps_box::protocol::msg::serialize(linyaps_box::protocol::msg::message{ original });
-    auto deserialized = linyaps_box::protocol::msg::deserialize(bytes);
-
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::die>(deserialized));
-    auto &d = std::get<linyaps_box::protocol::msg::die>(deserialized);
-    EXPECT_EQ(d.errnum, 13);
-    EXPECT_EQ(d.message, "permission denied");
-
-    // wire format: [msg_id(1)][errnum(4)][message_string]
-    EXPECT_EQ(bytes.size(), 1 + sizeof(int) + 17);
-    EXPECT_EQ(bytes[0], static_cast<std::byte>(linyaps_box::protocol::msg_id::die));
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    return { std::string{ message }, "test.cpp", "f", 1, 0, time, pid, lvl };
+#else
+    return { std::string{ message }, 0, time, pid, lvl };
+#endif
 }
 
-TEST(MessageChannel, EmptyDieMessage)
+[[maybe_unused]] auto make_log_context(log_lvl::level lvl = log_lvl::level::fatal,
+                                       std::string_view message = "test",
+                                       pid_t pid = 0,
+                                       std::chrono::nanoseconds time = { }) -> log_lvl::log_context
 {
-    linyaps_box::protocol::msg::die original{ 0, "" };
-    auto bytes =
-      linyaps_box::protocol::msg::serialize(linyaps_box::protocol::msg::message{ original });
-    auto deserialized = linyaps_box::protocol::msg::deserialize(bytes);
-
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::die>(deserialized));
-    auto &d = std::get<linyaps_box::protocol::msg::die>(deserialized);
-    EXPECT_EQ(d.errnum, 0);
-    EXPECT_TRUE(d.message.empty());
-
-    // wire format: [msg_id(1)][errnum(4)] — no message payload
-    EXPECT_EQ(bytes.size(), 1 + sizeof(int));
-    EXPECT_EQ(bytes[0], static_cast<std::byte>(linyaps_box::protocol::msg_id::die));
-}
-
-TEST(MessageChannel, SerializeAllStages)
-{
-    using linyaps_box::protocol::stage::type;
-
-    auto all_stages = {
-        type::namespace_ready,      type::namespace_done,      type::prestart_ready,
-        type::prestart_done,        type::createruntime_ready, type::createruntime_done,
-        type::createcontainer_done, type::exec_ready,
+    return {
+        lvl,
+        std::string{ message },
+        std::chrono::system_clock::time_point{
+          std::chrono::duration_cast<std::chrono::system_clock::duration>(time) },
+        pid,
+        0,
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+        "test.cpp",
+        "f",
+        1,
+#endif
     };
+}
 
-    bool first{ true };
-    for (auto s : all_stages) {
-        linyaps_box::protocol::msg::stage original{ s };
-        auto bytes =
-          linyaps_box::protocol::msg::serialize(linyaps_box::protocol::msg::message{ original });
-        auto deserialized = linyaps_box::protocol::msg::deserialize(bytes);
+auto log_wire_size(const msg::log &l) -> std::size_t
+{
+    return sizeof(proto::msg_id)            // msg_id
+      + sizeof(uint8_t)                     // lvl
+      + sizeof(uint32_t) + l.message.size() // string + message
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+      + sizeof(uint32_t) + l.file.size()     // string + file
+      + sizeof(int)                          // line
+      + sizeof(uint32_t) + l.function.size() // string + function
+#endif
+      + sizeof(int)      // errno
+      + sizeof(pid_t)    // pid
+      + sizeof(int64_t); // time
+}
 
-        ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::stage>(deserialized));
-        EXPECT_EQ(std::get<linyaps_box::protocol::msg::stage>(deserialized).value, s);
+class thread_guard
+{
+public:
+    explicit thread_guard(std::thread th)
+        : t(std::move(th))
+    {
+    }
 
-        // wire format: [msg_id(1)][stage_value(1)]
-        EXPECT_EQ(bytes.size(), 1 + 1);
-        EXPECT_EQ(bytes[0], static_cast<std::byte>(linyaps_box::protocol::msg_id::stage));
-        if (first) {
-            EXPECT_EQ(bytes[1],
-                      static_cast<std::byte>(
-                        static_cast<std::underlying_type_t<linyaps_box::protocol::stage::type>>(
-                          linyaps_box::protocol::stage::type::namespace_ready)));
-            first = false;
+    ~thread_guard()
+    {
+        if (t.joinable()) {
+            t.join();
         }
     }
+
+    thread_guard(const thread_guard &) = delete;
+    auto operator=(const thread_guard &) -> thread_guard & = delete;
+    thread_guard(thread_guard &&) noexcept = delete;
+    auto operator=(thread_guard &&) noexcept -> thread_guard & = delete;
+
+private:
+    std::thread t;
+};
+
+class ChannelTest : public ::testing::Test
+{
+protected:
+    std::optional<proto::parent_message_channel> parent;
+    std::optional<proto::child_message_channel> child;
+    linyaps_box::log::level saved_level_;
+
+    void SetUp() override
+    {
+        auto [p, c] = proto::create_message_socketpair();
+        parent.emplace(std::move(p));
+        child.emplace(std::move(c));
+
+        auto &logger = linyaps_box::log::global_logger::instance();
+        saved_level_ = logger.get_level();
+        logger.unset_sink();
+    }
+
+    void TearDown() override
+    {
+        auto &logger = linyaps_box::log::global_logger::instance();
+        logger.unset_sink();
+        logger.set_level(saved_level_);
+    }
+};
+
+class SerializeStageTest : public ::testing::TestWithParam<proto::stage::type>
+{
+};
+
+TEST_P(SerializeStageTest, RoundTrip)
+{
+    msg::stage original{ GetParam() };
+    auto bytes = msg::serialize(msg::message{ original });
+    auto deserialized = msg::deserialize(bytes);
+
+    ASSERT_TRUE(std::holds_alternative<msg::stage>(deserialized));
+    EXPECT_EQ(std::get<msg::stage>(deserialized).value, GetParam());
+
+    // wire format: [msg_id(1)][stage_value(1)]
+    EXPECT_EQ(bytes.size(), sizeof(proto::msg_id) + sizeof(proto::stage::type));
+    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::stage));
+    EXPECT_EQ(
+      bytes[1],
+      static_cast<std::byte>(static_cast<std::underlying_type_t<proto::stage::type>>(GetParam())));
+}
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         SerializeStageTest,
+                         ::testing::Values(proto::stage::type::namespace_ready,
+                                           proto::stage::type::namespace_done,
+                                           proto::stage::type::prestart_ready,
+                                           proto::stage::type::prestart_done,
+                                           proto::stage::type::createruntime_ready,
+                                           proto::stage::type::createruntime_done,
+                                           proto::stage::type::createcontainer_done,
+                                           proto::stage::type::exec_ready));
+
+TEST(MessageChannel, SerializeLog)
+{
+    auto now = std::chrono::system_clock::now().time_since_epoch();
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    msg::log original{ "permission denied",  "test_file", "test", 42, 0, now, 0,
+                       log_lvl::level::fatal };
+#else
+    msg::log original{ "permission denied", 0, now, 0, log_lvl::level::fatal };
+#endif
+    auto bytes = msg::serialize(msg::message{ original });
+    auto deserialized = msg::deserialize(bytes);
+
+    ASSERT_TRUE(std::holds_alternative<msg::log>(deserialized));
+    auto &d = std::get<msg::log>(deserialized);
+    EXPECT_EQ(d.lvl, log_lvl::level::fatal);
+    EXPECT_EQ(d.message, "permission denied");
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    EXPECT_EQ(d.file, "test_file");
+    EXPECT_EQ(d.function, "test");
+    EXPECT_EQ(d.line, 42);
+#endif
+    EXPECT_EQ(d.time, now);
+    EXPECT_EQ(d.errno_, 0);
+
+    EXPECT_EQ(bytes.size(), log_wire_size(original));
+    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::log));
+}
+
+TEST(MessageChannel, EmptyLogMessage)
+{
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    msg::log original{ "", "", "", 0, 0, std::chrono::nanoseconds{ 0 }, 0, log_lvl::level::fatal };
+#else
+    msg::log original{ 0, 0, std::chrono::nanoseconds{ 0 }, 0, log_lvl::level::fatal };
+#endif
+    auto bytes = msg::serialize(msg::message{ original });
+    auto deserialized = msg::deserialize(bytes);
+
+    ASSERT_TRUE(std::holds_alternative<msg::log>(deserialized));
+    auto &d = std::get<msg::log>(deserialized);
+    EXPECT_EQ(d.lvl, log_lvl::level::fatal);
+    EXPECT_TRUE(d.message.empty());
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    EXPECT_TRUE(d.file.empty());
+    EXPECT_EQ(d.line, 0);
+#endif
+    EXPECT_EQ(d.time, std::chrono::nanoseconds{ 0 });
+
+    EXPECT_EQ(bytes.size(), log_wire_size(original));
+    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::log));
 }
 
 TEST(MessageChannel, UnknownMsgIdThrows)
@@ -90,7 +214,7 @@ TEST(MessageChannel, UnknownMsgIdThrows)
     EXPECT_THROW(
       {
           try {
-              std::ignore = linyaps_box::protocol::msg::deserialize(wire);
+              std::ignore = msg::deserialize(wire);
           } catch (const std::runtime_error &e) {
               EXPECT_NE(std::string(e.what()).find("42"), std::string::npos);
               throw;
@@ -101,104 +225,122 @@ TEST(MessageChannel, UnknownMsgIdThrows)
 
 TEST(MessageChannel, SerializePidReport)
 {
-    linyaps_box::protocol::msg::pid_report original{ 12345 };
-    auto bytes =
-      linyaps_box::protocol::msg::serialize(linyaps_box::protocol::msg::message{ original });
-    auto deserialized = linyaps_box::protocol::msg::deserialize(bytes);
+    msg::pid_report original{ 12345 };
+    auto bytes = msg::serialize(msg::message{ original });
+    auto deserialized = msg::deserialize(bytes);
 
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::pid_report>(deserialized));
-    EXPECT_EQ(std::get<linyaps_box::protocol::msg::pid_report>(deserialized).value, 12345);
+    ASSERT_TRUE(std::holds_alternative<msg::pid_report>(deserialized));
+    EXPECT_EQ(std::get<msg::pid_report>(deserialized).value, 12345);
 
-    // wire format: [msg_id(1)][pid_t(sizeof(pid_t))]
-    EXPECT_EQ(bytes.size(), 1 + sizeof(pid_t));
-    EXPECT_EQ(bytes[0], static_cast<std::byte>(linyaps_box::protocol::msg_id::pid_report));
+    EXPECT_EQ(bytes.size(), sizeof(proto::msg_id) + sizeof(pid_t));
+    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::pid_report));
 }
 
-TEST(MessageChannel, ChildToParentPidReport)
+TEST(MessageChannel, TakeFdEmptyThrows)
 {
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-
-    child.send(linyaps_box::protocol::msg::pid_report{ 42 });
-
-    auto inc = parent.recv();
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::pid_report>(inc.body));
-    EXPECT_EQ(std::get<linyaps_box::protocol::msg::pid_report>(inc.body).value, 42);
+    msg::datagram inc;
+    inc.body = msg::stage{ proto::stage::type::namespace_ready };
+    EXPECT_THROW(std::ignore = inc.take_fds(), std::runtime_error);
 }
 
-TEST(MessageChannel, SendRecvStage)
+TEST(MessageChannel, UnknownStageTypeThrows)
 {
-    auto pair = linyaps_box::protocol::create_message_socketpair();
-    auto &parent = pair.first;
-    auto &child = pair.second;
-
-    std::thread t([&]() {
-        child.wait_for(linyaps_box::protocol::stage::type::namespace_ready);
-        child.send_stage(linyaps_box::protocol::stage::type::namespace_done);
-    });
-
-    parent.send_stage(linyaps_box::protocol::stage::type::namespace_ready);
-    parent.wait_for(linyaps_box::protocol::stage::type::namespace_done);
-
-    t.join();
+    std::vector<std::byte> wire = { static_cast<std::byte>(proto::msg_id::stage),
+                                    std::byte{ 0xFF } };
+    EXPECT_THROW(
+      {
+          try {
+              std::ignore = msg::deserialize(wire);
+          } catch (const std::runtime_error &e) {
+              EXPECT_NE(std::string(e.what()).find("255"), std::string::npos);
+              throw;
+          }
+      },
+      std::runtime_error);
 }
 
-TEST(MessageChannel, SendRecvDie)
+TEST(MessageChannel, SerializeConsoleFd)
 {
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
+    msg::console_fd original{ };
+    auto bytes = msg::serialize(msg::message{ original });
+    auto deserialized = msg::deserialize(bytes);
 
-    child.send(linyaps_box::protocol::msg::die{ 5, "test error" });
+    ASSERT_TRUE(std::holds_alternative<msg::console_fd>(deserialized));
 
-    auto inc = parent.recv();
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::die>(inc.body));
-    auto &d = std::get<linyaps_box::protocol::msg::die>(inc.body);
-    EXPECT_EQ(d.errnum, 5);
+    EXPECT_EQ(bytes.size(), sizeof(proto::msg_id));
+    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::console_fd));
+}
+
+TEST(MessageChannel, SerializeProceed)
+{
+    msg::proceed original{ };
+    auto bytes = msg::serialize(msg::message{ original });
+    auto deserialized = msg::deserialize(bytes);
+
+    ASSERT_TRUE(std::holds_alternative<msg::proceed>(deserialized));
+
+    EXPECT_EQ(bytes.size(), sizeof(proto::msg_id));
+    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::proceed));
+}
+
+// ── socketpair tests ───────────────────────────────────────────────
+
+TEST_F(ChannelTest, ChildToParentPidReport)
+{
+    child->send(msg::pid_report{ 42 });
+
+    auto inc = parent->recv();
+    ASSERT_TRUE(std::holds_alternative<msg::pid_report>(inc.body));
+    EXPECT_EQ(std::get<msg::pid_report>(inc.body).value, 42);
+}
+
+TEST_F(ChannelTest, SendRecvStage)
+{
+    const thread_guard tg{ std::thread([&]() {
+        child->wait_for(proto::stage::type::namespace_ready);
+        child->send_stage(proto::stage::type::namespace_done);
+    }) };
+
+    parent->send_stage(proto::stage::type::namespace_ready);
+    parent->wait_for(proto::stage::type::namespace_done);
+}
+
+TEST_F(ChannelTest, SendRecvLog)
+{
+    child->send(make_log(log_lvl::level::fatal, "test error"));
+
+    auto inc = parent->recv();
+    ASSERT_TRUE(std::holds_alternative<msg::log>(inc.body));
+    auto &d = std::get<msg::log>(inc.body);
+    EXPECT_EQ(d.lvl, log_lvl::level::fatal);
     EXPECT_EQ(d.message, "test error");
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    EXPECT_EQ(d.file, "test.cpp");
+    EXPECT_EQ(d.line, 1);
+#endif
+    EXPECT_EQ(d.time, std::chrono::nanoseconds{ 0 });
     EXPECT_TRUE(inc.fds.empty());
 }
 
-TEST(MessageChannel, WaitForThrowsOnDie)
+TEST_F(ChannelTest, WaitForUnexpectedStageThrows)
 {
-    auto pair = linyaps_box::protocol::create_message_socketpair();
-    auto &parent = pair.first;
-    auto &child = pair.second;
+    const thread_guard tg{ std::thread([&]() {
+        child->send_stage(proto::stage::type::namespace_ready);
+    }) };
 
-    std::thread t([&]() {
-        child.send(linyaps_box::protocol::msg::die{ 22, "fatal" });
-    });
-
-    EXPECT_THROW(parent.wait_for(linyaps_box::protocol::stage::type::namespace_done),
-                 std::system_error);
-    t.join();
+    EXPECT_THROW(parent->wait_for(proto::stage::type::createcontainer_done), std::runtime_error);
 }
 
-TEST(MessageChannel, WaitForUnexpectedStageThrows)
+TEST_F(ChannelTest, TakeFdFromIncoming)
 {
-    auto pair = linyaps_box::protocol::create_message_socketpair();
-    auto &parent = pair.first;
-    auto &child = pair.second;
-
-    std::thread t([&]() {
-        child.send_stage(linyaps_box::protocol::stage::type::namespace_ready);
-    });
-
-    EXPECT_THROW(parent.wait_for(linyaps_box::protocol::stage::type::createcontainer_done),
-                 std::runtime_error);
-    t.join();
-}
-
-TEST(MessageChannel, TakeFdFromIncoming)
-{
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
     auto [a, b] = linyaps_box::infra::unix_socket::create_socketpair();
     auto b_fd = b.release();
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     fds.emplace_back(b_fd, true);
-    child.send(
-      linyaps_box::protocol::msg::stage{ linyaps_box::protocol::stage::type::namespace_ready },
-      fds);
+    child->send(msg::stage{ proto::stage::type::namespace_ready }, fds);
 
-    auto inc = parent.recv();
+    auto inc = parent->recv();
     ASSERT_FALSE(inc.fds.empty());
 
     auto rec_fds = inc.take_fds();
@@ -208,228 +350,111 @@ TEST(MessageChannel, TakeFdFromIncoming)
     // verify the received fd is the same socket endpoint by write/read round-trip
     char wbuf = 'X';
     char rbuf = 0;
-    EXPECT_EQ(write(a.fd().get(), &wbuf, 1), 1);
-    EXPECT_EQ(read(rec_fds[0].get(), &rbuf, 1), 1);
+    ASSERT_EQ(write(a.fd().get(), &wbuf, 1), 1);
+    ASSERT_EQ(read(rec_fds[0].get(), &rbuf, 1), 1);
     EXPECT_EQ(rbuf, 'X');
 }
 
-TEST(MessageChannel, TakeFdEmptyThrows)
+TEST_F(ChannelTest, WaitForExecSocketCloseThrows)
 {
-    linyaps_box::protocol::msg::datagram inc;
-    inc.body =
-      linyaps_box::protocol::msg::stage{ linyaps_box::protocol::stage::type::namespace_ready };
-    EXPECT_THROW(std::ignore = inc.take_fds(), std::runtime_error);
+    auto [p1, p2] = linyaps_box::infra::unix_socket::create_socketpair();
+    p2.close();
+    const proto::parent_message_channel isolated_parent(std::move(p1));
+
+    EXPECT_THROW(isolated_parent.wait_for(proto::stage::type::exec_ready), std::runtime_error);
 }
 
-TEST(MessageChannel, UnknownStageTypeThrows)
+TEST_F(ChannelTest, WaitForExecWithExecReady)
 {
-    // msg_id::stage followed by an invalid stage byte (0xFF)
-    std::vector<std::byte> wire = { static_cast<std::byte>(linyaps_box::protocol::msg_id::stage),
-                                    std::byte{ 0xFF } };
+    auto [s1, s2] = linyaps_box::infra::unix_socket::create_socketpair();
+    const proto::parent_message_channel isolated_parent(std::move(s1));
+
+    auto msg = msg::serialize(msg::stage{ proto::stage::type::exec_ready });
+    s2.send(linyaps_box::utils::span<const std::byte>(msg.data(), msg.size()));
+    s2.close();
+
+    EXPECT_NO_THROW(isolated_parent.wait_for(proto::stage::type::exec_ready));
+    EXPECT_NO_THROW(isolated_parent.wait_for_close());
+}
+
+TEST_F(ChannelTest, WaitForExecFailedAfterReady)
+{
+    const thread_guard tg{ std::thread([&]() {
+        child->send_stage(proto::stage::type::exec_ready);
+        child->send(make_log(log_lvl::level::fatal, "execvpe"));
+        child.reset();
+    }) };
+
+    EXPECT_NO_THROW(parent->wait_for(proto::stage::type::exec_ready));
+    EXPECT_THROW(parent->wait_for_close(), std::runtime_error);
+}
+
+TEST_F(ChannelTest, ChildWaitForUnexpected)
+{
+    parent->send(msg::pid_report{ 42 });
+
     EXPECT_THROW(
       {
           try {
-              std::ignore = linyaps_box::protocol::msg::deserialize(wire);
+              child->wait_for(proto::stage::type::namespace_ready);
           } catch (const std::runtime_error &e) {
-              EXPECT_NE(std::string(e.what()).find("255"), std::string::npos);
+              EXPECT_NE(std::string(e.what()).find("unexpected"), std::string::npos);
               throw;
           }
       },
       std::runtime_error);
 }
 
-TEST(MessageChannel, WaitForExecSocketCloseThrows)
+TEST_F(ChannelTest, LargeLogMessageRoundTrip)
 {
-    auto [p1, p2] = linyaps_box::infra::unix_socket::create_socketpair();
-    p2.close();
-    const linyaps_box::protocol::parent_message_channel parent(std::move(p1));
-
-    EXPECT_THROW(parent.wait_for_exec(), std::runtime_error);
-}
-
-TEST(MessageChannel, WaitForExecWithExecReady)
-{
-    auto [s1, s2] = linyaps_box::infra::unix_socket::create_socketpair();
-    linyaps_box::protocol::parent_message_channel parent(std::move(s1));
-
-    auto msg = linyaps_box::protocol::msg::serialize(
-      linyaps_box::protocol::msg::stage{ linyaps_box::protocol::stage::type::exec_ready });
-    s2.send(linyaps_box::utils::span<const std::byte>(msg.data(), msg.size()));
-    s2.close();
-
-    EXPECT_NO_THROW(parent.wait_for_exec());
-}
-
-TEST(MessageChannel, WaitForExecFailedAfterReady)
-{
-    auto pair = linyaps_box::protocol::create_message_socketpair();
-    auto &parent = pair.first;
-    auto &child = pair.second;
-
-    std::thread t([&]() {
-        child.send_stage(linyaps_box::protocol::stage::type::exec_ready);
-        child.send(linyaps_box::protocol::msg::die{ ENOENT, "execvpe" });
-    });
-
-    EXPECT_THROW(
-      {
-          try {
-              parent.wait_for_exec();
-          } catch (const std::system_error &e) {
-              EXPECT_EQ(e.code().value(), ENOENT);
-              EXPECT_TRUE(std::string(e.what()).find("execvpe") != std::string::npos);
-              throw;
-          }
-      },
-      std::system_error);
-    t.join();
-}
-
-TEST(MessageChannel, WaitForExecDie)
-{
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-
-    child.send(linyaps_box::protocol::msg::die{ 1, "bad exec" });
-
-    EXPECT_THROW(
-      {
-          try {
-              parent.wait_for_exec();
-          } catch (const std::system_error &e) {
-              EXPECT_EQ(e.code().value(), 1);
-              throw;
-          }
-      },
-      std::system_error);
-}
-
-TEST(MessageChannel, WaitForExecUnexpectedMsgThrows)
-{
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-
-    child.send_stage(linyaps_box::protocol::stage::type::namespace_ready);
-
-    EXPECT_THROW(parent.wait_for_exec(), std::runtime_error);
-}
-
-TEST(MessageChannel, ChildWaitForDie)
-{
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-
-    parent.send(linyaps_box::protocol::msg::die{ 5, "parent error" });
-
-    EXPECT_THROW(
-      {
-          try {
-              child.wait_for(linyaps_box::protocol::stage::type::namespace_ready);
-          } catch (const std::system_error &e) {
-              EXPECT_EQ(e.code().value(), static_cast<int>(EPROTO));
-              throw;
-          }
-      },
-      std::system_error);
-}
-
-TEST(MessageChannel, LargeDieMessageRoundTrip)
-{
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-
     const std::string long_msg(5000, 'x');
-    child.send(linyaps_box::protocol::msg::die{ 99, long_msg });
+    child->send(make_log(log_lvl::level::error, long_msg));
 
-    auto inc = parent.recv();
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::die>(inc.body));
-    auto &d = std::get<linyaps_box::protocol::msg::die>(inc.body);
-    EXPECT_EQ(d.errnum, 99);
+    auto inc = parent->recv();
+    ASSERT_TRUE(std::holds_alternative<msg::log>(inc.body));
+    auto &d = std::get<msg::log>(inc.body);
     EXPECT_EQ(d.message, long_msg);
 }
 
-TEST(MessageChannel, FdsExceedLimitThrows)
+TEST_F(ChannelTest, FdsExceedLimitThrows)
 {
-    linyaps_box::protocol::msg::stage msg{ linyaps_box::protocol::stage::type::namespace_ready };
+    msg::stage m{ proto::stage::type::namespace_ready };
 
-    // Create 17 dummy fds (/dev/null), exceeding kMaxScmFds = 16
     std::vector<linyaps_box::utils::file_descriptor> fds;
     for (int i = 0; i < 17; ++i) {
         auto fd = ::open("/dev/null", O_RDONLY | O_CLOEXEC);
+        ASSERT_GE(fd, 0);
         fds.emplace_back(fd, true);
     }
 
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-    EXPECT_THROW(child.send(msg, fds), std::logic_error);
+    EXPECT_THROW(child->send(m, fds), std::logic_error);
 }
 
-TEST(MessageChannel, SerializeConsoleFd)
+TEST_F(ChannelTest, SendRecvConsoleFd)
 {
-    linyaps_box::protocol::msg::console_fd original{ };
-    auto bytes =
-      linyaps_box::protocol::msg::serialize(linyaps_box::protocol::msg::message{ original });
-    auto deserialized = linyaps_box::protocol::msg::deserialize(bytes);
-
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::console_fd>(deserialized));
-
-    // wire format: [msg_id(1)]
-    EXPECT_EQ(bytes.size(), 1);
-    EXPECT_EQ(bytes[0], static_cast<std::byte>(linyaps_box::protocol::msg_id::console_fd));
-}
-
-TEST(MessageChannel, SerializeProceed)
-{
-    linyaps_box::protocol::msg::proceed original{ };
-    auto bytes =
-      linyaps_box::protocol::msg::serialize(linyaps_box::protocol::msg::message{ original });
-    auto deserialized = linyaps_box::protocol::msg::deserialize(bytes);
-
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::proceed>(deserialized));
-
-    // wire format: [msg_id(1)]
-    EXPECT_EQ(bytes.size(), 1);
-    EXPECT_EQ(bytes[0], static_cast<std::byte>(linyaps_box::protocol::msg_id::proceed));
-}
-
-TEST(MessageChannel, SendRecvConsoleFd)
-{
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-
     auto [a, b] = linyaps_box::infra::unix_socket::create_socketpair();
     auto b_fd = b.release();
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     fds.emplace_back(b_fd, true);
-    child.send(linyaps_box::protocol::msg::console_fd{ }, fds);
+    child->send(msg::console_fd{ }, fds);
 
-    auto inc = parent.recv();
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::console_fd>(inc.body));
+    auto inc = parent->recv();
+    ASSERT_TRUE(std::holds_alternative<msg::console_fd>(inc.body));
     ASSERT_FALSE(inc.fds.empty());
 }
 
-TEST(MessageChannel, ReportErrorDie)
+TEST_F(ChannelTest, SendOnClosedSocketThrows)
 {
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-
-    child.report_error(EPERM, "test error from child");
-
-    auto inc = parent.recv();
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::die>(inc.body));
-    auto &d = std::get<linyaps_box::protocol::msg::die>(inc.body);
-    EXPECT_EQ(d.errnum, EPERM);
-    EXPECT_EQ(d.message, "test error from child");
-    EXPECT_TRUE(inc.fds.empty());
-}
-
-TEST(MessageChannel, ReportErrorOnClosedSocket)
-{
-    // report_error must not throw even when the peer has closed its end
     auto [p1, p2] = linyaps_box::infra::unix_socket::create_socketpair();
     p1.close();
-    linyaps_box::protocol::child_message_channel child(std::move(p2));
-    EXPECT_NO_THROW(child.report_error(EPERM, "parent gone"));
+    const proto::child_message_channel isolated_child(std::move(p2));
+    EXPECT_THROW(isolated_child.send(make_log(log_lvl::level::fatal, "parent gone")),
+                 std::system_error);
 }
 
-TEST(MessageChannel, MaxFdsTransfer)
+TEST_F(ChannelTest, MaxFdsTransfer)
 {
-    auto [parent, child] = linyaps_box::protocol::create_message_socketpair();
-
     std::vector<linyaps_box::utils::file_descriptor> fds;
     for (int i = 0; i < 16; ++i) {
         auto fd = ::open("/dev/null", O_RDONLY | O_CLOEXEC);
@@ -437,12 +462,10 @@ TEST(MessageChannel, MaxFdsTransfer)
         fds.emplace_back(fd, true);
     }
 
-    child.send(
-      linyaps_box::protocol::msg::stage{ linyaps_box::protocol::stage::type::namespace_ready },
-      fds);
+    child->send(msg::stage{ proto::stage::type::namespace_ready }, fds);
 
-    auto inc = parent.recv();
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::stage>(inc.body));
+    auto inc = parent->recv();
+    ASSERT_TRUE(std::holds_alternative<msg::stage>(inc.body));
     ASSERT_EQ(inc.fds.size(), 16UL);
 
     for (const auto &fd : inc.fds) {
@@ -452,24 +475,109 @@ TEST(MessageChannel, MaxFdsTransfer)
     }
 }
 
-TEST(MessageChannel, ProceedRoundTrip)
+TEST_F(ChannelTest, ProceedRoundTrip)
 {
-    auto pair = linyaps_box::protocol::create_message_socketpair();
-    const auto &child = pair.second;
-    const auto &parent = pair.first;
+    const thread_guard tg{ std::thread([&]() {
+        child->send(msg::pid_report{ 42 });
+        child->wait_for_proceed();
+    }) };
 
-    std::thread t([&]() {
-        child.send(linyaps_box::protocol::msg::pid_report{ 42 });
-        child.wait_for_proceed();
-    });
+    auto inc = parent->recv();
+    ASSERT_TRUE(std::holds_alternative<msg::pid_report>(inc.body));
+    EXPECT_EQ(std::get<msg::pid_report>(inc.body).value, 42);
 
-    auto inc = parent.recv();
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::protocol::msg::pid_report>(inc.body));
-    EXPECT_EQ(std::get<linyaps_box::protocol::msg::pid_report>(inc.body).value, 42);
+    parent->send(msg::proceed{ });
+}
 
-    parent.send(linyaps_box::protocol::msg::proceed{ });
+TEST_F(ChannelTest, SyncSocketSinkForwardsLogToParent)
+{
+    // Install a sync_socket_sink on the child side.  The child's log call
+    // should be serialized, sent over the socket, and arrive at the parent.
+    auto &logger = linyaps_box::log::global_logger::instance();
+    logger.unset_sink();
+    logger.set_sink(linyaps_box::log::sync_socket_sink{ *child });
+    logger.set_level(linyaps_box::log::level::debug);
 
-    t.join();
+    constexpr auto expected_line = __LINE__ + 1;
+    LINYAPS_BOX_LOG_ERROR("sync_sink_test {} {}", 42, "hello");
+
+    // Read back on the parent side via drain_logs.
+    auto inc = parent->recv();
+    ASSERT_TRUE(std::holds_alternative<msg::log>(inc.body));
+    auto &d = std::get<msg::log>(inc.body);
+    EXPECT_EQ(d.lvl, log_lvl::level::error);
+    EXPECT_EQ(d.message, "sync_sink_test 42 hello");
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    EXPECT_NE(d.file.find("message_channel_test.cpp"), std::string::npos);
+    EXPECT_EQ(d.line, expected_line);
+#endif
+    EXPECT_GT(d.time.count(), 0);
+
+    logger.unset_sink();
+    logger.set_level(linyaps_box::log::level::warn);
+}
+
+TEST_F(ChannelTest, WaitForDrainsInterleavedLogs)
+{
+    const thread_guard tg{ std::thread([&]() {
+        child->send(make_log(log_lvl::level::debug, "dbg1"));
+        child->send(make_log(log_lvl::level::info, "info1"));
+        child->send_stage(proto::stage::type::namespace_ready);
+    }) };
+
+    EXPECT_NO_THROW(parent->wait_for(proto::stage::type::namespace_ready));
+}
+
+TEST_F(ChannelTest, WaitForDrainsLogsThenCloseThrows)
+{
+    const thread_guard tg{ std::thread([&]() {
+        child->send(make_log(log_lvl::level::error, "boom"));
+        child.reset();
+    }) };
+
+    EXPECT_THROW(parent->wait_for(proto::stage::type::exec_ready), std::runtime_error);
+}
+
+TEST_F(ChannelTest, DrainLogsReturnsNonLogDatagram)
+{
+    const thread_guard tg{ std::thread([&]() {
+        child->send(make_log(log_lvl::level::info, "ignored"));
+        child->send(make_log(log_lvl::level::debug, "also ignored"));
+        child->send(msg::pid_report{ 7 });
+    }) };
+
+    auto inc = parent->drain_logs();
+    ASSERT_TRUE(std::holds_alternative<msg::pid_report>(inc.body));
+    EXPECT_EQ(std::get<msg::pid_report>(inc.body).value, 7);
+}
+
+TEST_F(ChannelTest, DrainLogsThrowsOnClose)
+{
+    const thread_guard tg{ std::thread([&]() {
+        child->send(make_log(log_lvl::level::info, "x"));
+        child.reset();
+    }) };
+
+    EXPECT_THROW(std::ignore = parent->drain_logs(), std::runtime_error);
+}
+
+TEST_F(ChannelTest, WaitForCloseThrowsSystemErrorWithErrno)
+{
+    const thread_guard tg{ std::thread([&]() {
+        child->send_stage(proto::stage::type::exec_ready);
+        auto l = make_log(log_lvl::level::fatal, "execvpe");
+        l.errno_ = ENOENT;
+        child->send(l);
+        child.reset();
+    }) };
+
+    EXPECT_NO_THROW(parent->wait_for(proto::stage::type::exec_ready));
+    try {
+        parent->wait_for_close();
+        FAIL() << "expected throw";
+    } catch (const std::system_error &e) {
+        EXPECT_EQ(e.code().value(), ENOENT);
+    }
 }
 
 } // namespace

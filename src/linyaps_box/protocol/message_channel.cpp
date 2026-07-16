@@ -4,13 +4,14 @@
 
 #include "linyaps_box/protocol/message_channel.h"
 
+#include "linyaps_box/log/logger.h"
 #include "linyaps_box/os/socket.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/span.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
 
+#include <cassert>
 #include <cerrno>
 #include <optional>
 #include <stdexcept>
@@ -47,10 +48,31 @@ struct raw_packet
     std::vector<utils::file_descriptor> fds;
 };
 
+auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>;
+
+// Common helper: recv one message, deserialize, return nullopt on peer close.
+[[nodiscard]] auto recv_one(const infra::unix_socket &socket) -> std::optional<msg::datagram>
+{
+    auto raw = recv_raw(socket);
+    if (!raw) {
+        return std::nullopt;
+    }
+
+    auto body = msg::deserialize(utils::span<const std::byte>(raw->data.data(), raw->data.size()));
+    return msg::datagram{ std::move(body), std::move(raw->fds) };
+}
+
 auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>
 {
     std::byte dummy{ };
     auto peek = os::recv(socket.fd().get(), &dummy, 0, MSG_PEEK | MSG_TRUNC);
+    if (!peek) {
+        if (peek.error == ECONNRESET || peek.error == ENOTCONN || peek.error == EPIPE) {
+            return std::nullopt;
+        }
+
+        throw std::system_error(peek.error, std::system_category(), "recv");
+    }
 
     // PEER-CLOSE DETECTION ON SEQPACKET
     //
@@ -60,14 +82,6 @@ auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>
     // second phase: after receiving exec_ready, CLOEXEC socket close signals
     // exec success, while a die message signals exec failure.  Close-before-
     // exec_ready is still treated as an error.
-    if (!peek) {
-        if (peek.error == ECONNRESET || peek.error == ENOTCONN || peek.error == EPIPE) {
-            return std::nullopt;
-        }
-
-        throw std::system_error(peek.error, std::system_category(), "recv");
-    }
-
     if (peek.bytes == 0) {
         return std::nullopt;
     }
@@ -101,15 +115,54 @@ auto message_channel_base::send_stage(stage::type s) const -> void
     send(msg::stage{ s });
 }
 
+auto message_channel_base::send_log(const linyaps_box::log::log_context &ctx) const -> void
+{
+    const msg::log m{
+        ctx.msg,
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+        ctx.file,
+        ctx.function,
+        ctx.line,
+#endif
+        ctx.errno_,
+        std::chrono::duration_cast<std::chrono::nanoseconds>(ctx.wall_time.time_since_epoch()),
+        ctx.pid,
+        ctx.lvl
+    };
+
+    auto buffer = msg::serialize_log(m);
+    send_raw(socket_, utils::span(buffer), { });
+}
+
 auto message_channel_base::recv() const -> msg::datagram
 {
-    auto raw = recv_raw(socket_);
-    if (UNLIKELY(!raw)) {
+    auto inc = recv_one(socket_);
+    if (UNLIKELY(!inc)) {
         throw std::runtime_error("socket closed by peer");
     }
 
-    auto body = msg::deserialize(utils::span<const std::byte>(raw->data.data(), raw->data.size()));
-    return msg::datagram{ std::move(body), std::move(raw->fds) };
+    return std::move(inc).value();
+}
+
+void forward_log_to_parent(msg::log l)
+{
+    auto tp = std::chrono::system_clock::time_point{
+        std::chrono::duration_cast<std::chrono::system_clock::duration>(l.time)
+    };
+
+    const linyaps_box::log::log_context ctx{
+        l.lvl,
+        std::move(l.message),
+        tp,
+        l.pid,
+        l.errno_,
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+        std::move(l.file),
+        std::move(l.function),
+        l.line,
+#endif
+    };
+    linyaps_box::log::global_logger::instance().dispatch_raw(ctx);
 }
 
 parent_message_channel::parent_message_channel(infra::unix_socket socket) noexcept
@@ -119,77 +172,94 @@ parent_message_channel::parent_message_channel(infra::unix_socket socket) noexce
 
 auto parent_message_channel::wait_for(stage::type expected) const -> void
 {
-    auto inc = recv();
-
-    std::visit(utils::Overload{
-                 [&](const msg::die &d) {
-                     throw std::system_error(d.errnum, std::system_category(), d.message);
-                 },
-                 [&](const msg::stage &s) {
-                     if (UNLIKELY(s.value != expected)) {
-                         throw std::runtime_error(
-                           fmt::format("expected stage {} but got {}", expected, s.value));
-                     }
-                 },
-                 [&](const msg::pid_report &) {
-                     throw std::runtime_error("unexpected pid_report during wait_for");
-                 },
-                 [&](const msg::console_fd &) {
-                     throw std::runtime_error("unexpected console_fd during wait_for");
-                 },
-                 [&](const msg::proceed &) {
-                     throw std::runtime_error("unexpected proceed during wait_for");
-                 },
-               },
-               inc.body);
-}
-
-auto parent_message_channel::wait_for_exec() const -> void
-{
-    // Phase 1: receive exec_ready or die
-    {
-        auto raw = recv_raw(socket_);
-        if (!raw) {
-            throw std::runtime_error("container process closed sync socket before exec_ready");
+    while (true) {
+        auto inc = recv_one(socket_);
+        if (UNLIKELY(!inc)) {
+            throw std::runtime_error(
+              fmt::format("container process exited before reaching expected stage {}", expected));
         }
 
-        auto body =
-          msg::deserialize(utils::span<const std::byte>(raw->data.data(), raw->data.size()));
+        bool matched{ false };
         std::visit(utils::Overload{
-                     [&](const msg::die &d) {
-                         throw std::system_error(d.errnum, std::system_category(), d.message);
+                     [&](msg::log &l) {
+                         assert(inc->fds.empty());
+                         forward_log_to_parent(std::move(l));
                      },
                      [&](const msg::stage &s) {
-                         if (UNLIKELY(s.value != stage::type::exec_ready)) {
+                         if (UNLIKELY(s.value != expected)) {
                              throw std::runtime_error(
-                               fmt::format("expected exec_ready but got {}", s.value));
+                               fmt::format("expected stage {} but got {}", expected, s.value));
                          }
+
+                         matched = true;
                      },
                      [&](const auto &) {
-                         throw std::runtime_error("unexpected message during wait_for_exec");
+                         throw std::runtime_error("unexpected message during wait_for");
                      },
                    },
-                   body);
-    }
+                   inc->body);
 
-    // Phase 2: receive either a close (exec success) or die (exec failure)
-    auto result = recv_raw(socket_);
-    if (!result) {
-        return; // success
+        if (matched) {
+            return;
+        }
     }
+}
 
-    auto body =
-      msg::deserialize(utils::span<const std::byte>(result->data.data(), result->data.size()));
-    std::visit(utils::Overload{
-                 [&](const msg::die &d) {
-                     throw std::system_error(d.errnum, std::system_category(), d.message);
-                 },
-                 [&](const auto &) {
-                     throw std::runtime_error(
-                       "unexpected message after exec_ready (expected close or die)");
-                 },
-               },
-               body);
+auto parent_message_channel::wait_for_close() const -> void
+{
+    // Contract: a socket close without any preceding FATAL log is treated as
+    // "exec succeeded".  The child's exit code is not known here — it is
+    // reaped later by container_monitor::wait_container_exit().  Callers that
+    // need to distinguish "exec ok" from "child died silently (e.g. OOM/signal
+    // before it could log FATAL)" must additionally consult the monitor; this
+    // function cannot tell those apart.
+    bool saw_log{ false };
+    int saved_errno{ 0 };
+    while (true) {
+        auto inc = recv_one(socket_);
+        if (!inc) {
+            if (UNLIKELY(saw_log)) {
+                throw std::system_error(saved_errno,
+                                        std::system_category(),
+                                        "container process failed during exec");
+            }
+
+            return;
+        }
+
+        std::visit(utils::Overload{
+                     [&](msg::log &l) {
+                         assert(inc->fds.empty());
+                         if (l.lvl == linyaps_box::log::level::fatal) {
+                             saw_log = true;
+                             saved_errno = l.errno_;
+                         }
+
+                         forward_log_to_parent(std::move(l));
+                     },
+                     [&](const auto &) {
+                         throw std::runtime_error("unexpected message after exec_ready");
+                     },
+                   },
+                   inc->body);
+    }
+}
+
+auto parent_message_channel::drain_logs() const -> msg::datagram
+{
+    while (true) {
+        auto inc = recv_one(socket_);
+        if (UNLIKELY(!inc)) {
+            throw std::runtime_error("child process exited before sending expected message");
+        }
+
+        if (!std::holds_alternative<msg::log>(inc->body)) {
+            return std::move(inc).value();
+        }
+
+        assert(inc->fds.empty());
+        forward_log_to_parent(std::move(std::get<msg::log>(inc->body)));
+    }
 }
 
 child_message_channel::child_message_channel(infra::unix_socket socket) noexcept
@@ -201,28 +271,18 @@ auto child_message_channel::wait_for(stage::type expected) const -> void
 {
     auto inc = recv();
 
-    std::visit(
-      utils::Overload{
-        [&](const msg::die &) {
-            throw std::system_error(EPROTO, std::system_category(), "received die from parent");
-        },
-        [&](const msg::stage &s) {
-            if (UNLIKELY(s.value != expected)) {
-                throw std::runtime_error(
-                  fmt::format("expected stage {} but got {}", expected, s.value));
-            }
-        },
-        [&](const msg::pid_report &) {
-            throw std::runtime_error("unexpected pid_report during wait_for");
-        },
-        [&](const msg::console_fd &) {
-            throw std::runtime_error("unexpected console_fd during wait_for");
-        },
-        [&](const msg::proceed &) {
-            throw std::runtime_error("unexpected proceed during wait_for");
-        },
-      },
-      inc.body);
+    std::visit(utils::Overload{
+                 [&](const msg::stage &s) {
+                     if (UNLIKELY(s.value != expected)) {
+                         throw std::runtime_error(
+                           fmt::format("expected stage {} but got {}", expected, s.value));
+                     }
+                 },
+                 [&](const auto &) {
+                     throw std::runtime_error("unexpected message during child wait_for");
+                 },
+               },
+               inc.body);
 }
 
 auto child_message_channel::wait_for_proceed() const -> void
@@ -231,32 +291,12 @@ auto child_message_channel::wait_for_proceed() const -> void
 
     std::visit(utils::Overload{
                  [](const msg::proceed &) { },
-                 [&](const msg::die &) {
-                     throw std::system_error(EPROTO,
-                                             std::system_category(),
-                                             "received die from parent during wait_for_proceed");
-                 },
                  [&](const auto &other) {
                      throw std::runtime_error(
                        fmt::format("unexpected message during wait_for_proceed: {}", other));
                  },
                },
                inc.body);
-}
-
-auto child_message_channel::report_error(int errnum, std::string_view text) const noexcept -> void
-try {
-    send(msg::die{ errnum, std::string{ text } });
-} catch (const std::exception &e) {
-    LINYAPS_BOX_ERR() << fmt::format("failed to report error to parent (errno={}, msg=\"{}\"): {}",
-                                     errnum,
-                                     text,
-                                     e.what());
-} catch (...) {
-    LINYAPS_BOX_ERR() << fmt::format(
-      "failed to report error to parent (errno={}, msg=\"{}\"): unknown",
-      errnum,
-      text);
 }
 
 auto create_message_socketpair() -> std::pair<parent_message_channel, child_message_channel>
