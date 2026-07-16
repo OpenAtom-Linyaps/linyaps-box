@@ -4,9 +4,9 @@
 
 #include "linyaps_box/command/exec.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory_manager.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <nlohmann/json.hpp>
@@ -65,6 +65,9 @@ try {
 
     return container->second.exec(std::move(option));
 } catch (const std::exception &e) {
-    LINYAPS_BOX_ERR() << "failed to exec: " << e.what();
-    return -1;
+    LINYAPS_BOX_LOG_ERROR("failed to exec: {}", e.what());
+    return EXIT_FAILURE;
+} catch (...) {
+    LINYAPS_BOX_LOG_ERROR("failed to exec: unknown exception");
+    return EXIT_FAILURE;
 }
