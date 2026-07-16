@@ -6,6 +6,7 @@
 
 #include "linyaps_box/utils/utils.h"
 
+#include <chrono>
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
@@ -28,7 +29,7 @@ template <typename T>
 auto read_pod(utils::span<const std::byte> data, std::size_t &offset) -> T
 {
     static_assert(std::is_trivially_copyable_v<T>);
-    if (UNLIKELY(offset + sizeof(T) > data.size())) {
+    if (UNLIKELY(sizeof(T) > data.size() - offset)) {
         throw std::runtime_error("payload too short for pod read");
     }
 
@@ -36,6 +37,29 @@ auto read_pod(utils::span<const std::byte> data, std::size_t &offset) -> T
     std::memcpy(&val, data.data() + offset, sizeof(T));
     offset += sizeof(T);
     return val;
+}
+
+auto append_string(std::vector<std::byte> &buf, std::string_view s) -> void
+{
+    if (s.size() > UINT32_MAX) {
+        throw std::logic_error("string too large for wire format");
+    }
+    auto len = static_cast<uint32_t>(s.size());
+    append_pod(buf, len);
+    auto view = utils::as_bytes(utils::span{ s });
+    buf.insert(buf.end(), view.cbegin(), view.cend());
+}
+
+auto read_string(utils::span<const std::byte> data, std::size_t &offset) -> std::string
+{
+    auto len = read_pod<uint32_t>(data, offset);
+    if (offset > data.size() || len > data.size() - offset) {
+        throw std::runtime_error("payload too short for string read");
+    }
+
+    std::string result(reinterpret_cast<const char *>(data.data() + offset), len);
+    offset += len;
+    return result;
 }
 
 } // namespace
@@ -52,14 +76,8 @@ auto datagram::take_fds() -> std::vector<utils::file_descriptor>
 auto serialize(const message &msg) -> std::vector<std::byte>
 {
     return std::visit(utils::Overload{
-                        [](const die &m) -> std::vector<std::byte> {
-                            std::vector<std::byte> buf;
-                            buf.reserve(sizeof(msg_id) + sizeof(m.errnum) + m.message.size());
-                            append_pod(buf, msg_id::die);
-                            append_pod(buf, m.errnum);
-                            const auto msg_view = utils::as_bytes(utils::span{ m.message });
-                            buf.insert(buf.end(), msg_view.cbegin(), msg_view.cend());
-                            return buf;
+                        [](const log &m) -> std::vector<std::byte> {
+                            return serialize_log(m);
                         },
                         [](const stage &m) -> std::vector<std::byte> {
                             std::vector<std::byte> buf;
@@ -104,15 +122,33 @@ auto deserialize(utils::span<const std::byte> wire) -> message
     std::size_t offset{ 0 };
 
     switch (id) {
-    case msg_id::die: {
-        auto errnum = read_pod<decltype(die::errnum)>(payload, offset);
-        const auto remaining = payload.subspan(offset);
-        // convert to char* explicitly for older libstdc++ versions which before 14.1.0
-        // more detailed:
-        // https://gitlab.com/gnutools/gcc/-/commit/cc3d7baf2741777e99567d4301802c99f5775619
-        return die{ errnum,
-                    std::string{ reinterpret_cast<const char *>(remaining.data()), // NOLINT
-                                 remaining.size() } };
+    case msg_id::log: {
+        auto lvl_raw = read_pod<uint8_t>(payload, offset);
+        if (UNLIKELY(lvl_raw > static_cast<uint8_t>(linyaps_box::log::level::debug))) {
+            throw std::runtime_error(fmt::format("invalid log level: {}", lvl_raw));
+        }
+
+        auto lvl = static_cast<linyaps_box::log::level>(lvl_raw);
+        auto message = read_string(payload, offset);
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+        auto file = read_string(payload, offset);
+        auto line = read_pod<int>(payload, offset);
+        auto function = read_string(payload, offset);
+#endif
+        auto errno_val = read_pod<int>(payload, offset);
+        auto pid = read_pod<pid_t>(payload, offset);
+        auto time_count = read_pod<std::int64_t>(payload, offset);
+
+        return log{ std::move(message),
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+                    std::move(file),
+                    std::move(function),
+                    line,
+#endif
+                    errno_val,
+                    std::chrono::nanoseconds{ time_count },
+                    pid,
+                    lvl };
     }
     case msg_id::stage: {
         auto value = read_pod<protocol::stage::type>(payload, offset);
@@ -138,6 +174,33 @@ auto deserialize(utils::span<const std::byte> wire) -> message
           fmt::format("unknown msg_id: {}", static_cast<std::underlying_type_t<msg_id>>(id)));
     }
     }
+}
+
+auto serialize_log(const msg::log &m) -> std::vector<std::byte>
+{
+    std::vector<std::byte> buf;
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    buf.reserve(sizeof(msg_id) + 1 + m.message.size() + m.file.size() + m.function.size()
+                + sizeof(int) + sizeof(int) + sizeof(pid_t) + sizeof(std::int64_t)
+                + (3 * sizeof(uint32_t)));
+#else
+    buf.reserve(sizeof(msg_id) + 1 + m.message.size() + sizeof(int) + sizeof(pid_t)
+                + sizeof(std::int64_t) + sizeof(uint32_t));
+#endif
+    append_pod(buf, msg_id::log);
+    append_pod(buf, static_cast<uint8_t>(m.lvl));
+    append_string(buf, m.message);
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+    append_string(buf, m.file);
+    append_pod(buf, m.line);
+    append_string(buf, m.function);
+#endif
+    append_pod(buf, m.errno_);
+    append_pod(buf, m.pid);
+    const auto ns = m.time.count();
+    static_assert(std::is_signed_v<decltype(ns)>);
+    append_pod<std::int64_t>(buf, ns);
+    return buf;
 }
 
 } // namespace linyaps_box::protocol::msg

@@ -7,7 +7,6 @@
 #include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/protocol/message.h"
 
-#include <string_view>
 #include <utility>
 
 namespace linyaps_box::protocol {
@@ -27,6 +26,8 @@ public:
 
     auto send(const msg::message &body, utils::span<const utils::file_descriptor> fds = { }) const
       -> void;
+
+    auto send_log(const linyaps_box::log::log_context &ctx) const -> void;
 
     auto send_stage(stage::type s) const -> void;
 
@@ -48,8 +49,8 @@ public:
     ~parent_message_channel() noexcept = default;
 
     auto wait_for(stage::type expected) const -> void;
-
-    auto wait_for_exec() const -> void;
+    auto wait_for_close() const -> void;
+    [[nodiscard]] auto drain_logs() const -> msg::datagram;
 };
 
 class child_message_channel final : public message_channel_base
@@ -64,11 +65,10 @@ public:
     ~child_message_channel() noexcept = default;
 
     auto wait_for(stage::type expected) const -> void;
-
     auto wait_for_proceed() const -> void;
-
-    auto report_error(int errnum, std::string_view text) const noexcept -> void;
 };
+
+void forward_log_to_parent(msg::log l);
 
 auto create_message_socketpair() -> std::pair<parent_message_channel, child_message_channel>;
 
