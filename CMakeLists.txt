@@ -34,6 +34,9 @@ option(linyaps-box_ENABLE_SECCOMP "Build linyaps-box with seccomp support." ON)
 
 option(linyaps-box_ENABLE_CAP "Build linyaps-box with capability support" ON)
 
+option(linyaps-box_ENABLE_SYSTEMD_INTEGRATION
+       "Build with journald (systemd) support." ON)
+
 option(linyaps-box_ENABLE_UNIT_TESTS "Enable unit tests."
        ${linyaps-box_IS_TOP_LEVEL})
 
@@ -77,17 +80,14 @@ set(linyaps-box_STACK_GROWTH_DOWN
 )
 
 set(linyaps-box_DEFAULT_LOG_LEVEL
-    LOG_WARNING
-    CACHE
-      STRING
-      "The default syslog priority. This is used to filter log messages at runtime time."
-)
+    warn
+    CACHE STRING "Default runtime log level (fatal/error/warn/info/debug).")
 
 set(linyaps-box_ACTIVE_LOG_LEVEL
-    LOG_WARNING
+    info
     CACHE
       STRING
-      "The active syslog priority. This is used to filter log messages at compile time."
+      "Compile-time log level; fatal/error always kept. Default 'info' eliminates debug only."
 )
 
 set(linyaps-box_ENABLE_CPM
@@ -143,6 +143,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/command/run.h
     src/linyaps_box/config.cpp
     src/linyaps_box/config.h
+    src/linyaps_box/config/kernel_fallbacks.h
+    src/linyaps_box/config/mount_options.h
     src/linyaps_box/container.cpp
     src/linyaps_box/container.h
     src/linyaps_box/container_monitor.cpp
@@ -157,18 +159,45 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/impl/json_printer.h
     src/linyaps_box/impl/table_printer.cpp
     src/linyaps_box/impl/table_printer.h
+    src/linyaps_box/infra/unix_socket.cpp
+    src/linyaps_box/infra/unix_socket.h
     src/linyaps_box/interface.cpp
     src/linyaps_box/interface.h
     src/linyaps_box/io/epoll.cpp
     src/linyaps_box/io/epoll.h
     src/linyaps_box/io/forwarder.cpp
     src/linyaps_box/io/forwarder.h
+    src/linyaps_box/log/formatter.cpp
+    src/linyaps_box/log/formatter.h
+    src/linyaps_box/log/logger.cpp
+    src/linyaps_box/log/logger.h
+    src/linyaps_box/log/macro.h
+    src/linyaps_box/log/sink.h
+    src/linyaps_box/log/sinks/file_sink.cpp
+    src/linyaps_box/log/sinks/file_sink.h
+    src/linyaps_box/log/sinks/journald_sink.cpp
+    src/linyaps_box/log/sinks/journald_sink.h
+    src/linyaps_box/log/sinks/stderr_sink.cpp
+    src/linyaps_box/log/sinks/stderr_sink.h
+    src/linyaps_box/log/sinks/sync_socket_sink.cpp
+    src/linyaps_box/log/sinks/sync_socket_sink.h
+    src/linyaps_box/log/sinks/syslog_sink.cpp
+    src/linyaps_box/log/sinks/syslog_sink.h
+    src/linyaps_box/log/utils.cpp
+    src/linyaps_box/log/utils.h
+    src/linyaps_box/os/process.cpp
+    src/linyaps_box/os/process.h
+    src/linyaps_box/os/result.h
+    src/linyaps_box/os/socket.cpp
+    src/linyaps_box/os/socket.h
+    src/linyaps_box/os/tty.cpp
+    src/linyaps_box/os/tty.h
     src/linyaps_box/printer.cpp
     src/linyaps_box/printer.h
-    src/linyaps_box/protocol/message.cpp
-    src/linyaps_box/protocol/message.h
     src/linyaps_box/protocol/message_channel.cpp
     src/linyaps_box/protocol/message_channel.h
+    src/linyaps_box/protocol/message.cpp
+    src/linyaps_box/protocol/message.h
     src/linyaps_box/protocol/stage.h
     src/linyaps_box/runtime.cpp
     src/linyaps_box/runtime.h
@@ -178,10 +207,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/status_directory_manager.h
     src/linyaps_box/terminal.cpp
     src/linyaps_box/terminal.h
-    src/linyaps_box/os/socket.cpp
-    src/linyaps_box/os/socket.h
-    src/linyaps_box/infra/unix_socket.cpp
-    src/linyaps_box/infra/unix_socket.h
     src/linyaps_box/utils/atomic_write.cpp
     src/linyaps_box/utils/atomic_write.h
     src/linyaps_box/utils/cgroups.cpp
@@ -189,6 +214,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/close_range.cpp
     src/linyaps_box/utils/close_range.h
     src/linyaps_box/utils/defer.h
+    src/linyaps_box/utils/enum_traits.h
     src/linyaps_box/utils/epoll.cpp
     src/linyaps_box/utils/epoll.h
     src/linyaps_box/utils/file.cpp
@@ -198,17 +224,14 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/inspect.cpp
     src/linyaps_box/utils/inspect.h
     src/linyaps_box/utils/ioctl.h
-    src/linyaps_box/utils/log.cpp
-    src/linyaps_box/utils/log.h
     src/linyaps_box/utils/mkdir.cpp
     src/linyaps_box/utils/mkdir.h
     src/linyaps_box/utils/mknod.cpp
     src/linyaps_box/utils/mknod.h
     src/linyaps_box/utils/mman.cpp
+    src/linyaps_box/utils/mman.h
     src/linyaps_box/utils/platform.cpp
     src/linyaps_box/utils/platform.h
-    src/linyaps_box/utils/process.cpp
-    src/linyaps_box/utils/process.h
     src/linyaps_box/utils/ringbuffer.cpp
     src/linyaps_box/utils/ringbuffer.h
     src/linyaps_box/utils/semver.cpp
@@ -225,6 +248,12 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/terminal.cpp
     src/linyaps_box/utils/terminal.h
     src/linyaps_box/utils/utils.h)
+
+if(NOT linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
+  list(REMOVE_ITEM linyaps-box_LIBRARY_SOURCE
+       src/linyaps_box/log/sinks/journald_sink.h
+       src/linyaps_box/log/sinks/journald_sink.cpp)
+endif()
 
 set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
 
@@ -263,6 +292,11 @@ if(linyaps-box_ENABLE_CAP)
   # TODO: maybe remove libcap and implement it by ourself ?
   pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap>=2.25)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
+endif()
+
+if(linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
+  pkg_check_modules(libsystemd REQUIRED IMPORTED_TARGET libsystemd)
+  list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE PkgConfig::libsystemd)
 endif()
 
 if(linyaps-box_ENABLE_CPM)
@@ -314,7 +348,8 @@ else()
   message(STATUS "use system nlohmann_json ${nlohmann_json_VERSION}")
 endif()
 
-list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES nlohmann_json::nlohmann_json)
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
+     nlohmann_json::nlohmann_json)
 
 find_package(CLI11 2.5.0 QUIET)
 if(NOT CLI11_FOUND)
@@ -387,13 +422,14 @@ target_compile_definitions(
   PRIVATE
     "LINYAPS_BOX_CLONE_CHILD_STACK_SIZE=${linyaps-box_CLONE_CHILD_STACK_SIZE}"
     "LINYAPS_BOX_STACK_GROWTH_DOWN=${linyaps-box_STACK_GROWTH_DOWN}"
-    "LINYAPS_BOX_DEFAULT_LOG_LEVEL=${linyaps-box_DEFAULT_LOG_LEVEL}"
-    "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
+  PUBLIC "LINYAPS_BOX_DEFAULT_LOG_LEVEL_NAME=${linyaps-box_DEFAULT_LOG_LEVEL}"
+         "LINYAPS_BOX_ACTIVE_LOG_LEVEL_NAME=${linyaps-box_ACTIVE_LOG_LEVEL}")
 target_compile_options("${linyaps-box_LIBRARY}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 target_compile_definitions(
   "${linyaps-box_LIBRARY}"
-  PUBLIC "$<$<BOOL:${linyaps-box_STATIC}>:LINYAPS_BOX_STATIC_LINK>")
+  PUBLIC "$<$<BOOL:${linyaps-box_STATIC}>:LINYAPS_BOX_STATIC_LINK>"
+         "LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION")
 
 if(linyaps-box_ENABLE_SECCOMP)
   target_compile_definitions("${linyaps-box_LIBRARY}"
@@ -407,6 +443,11 @@ endif()
 if(linyaps-box_ENABLE_CAP)
   target_compile_definitions("${linyaps-box_LIBRARY}"
                              PUBLIC LINYAPS_BOX_ENABLE_CAP)
+endif()
+
+if(linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
+  target_compile_definitions("${linyaps-box_LIBRARY}"
+                             PUBLIC LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION)
 endif()
 
 if(linyaps-box_ENABLE_COVERAGE)
@@ -444,14 +485,6 @@ target_link_options(
   "${linyaps-box_APP}" PRIVATE "$<$<BOOL:${linyaps-box_STATIC}>:-static>"
   "$<$<BOOL:${linyaps-box_STATIC}>:-static-libgcc>"
   "$<$<BOOL:${linyaps-box_STATIC}>:-static-libstdc++>")
-target_compile_features("${linyaps-box_APP}" PRIVATE cxx_std_17)
-set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD 17)
-set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_EXTENSIONS OFF)
-set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD_REQUIRED ON)
-target_compile_definitions(
-  "${linyaps-box_APP}"
-  PRIVATE "LINYAPS_BOX_DEFAULT_LOG_LEVEL=${linyaps-box_DEFAULT_LOG_LEVEL}"
-          "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
 target_compile_options("${linyaps-box_APP}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 

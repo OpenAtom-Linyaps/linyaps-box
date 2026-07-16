@@ -24,7 +24,7 @@ struct flag_entry
 };
 
 // VFS mount(2) flags — passed directly to mount()'s 4th argument.
-constexpr std::array<flag_entry, 20> vfs{ {
+constexpr std::array<flag_entry, 19> vfs{ {
   { MS_BIND, "bind" },
   { MS_DIRSYNC, "dirsync" },
   { 0, "defaults" },
@@ -122,7 +122,7 @@ constexpr const flag_entry *find(const std::array<flag_entry, N> &table,
 // Dump VFS + propagation flags and any leftover unknown bits.
 // Names are looked up from the vfs and propagation tables; unknown bits
 // are printed as hex.
-inline std::string dump(unsigned long vfs_flags, unsigned long prop_flags = 0) noexcept
+inline std::string dump(unsigned long vfs_flags, unsigned long prop_flags = 0)
 {
     std::stringstream ss;
     ss << "[ ";
