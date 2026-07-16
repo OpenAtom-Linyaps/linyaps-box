@@ -118,10 +118,10 @@ auto message_channel_base::send_stage(stage::type s) const -> void
 auto message_channel_base::send_log(const linyaps_box::log::log_context &ctx) const -> void
 {
     const msg::log m{
-        ctx.msg,
+        std::string{ ctx.msg },
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        ctx.file,
-        ctx.function,
+        std::string{ ctx.file },
+        std::string{ ctx.function },
         ctx.line,
 #endif
         ctx.errno_,
@@ -152,13 +152,13 @@ void forward_log_to_parent(msg::log l)
 
     const linyaps_box::log::log_context ctx{
         l.lvl,
-        std::move(l.message),
+        l.message,
         tp,
         l.pid,
         l.errno_,
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        std::move(l.file),
-        std::move(l.function),
+        l.file,
+        l.function,
         l.line,
 #endif
     };

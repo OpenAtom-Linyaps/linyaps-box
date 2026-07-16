@@ -114,7 +114,7 @@ void global_logger::dispatch_log(level lvl,
                                  std::string_view function,
                                  int line) const
 {
-    if (lvl > level_) {
+    if (UNLIKELY(lvl > level_)) {
         return;
     }
 
@@ -123,13 +123,13 @@ void global_logger::dispatch_log(level lvl,
 
     const log_context ctx{
         lvl,
-        fmt::to_string(buf),
+        std::string_view{ buf.data(), buf.size() },
         std::chrono::system_clock::now(),
         ::getpid(),
         0,
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        std::string(file),
-        std::string(function),
+        file,
+        function,
         line,
 #endif
     };
@@ -144,7 +144,7 @@ void global_logger::dispatch_log(level lvl,
                                  std::string_view function,
                                  int line) const
 {
-    if (lvl > level_) {
+    if (UNLIKELY(lvl > level_)) {
         return;
     }
 
@@ -153,13 +153,13 @@ void global_logger::dispatch_log(level lvl,
 
     const log_context ctx{
         lvl,
-        fmt::to_string(buf),
+        std::string_view{ buf.data(), buf.size() },
         std::chrono::system_clock::now(),
         ::getpid(),
         errno_val,
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        std::string(file),
-        std::string(function),
+        file,
+        function,
         line,
 #endif
     };
@@ -183,9 +183,10 @@ auto global_logger::dispatch_to_sinks(const log_context &ctx) const -> void
 
 void global_logger::dispatch_raw(const log_context &ctx) const
 {
-    if (ctx.lvl > level_) {
+    if (UNLIKELY(ctx.lvl > level_)) {
         return;
     }
+
     dispatch_to_sinks(ctx);
 }
 

@@ -46,13 +46,13 @@ constexpr std::string_view log_basename(std::string_view path) noexcept
 struct log_context
 {
     level lvl{ };
-    std::string msg;
+    std::string_view msg;
     std::chrono::system_clock::time_point wall_time;
     pid_t pid{ };
     int errno_{ 0 };
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    std::string file;
-    std::string function;
+    std::string_view file;
+    std::string_view function;
     int line{ };
 #endif
 
