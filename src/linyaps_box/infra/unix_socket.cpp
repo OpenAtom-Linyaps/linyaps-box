@@ -202,6 +202,9 @@ auto unix_socket::recv_data_with_fds(utils::span<std::byte> data) const
         throw std::system_error(result.error, std::system_category(), "recvmsg");
     }
 
+    // Extract fds first
+    auto fds = extract_fds(msg);
+
     // On SOCK_SEQPACKET, recv_raw already handles peer-close detection via
     // zero-byte MSG_PEEK.  By the time we get here, a non-zero peek was
     // observed, so recvmsg cannot return 0 — the datagram is already queued.
@@ -209,7 +212,7 @@ auto unix_socket::recv_data_with_fds(utils::span<std::byte> data) const
         throw std::runtime_error("message or control data truncated during recvmsg");
     }
 
-    return { extract_fds(msg), result.bytes };
+    return { std::move(fds), result.bytes };
 }
 
 auto unix_socket::create_socketpair() -> std::pair<unix_socket, unix_socket>
