@@ -11,6 +11,7 @@ exclude: |
   )
 
 ci:
+  autoupdate_commit_msg: "chore(deps): pre-commit.ci autoupdate"
   autofix_prs: false
   autoupdate_schedule: 'monthly'
 
@@ -18,21 +19,24 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      - id: check-merge-conflict
       - id: trailing-whitespace
+      - id: check-symlinks
         exclude: \.md$
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
       - id: check-toml
       - id: check-added-large-files
+      - id: mixed-line-ending
+      - id: check-shebang-scripts-are-executable
+      - id: check-executables-have-shebangs
 
-  - repo: https://github.com/cpp-linter/cpp-linter-hooks
-    rev: v1.6.0
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v22.1.8
     hooks:
       - id: clang-format
-        name: clang-format (C/C++)
-        files: \.(c|cc|cpp|cxx|h|hpp|hxx)$
-        args: ['--style=file']
+        types_or: [c++, c]
 
   - repo: https://github.com/cheshirekow/cmake-format-precommit
     rev: v0.6.13
