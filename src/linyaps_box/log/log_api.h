@@ -13,45 +13,40 @@
 
 namespace linyaps_box::log {
 
-void dispatch(level lvl,
+auto dispatch(level lvl,
               fmt::string_view fmt_str,
               fmt::format_args args,
               std::string_view file,
               std::string_view function,
-              int line);
+              int line) noexcept -> void;
 
 [[nodiscard]] auto get_current_log_level() noexcept -> level;
 
-void dispatch(level lvl,
+auto dispatch(level lvl,
               int errno_val,
               fmt::string_view fmt_str,
               fmt::format_args args,
               std::string_view file,
               std::string_view function,
-              int line);
+              int line) noexcept -> void;
 
 template <typename... Args>
-inline void fatal(std::string_view file,
+inline auto fatal(std::string_view file,
                   std::string_view function,
                   int line,
                   fmt::format_string<Args...> fmt,
-                  Args &&...args)
+                  Args &&...args) noexcept -> void
 {
-    dispatch(level::fatal,
-             fmt.get(),
-             fmt::make_format_args(args...),
-             file,
-             function,
-             line);
+    dispatch(level::fatal, fmt.get(), fmt::make_format_args(args...), file, function, line);
 }
 
 template <typename... Args>
-inline void fatal(std::string_view file,
+inline auto fatal(std::string_view file,
                   std::string_view function,
                   int line,
                   int errno_val,
                   fmt::format_string<Args...> fmt,
-                  Args &&...args)
+                  Args &&...args) noexcept -> void
 {
     dispatch(level::fatal,
              errno_val,
@@ -63,27 +58,22 @@ inline void fatal(std::string_view file,
 }
 
 template <typename... Args>
-inline void error(std::string_view file,
+inline auto error(std::string_view file,
                   std::string_view function,
                   int line,
                   fmt::format_string<Args...> fmt,
-                  Args &&...args)
+                  Args &&...args) noexcept -> void
 {
-    dispatch(level::error,
-             fmt.get(),
-             fmt::make_format_args(args...),
-             file,
-             function,
-             line);
+    dispatch(level::error, fmt.get(), fmt::make_format_args(args...), file, function, line);
 }
 
 template <typename... Args>
-inline void error(std::string_view file,
+inline auto error(std::string_view file,
                   std::string_view function,
                   int line,
                   int errno_val,
                   fmt::format_string<Args...> fmt,
-                  Args &&...args)
+                  Args &&...args) noexcept -> void
 {
     dispatch(level::error,
              errno_val,
@@ -95,48 +85,33 @@ inline void error(std::string_view file,
 }
 
 template <typename... Args>
-inline void warn(std::string_view file,
+inline auto warn(std::string_view file,
                  std::string_view function,
                  int line,
                  fmt::format_string<Args...> fmt,
-                 Args &&...args)
+                 Args &&...args) noexcept -> void
 {
-    dispatch(level::warn,
-             fmt.get(),
-             fmt::make_format_args(args...),
-             file,
-             function,
-             line);
+    dispatch(level::warn, fmt.get(), fmt::make_format_args(args...), file, function, line);
 }
 
 template <typename... Args>
-inline void info(std::string_view file,
+inline auto info(std::string_view file,
                  std::string_view function,
                  int line,
                  fmt::format_string<Args...> fmt,
-                 Args &&...args)
+                 Args &&...args) noexcept -> void
 {
-    dispatch(level::info,
-             fmt.get(),
-             fmt::make_format_args(args...),
-             file,
-             function,
-             line);
+    dispatch(level::info, fmt.get(), fmt::make_format_args(args...), file, function, line);
 }
 
 template <typename... Args>
-inline void debug(std::string_view file,
+inline auto debug(std::string_view file,
                   std::string_view function,
                   int line,
                   fmt::format_string<Args...> fmt,
-                  Args &&...args)
+                  Args &&...args) noexcept -> void
 {
-    dispatch(level::debug,
-             fmt.get(),
-             fmt::make_format_args(args...),
-             file,
-             function,
-             line);
+    dispatch(level::debug, fmt.get(), fmt::make_format_args(args...), file, function, line);
 }
 
 } // namespace linyaps_box::log

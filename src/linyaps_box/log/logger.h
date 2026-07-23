@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "linyaps_box/log/log_api.h"
 #include "linyaps_box/log/sink.h"
 
 #include <vector>
@@ -26,7 +25,7 @@ public:
     global_logger &operator=(global_logger &&) = delete;
     ~global_logger() noexcept = default;
 
-    static global_logger &instance() noexcept;
+    static auto instance() noexcept -> global_logger &;
 
     auto set_level(level) noexcept -> void;
     [[nodiscard]] auto get_level() const noexcept -> level;
@@ -35,27 +34,27 @@ public:
     [[nodiscard]] auto get_format() const noexcept -> output_format;
 
     auto set_sinks(std::vector<sink_variant> sinks) noexcept -> void;
-    auto set_sink(sink_variant sink) -> void;
+    auto set_sink(sink_variant sink) noexcept -> void;
     auto unset_sink() noexcept -> void;
 
-    void dispatch_log(level lvl,
+    auto dispatch_log(level lvl,
                       fmt::string_view fmt_str,
                       fmt::format_args args,
                       std::string_view file,
                       std::string_view function,
-                      int line) const;
+                      int line) const noexcept -> void;
 
-    void dispatch_log(level lvl,
+    auto dispatch_log(level lvl,
                       int errno_val,
                       fmt::string_view fmt_str,
                       fmt::format_args args,
                       std::string_view file,
                       std::string_view function,
-                      int line) const;
+                      int line) const noexcept -> void;
 
-    void dispatch_to_sinks(const log_context &ctx) const;
+    auto dispatch_to_sinks(const log_context &ctx) const noexcept -> void;
 
-    void dispatch_raw(const log_context &ctx) const;
+    auto dispatch_raw(const log_context &ctx) const noexcept -> void;
 
 private:
     global_logger() noexcept = default;
@@ -74,7 +73,7 @@ using sink_spec = std::variant<stderr_spec,
 #endif
                                >;
 
-auto parse_log_to(std::string_view spec) -> sink_spec;
-auto make_sink(sink_spec spec) -> sink_variant;
+auto make_spec(std::string_view log_dest) -> sink_spec;
+auto make_sink(sink_spec spec) noexcept -> sink_variant;
 
 } // namespace linyaps_box::log

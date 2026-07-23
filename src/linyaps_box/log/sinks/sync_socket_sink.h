@@ -18,7 +18,7 @@ public:
     sync_socket_sink &operator=(const sync_socket_sink &) = default;
     ~sync_socket_sink() noexcept = default;
 
-    auto log(const log_context &ctx) const -> void;
+    auto log(const log_context &ctx) const noexcept -> void;
 
 private:
     std::reference_wrapper<const protocol::child_message_channel> channel;

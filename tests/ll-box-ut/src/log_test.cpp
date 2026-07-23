@@ -45,7 +45,7 @@ struct mock_syslog_backend
 
     mutable std::vector<call> calls;
 
-    explicit mock_syslog_backend(std::string /*ident*/) { }
+    explicit mock_syslog_backend([[maybe_unused]] std::string mock) { }
 
     void syslog(linyaps_box::log::level priority, std::string_view msg) const noexcept
     {
@@ -321,12 +321,12 @@ TEST_F(LogFixture, SourceLocationPropagation)
 TEST_F(LogFixture, FileSinkOutput)
 {
     std::string tmp{ "/tmp/ll_box_test_XXXXXX" };
-    const auto fd = ::mkstemp(const_cast<char *>(tmp.data()));
-    ASSERT_GE(fd, 0);
-    ::close(fd);
+    const auto ret = ::mkstemp(const_cast<char *>(tmp.data()));
+    ASSERT_GE(ret, 0);
+    linyaps_box::utils::file_descriptor fd{ ret };
 
     auto &logger = linyaps_box::log::global_logger::instance();
-    linyaps_box::log::file_sink sink(linyaps_box::log::file_spec{ tmp });
+    linyaps_box::log::file_sink sink(linyaps_box::log::file_spec{ std::move(fd) });
     logger.set_sink(std::move(sink));
     logger.set_level(linyaps_box::log::level::debug);
 
@@ -343,28 +343,28 @@ TEST_F(LogFixture, FileSinkOutput)
     std::filesystem::remove(tmp);
 }
 
-TEST(LogConfig, ParseLogTo)
+TEST(LogConfig, MakeSpec)
 {
     using namespace linyaps_box::log;
 
-    auto s1 = parse_log_to("stderr");
+    auto s1 = make_spec("stderr");
     EXPECT_TRUE(std::holds_alternative<stderr_spec>(s1));
 
-    auto s2 = parse_log_to("file:/var/log/test.log");
+    auto s2 = make_spec("file:/tmp/test.log");
     ASSERT_TRUE(std::holds_alternative<file_spec>(s2));
-    EXPECT_EQ(std::get<file_spec>(s2).path, "/var/log/test.log");
+    EXPECT_EQ(std::get<file_spec>(s2).fd.current_path(), "/tmp/test.log");
 
-    auto s3 = parse_log_to("syslog:myapp");
+    auto s3 = make_spec("syslog:myapp");
     ASSERT_TRUE(std::holds_alternative<syslog_spec>(s3));
     EXPECT_EQ(std::get<syslog_spec>(s3).ident, "myapp");
 
-    auto s4 = parse_log_to("/var/log/default.log");
+    auto s4 = make_spec("/tmp/default.log");
     ASSERT_TRUE(std::holds_alternative<file_spec>(s4));
-    EXPECT_EQ(std::get<file_spec>(s4).path, "/var/log/default.log");
+    EXPECT_EQ(std::get<file_spec>(s4).fd.current_path(), "/tmp/default.log");
 
 #ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
 
-    auto s5 = linyaps_box::log::parse_log_to("journald:app");
+    auto s5 = linyaps_box::log::make_spec("journald:app");
     ASSERT_TRUE(std::holds_alternative<linyaps_box::log::journald_spec>(s5));
     EXPECT_EQ(std::get<linyaps_box::log::journald_spec>(s5).ident, "app");
 
@@ -440,13 +440,13 @@ TEST_F(LogFixture, MultiSinkOutput)
     auto &logger = linyaps_box::log::global_logger::instance();
 
     std::string tmp{ "/tmp/ll_box_test_XXXXXX" };
-    const auto fd = ::mkstemp(const_cast<char *>(tmp.data()));
-    ASSERT_GE(fd, 0);
-    ::close(fd);
+    const auto ret = ::mkstemp(const_cast<char *>(tmp.data()));
+    ASSERT_GE(ret, 0);
+    linyaps_box::utils::file_descriptor fd{ ret };
 
     std::vector<linyaps_box::log::sink_variant> sinks;
-    sinks.push_back(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
-    sinks.push_back(linyaps_box::log::file_sink{ linyaps_box::log::file_spec{ tmp } });
+    sinks.emplace_back(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
+    sinks.emplace_back(linyaps_box::log::file_sink{ linyaps_box::log::file_spec{ std::move(fd) } });
     logger.set_sinks(std::move(sinks));
     logger.set_level(linyaps_box::log::level::info);
 
@@ -480,10 +480,10 @@ TEST_F(LogFixture, JsonFormatOutput)
     LINYAPS_BOX_LOG_INFO("json test {}", 42);
 
     auto output = cap.extract();
-    EXPECT_NE(output.find("\"level\":\"INFO\""), std::string::npos);
-    EXPECT_NE(output.find("\"msg\":\"json test 42\""), std::string::npos);
-    EXPECT_NE(output.find("\"pid\":"), std::string::npos);
-    EXPECT_NE(output.find("Z\""), std::string::npos);
+    EXPECT_NE(output.find(R"("level":"INFO")"), std::string::npos);
+    EXPECT_NE(output.find(R"("msg":"json test 42")"), std::string::npos);
+    EXPECT_NE(output.find(R"("pid":)"), std::string::npos);
+    EXPECT_NE(output.find(R"(Z")"), std::string::npos);
     EXPECT_NE(output.find("}\n"), std::string::npos);
 }
 

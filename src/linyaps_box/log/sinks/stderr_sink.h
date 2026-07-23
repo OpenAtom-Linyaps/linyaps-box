@@ -23,9 +23,9 @@ public:
     stderr_sink(stderr_sink &&) noexcept = default;
     stderr_sink &operator=(const stderr_sink &) = delete;
     stderr_sink &operator=(stderr_sink &&) noexcept = default;
-    ~stderr_sink() = default;
+    ~stderr_sink() noexcept = default;
 
-    auto log(const log_context &ctx) const -> void;
+    auto log(const log_context &ctx) const noexcept -> void;
 
 private:
     utils::file_descriptor stderr_fd;

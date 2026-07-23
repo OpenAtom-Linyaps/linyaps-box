@@ -21,7 +21,7 @@ stderr_sink::stderr_sink([[maybe_unused]] stderr_spec spec) noexcept
 {
 }
 
-auto stderr_sink::log(const log_context &ctx) const -> void
+auto stderr_sink::log(const log_context &ctx) const noexcept -> void
 try {
     fmt::text_style style;
     if (color) {

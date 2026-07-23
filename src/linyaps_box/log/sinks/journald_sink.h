@@ -52,7 +52,7 @@ class basic_journald_sink
 
 public:
     template <typename T>
-    explicit basic_journald_sink(T spec)
+    explicit basic_journald_sink(T spec) noexcept
         : ident_(std::move(spec.ident))
     {
     }

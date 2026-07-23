@@ -20,7 +20,7 @@ syslog_backend::syslog_backend(std::string ident) noexcept
     openlog();
 }
 
-syslog_backend::~syslog_backend()
+syslog_backend::~syslog_backend() noexcept
 {
     if (opened) {
         ::closelog();

@@ -17,7 +17,7 @@
 
 namespace linyaps_box::log {
 
-void to_json(nlohmann::json &j, level lvl)
+auto to_json(nlohmann::json &j, level lvl) -> void
 {
     switch (lvl) {
     case level::fatal:
@@ -38,7 +38,7 @@ void to_json(nlohmann::json &j, level lvl)
     }
 }
 
-void from_json(const nlohmann::json &j, level &lvl)
+auto from_json(const nlohmann::json &j, level &lvl) -> void
 {
     auto s = j.get<std::string_view>();
     if (s == "FATAL") {
@@ -71,7 +71,7 @@ void from_json(const nlohmann::json &j, level &lvl)
 
 namespace {
 
-void append_strerror(fmt::memory_buffer &buf, int errno_val)
+auto append_strerror(fmt::memory_buffer &buf, int errno_val) noexcept -> void
 {
     if (errno_val != 0) {
         fmt::format_to(std::back_inserter(buf), "\n{}", OciLogMessage::base_indent);
@@ -81,7 +81,7 @@ void append_strerror(fmt::memory_buffer &buf, int errno_val)
 
 } // namespace
 
-void to_json(nlohmann::json &j, const log_context &ctx)
+auto to_json(nlohmann::json &j, const log_context &ctx) noexcept -> void
 {
     std::string time_str;
     time_str.reserve(32);
@@ -107,12 +107,7 @@ void to_json(nlohmann::json &j, const log_context &ctx)
     }
 }
 
-auto log_context_to_json_string(const log_context &ctx) -> std::string
-{
-    return nlohmann::json(ctx).dump();
-}
-
-void format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_style style)
+auto format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_style style) -> void
 {
     // Format time into a local buffer first to avoid writing raw bytes to output
     thread_local fmt::memory_buffer time_buf;
@@ -147,17 +142,17 @@ void format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_styl
     buf.push_back('\n');
 }
 
-void format_log(fmt::memory_buffer &buf,
+auto format_log(fmt::memory_buffer &buf,
                 const log_context &ctx,
                 output_format fmt,
-                fmt::text_style style)
+                fmt::text_style style) noexcept -> void
 {
     switch (fmt) {
     case output_format::text:
         format_text(buf, ctx, style);
         break;
     case output_format::json:
-        fmt::format_to(std::back_inserter(buf), "{}", log_context_to_json_string(ctx));
+        fmt::format_to(std::back_inserter(buf), "{}\n", nlohmann::json(ctx).dump());
         break;
     }
 }

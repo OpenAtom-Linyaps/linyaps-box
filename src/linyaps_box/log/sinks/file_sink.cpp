@@ -7,7 +7,6 @@
 #include "linyaps_box/log/formatter.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/utils.h"
-#include "linyaps_box/utils/file.h"
 #include "linyaps_box/utils/span.h"
 
 #include <fmt/format.h>
@@ -16,12 +15,12 @@
 
 namespace linyaps_box::log {
 
-file_sink::file_sink(const file_spec &spec)
-    : fd(utils::open(spec.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0600))
+file_sink::file_sink(file_spec spec)
+    : fd(std::move(spec.fd))
 {
 }
 
-auto file_sink::log(const log_context &ctx) const -> void
+auto file_sink::log(const log_context &ctx) const noexcept -> void
 try {
     thread_local fmt::memory_buffer buf;
     buf.clear();
