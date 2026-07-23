@@ -11,13 +11,11 @@
 
 namespace linyaps_box::log {
 
-void format_log(fmt::memory_buffer &buf,
+auto format_log(fmt::memory_buffer &buf,
                 const log_context &ctx,
                 output_format fmt,
-                fmt::text_style style);
+                fmt::text_style style) noexcept -> void;
 
 [[nodiscard]] auto get_current_format() noexcept -> output_format;
-
-[[nodiscard]] auto log_context_to_json_string(const log_context &ctx) -> std::string;
 
 } // namespace linyaps_box::log

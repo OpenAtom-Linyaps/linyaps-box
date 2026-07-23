@@ -36,10 +36,11 @@ try {
 
     std::vector<log::sink_variant> sinks;
     for (const auto &spec_str : opts.log) {
-        auto spec = log::parse_log_to(spec_str);
+        auto spec = log::make_spec(spec_str);
         if (opts.cee_syslog && std::holds_alternative<log::syslog_spec>(spec)) {
             std::get<log::syslog_spec>(spec).cee = true;
         }
+
         sinks.push_back(log::make_sink(std::move(spec)));
     }
 

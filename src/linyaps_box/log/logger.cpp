@@ -6,28 +6,32 @@
 
 #include "linyaps_box/utils/utils.h"
 
+#include <linyaps_box/utils/file.h>
+
 #include <chrono>
 
 #include <unistd.h>
 
 namespace linyaps_box::log {
 
-auto parse_log_to(std::string_view spec) -> sink_spec
+auto make_spec(std::string_view log_dest) -> sink_spec
 {
-    auto idx = spec.find(':');
+    constexpr auto file_log_flag = O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC;
+    constexpr auto file_log_mod = 0600;
+    auto idx = log_dest.find(':');
     if (idx == std::string_view::npos) {
-        if (spec == "stderr") {
+        if (log_dest == "stderr") {
             return stderr_spec{ };
         }
 
-        return file_spec{ spec };
+        return file_spec{ utils::open(log_dest, file_log_flag, file_log_mod) };
     }
 
-    auto scheme = spec.substr(0, idx);
-    auto content = spec.substr(idx + 1);
+    auto scheme = log_dest.substr(0, idx);
+    auto content = log_dest.substr(idx + 1);
 
     if (scheme == "file") {
-        return file_spec{ content };
+        return file_spec{ utils::open(content, file_log_flag, file_log_mod) };
     }
 
     if (scheme == "syslog") {
@@ -40,17 +44,17 @@ auto parse_log_to(std::string_view spec) -> sink_spec
     }
 #endif
 
-    throw std::runtime_error(fmt::format("unknown log scheme: {}", spec.substr(0, idx)));
+    throw std::runtime_error(fmt::format("unknown log scheme: {}", log_dest.substr(0, idx)));
 }
 
-auto make_sink(sink_spec spec) -> sink_variant
+auto make_sink(sink_spec spec) noexcept -> sink_variant
 {
     return std::visit(utils::Overload{
                         [](stderr_spec s) -> sink_variant {
                             return stderr_sink{ s };
                         },
-                        [](const file_spec &s) -> sink_variant {
-                            return file_sink{ s };
+                        [](file_spec s) -> sink_variant {
+                            return file_sink{ std::move(s) };
                         },
                         [](syslog_spec s) -> sink_variant {
                             return syslog_sink{ std::move(s) };
@@ -69,28 +73,28 @@ auto get_current_log_level() noexcept -> level
     return global_logger::instance().get_level();
 }
 
-void dispatch(level lvl,
+auto dispatch(level lvl,
               fmt::string_view fmt_str,
               fmt::format_args args,
               std::string_view file,
               std::string_view function,
-              int line)
+              int line) noexcept -> void
 {
     global_logger::instance().dispatch_log(lvl, fmt_str, args, file, function, line);
 }
 
-void dispatch(level lvl,
+auto dispatch(level lvl,
               int errno_val,
               fmt::string_view fmt_str,
               fmt::format_args args,
               std::string_view file,
               std::string_view function,
-              int line)
+              int line) noexcept -> void
 {
     global_logger::instance().dispatch_log(lvl, errno_val, fmt_str, args, file, function, line);
 }
 
-global_logger &global_logger::instance() noexcept
+auto global_logger::instance() noexcept -> global_logger &
 {
     static global_logger logger;
     return logger;
@@ -121,7 +125,7 @@ auto global_logger::set_sinks(std::vector<sink_variant> sinks) noexcept -> void
     sinks_ = std::move(sinks);
 }
 
-auto global_logger::set_sink(sink_variant sink) -> void
+auto global_logger::set_sink(sink_variant sink) noexcept -> void
 {
     std::vector<sink_variant> tmp;
     tmp.push_back(std::move(sink));
@@ -138,7 +142,7 @@ void global_logger::dispatch_log(level lvl,
                                  fmt::format_args args,
                                  std::string_view file,
                                  std::string_view function,
-                                 int line) const
+                                 int line) const noexcept
 {
     if (UNLIKELY(lvl > level_)) {
         return;
@@ -169,7 +173,7 @@ void global_logger::dispatch_log(level lvl,
                                  fmt::format_args args,
                                  std::string_view file,
                                  std::string_view function,
-                                 int line) const
+                                 int line) const noexcept
 {
     if (UNLIKELY(lvl > level_)) {
         return;
@@ -194,7 +198,7 @@ void global_logger::dispatch_log(level lvl,
     dispatch_to_sinks(ctx);
 }
 
-auto global_logger::dispatch_to_sinks(const log_context &ctx) const -> void
+auto global_logger::dispatch_to_sinks(const log_context &ctx) const noexcept -> void
 {
     for (const auto &sink : sinks_) {
         std::visit(utils::Overload{
@@ -209,7 +213,7 @@ auto global_logger::dispatch_to_sinks(const log_context &ctx) const -> void
     }
 }
 
-void global_logger::dispatch_raw(const log_context &ctx) const
+void global_logger::dispatch_raw(const log_context &ctx) const noexcept
 {
     if (UNLIKELY(ctx.lvl > level_)) {
         return;

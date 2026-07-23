@@ -14,7 +14,7 @@ sync_socket_sink::sync_socket_sink(const protocol::child_message_channel &ch) no
 {
 }
 
-auto sync_socket_sink::log(const log_context &ctx) const -> void
+auto sync_socket_sink::log(const log_context &ctx) const noexcept -> void
 try {
     channel.get().send_log(ctx);
 } catch (...) {
@@ -45,7 +45,7 @@ try {
           { const_cast<char *>("\n"), 1 } },
     };
 
-    std::ignore = stderr_fd.write_vecs(iov);
+    std::ignore = stderr_fd.write_vecs(iov); // we couldn't handle error at this point, just ignore
 }
 
 } // namespace linyaps_box::log

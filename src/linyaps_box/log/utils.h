@@ -31,7 +31,7 @@ enum class output_format : std::uint8_t {
     json,
 };
 
-constexpr std::string_view log_basename(std::string_view path) noexcept
+constexpr auto log_basename(std::string_view path) noexcept -> std::string_view
 {
     auto pos = std::string_view::npos;
     for (std::size_t i = 0; i < path.size(); ++i) {
@@ -56,7 +56,7 @@ struct log_context
     int line{ };
 #endif
 
-    [[nodiscard]] std::tm utc_tm() const
+    [[nodiscard]] auto utc_tm() const noexcept -> std::tm
     {
         auto t = std::chrono::system_clock::to_time_t(wall_time);
         std::tm tm{ };

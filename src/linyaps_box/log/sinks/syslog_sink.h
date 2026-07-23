@@ -43,7 +43,7 @@ public:
     auto operator=(syslog_backend &&other) noexcept -> syslog_backend & = delete;
     syslog_backend(const syslog_backend &) = delete;
     auto operator=(const syslog_backend &) -> syslog_backend & = delete;
-    ~syslog_backend();
+    ~syslog_backend() noexcept;
 
     auto syslog(level lvl, std::string_view msg) const noexcept -> void;
 
@@ -64,7 +64,7 @@ class basic_syslog_sink
 
 public:
     template <typename T>
-    explicit basic_syslog_sink(T spec)
+    explicit basic_syslog_sink(T spec) noexcept
         : backend_(std::move(spec.ident))
         , cee_(spec.cee)
     {
