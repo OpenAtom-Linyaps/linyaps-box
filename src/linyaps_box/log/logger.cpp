@@ -91,7 +91,7 @@ auto dispatch(level lvl,
               std::string_view function,
               int line) noexcept -> void
 {
-    global_logger::instance().dispatch_log(lvl, errno_val, fmt_str, args, file, function, line);
+    global_logger::instance().dispatch_log(lvl, fmt_str, args, file, function, line, errno_val);
 }
 
 auto global_logger::instance() noexcept -> global_logger &
@@ -122,11 +122,12 @@ auto global_logger::get_format() const noexcept -> output_format
 
 auto global_logger::set_sinks(std::vector<sink_variant> sinks) noexcept -> void
 {
-    sinks_ = std::move(sinks);
+    sinks_.swap(sinks);
 }
 
 auto global_logger::set_sink(sink_variant sink) noexcept -> void
 {
+    // for exception safety
     std::vector<sink_variant> tmp;
     tmp.push_back(std::move(sink));
     sinks_.swap(tmp);
@@ -142,38 +143,8 @@ void global_logger::dispatch_log(level lvl,
                                  fmt::format_args args,
                                  std::string_view file,
                                  std::string_view function,
-                                 int line) const noexcept
-{
-    if (UNLIKELY(lvl > level_)) {
-        return;
-    }
-
-    thread_local fmt::memory_buffer buf;
-    buf.clear();
-    fmt::vformat_to(std::back_inserter(buf), fmt::locale_ref{ }, fmt_str, args);
-
-    const log_context ctx{
-        lvl,
-        std::string_view{ buf.data(), buf.size() },
-        std::chrono::system_clock::now(),
-        ::getpid(),
-        0,
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        file,
-        function,
-        line,
-#endif
-    };
-    dispatch_to_sinks(ctx);
-}
-
-void global_logger::dispatch_log(level lvl,
-                                 int errno_val,
-                                 fmt::string_view fmt_str,
-                                 fmt::format_args args,
-                                 std::string_view file,
-                                 std::string_view function,
-                                 int line) const noexcept
+                                 int line,
+                                 int errno_val) const noexcept
 {
     if (UNLIKELY(lvl > level_)) {
         return;

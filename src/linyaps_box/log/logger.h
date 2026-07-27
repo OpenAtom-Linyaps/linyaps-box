@@ -42,15 +42,8 @@ public:
                       fmt::format_args args,
                       std::string_view file,
                       std::string_view function,
-                      int line) const noexcept -> void;
-
-    auto dispatch_log(level lvl,
-                      int errno_val,
-                      fmt::string_view fmt_str,
-                      fmt::format_args args,
-                      std::string_view file,
-                      std::string_view function,
-                      int line) const noexcept -> void;
+                      int line,
+                      int errno_val = 0) const noexcept -> void;
 
     auto dispatch_to_sinks(const log_context &ctx) const noexcept -> void;
 
