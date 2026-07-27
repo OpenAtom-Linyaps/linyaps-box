@@ -4,7 +4,9 @@
 
 #include "linyaps_box/log/sinks/sync_socket_sink.h"
 
-#include <sys/uio.h>
+#include "linyaps_box/log/formatter.h"
+#include "linyaps_box/utils/span.h"
+
 #include <unistd.h>
 
 namespace linyaps_box::log {
@@ -18,34 +20,13 @@ auto sync_socket_sink::log(const log_context &ctx) const noexcept -> void
 try {
     channel.get().send_log(ctx);
 } catch (...) {
-    // If the parent is gone, fall back to stderr
+    thread_local fmt::memory_buffer buf;
+    buf.clear();
+    format_log(buf, ctx, output_format::text, { });
+
     const utils::file_descriptor stderr_fd{ STDERR_FILENO, false };
-    std::string_view prefix;
-    switch (ctx.lvl) {
-    case level::fatal:
-        prefix = "[FATAL] ";
-        break;
-    case level::error:
-        prefix = "[ERROR] ";
-        break;
-    case level::warn:
-        prefix = "[WARN]  ";
-        break;
-    case level::info:
-        prefix = "[INFO]  ";
-        break;
-    case level::debug:
-        prefix = "[DEBUG] ";
-        break;
-    }
-
-    const std::array<struct iovec, 3> iov{
-        { { const_cast<char *>(prefix.data()), prefix.size() },
-          { const_cast<char *>(ctx.msg.data()), ctx.msg.size() },
-          { const_cast<char *>("\n"), 1 } },
-    };
-
-    std::ignore = stderr_fd.write_vecs(iov); // we couldn't handle error at this point, just ignore
+    auto bytes = utils::as_bytes(utils::span(buf.data(), buf.size()));
+    std::ignore = stderr_fd.write_span(bytes);
 }
 
 } // namespace linyaps_box::log

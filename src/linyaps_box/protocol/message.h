@@ -82,9 +82,13 @@ struct datagram
 };
 
 [[nodiscard]] auto serialize(const message &msg) -> std::vector<std::byte>;
+
 [[nodiscard]] auto deserialize(utils::span<const std::byte> wire) -> message;
 
 [[nodiscard]] auto serialize_log(const msg::log &m) -> std::vector<std::byte>;
+
+[[nodiscard]] auto serialize_log(const linyaps_box::log::log_context &ctx)
+  -> std::vector<std::byte>;
 
 } // namespace linyaps_box::protocol::msg
 

@@ -67,6 +67,20 @@
         }                                                                                         \
     } while (false)
 
+#define LINYAPS_BOX_LOG_WARN_ERRNO(errno_val, ...)                                                \
+    do {                                                                                          \
+        if constexpr (LINYAPS_BOX_LOG_ACTIVE_LEVEL                                                \
+                      >= static_cast<int>(::linyaps_box::log::level::warn)) {                     \
+            if (::linyaps_box::log::get_current_log_level() >= ::linyaps_box::log::level::warn) { \
+                ::linyaps_box::log::warn(::linyaps_box::log::log_basename(__FILE__),              \
+                                         __func__,                                                \
+                                         __LINE__,                                                \
+                                         errno_val,                                               \
+                                         __VA_ARGS__);                                            \
+            }                                                                                     \
+        }                                                                                         \
+    } while (false)
+
 #define LINYAPS_BOX_LOG_INFO(...)                                                                 \
     do {                                                                                          \
         if constexpr (LINYAPS_BOX_LOG_ACTIVE_LEVEL                                                \

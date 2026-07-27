@@ -95,6 +95,23 @@ inline auto warn(std::string_view file,
 }
 
 template <typename... Args>
+inline auto warn(std::string_view file,
+                 std::string_view function,
+                 int line,
+                 int errno_val,
+                 fmt::format_string<Args...> fmt,
+                 Args &&...args) noexcept -> void
+{
+    dispatch(level::warn,
+             errno_val,
+             fmt.get(),
+             fmt::make_format_args(args...),
+             file,
+             function,
+             line);
+}
+
+template <typename... Args>
 inline auto info(std::string_view file,
                  std::string_view function,
                  int line,
