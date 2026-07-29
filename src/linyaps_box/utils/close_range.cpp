@@ -4,10 +4,11 @@
 
 #include "linyaps_box/utils/close_range.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/defer.h"
-#include "linyaps_box/utils/log.h"
 
 #include <cstring>
+#include <sstream>
 #include <system_error>
 
 #include <dirent.h>
@@ -39,8 +40,8 @@ void close_range_fallback(uint first, uint last, int flags)
 
     auto close_dir = linyaps_box::utils::make_defer([dir]() noexcept {
         if (closedir(dir) < 0) {
-            LINYAPS_BOX_WARNING() << "closedir /proc/self/fd failed: " << strerror(errno)
-                                  << ", but this may not be a problem";
+            LINYAPS_BOX_LOG_WARN("closedir /proc/self/fd failed: {}, but this may not be a problem",
+                                 ::strerror(errno));
         }
     });
 
@@ -54,7 +55,7 @@ void close_range_fallback(uint first, uint last, int flags)
 
     struct dirent *next{ nullptr };
     while ((next = ::readdir(dir)) != nullptr) {
-        const std::string name{ next->d_name[0] };
+        const std::string name{ next->d_name };
         if (name == "." || name == "..") { // skip "." and ".."
             continue;
         }
@@ -85,19 +86,21 @@ void close_range_fallback(uint first, uint last, int flags)
 
 void linyaps_box::utils::close_range(uint first, uint last, int flags)
 {
-    LINYAPS_BOX_DEBUG() << "close_range (" << first << ", " << last << ")" << "with flags "
-                        << [flags]() -> std::string {
-        std::stringstream ss;
-        ss << '[';
-        if ((static_cast<uint>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
-            ss << " CLOSE_RANGE_CLOEXEC";
-        }
-        if ((static_cast<uint>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
-            ss << " CLOSE_RANGE_UNSHARE ";
-        }
-        ss << ']';
-        return ss.str();
-    }();
+    LINYAPS_BOX_LOG_DEBUG("close_range ({}, {}) with flags {}",
+                          first,
+                          last,
+                          [flags]() -> std::string {
+                              std::stringstream ss;
+                              ss << '[';
+                              if ((static_cast<uint>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
+                                  ss << " CLOSE_RANGE_CLOEXEC";
+                              }
+                              if ((static_cast<uint>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
+                                  ss << " CLOSE_RANGE_UNSHARE ";
+                              }
+                              ss << ']';
+                              return ss.str();
+                          }());
 
     static bool support_close_range{ true };
     if (!support_close_range) {

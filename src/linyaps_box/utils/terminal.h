@@ -21,6 +21,4 @@ auto tcgetattr(const file_descriptor &fd, struct termios &termios) -> void;
 
 auto tcsetattr(const file_descriptor &fd, int action, const struct termios &termios) -> void;
 
-auto isatty(const file_descriptor &fd) -> bool;
-
 } // namespace linyaps_box::utils

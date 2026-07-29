@@ -196,13 +196,13 @@ function run_test() {
 	CONTAINER_NAME="$(basename -- "${TEST_FILE_NAME}" .json)"
 
 	local TEST_COMMAND
-	TEST_COMMAND=("${LL_BOX}" run -b "${BUNDLE_DIR}" -f "${TEST_CONFIG}" "${CONTAINER_NAME}")
+	TEST_COMMAND=("${LL_BOX}" --log-level warn run -b "${BUNDLE_DIR}" -f "${TEST_CONFIG}" "${CONTAINER_NAME}")
 	log "[INFO] Running command: %s" "${TEST_COMMAND[*]}"
 
 	log "[INFO] ==== COMMAND OUTPUT START ===="
 	local REAL
 	REAL="$(
-	 LINYAPS_BOX_LOG_LEVEL=6 LINYAPS_BOX_LOG_FORCE_STDERR=1 "${TEST_COMMAND[@]}" </dev/null | tr -d '\r' && :
+		"${TEST_COMMAND[@]}" </dev/null | tr -d '\r' && :
 	)" && :
 	EXIT_CODE=$?
 	log "[INFO] ==== COMMAND OUTPUT END ======"

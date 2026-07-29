@@ -4,8 +4,8 @@
 
 #include "linyaps_box/utils/file_describer.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/file.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <algorithm>
@@ -53,9 +53,9 @@ linyaps_box::utils::file_descriptor::~file_descriptor() noexcept
     try {
         close();
     } catch (const std::system_error &e) {
-        LINYAPS_BOX_ERR() << "close " << fd_ << " failed:" << e.what();
+        LINYAPS_BOX_LOG_ERROR("close {} failed:{}", fd_, e.what());
     } catch (...) {
-        LINYAPS_BOX_ERR() << "close " << fd_ << " failed with unknown error";
+        LINYAPS_BOX_LOG_ERROR("close {} failed with unknown error", fd_);
     }
 }
 
@@ -219,7 +219,7 @@ auto linyaps_box::utils::file_descriptor::current_path() const -> std::filesyste
     auto p_path = proc_path();
     auto path = std::filesystem::read_symlink(p_path, ec);
     if (UNLIKELY(!!ec)) {
-        LINYAPS_BOX_ERR() << "failed to read symlink " << p_path.c_str() << ": " << ec.message();
+        LINYAPS_BOX_LOG_ERROR("failed to read symlink {}: {}", p_path, ec.message());
     }
 
     return path;
@@ -238,7 +238,7 @@ auto linyaps_box::utils::file_descriptor::nonblock() const -> bool
 
 auto linyaps_box::utils::file_descriptor::set_nonblock(bool nonblock) const & -> void
 {
-    LINYAPS_BOX_DEBUG() << "set fd " << fd_ << " to nonblock: " << std::boolalpha << nonblock;
+    LINYAPS_BOX_LOG_DEBUG("set fd {} to nonblock: {}", fd_, nonblock);
 
     auto flags = this->flags();
     auto new_flags = nonblock ? (flags | O_NONBLOCK) : (flags & ~static_cast<unsigned>(O_NONBLOCK));
@@ -252,7 +252,7 @@ auto linyaps_box::utils::file_descriptor::flags() const -> unsigned int
 
 auto linyaps_box::utils::file_descriptor::set_flags(unsigned int flags) const & -> void
 {
-    LINYAPS_BOX_DEBUG() << "set fd " << fd_ << " flags to " << std::hex << flags;
+    LINYAPS_BOX_LOG_DEBUG("set fd {} flags to {:x}", fd_, flags);
 
     fcntl(*this, F_SETFL, flags);
 }

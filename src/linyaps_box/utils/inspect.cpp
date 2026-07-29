@@ -4,7 +4,7 @@
 
 #include "linyaps_box/utils/inspect.h"
 
-#include "linyaps_box/utils/log.h"
+#include "linyaps_box/log/macro.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -233,7 +233,7 @@ auto inspect_path(int fd) -> std::filesystem::path
     std::error_code ec;
     auto ret = std::filesystem::read_symlink("/proc/self/fd/" + std::to_string(fd), ec);
     if (ec) {
-        LINYAPS_BOX_ERR() << "failed to inspect path for fd " << fd << ":" << ec.message();
+        LINYAPS_BOX_LOG_ERROR("failed to inspect path for fd {}:{}", fd, ec.message());
     }
 
     return ret;

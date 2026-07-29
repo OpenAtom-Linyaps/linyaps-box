@@ -52,7 +52,7 @@ auto lstat(const std::filesystem::path &path) -> struct stat;
 
 auto statfs(const file_descriptor &fd) -> struct statfs;
 
-auto to_linux_file_type(std::filesystem::file_type type) noexcept -> int;
+auto to_linux_file_type(std::filesystem::file_type type) -> int;
 
 auto to_fs_file_type(mode_t type) noexcept -> std::filesystem::file_type;
 

@@ -4,8 +4,8 @@
 
 #include "linyaps_box/status_directory.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/atomic_write.h"
-#include "linyaps_box/utils/log.h"
 #include "nlohmann/json.hpp"
 
 #include <csignal> // IWYU pragma: keep
@@ -88,12 +88,7 @@ auto linyaps_box::status_directory::read() const -> container_status_t
 
 void linyaps_box::status_directory::remove() const
 {
-    LINYAPS_BOX_DEBUG() << "Remove " << path_;
-    if (!std::filesystem::exists(path_)) {
-        LINYAPS_BOX_WARNING() << "Status directory " << path_ << " does not exist";
-        return;
-    }
-
+    LINYAPS_BOX_LOG_DEBUG("Remove {}", path_);
     std::filesystem::remove_all(path_);
 }
 

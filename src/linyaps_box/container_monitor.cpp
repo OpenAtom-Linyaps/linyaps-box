@@ -4,10 +4,11 @@
 
 #include "linyaps_box/container_monitor.h"
 
+#include "linyaps_box/log/macro.h"
+#include "linyaps_box/os/process.h"
+#include "linyaps_box/os/tty.h"
 #include "linyaps_box/utils/file.h"
-#include "linyaps_box/utils/process.h"
 #include "linyaps_box/utils/signal.h"
-#include "linyaps_box/utils/terminal.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <sys/signalfd.h>
@@ -18,29 +19,34 @@ namespace linyaps_box {
 namespace {
 
 // Detect a local terminal to mirror window-resize events from.
-// Prefers stdin, then stdout; falls back to /dev/tty, then /dev/console.
-auto detect_host_tty(const linyaps_box::utils::file_descriptor &in,
-                     const linyaps_box::utils::file_descriptor &out)
-  -> std::optional<terminal_slave>
+// Prefers stdin, then stdout; falls back to /dev/tty.
+auto detect_host_tty() -> terminal_slave
 {
-    if (utils::isatty(in)) {
-        return terminal_slave{ in.duplicate() };
-    }
+    LINYAPS_BOX_LOG_DEBUG("detect host available tty");
 
-    if (utils::isatty(out)) {
-        return terminal_slave{ out.duplicate() };
-    }
+    for (auto io : { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO }) {
+        utils::file_descriptor fd{ io, false };
+        auto ret = os::isatty(fd);
+        if (UNLIKELY(!ret)) {
+            throw std::system_error(ret.error().err, std::system_category(), ret.error().msg);
+        }
 
-    // No controlling terminal — try /dev/tty, then /dev/console as last resort.
-    for (const auto *path : { "/dev/tty", "/dev/console" }) {
-        try {
-            return terminal_slave{ utils::open(path, O_RDWR | O_CLOEXEC) };
-        } catch (const std::system_error &) {
-            continue;
+        if (ret.value()) {
+            return terminal_slave{ std::move(fd) };
         }
     }
 
-    return std::nullopt;
+    auto tty = utils::open("/dev/tty", O_RDONLY | O_CLOEXEC);
+    auto ret = os::isatty(tty);
+    if (LIKELY(ret && ret)) {
+        return terminal_slave{ std::move(tty) };
+    }
+
+    if (!ret) {
+        throw std::system_error(ret.error().err, std::system_category(), ret.error().msg);
+    }
+
+    throw std::runtime_error("no available tty");
 }
 
 // Dispatch EPOLLERR / EPOLLHUP on a forwarder's src/dst fds.
@@ -83,15 +89,15 @@ auto container_monitor::enable_signal_forwarding() -> void
     // Without this they'd become zombies — signalfd only delivers SIGCHLD
     // for future events.
     while (true) {
-        auto ret = linyaps_box::utils::waitpid(-1, WNOHANG);
-        if (ret.status != linyaps_box::utils::WaitStatus::Reaped) {
+        int status{ 0 };
+        auto ret = linyaps_box::os::waitpid(-1, status, WNOHANG);
+        if (!ret || *ret == 0) {
             break;
         }
 
-        if (ret.pid == pid) {
+        if (*ret == pid) {
             child_exited = true;
-            exit_code = WIFSIGNALED(ret.exit_code) ? 128 + WTERMSIG(ret.exit_code)
-                                                   : WEXITSTATUS(ret.exit_code);
+            exit_code = os::throw_if_error(os::get_exit_code(status));
         }
     }
 
@@ -105,36 +111,34 @@ auto container_monitor::handle_signals() -> void
 {
     while (true) {
         struct signalfd_siginfo info{ };
-        auto [status, bytes_read] = signal_fd.read(info);
+        auto [istatus, bytes_read] = signal_fd.read(info);
 
-        if (status == utils::IOStatus::TryAgain) {
+        if (istatus == utils::IOStatus::TryAgain) {
             break;
         }
 
-        if (status != utils::IOStatus::Success) {
+        if (istatus != utils::IOStatus::Success) {
             throw std::runtime_error("failed to read signalfd");
         }
 
         switch (info.ssi_signo) {
         case SIGCHLD: {
-            auto res = linyaps_box::utils::waitpid(-1, WNOHANG);
-            if (res.status != linyaps_box::utils::WaitStatus::Reaped) {
+            int status{ 0 };
+            auto res = linyaps_box::os::waitpid(-1, status, WNOHANG);
+            if (!res || *res == 0) {
                 break;
             }
 
-            if (res.pid == pid) {
+            if (*res == pid) {
                 child_exited = true;
-                exit_code = WIFSIGNALED(res.exit_code) ? 128 + WTERMSIG(res.exit_code)
-                                                       : WEXITSTATUS(res.exit_code);
+                exit_code = os::throw_if_error(os::get_exit_code(status));
             }
         } break;
-
         case SIGWINCH: {
             if (master && host_tty) {
                 master->resize(host_tty->get_size());
             }
         } break;
-
         default: {
             if (!child_exited) {
                 ::kill(pid, static_cast<int>(info.ssi_signo));
@@ -144,29 +148,50 @@ auto container_monitor::handle_signals() -> void
     }
 }
 
-auto container_monitor::enable_io_forwarding(terminal_master master,
+auto container_monitor::kill_child() noexcept -> int
+{
+    auto ret = ::kill(pid, SIGKILL);
+    if (ret < 0) {
+        if (LIKELY(errno == ESRCH)) {
+            return 0;
+        }
+
+        LINYAPS_BOX_LOG_ERROR_ERRNO(errno, "failed to kill container");
+        return -1;
+    }
+
+    int status{ 0 };
+    auto result = linyaps_box::os::waitpid(pid, status, 0);
+    if (!result) {
+        const auto &err = result.error();
+        LINYAPS_BOX_LOG_ERROR_ERRNO(err.err, "failed to wait container process: {}", err.msg);
+        return -1;
+    }
+
+    return result.value();
+}
+
+auto container_monitor::enable_io_forwarding(terminal_master pty,
                                              const linyaps_box::utils::file_descriptor &in,
                                              const linyaps_box::utils::file_descriptor &out) -> void
 {
-    host_tty = detect_host_tty(in, out);
-    if (host_tty) {
-        host_tty->set_raw();
-    }
+    host_tty = detect_host_tty();
+    host_tty->set_raw();
 
-    this->master = std::move(master);
+    master = std::move(pty);
 
     // Immediately propagate the host terminal size to the PTY master,
     // so the terminal inside the container starts with the right dimensions
     // even when the OCI config does not specify consoleSize.
-    if (host_tty && this->master) {
-        this->master->resize(host_tty->get_size());
+    if (host_tty && master) {
+        master->resize(host_tty->get_size());
     }
 
     // The PTY master fd is used bidirectionally: we write stdin into it AND
     // read its output back to stdout.  epoll needs two independent fd
     // registrations, so we duplicate the master fd here.
-    this->master->get().set_nonblock(true);
-    master_out = this->master.value().get().duplicate();
+    master->fd().set_nonblock(true);
+    master_out = master.value().fd().duplicate();
     master_out->set_nonblock(true);
 
     // Linux TTY buffer is hardcoded to 4K (N_TTY_BUF_SIZE). Using an 8K buffer
@@ -175,7 +200,7 @@ auto container_monitor::enable_io_forwarding(terminal_master master,
     if (!child_exited) {
         in_fwd.emplace(epoll, buffer_size);
         in_fwd->set_src(in);
-        in_fwd->set_dst(this->master->get());
+        in_fwd->set_dst(master->fd());
     }
 
     out_fwd.emplace(epoll, buffer_size);

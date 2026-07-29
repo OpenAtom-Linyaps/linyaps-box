@@ -4,7 +4,7 @@
 
 #include "linyaps_box/utils/platform.h"
 
-#include "linyaps_box/utils/log.h"
+#include "linyaps_box/log/macro.h"
 
 #include <algorithm>
 #include <array>
@@ -81,8 +81,8 @@ auto get_path_max(const std::filesystem::path &fs_dir) noexcept -> std::size_t
     if (max == -1) {
         if (errno != 0) {
             auto saved_errno = errno;
-            LINYAPS_BOX_WARNING() << "Failed to get pathconf: " << ::strerror(saved_errno)
-                                  << ", use default value";
+            LINYAPS_BOX_LOG_WARN("Failed to get pathconf: {}, use default value",
+                                 ::strerror(saved_errno));
             errno = 0;
         }
 #ifdef PATH_MAX
@@ -104,9 +104,7 @@ auto get_page_size() noexcept -> std::size_t
 
         if (sz == -1) {
             if (errno != 0) {
-                auto saved_errno = errno;
-                LINYAPS_BOX_WARNING() << "Failed to get page size: " << ::std::strerror(saved_errno)
-                                      << ", defaulting to 4096";
+                LINYAPS_BOX_LOG_ERROR_ERRNO(errno, "Failed to get page size, defaulting to 4096");
             }
 
             return 4096;

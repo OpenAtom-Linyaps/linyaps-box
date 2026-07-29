@@ -6,8 +6,8 @@
 
 #include "linyaps_box/config.h"
 #include "linyaps_box/container_status.h"
+#include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/status_directory.h"
-#include "linyaps_box/unix_socket.h"
 
 #include <string>
 
@@ -32,7 +32,7 @@ struct exec_container_option
     std::optional<std::vector<cap_value_t>> caps;
 #endif
 
-    std::optional<unix_socket> console_socket;
+    std::optional<infra::unix_socket> console_socket;
 };
 
 class container_ref

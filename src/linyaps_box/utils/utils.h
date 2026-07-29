@@ -4,13 +4,12 @@
 
 #pragma once
 
-#include <array>
-#include <charconv>
+#include <fmt/format.h>
+#include <zeus/expected.hpp>
+
 #include <cstddef>
-#include <cstdint>
 #include <string>
 #include <tuple>
-
 #if defined(__GNUC__) || defined(__clang__)
 #  define LIKELY(x) __builtin_expect((x), 1)
 #  define UNLIKELY(x) __builtin_expect((x), 0)
@@ -53,26 +52,26 @@ struct Overload : T...
 template <typename... T>
 Overload(T...) -> Overload<T...>;
 
-template <typename T>
-std::string stringify_arg(T arg)
+template <typename Alloc, typename T>
+void append_arg(std::basic_string<char, std::char_traits<char>, Alloc> &msg, bool &first, T &&arg)
 {
-    if constexpr (std::is_convertible_v<T, std::string_view>) {
-        if (arg == nullptr) {
-            return "nullptr";
-        }
+    using Decayed = std::decay_t<T>;
 
-        return std::string(arg);
-    } else if constexpr (std::is_pointer_v<T>) {
-        if (arg == nullptr) {
-            return "nullptr";
-        }
+    if (!first) {
+        fmt::format_to(std::back_inserter(msg), ", ");
+    }
+    first = false;
 
-        std::array<char, 20> buf{ };
-        auto [ptr, ec] =
-          std::to_chars(buf.begin(), buf.end(), reinterpret_cast<uintptr_t>(arg), 16);
-        return "0x" + std::string(buf.begin(), ptr);
+    if constexpr (std::is_pointer_v<Decayed> || std::is_null_pointer_v<Decayed>) {
+        if (arg == nullptr) {
+            fmt::format_to(std::back_inserter(msg), "nullptr");
+        } else if constexpr (std::is_convertible_v<Decayed, std::string_view>) {
+            fmt::format_to(std::back_inserter(msg), "{}", arg);
+        } else {
+            fmt::format_to(std::back_inserter(msg), "{}", static_cast<const void *>(arg));
+        }
     } else {
-        return std::to_string(arg);
+        fmt::format_to(std::back_inserter(msg), "{}", std::forward<T>(arg));
     }
 }
 

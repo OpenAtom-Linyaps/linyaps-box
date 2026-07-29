@@ -4,8 +4,8 @@
 
 #include "linyaps_box/utils/ringbuffer.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/defer.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/mman.h"
 #include "linyaps_box/utils/platform.h"
 
@@ -28,7 +28,7 @@ auto ring_buffer::deleter::operator()(ring_buffer *rb) const noexcept -> void
     try {
         munmap(reinterpret_cast<std::byte *>(rb), total_size); // NOLINT
     } catch (const std::system_error &e) {
-        LINYAPS_BOX_ERR() << "Failed to munmap ring buffer: " << e.what();
+        LINYAPS_BOX_LOG_ERROR("Failed to munmap ring buffer: {}", e.what());
         // Memory leak, but will be cleaned up by OS on process exit
     }
 }
@@ -39,7 +39,12 @@ auto ring_buffer::create(std::size_t requested_capacity) -> ptr
     auto meta_size = (sizeof(ring_buffer) + page_size - 1) & ~(page_size - 1);
 
     auto cap = page_size;
+    constexpr auto max_cap = (std::numeric_limits<std::size_t>::max() / 4);
     while (cap < requested_capacity) {
+        if (cap > max_cap) {
+            throw std::runtime_error("requested ring buffer capacity too large");
+        }
+
         cap <<= 1U;
     }
 
@@ -55,7 +60,7 @@ auto ring_buffer::create(std::size_t requested_capacity) -> ptr
         try {
             munmap(addr, total_vma);
         } catch (const std::system_error &e) {
-            LINYAPS_BOX_INFO() << "Failed to munmap ring buffer after mmap failure: " << e.what();
+            LINYAPS_BOX_LOG_INFO("Failed to munmap ring buffer after mmap failure: {}", e.what());
         }
     });
 

@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -37,12 +37,12 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build build-essential pkgconf libcap-dev libseccomp-dev nlohmann-json3-dev libcli11-dev libgtest-dev
+          sudo apt-get install -y cmake ninja-build build-essential pkgconf \
+                                  libcap-dev libseccomp-dev libsystemd-dev
 
       - name: Configure and Build
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -Dlinyaps-box_ENABLE_CPM=OFF -Dlinyaps-box_DEFAULT_LOG_LEVEL=7 -Dlinyaps-box_ACTIVE_LOG_LEVEL=7
-          ninja -C build
+          cmake --workflow --preset=codeql
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4

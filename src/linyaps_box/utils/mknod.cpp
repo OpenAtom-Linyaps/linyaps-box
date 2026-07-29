@@ -4,7 +4,7 @@
 
 #include "linyaps_box/utils/mknod.h"
 
-#include "linyaps_box/utils/log.h"
+#include "linyaps_box/log/macro.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -14,8 +14,7 @@ void linyaps_box::utils::mknodat(const file_descriptor &root,
                                  mode_t mode,
                                  dev_t dev)
 {
-    LINYAPS_BOX_DEBUG() << "Create device " << path.string() << " with mode " << mode << " and dev "
-                        << dev;
+    LINYAPS_BOX_LOG_DEBUG("Create device {} with mode {} and dev {}", path, mode, dev);
 
     if (::mknodat(root.get(), path.c_str(), mode, dev) == 0) {
         return;
@@ -29,8 +28,7 @@ void linyaps_box::utils::mknodat(const file_descriptor &root,
                                  dev_t dev,
                                  std::error_code &ec) noexcept
 {
-    LINYAPS_BOX_DEBUG() << "Create device " << path.string() << " with mode " << mode << " and dev "
-                        << dev;
+    LINYAPS_BOX_LOG_DEBUG("Create device {} with mode {} and dev {}", path, mode, dev);
 
     ec.clear();
     if (::mknodat(root.get(), path.c_str(), mode, dev) == 0) {

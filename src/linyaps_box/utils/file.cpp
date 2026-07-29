@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 #include "linyaps_box/utils/file.h"
 
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/inspect.h"
-#include "linyaps_box/utils/log.h"
 #include "linyaps_box/utils/symlink.h"
 
 #include <sys/syscall.h>
@@ -64,7 +64,7 @@ auto resolve_symlink_component(linyaps_box::utils::file_descriptor &dir_fd,
     }
 
     auto target = linyaps_box::utils::readlinkat(link_fd, "");
-    LINYAPS_BOX_DEBUG() << "resolve symlink -> " << target;
+    LINYAPS_BOX_LOG_DEBUG("resolve symlink -> {}", target);
 
     if (target.is_absolute()) {
         dir_fd = root.duplicate();
@@ -125,10 +125,12 @@ auto open_at_fallback(const linyaps_box::utils::file_descriptor &root,
                       int flag,
                       mode_t mode) -> linyaps_box::utils::file_descriptor
 {
-    LINYAPS_BOX_DEBUG() << "fallback openat " << path.c_str() << " at FD=" << root.get() << " with "
-                        << linyaps_box::utils::inspect_fcntl_or_open_flags(
-                             static_cast<size_t>(flag))
-                        << "\n\t" << linyaps_box::utils::inspect_fd(root.get());
+    LINYAPS_BOX_LOG_DEBUG(
+      "fallback openat {} at FD={} with {}\n\t{}",
+      path.c_str(),
+      root.get(),
+      linyaps_box::utils::inspect_fcntl_or_open_flags(static_cast<size_t>(flag)),
+      linyaps_box::utils::inspect_fd(root.get()));
 
     auto current = root.duplicate();
     const auto &parts = path.relative_path();
@@ -221,8 +223,9 @@ namespace linyaps_box::utils {
 auto open(const std::filesystem::path &path, int flag, mode_t mode)
   -> linyaps_box::utils::file_descriptor
 {
-    LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " with "
-                        << inspect_fcntl_or_open_flags(static_cast<size_t>(flag));
+    LINYAPS_BOX_LOG_DEBUG("open {} with {}",
+                          path,
+                          inspect_fcntl_or_open_flags(static_cast<size_t>(flag)));
     const auto fd = ::open(path.c_str(), flag, mode);
     if (UNLIKELY(fd == -1)) {
         throw std::system_error(errno,
@@ -238,9 +241,11 @@ auto open_at(const linyaps_box::utils::file_descriptor &root,
              int flag,
              mode_t mode) -> linyaps_box::utils::file_descriptor
 {
-    LINYAPS_BOX_DEBUG() << "open " << path.c_str() << " at FD=" << root.get() << " with "
-                        << inspect_fcntl_or_open_flags(static_cast<size_t>(flag)) << "\n\t"
-                        << inspect_fd(root.get());
+    LINYAPS_BOX_LOG_DEBUG("open {} at FD={} with {}\n\t{}",
+                          path,
+                          root.get(),
+                          inspect_fcntl_or_open_flags(static_cast<size_t>(flag)),
+                          inspect_fd(root.get()));
 
     // currently box is running in single thread, so use bool is safe
     static bool support_openat2{ true };
@@ -283,7 +288,7 @@ auto open_at(const linyaps_box::utils::file_descriptor &root,
 auto touch(const file_descriptor &root, const std::filesystem::path &path, int flag, mode_t mode)
   -> linyaps_box::utils::file_descriptor
 {
-    LINYAPS_BOX_DEBUG() << "touch " << path << " at " << inspect_fd(root.get());
+    LINYAPS_BOX_LOG_DEBUG("touch {} at {}", path, inspect_fd(root.get()));
     const auto fd = ::openat(root.get(), path.c_str(), flag, mode);
     if (UNLIKELY(fd == -1)) {
         throw std::system_error(errno,
@@ -362,7 +367,7 @@ auto statfs(const file_descriptor &fd) -> struct statfs
 }
 
 auto
-to_linux_file_type(std::filesystem::file_type type) noexcept -> int
+to_linux_file_type(std::filesystem::file_type type) -> int
 
 {
     switch (type) {
@@ -380,22 +385,17 @@ to_linux_file_type(std::filesystem::file_type type) noexcept -> int
         return S_IFIFO;
     case std::filesystem::file_type::socket:
         return S_IFSOCK;
+    case std::filesystem::file_type::none:
+    case std::filesystem::file_type::not_found:
+        throw std::invalid_argument(
+          fmt::format("invalid file type {} in to_linux_file_type", static_cast<int>(type)));
     case std::filesystem::file_type::unknown: {
-        LINYAPS_BOX_WARNING() << "Try to convert unknown type to linux file type";
+        LINYAPS_BOX_LOG_WARN("Try to convert unknown type to linux file type");
         return 0;
     }
-    case std::filesystem::file_type::none: {
-        LINYAPS_BOX_ERR() << "Invalid file type 'none' in to_linux_file_type";
-        std::terminate();
-    }
-    case std::filesystem::file_type::not_found: {
-        LINYAPS_BOX_ERR() << "Invalid file type 'not_found' in to_linux_file_type";
-        std::terminate();
-    }
     default: {
-        LINYAPS_BOX_ERR() << "Unhandled file type " << static_cast<int>(type)
-                          << " in to_linux_file_type";
-        std::terminate();
+        throw std::invalid_argument(
+          fmt::format("unhandled file type {} in to_linux_file_type", static_cast<int>(type)));
     }
     }
 }
@@ -520,7 +520,7 @@ auto read_exact(const file_descriptor &fd, std::size_t size) -> std::string
 
 void unlink_at(const file_descriptor &root, const std::filesystem::path &path)
 {
-    LINYAPS_BOX_DEBUG() << "Unlink " << path << " at " << root.current_path();
+    LINYAPS_BOX_LOG_DEBUG("Unlink {} at {}", path, root.current_path());
 
     auto ret = ::unlinkat(root.get(), path.c_str(), 0);
     if (UNLIKELY(ret != 0)) {
@@ -532,7 +532,7 @@ void unlink_at(const file_descriptor &root,
                const std::filesystem::path &path,
                std::error_code &ec) noexcept
 {
-    LINYAPS_BOX_DEBUG() << "Unlink " << path << " at " << root.current_path();
+    LINYAPS_BOX_LOG_DEBUG("Unlink {} at {}", path, root.current_path());
 
     ec.clear();
     auto ret = ::unlinkat(root.get(), path.c_str(), 0);
@@ -546,8 +546,11 @@ auto rename_at(const file_descriptor &old_dir,
                const file_descriptor &new_dir,
                const std::filesystem::path &new_path) -> void
 {
-    LINYAPS_BOX_DEBUG() << "Rename " << old_path << " at " << old_dir.current_path() << " to "
-                        << new_path << " at " << new_dir.current_path();
+    LINYAPS_BOX_LOG_DEBUG("Rename {} at {} to {} at {}",
+                          old_path,
+                          old_dir.current_path(),
+                          new_path,
+                          new_dir.current_path());
 
     auto ret = ::renameat(old_dir.get(), old_path.c_str(), new_dir.get(), new_path.c_str());
     if (UNLIKELY(ret != 0)) {

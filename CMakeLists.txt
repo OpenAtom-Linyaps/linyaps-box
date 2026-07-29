@@ -34,12 +34,18 @@ option(linyaps-box_ENABLE_SECCOMP "Build linyaps-box with seccomp support." ON)
 
 option(linyaps-box_ENABLE_CAP "Build linyaps-box with capability support" ON)
 
+option(linyaps-box_ENABLE_SYSTEMD_INTEGRATION
+       "Build with journald (systemd) support." ON)
+
 option(linyaps-box_ENABLE_UNIT_TESTS "Enable unit tests."
        ${linyaps-box_IS_TOP_LEVEL})
 
 option(linyaps-box_ENABLE_SMOKE_TESTS "Enable smoke tests." OFF)
 
 option(linyaps-box_MAKE_RELEASE "Make release build." OFF)
+
+option(linyaps-box_ENABLE_SANITIZER
+       "Enable address and undefined behavior sanitizers" OFF)
 
 if(linyaps-box_ENABLE_SMOKE_TESTS OR linyaps-box_ENABLE_UNIT_TESTS)
   set(linyaps-box_ENABLE_TESTING ON)
@@ -77,17 +83,14 @@ set(linyaps-box_STACK_GROWTH_DOWN
 )
 
 set(linyaps-box_DEFAULT_LOG_LEVEL
-    LOG_WARNING
-    CACHE
-      STRING
-      "The default syslog priority. This is used to filter log messages at runtime time."
-)
+    warn
+    CACHE STRING "Default runtime log level (fatal/error/warn/info/debug).")
 
 set(linyaps-box_ACTIVE_LOG_LEVEL
-    LOG_WARNING
+    info
     CACHE
       STRING
-      "The active syslog priority. This is used to filter log messages at compile time."
+      "Compile-time log level; fatal/error always kept. Default 'info' eliminates debug only."
 )
 
 set(linyaps-box_ENABLE_CPM
@@ -113,16 +116,22 @@ set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
 
 # ==============================================================================
 
-if(linyaps-box_HARDENING)
+if(linyaps-box_MAKE_RELEASE AND linyaps-box_HARDENING)
   message(STATUS "applying harden settings")
   set(CMAKE_EXE_LINKER_FLAGS
       "${CMAKE_EXE_LINKER_FLAGS} -pie -Wl,-z,relro -Wl,-z,now")
   add_compile_options(-fstack-protector-strong)
+  add_compile_definitions("$<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=2>")
+endif()
 
-  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(STATUS "Non-Debug build, enabling FORTIFY_SOURCE")
-    add_compile_definitions(_FORTIFY_SOURCE=2)
+if(linyaps-box_ENABLE_SANITIZER)
+  if(linyaps-box_MAKE_RELEASE)
+    message(WARNING "enable sanitizer while making a release build")
   endif()
+
+  message(STATUS "enable address and undefined sanitizer")
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g3)
+  add_link_options(-fsanitize=address,undefined)
 endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
@@ -145,6 +154,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/command/run.h
     src/linyaps_box/config.cpp
     src/linyaps_box/config.h
+    src/linyaps_box/config/kernel_fallbacks.h
+    src/linyaps_box/config/mount_options.h
     src/linyaps_box/container.cpp
     src/linyaps_box/container.h
     src/linyaps_box/container_monitor.cpp
@@ -159,26 +170,54 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/impl/json_printer.h
     src/linyaps_box/impl/table_printer.cpp
     src/linyaps_box/impl/table_printer.h
+    src/linyaps_box/infra/unix_socket.cpp
+    src/linyaps_box/infra/unix_socket.h
     src/linyaps_box/interface.cpp
     src/linyaps_box/interface.h
     src/linyaps_box/io/epoll.cpp
     src/linyaps_box/io/epoll.h
     src/linyaps_box/io/forwarder.cpp
     src/linyaps_box/io/forwarder.h
+    src/linyaps_box/log/formatter.cpp
+    src/linyaps_box/log/formatter.h
+    src/linyaps_box/log/logger.cpp
+    src/linyaps_box/log/logger.h
+    src/linyaps_box/log/macro.h
+    src/linyaps_box/log/sink.h
+    src/linyaps_box/log/sinks/file_sink.cpp
+    src/linyaps_box/log/sinks/file_sink.h
+    src/linyaps_box/log/sinks/journald_sink.cpp
+    src/linyaps_box/log/sinks/journald_sink.h
+    src/linyaps_box/log/sinks/stderr_sink.cpp
+    src/linyaps_box/log/sinks/stderr_sink.h
+    src/linyaps_box/log/sinks/sync_socket_sink.cpp
+    src/linyaps_box/log/sinks/sync_socket_sink.h
+    src/linyaps_box/log/sinks/syslog_sink.cpp
+    src/linyaps_box/log/sinks/syslog_sink.h
+    src/linyaps_box/log/utils.cpp
+    src/linyaps_box/log/utils.h
+    src/linyaps_box/os/process.cpp
+    src/linyaps_box/os/process.h
+    src/linyaps_box/os/result.h
+    src/linyaps_box/os/socket.cpp
+    src/linyaps_box/os/socket.h
+    src/linyaps_box/os/tty.cpp
+    src/linyaps_box/os/tty.h
     src/linyaps_box/printer.cpp
     src/linyaps_box/printer.h
+    src/linyaps_box/protocol/message_channel.cpp
+    src/linyaps_box/protocol/message_channel.h
+    src/linyaps_box/protocol/message.cpp
+    src/linyaps_box/protocol/message.h
+    src/linyaps_box/protocol/stage.h
     src/linyaps_box/runtime.cpp
     src/linyaps_box/runtime.h
-    src/linyaps_box/socket.cpp
-    src/linyaps_box/socket.h
     src/linyaps_box/status_directory.cpp
     src/linyaps_box/status_directory.h
     src/linyaps_box/status_directory_manager.cpp
     src/linyaps_box/status_directory_manager.h
     src/linyaps_box/terminal.cpp
     src/linyaps_box/terminal.h
-    src/linyaps_box/unix_socket.cpp
-    src/linyaps_box/unix_socket.h
     src/linyaps_box/utils/atomic_write.cpp
     src/linyaps_box/utils/atomic_write.h
     src/linyaps_box/utils/cgroups.cpp
@@ -186,6 +225,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/close_range.cpp
     src/linyaps_box/utils/close_range.h
     src/linyaps_box/utils/defer.h
+    src/linyaps_box/utils/enum_traits.h
     src/linyaps_box/utils/epoll.cpp
     src/linyaps_box/utils/epoll.h
     src/linyaps_box/utils/file.cpp
@@ -195,17 +235,14 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/inspect.cpp
     src/linyaps_box/utils/inspect.h
     src/linyaps_box/utils/ioctl.h
-    src/linyaps_box/utils/log.cpp
-    src/linyaps_box/utils/log.h
     src/linyaps_box/utils/mkdir.cpp
     src/linyaps_box/utils/mkdir.h
     src/linyaps_box/utils/mknod.cpp
     src/linyaps_box/utils/mknod.h
     src/linyaps_box/utils/mman.cpp
+    src/linyaps_box/utils/mman.h
     src/linyaps_box/utils/platform.cpp
     src/linyaps_box/utils/platform.h
-    src/linyaps_box/utils/process.cpp
-    src/linyaps_box/utils/process.h
     src/linyaps_box/utils/ringbuffer.cpp
     src/linyaps_box/utils/ringbuffer.h
     src/linyaps_box/utils/semver.cpp
@@ -222,6 +259,12 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/terminal.cpp
     src/linyaps_box/utils/terminal.h
     src/linyaps_box/utils/utils.h)
+
+if(NOT linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
+  list(REMOVE_ITEM linyaps-box_LIBRARY_SOURCE
+       src/linyaps_box/log/sinks/journald_sink.h
+       src/linyaps_box/log/sinks/journald_sink.cpp)
+endif()
 
 set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
 
@@ -257,9 +300,14 @@ if(linyaps-box_ENABLE_SECCOMP)
 endif()
 
 if(linyaps-box_ENABLE_CAP)
-  # TODO: remove libcap and implement it by ourself
+  # TODO: maybe remove libcap and implement it by ourself ?
   pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap>=2.25)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
+endif()
+
+if(linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
+  pkg_check_modules(libsystemd REQUIRED IMPORTED_TARGET libsystemd)
+  list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE PkgConfig::libsystemd)
 endif()
 
 if(linyaps-box_ENABLE_CPM)
@@ -284,6 +332,19 @@ if(linyaps-box_ENABLE_CPM)
     GIT_TAG v2.6.2
     EXCLUDE_FROM_ALL ON
     OPTIONS "CLI11_BUILD_TESTS OFF")
+  CPMFindPackage(
+    NAME zeus_expected
+    VERSION 1.3.3
+    GITHUB_REPOSITORY zeus-cpp/expected
+    GIT_TAG v1.3.3
+    EXCLUDE_FROM_ALL ON
+    OPTIONS "BUILD_TESTING OFF")
+  CPMFindPackage(
+    NAME fmt
+    VERSION 10.1.0
+    GITHUB_REPOSITORY fmtlib/fmt
+    GIT_TAG 12.2.0
+    EXCLUDE_FROM_ALL ON)
 endif()
 
 # find minimal version
@@ -294,6 +355,8 @@ if(NOT nlohmann_json_FOUND)
        "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/nlohmann_json")
   find_package(nlohmann_json 3.11.3 REQUIRED)
   message(STATUS "use vendor nlohmann_json ${nlohmann_json_VERSION}")
+else()
+  message(STATUS "use system nlohmann_json ${nlohmann_json_VERSION}")
 endif()
 
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
@@ -306,9 +369,46 @@ if(NOT CLI11_FOUND)
        "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
   find_package(CLI11 2.5.0 REQUIRED)
   message(STATUS "use vendor CLI11 ${CLI11_VERSION}")
+else()
+  message(STATUS "use system CLI11 ${CLI11_VERSION}")
 endif()
 
-list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC CLI11::CLI11)
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES CLI11::CLI11)
+
+set(FMT_TARGET
+    "$<IF:$<BOOL:${linyaps-box_STATIC}>,fmt::fmt-header-only,fmt::fmt>")
+
+find_package(fmt 10.1.0 QUIET)
+if(NOT fmt_FOUND)
+  # if fmt is not found in local system. just use fmt::fmt with static linkage
+  # for boosting compiling speed.
+  set(FMT_TARGET fmt::fmt)
+
+  set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+  set(BUILD_SHARED_LIBS OFF)
+
+  list(APPEND CMAKE_MODULE_PATH
+       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/fmt")
+  add_subdirectory(external/fmt)
+
+  set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
+  message(STATUS "use vendor fmt ${fmt_VERSION}")
+else()
+  message(STATUS "use system fmt ${fmt_VERSION}")
+endif()
+
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES ${FMT_TARGET})
+
+find_package(zeus_expected 1.3.3 QUIET)
+if(NOT zeus_expected_FOUND)
+  add_subdirectory(external/zeus_expected)
+  list(APPEND CMAKE_MODULE_PATH
+       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/zeus_expected")
+  find_package(zeus_expected 1.3.3 REQUIRED)
+  message(STATUS "use vendor zeus_expected ${zeus_expected_VERSION}")
+endif()
+
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES zeus::expected)
 
 add_library("${linyaps-box_LIBRARY}" STATIC ${linyaps-box_LIBRARY_SOURCE})
 target_include_directories("${linyaps-box_LIBRARY}"
@@ -333,14 +433,14 @@ target_compile_definitions(
   PRIVATE
     "LINYAPS_BOX_CLONE_CHILD_STACK_SIZE=${linyaps-box_CLONE_CHILD_STACK_SIZE}"
     "LINYAPS_BOX_STACK_GROWTH_DOWN=${linyaps-box_STACK_GROWTH_DOWN}"
-    "LINYAPS_BOX_DEFAULT_LOG_LEVEL=${linyaps-box_DEFAULT_LOG_LEVEL}"
-    "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
+  PUBLIC "LINYAPS_BOX_DEFAULT_LOG_LEVEL_NAME=${linyaps-box_DEFAULT_LOG_LEVEL}"
+         "LINYAPS_BOX_ACTIVE_LOG_LEVEL_NAME=${linyaps-box_ACTIVE_LOG_LEVEL}")
 target_compile_options("${linyaps-box_LIBRARY}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
-if(linyaps-box_STATIC)
-  target_compile_definitions("${linyaps-box_LIBRARY}"
-                             PUBLIC "LINYAPS_BOX_STATIC_LINK")
-endif()
+target_compile_definitions(
+  "${linyaps-box_LIBRARY}"
+  PUBLIC "$<$<BOOL:${linyaps-box_STATIC}>:LINYAPS_BOX_STATIC_LINK>"
+         "LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION")
 
 if(linyaps-box_ENABLE_SECCOMP)
   target_compile_definitions("${linyaps-box_LIBRARY}"
@@ -356,19 +456,28 @@ if(linyaps-box_ENABLE_CAP)
                              PUBLIC LINYAPS_BOX_ENABLE_CAP)
 endif()
 
+if(linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
+  target_compile_definitions("${linyaps-box_LIBRARY}"
+                             PUBLIC LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION)
+endif()
+
 if(linyaps-box_ENABLE_COVERAGE)
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options("${linyaps-box_LIBRARY}"
-                           PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options("${linyaps-box_LIBRARY}" PUBLIC
-                        -fprofile-instr-generate -fcoverage-mapping)
-  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options("${linyaps-box_LIBRARY}" PRIVATE --coverage)
-    target_link_options("${linyaps-box_LIBRARY}" PUBLIC --coverage)
-  else()
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_ID
+                                                   STREQUAL "GNU")
     message(
       FATAL_ERROR "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}.")
   endif()
+  target_compile_options(
+    "${linyaps-box_LIBRARY}"
+    PRIVATE "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fprofile-instr-generate>"
+            "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fcoverage-mapping>"
+            "$<$<CXX_COMPILER_ID:GNU>:--coverage>")
+  target_link_options(
+    "${linyaps-box_LIBRARY}"
+    PUBLIC
+    "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fprofile-instr-generate>"
+    "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fcoverage-mapping>"
+    "$<$<CXX_COMPILER_ID:GNU>:--coverage>")
 endif()
 
 # ==============================================================================
@@ -383,18 +492,10 @@ add_executable("${linyaps-box_APP}" ${linyaps-box_APP_SOURCE})
 target_include_directories("${linyaps-box_APP}"
                            ${linyaps-box_APP_SOURCE_INCLUDE_DIRS})
 target_link_libraries("${linyaps-box_APP}" ${linyaps-box_APP_LINK_LIBRARIES})
-if(linyaps-box_STATIC)
-  target_link_options("${linyaps-box_APP}" PRIVATE -static -static-libgcc
-                      -static-libstdc++)
-endif()
-target_compile_features("${linyaps-box_APP}" PRIVATE cxx_std_17)
-set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD 17)
-set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_EXTENSIONS OFF)
-set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD_REQUIRED ON)
-target_compile_definitions(
-  "${linyaps-box_APP}"
-  PRIVATE "LINYAPS_BOX_DEFAULT_LOG_LEVEL=${linyaps-box_DEFAULT_LOG_LEVEL}"
-          "LINYAPS_BOX_ACTIVE_LOG_LEVEL=${linyaps-box_ACTIVE_LOG_LEVEL}")
+target_link_options(
+  "${linyaps-box_APP}" PRIVATE "$<$<BOOL:${linyaps-box_STATIC}>:-static>"
+  "$<$<BOOL:${linyaps-box_STATIC}>:-static-libgcc>"
+  "$<$<BOOL:${linyaps-box_STATIC}>:-static-libstdc++>")
 target_compile_options("${linyaps-box_APP}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 
