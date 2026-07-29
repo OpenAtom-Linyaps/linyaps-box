@@ -1,10 +1,21 @@
-Index: linyaps-box/src/linyaps_box/container.cpp
-===================================================================
---- linyaps-box.orig/src/linyaps_box/container.cpp
-+++ linyaps-box/src/linyaps_box/container.cpp
-@@ -1382,6 +1382,14 @@ void configure_mounts(linyaps_box::conta
-         return ss.str();
-     }();
+From 1c3a1d96e429fe7f487d7039191727af3ec1aba3 Mon Sep 17 00:00:00 2001
+From: wurongjie <wurongjie@uniontech.com>
+Date: Wed, 29 Jul 2026 10:24:55 +0800
+Subject: [PATCH] feat: write cred before start container process
+
+This node only exists in UOS kernel, it is used to identify child
+process running in linyaps container.
+---
+ src/linyaps_box/container.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/linyaps_box/container.cpp b/src/linyaps_box/container.cpp
+index e457906..cf1424e 100644
+--- a/src/linyaps_box/container.cpp
++++ b/src/linyaps_box/container.cpp
+@@ -1283,6 +1283,14 @@ void configure_mounts(linyaps_box::container &container, const std::filesystem::
+         throw std::system_error(errno, std::system_category(), "chdir");
+     }
  
 +    // NOTE: This node only exist in UOS kernel, it is used to identify child process
 +    // running in linyaps container
@@ -14,6 +25,9 @@ Index: linyaps-box/src/linyaps_box/container.cpp
 +        ofs << "1";
 +    }
 +
-     execvpe(c_args.at(0),
-             const_cast<char *const *>(c_args.data()), // NOLINT
-             const_cast<char *const *>(c_env.data())); // NOLINT
+     ::execvpe(c_args.at(0),
+               const_cast<char *const *>(c_args.data()),
+               const_cast<char *const *>(c_env.data()));
+-- 
+2.50.1
+
