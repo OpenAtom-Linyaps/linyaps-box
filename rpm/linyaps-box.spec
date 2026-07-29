@@ -7,7 +7,7 @@ License:        LGPLv3
 URL:            https://github.com/linuxdeepin/%{name}
 Source0:        %{url}/archive/%{version}/linglong-box-%{version}.tar
 
-BuildRequires:  cmake gcc-c++ glib2-devel glibc-static libstdc++-static gtest-devel gmock-devel libseccomp-devel libcap-devel
+BuildRequires:  cmake gcc-c++ glib2-devel glibc-static libstdc++-static gtest-devel gmock-devel libseccomp-devel libcap-devel systemd-devel
 
 %description
 Linglong sandbox with OCI standard.
