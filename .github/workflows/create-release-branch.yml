@@ -1,0 +1,23 @@
+name: create release branch
+on:
+  workflow_dispatch:
+jobs:
+  create_release_branch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get latest release branch
+        id: detect_branch
+        run: |
+          TARGET_BRANCH=$(git ls-remote --heads https://github.com/OpenAtom-Linyaps/linyaps-box | awk -F'/' '/release/ {print $NF}' | sort -V | tail -n 1)
+          echo "target_branch=${TARGET_BRANCH}" >> $GITHUB_OUTPUT
+      - run: |
+          git remote add upstream https://github.com/OpenAtom-Linyaps/linyaps-box
+          git fetch upstream --no-tags
+          git reset --hard upstream/release/${{ steps.detect_branch.outputs.target_branch }}
+          git checkout origin/master debian rpm
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: ${{ steps.detect_branch.outputs.target_branch }}
+          create_branch: true
+          commit_message: "Create release branch"
