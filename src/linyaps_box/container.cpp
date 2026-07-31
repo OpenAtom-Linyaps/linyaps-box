@@ -676,7 +676,7 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
 }
 
 [[nodiscard]] std::optional<remount_t> do_mount(linyaps_box::container &container,
-                                                const linyaps_box::utils::file_descriptor &root,
+                                                linyaps_box::utils::file_descriptor &root,
                                                 const linyaps_box::config::mount_t &mount)
 {
     // FIXME: this is a workaround, it should be fixed in the future
@@ -738,6 +738,12 @@ void do_propagation_mount(const linyaps_box::utils::file_descriptor &destination
     }
 
     do_propagation_mount(destination_fd, mount.propagation_flags);
+
+    // if the mount destination is root, we need to reopen it after mount
+    // to refresh the file descriptor, otherwise it may cause some unexpected behavior
+    if (mount.destination == "/") {
+        root = linyaps_box::utils::open(root.current_path(), O_PATH | O_CLOEXEC | O_DIRECTORY);
+    }
 
     bool need_remount{ false };
     if ((mount.flags & (MS_RDONLY | MS_BIND)) != 0) {
