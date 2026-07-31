@@ -1,3 +1,45 @@
+linglong-box (2.2.1-1) unstable; urgency=medium
+
+  * release 2.2.1-1.
+
+ -- wurongjie <wurongjie@uniontech.com>  Fri, 31 Jul 2026 13:58:50 +0800
+
+linglong-box (2.2.0-1) unstable; urgency=medium
+
+  * release 2.2.0-1.
+
+ -- dengbo <dengbo@deepin.org>  Thu, 18 Jun 2026 16:22:28 +0800
+
+linglong-box (2.1.2-1) unstable; urgency=medium
+
+  * release 2.1.2-1.
+
+ -- dengbo <dengbo@deepin.org>  Fri, 31 Oct 2025 13:22:43 +0800
+
+linglong-box (2.1.0-1) unstable; urgency=medium
+
+  * release 2.1.0-1.
+
+ -- dengbo <dengbo@deepin.org>  Wed, 06 Aug 2025 17:59:08 +0800
+
+linglong-box (2.0.3-1) unstable; urgency=medium
+
+  * release 2.0.3-1.
+
+ -- dengbo <dengbo@deepin.org>  Thu, 17 Jul 2025 21:57:45 +0800
+
+linglong-box (2.0.2-1) unstable; urgency=medium
+
+  * release 2.0.2-1.
+
+ -- dengbo <dengbo@deepin.org>  Wed, 16 Jul 2025 15:21:14 +0800
+
+linglong-box (2.0.0-1) unstable; urgency=medium
+
+  * release 2.0.0-1.
+
+ -- dengbo <dengbo@deepin.org>  Fri, 13 Jun 2025 18:51:08 +0800
+
 linglong-box (1.8.1-1) unstable; urgency=medium
 
   * release 1.8.1-1.

@@ -1,6 +1,6 @@
 %global debug_package %{nil}
 Name:           linglong-box
-Version:        1.4.3
+Version:        2.2.1
 Release:        1
 Summary:        Linglong sandbox
 License:        LGPLv3
@@ -37,5 +37,8 @@ cd build
 %{_bindir}/ll-box
 
 %changelog
+* Fri Jul 31 2026 wurongjie <wurongjie@uniontech.com> - 2.2.1-1
+- release 2.2.1-1
+
 * Wed May 14 2025 wurongjie <wurongjie@deepin.org> - 1.8.1-1
 - Init project
