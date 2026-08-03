@@ -24,14 +24,16 @@ public:
     auto operator=(message_channel_base &&) noexcept -> message_channel_base & = default;
     ~message_channel_base() noexcept = default;
 
-    auto send(const msg::message &body, utils::span<const utils::file_descriptor> fds = { }) const
-      -> void;
+    auto send(const msg::message &body,
+              utils::span<const utils::file_descriptor_ref> fds = { }) const -> void;
 
     auto send_log(const linyaps_box::log::log_context &ctx) const -> void;
 
     auto send_stage(stage::type s) const -> void;
 
     [[nodiscard]] auto recv() const -> msg::datagram;
+
+    auto close() & -> void { socket_.close(); }
 
 protected:
     infra::unix_socket socket_;
@@ -40,8 +42,6 @@ protected:
 class parent_message_channel final : public message_channel_base
 {
 public:
-    explicit parent_message_channel(infra::unix_socket socket) noexcept;
-
     parent_message_channel(const parent_message_channel &) = delete;
     auto operator=(const parent_message_channel &) -> parent_message_channel & = delete;
     parent_message_channel(parent_message_channel &&) noexcept = default;
@@ -51,13 +51,16 @@ public:
     auto wait_for(stage::type expected) const -> void;
     auto wait_for_close() const -> void;
     [[nodiscard]] auto drain_logs() const -> msg::datagram;
+
+private:
+    friend auto create_message_socketpair()
+      -> std::pair<parent_message_channel, child_message_channel>;
+    explicit parent_message_channel(infra::unix_socket socket) noexcept;
 };
 
 class child_message_channel final : public message_channel_base
 {
 public:
-    explicit child_message_channel(infra::unix_socket socket) noexcept;
-
     child_message_channel(const child_message_channel &) = delete;
     auto operator=(const child_message_channel &) -> child_message_channel & = delete;
     child_message_channel(child_message_channel &&) noexcept = default;
@@ -66,9 +69,12 @@ public:
 
     auto wait_for(stage::type expected) const -> void;
     auto wait_for_proceed() const -> void;
-};
 
-void forward_log_to_parent(msg::log l);
+private:
+    friend auto create_message_socketpair()
+      -> std::pair<parent_message_channel, child_message_channel>;
+    explicit child_message_channel(infra::unix_socket socket) noexcept;
+};
 
 auto create_message_socketpair() -> std::pair<parent_message_channel, child_message_channel>;
 

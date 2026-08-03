@@ -180,6 +180,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/io/forwarder.h
     src/linyaps_box/log/formatter.cpp
     src/linyaps_box/log/formatter.h
+    src/linyaps_box/log/log_api.h
     src/linyaps_box/log/logger.cpp
     src/linyaps_box/log/logger.h
     src/linyaps_box/log/macro.h
@@ -196,11 +197,12 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/log/sinks/syslog_sink.h
     src/linyaps_box/log/utils.cpp
     src/linyaps_box/log/utils.h
+    src/linyaps_box/os/io.h
+    src/linyaps_box/os/net.cpp
+    src/linyaps_box/os/net.h
     src/linyaps_box/os/process.cpp
     src/linyaps_box/os/process.h
     src/linyaps_box/os/result.h
-    src/linyaps_box/os/socket.cpp
-    src/linyaps_box/os/socket.h
     src/linyaps_box/os/tty.cpp
     src/linyaps_box/os/tty.h
     src/linyaps_box/printer.cpp

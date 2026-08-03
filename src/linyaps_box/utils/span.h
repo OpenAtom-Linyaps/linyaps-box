@@ -635,4 +635,17 @@ template <typename T,
     return ReturnType(reinterpret_cast<std::byte *>(s.data()), s.size_bytes());
 }
 
+template <typename T>
+struct is_span : std::false_type
+{
+};
+
+template <typename T, std::size_t Extent>
+struct is_span<span<T, Extent>> : std::true_type
+{
+};
+
+template <typename T>
+inline constexpr bool is_span_v = is_span<std::decay_t<T>>::value;
+
 } // namespace linyaps_box::utils

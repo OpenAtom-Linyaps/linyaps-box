@@ -20,7 +20,7 @@ auto isatty(const utils::file_descriptor &fd) noexcept -> Result<bool>
         return false;
     }
 
-    return unexpected(Err{ "failed to detect fd is a tty or not", errno });
+    return unexpected(make_error_code(errno));
 }
 
 } // namespace linyaps_box::os

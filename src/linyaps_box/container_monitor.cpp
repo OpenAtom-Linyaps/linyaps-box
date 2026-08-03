@@ -28,7 +28,7 @@ auto detect_host_tty() -> terminal_slave
         utils::file_descriptor fd{ io, false };
         auto ret = os::isatty(fd);
         if (UNLIKELY(!ret)) {
-            throw std::system_error(ret.error().err, std::system_category(), ret.error().msg);
+            throw std::system_error(std::move(ret).error());
         }
 
         if (ret.value()) {
@@ -43,7 +43,7 @@ auto detect_host_tty() -> terminal_slave
     }
 
     if (!ret) {
-        throw std::system_error(ret.error().err, std::system_category(), ret.error().msg);
+        throw std::system_error(std::move(ret).error());
     }
 
     throw std::runtime_error("no available tty");
@@ -164,7 +164,7 @@ auto container_monitor::kill_child() noexcept -> int
     auto result = linyaps_box::os::waitpid(pid, status, 0);
     if (!result) {
         const auto &err = result.error();
-        LINYAPS_BOX_LOG_ERROR_ERRNO(err.err, "failed to wait container process: {}", err.msg);
+        LINYAPS_BOX_LOG_ERROR("failed to wait container process: {}", err);
         return -1;
     }
 

@@ -101,7 +101,9 @@ void execute_hook(const linyaps_box::oci_config::hooks_t::hook_t &hook,
     //  hook fail to parse its stdin.  runc, youki and crun all feed hook stdin via
     //  a stream pipe (pipe2(O_CLOEXEC) + write_all) instead; replace this with
     //  pipe2 + file_descriptor::write_span in a follow-up.
-    auto [parent, child] = linyaps_box::infra::unix_socket::create_socketpair();
+    auto [parent, child] =
+      linyaps_box::infra::unix_socket::create_pair(os::sys::socket_type::seqpacket,
+                                                   os::sys::socket_flag::cloexec);
 
     auto pid = fork();
     if (pid < 0) {
@@ -156,10 +158,8 @@ void execute_hook(const linyaps_box::oci_config::hooks_t::hook_t &hook,
     const auto *data = reinterpret_cast<const std::byte *>(state_json.data());
     auto remaining = state_json.size();
 
-    try {
-        child.send(linyaps_box::utils::span(data, remaining));
-    } catch (const std::exception &e) {
-        LINYAPS_BOX_LOG_WARN("failed to write state to hook stdin: {}", e.what());
+    if (auto r = child.send(linyaps_box::utils::span(data, remaining)); !r) {
+        LINYAPS_BOX_LOG_WARN("failed to write state to hook stdin: {}", r.error().message());
     }
 
     child.close();
@@ -1719,9 +1719,9 @@ void configure_terminal(const linyaps_box::container &container,
 
     std::ignore = container_ns::do_bind_mount(root, mount);
     auto console_fd = std::move(master).take();
-    std::vector<linyaps_box::utils::file_descriptor> fds;
-    fds.emplace_back(std::move(console_fd));
-    sync.send(linyaps_box::protocol::msg::console_fd{ }, fds);
+    auto ref = console_fd.ref();
+    sync.send(linyaps_box::protocol::msg::console_fd{ },
+              linyaps_box::utils::span<const linyaps_box::utils::file_descriptor_ref>{ &ref, 1 });
 }
 
 int clone_fn(void *data) noexcept
@@ -2517,7 +2517,8 @@ int linyaps_box::container::run(run_container_options_t options)
                              auto master_fd = std::move(fds.front());
 
                              if (options.console_socket) {
-                                 options.console_socket->send_fd(master_fd);
+                                 os::throw_if_error(
+                                   options.console_socket->send_fd(master_fd.ref()));
                              } else {
                                  master = linyaps_box::terminal_master{ std::move(master_fd) };
                              }

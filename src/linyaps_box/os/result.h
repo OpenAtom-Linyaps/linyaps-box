@@ -7,21 +7,13 @@
 #include <fmt/format.h>
 #include <zeus/expected.hpp>
 
-#include <string>
-
 namespace linyaps_box::os {
-
-struct Err
-{
-    std::string msg;
-    int err;
-};
 
 // if we update to C++ 23, just replace below
 // alias template.
 
 template <typename T>
-using Result = zeus::expected<T, Err>;
+using Result = zeus::expected<T, std::error_code>;
 
 // alias template CTAD available after C++ 20
 // this is a workaround
@@ -42,19 +34,15 @@ template <typename T>
 auto throw_if_error(Result<T> &&res) -> T
 {
     if (!res) {
-        throw std::system_error(res.error().err, std::system_category(), res.error().msg);
+        throw std::system_error(res.error());
     }
 
     return std::move(res).value();
 }
 
-} // namespace linyaps_box::os
-
-template <>
-struct fmt::formatter<linyaps_box::os::Err> : fmt::formatter<std::string>
+inline auto make_error_code(int err) noexcept
 {
-    auto format(const linyaps_box::os::Err &error, fmt::format_context &ctx) const
-    {
-        return fmt::format_to(ctx.out(), "{}: {}", error.msg, ::strerror(error.err));
-    }
-};
+    return std::error_code{ err, std::generic_category() };
+}
+
+} // namespace linyaps_box::os

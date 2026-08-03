@@ -29,6 +29,11 @@ target_link_libraries("${linyaps-box_UNIT_TESTS}"
 target_compile_options("${linyaps-box_UNIT_TESTS}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 
+set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD 17)
+set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_EXTENSIONS OFF)
+set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD_REQUIRED
+                                                         ON)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   list(APPEND GTEST_DISCOVER_TESTS_ARGS ENVIRONMENT
        "LLVM_PROFILE_FILE=/dev/null")

@@ -113,9 +113,9 @@ void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
     }
 
     auto console_fd = std::move(master).take();
-    std::vector<linyaps_box::utils::file_descriptor> fds;
-    fds.emplace_back(std::move(console_fd));
-    sync.send(protocol::msg::console_fd{ }, fds);
+    auto ref = console_fd.ref();
+    sync.send(protocol::msg::console_fd{ },
+              linyaps_box::utils::span<const linyaps_box::utils::file_descriptor_ref>{ &ref, 1 });
 }
 
 void child_apply_credentials(const linyaps_box::oci_config::process_t &proc)
@@ -300,18 +300,16 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
 }
 #endif // LINYAPS_BOX_ENABLE_CAP
 
-[[noreturn]] void exec_child_process(pid_t target_pid,
+[[noreturn]] auto exec_child_process(pid_t target_pid,
                                      const linyaps_box::oci_config &config,
                                      const linyaps_box::oci_config::process_t &proc,
                                      int preserve_fds,
-                                     linyaps_box::infra::unix_socket sync_sock)
+                                     protocol::child_message_channel child_chan) -> void
 {
-    auto sync = protocol::child_message_channel(std::move(sync_sock));
-
     try {
         auto &logger = linyaps_box::log::global_logger::instance();
         logger.unset_sink();
-        logger.set_sink(linyaps_box::log::sync_socket_sink(sync));
+        logger.set_sink(linyaps_box::log::sync_socket_sink(child_chan));
 
         bool pid_ns{ false };
         if (config.linux && config.linux->namespaces) {
@@ -331,19 +329,19 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
             }
 
             if (grandchild > 0) {
-                sync.send(protocol::msg::pid_report{ static_cast<pid_t>(grandchild) });
+                child_chan.send(protocol::msg::pid_report{ static_cast<pid_t>(grandchild) });
                 _exit(EXIT_SUCCESS);
             }
         } else {
-            sync.send(protocol::msg::pid_report{ ::getpid() });
+            child_chan.send(protocol::msg::pid_report{ ::getpid() });
         }
 
-        sync.wait_for_proceed();
+        child_chan.wait_for_proceed();
 
         linyaps_box::utils::setsid();
 
         if (proc.terminal) {
-            child_setup_terminal(proc, sync);
+            child_setup_terminal(proc, child_chan);
         }
 
         child_apply_environment(proc, config);
@@ -388,7 +386,7 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
 
         LINYAPS_BOX_LOG_DEBUG("exec command");
 
-        sync.send_stage(protocol::stage::type::exec_ready);
+        child_chan.send_stage(protocol::stage::type::exec_ready);
 
         ::execvpe(c_args.at(0),
                   const_cast<char *const *>(c_args.data()),
@@ -468,7 +466,8 @@ auto exec_parent_process(protocol::parent_message_channel sync,
                              auto master_fd = std::move(fds.front());
 
                              if (external_console_socket) {
-                                 external_console_socket->send_fd(master_fd);
+                                 os::throw_if_error(
+                                   external_console_socket->send_fd(master_fd.ref()));
                              } else {
                                  in.set_nonblock(true);
                                  out.set_nonblock(true);
@@ -535,7 +534,7 @@ auto container_ref::exec(exec_container_option option) const -> int
     auto config = oci_config::parse(status_dir_.config());
     auto &proc = resolve_final_process(option, config);
 
-    auto [raw_parent, raw_child] = infra::unix_socket::create_socketpair();
+    auto [parent_chan, child_chan] = protocol::create_message_socketpair();
 
     auto child = ::fork();
     if (UNLIKELY(child < 0)) {
@@ -543,16 +542,15 @@ auto container_ref::exec(exec_container_option option) const -> int
     }
 
     if (child == 0) {
-        raw_parent.close();
+        parent_chan.close();
         option.console_socket.reset();
 
-        exec_child_process(target_pid, config, proc, option.preserve_fds, std::move(raw_child));
+        exec_child_process(target_pid, config, proc, option.preserve_fds, std::move(child_chan));
     }
 
-    raw_child.close();
-    auto sync = protocol::parent_message_channel(std::move(raw_parent));
-    return exec_parent_process(std::move(sync),
-                               static_cast<bool>(proc.terminal),
+    child_chan.close();
+    return exec_parent_process(std::move(parent_chan),
+                               proc.terminal.value_or(false),
                                std::move(option.console_socket));
 }
 
