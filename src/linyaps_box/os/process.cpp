@@ -24,7 +24,7 @@ auto waitpid(pid_t pid, int &status, int options) noexcept -> Result<int>
             continue;
         }
 
-        return unexpected{ Err{ "waitpid failed", errno } };
+        return unexpected{ make_error_code(errno) };
     }
 
     __builtin_unreachable();
@@ -40,7 +40,7 @@ auto get_exit_code(int status) noexcept -> Result<int>
         return 128 + WTERMSIG(status);
     }
 
-    return unexpected(Err{ "invalid process status", EINVAL });
+    return unexpected(make_error_code(EINVAL));
 }
 
 } // namespace linyaps_box::os

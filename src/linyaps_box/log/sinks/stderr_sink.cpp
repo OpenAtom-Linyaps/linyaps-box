@@ -27,7 +27,7 @@ try {
     if (color) {
         switch (ctx.lvl) {
         case level::fatal: {
-            style = fmt::bg(fmt::color::crimson) | fmt::fg(fmt::color::white) | fmt::emphasis::bold;
+            style = fmt::fg(fmt::color::white) | fmt::emphasis::bold;
         } break;
         case level::error: {
             style = fmt::fg(fmt::color::red) | fmt::emphasis::bold;

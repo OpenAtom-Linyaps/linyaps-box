@@ -25,6 +25,7 @@ namespace {
 namespace proto = linyaps_box::protocol;
 namespace msg = linyaps_box::protocol::msg;
 namespace log_lvl = linyaps_box::log;
+namespace os = linyaps_box::os;
 
 auto make_log(log_lvl::level lvl = log_lvl::level::fatal,
               std::string_view message = "test",
@@ -333,12 +334,15 @@ TEST_F(ChannelTest, WaitForUnexpectedStageThrows)
 
 TEST_F(ChannelTest, TakeFdFromIncoming)
 {
-    auto [a, b] = linyaps_box::infra::unix_socket::create_socketpair();
+    auto [a, b] = linyaps_box::infra::unix_socket::create_pair(os::sys::socket_type::seqpacket,
+                                                               os::sys::socket_flag::cloexec);
     auto b_fd = b.release();
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     fds.emplace_back(b_fd, true);
-    child->send(msg::stage{ proto::stage::type::namespace_ready }, fds);
+    linyaps_box::utils::file_descriptor_ref ref{ fds.front() };
+    child->send(msg::stage{ proto::stage::type::namespace_ready },
+                linyaps_box::utils::span<const linyaps_box::utils::file_descriptor_ref>{ &ref, 1 });
 
     auto inc = parent->recv();
     ASSERT_FALSE(inc.fds.empty());
@@ -357,24 +361,20 @@ TEST_F(ChannelTest, TakeFdFromIncoming)
 
 TEST_F(ChannelTest, WaitForExecSocketCloseThrows)
 {
-    auto [p1, p2] = linyaps_box::infra::unix_socket::create_socketpair();
-    p2.close();
-    const proto::parent_message_channel isolated_parent(std::move(p1));
+    auto [parent, child] = proto::create_message_socketpair();
+    child.close();
 
-    EXPECT_THROW(isolated_parent.wait_for(proto::stage::type::exec_ready), std::runtime_error);
+    EXPECT_THROW(parent.wait_for(proto::stage::type::exec_ready), std::runtime_error);
 }
 
 TEST_F(ChannelTest, WaitForExecWithExecReady)
 {
-    auto [s1, s2] = linyaps_box::infra::unix_socket::create_socketpair();
-    const proto::parent_message_channel isolated_parent(std::move(s1));
+    auto [parent, child] = proto::create_message_socketpair();
+    child.send(msg::stage{ proto::stage::type::exec_ready });
+    child.close();
 
-    auto msg = msg::serialize(msg::stage{ proto::stage::type::exec_ready });
-    s2.send(linyaps_box::utils::span<const std::byte>(msg.data(), msg.size()));
-    s2.close();
-
-    EXPECT_NO_THROW(isolated_parent.wait_for(proto::stage::type::exec_ready));
-    EXPECT_NO_THROW(isolated_parent.wait_for_close());
+    EXPECT_NO_THROW(parent.wait_for(proto::stage::type::exec_ready));
+    EXPECT_NO_THROW(parent.wait_for_close());
 }
 
 TEST_F(ChannelTest, WaitForExecFailedAfterReady)
@@ -427,17 +427,26 @@ TEST_F(ChannelTest, FdsExceedLimitThrows)
         fds.emplace_back(fd, true);
     }
 
-    EXPECT_THROW(child->send(m, fds), std::logic_error);
+    std::vector<linyaps_box::utils::file_descriptor_ref> refs;
+    refs.reserve(fds.size());
+    for (const auto &fd : fds) {
+        refs.emplace_back(fd.ref());
+    }
+
+    EXPECT_THROW(child->send(m, refs), std::logic_error);
 }
 
 TEST_F(ChannelTest, SendRecvConsoleFd)
 {
-    auto [a, b] = linyaps_box::infra::unix_socket::create_socketpair();
+    auto [a, b] = linyaps_box::infra::unix_socket::create_pair(os::sys::socket_type::seqpacket,
+                                                               os::sys::socket_flag::cloexec);
     auto b_fd = b.release();
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     fds.emplace_back(b_fd, true);
-    child->send(msg::console_fd{ }, fds);
+    linyaps_box::utils::file_descriptor_ref ref{ fds.front() };
+    child->send(msg::console_fd{ },
+                linyaps_box::utils::span<const linyaps_box::utils::file_descriptor_ref>{ &ref, 1 });
 
     auto inc = parent->recv();
     ASSERT_TRUE(std::holds_alternative<msg::console_fd>(inc.body));
@@ -446,11 +455,9 @@ TEST_F(ChannelTest, SendRecvConsoleFd)
 
 TEST_F(ChannelTest, SendOnClosedSocketThrows)
 {
-    auto [p1, p2] = linyaps_box::infra::unix_socket::create_socketpair();
-    p1.close();
-    const proto::child_message_channel isolated_child(std::move(p2));
-    EXPECT_THROW(isolated_child.send(make_log(log_lvl::level::fatal, "parent gone")),
-                 std::system_error);
+    auto [parent, child] = proto::create_message_socketpair();
+    parent.close();
+    EXPECT_THROW(child.send(make_log(log_lvl::level::fatal, "parent gone")), std::system_error);
 }
 
 TEST_F(ChannelTest, MaxFdsTransfer)
@@ -462,7 +469,13 @@ TEST_F(ChannelTest, MaxFdsTransfer)
         fds.emplace_back(fd, true);
     }
 
-    child->send(msg::stage{ proto::stage::type::namespace_ready }, fds);
+    std::vector<linyaps_box::utils::file_descriptor_ref> refs;
+    refs.reserve(fds.size());
+    for (const auto &fd : fds) {
+        refs.emplace_back(fd.ref());
+    }
+
+    child->send(msg::stage{ proto::stage::type::namespace_ready }, refs);
 
     auto inc = parent->recv();
     ASSERT_TRUE(std::holds_alternative<msg::stage>(inc.body));

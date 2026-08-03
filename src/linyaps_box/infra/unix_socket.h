@@ -4,17 +4,21 @@
 
 #pragma once
 
-#include "linyaps_box/os/socket.h"
+#include "linyaps_box/os/net.h"
 #include "linyaps_box/utils/file_describer.h"
 
 #include <filesystem>
 #include <vector>
 
-#include <sys/socket.h>
-
 namespace linyaps_box::infra {
 
 inline constexpr std::size_t kMaxScmFds = 16;
+
+struct recv_result
+{
+    std::vector<utils::file_descriptor> fds;
+    std::size_t bytes;
+};
 
 class unix_socket
 {
@@ -37,28 +41,32 @@ public:
 
     [[nodiscard]] auto fd() const && = delete;
 
-    auto send(utils::span<const std::byte> data) const -> void;
+    [[nodiscard]] auto send(utils::span<const std::byte> data) const -> os::Result<std::size_t>;
 
-    auto send_fd(const utils::file_descriptor &fd) const -> void;
+    [[nodiscard]] auto recv(utils::span<std::byte> buf,
+                            os::sys::recv_flag flags = os::sys::recv_flag::none) const
+      -> os::Result<std::size_t>;
+
+    [[nodiscard]] auto send_fd(utils::file_descriptor_ref fd) const -> os::Result<void>;
 
     [[nodiscard]] auto recv_fd() const -> utils::file_descriptor;
 
-    auto send_data_with_fds(utils::span<const std::byte> data,
-                            utils::span<const utils::file_descriptor> fds) const -> void;
+    // TODO: after removing file_descriptor::auto_close, file_descriptor will
+    // have the same layout as int; change this parameter to
+    // span<const file_descriptor> so senders pass owning fds directly without
+    // file_descriptor_ref.
+    [[nodiscard]] auto send_data_with_fds(utils::span<const std::byte> data,
+                                          utils::span<const utils::file_descriptor_ref> fds) const
+      -> os::Result<std::size_t>;
 
     [[nodiscard]] auto recv_data_with_fds(utils::span<std::byte> data) const
-      -> std::pair<std::vector<utils::file_descriptor>, std::size_t>;
+      -> os::Result<recv_result>;
 
-    static auto create_socketpair() -> std::pair<unix_socket, unix_socket>;
+    static auto create_pair(os::sys::socket_type type, os::sys::socket_flag flag)
+      -> std::pair<unix_socket, unix_socket>;
 
 private:
     explicit unix_socket(utils::file_descriptor fd);
-
-    auto send_msg(struct msghdr &msg) const -> int;
-    static auto append_fds(struct msghdr &msg, utils::span<const int> fds) -> void;
-    [[nodiscard]] auto recv_msg(struct msghdr &msg) const -> os::recv_result;
-    [[nodiscard]] static auto extract_fds(struct msghdr &msg)
-      -> std::vector<utils::file_descriptor>;
 
     utils::file_descriptor fd_;
 };

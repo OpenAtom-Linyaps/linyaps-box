@@ -5,6 +5,7 @@
 #pragma once
 
 #include "linyaps_box/os/result.h"
+#include "linyaps_box/utils/utils.h"
 
 #include <fmt/ranges.h>
 #include <sys/prctl.h>
@@ -17,12 +18,8 @@ template <typename... Args>
 [[nodiscard]] auto prctl(int option, Args... args) noexcept -> Result<int>
 {
     auto ret = ::prctl(option, std::forward<Args>(args)...);
-    if (ret < 0) {
-        auto msg = fmt::format("prctl op {} with args: [{}]",
-                               option,
-                               fmt::join(std::forward_as_tuple(std::forward<Args>(args)...), ", "));
-
-        return unexpected(Err{ msg, errno });
+    if (UNLIKELY(ret < 0)) {
+        return unexpected(make_error_code(errno));
     }
 
     return ret;

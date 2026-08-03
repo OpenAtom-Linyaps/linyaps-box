@@ -92,7 +92,7 @@ auto linyaps_box::utils::file_descriptor::release() & -> int
 auto linyaps_box::utils::file_descriptor::close() & -> void
 {
     if (UNLIKELY(fd_ < 0)) {
-        throw file_descriptor_invalid_exception("invalid fd");
+        throw file_descriptor_invalid_exception("double close or invalid fd");
     }
 
     auto ret = ::close(fd_);

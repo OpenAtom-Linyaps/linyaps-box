@@ -588,41 +588,14 @@ void validate_namespace_path(const oci_config::linux_t::namespace_t &ns);
 
 void from_json(const nlohmann::json &j, oci_config &v);
 
-template <>
-struct utils::is_bitmask_enum<oci_config::linux_t::namespace_t::type> : std::true_type
-{
-};
-
-template <>
-struct utils::is_bitmask_enum<oci_config::mount_t::extension> : std::true_type
-{
-};
-
-template <>
-struct utils::is_bitmask_enum<oci_config::process_t::scheduler_t::flag_t> : std::true_type
-{
-};
-
-template <>
-struct utils::is_bitmask_enum<oci_config::linux_t::memory_policy_t::flag_t> : std::true_type
-{
-};
-
-#ifdef LINYAPS_BOX_ENABLE_SECCOMP
-template <>
-struct utils::is_bitmask_enum<oci_config::linux_t::seccomp_t::flag_t> : std::true_type
-{
-};
-#endif
-
-using utils::operator|;
-using utils::operator&;
-using utils::operator^;
-using utils::operator~;
-using utils::operator|=;
-using utils::operator&=;
-using utils::operator^=;
-
 void from_json(const nlohmann::json &j, oci_config::process_t &v);
+
+ENABLE_BITMASK_OPERATORS(oci_config::linux_t::namespace_t::type)
+ENABLE_BITMASK_OPERATORS(oci_config::process_t::scheduler_t::flag_t)
+ENABLE_BITMASK_OPERATORS(oci_config::mount_t::extension)
+ENABLE_BITMASK_OPERATORS(oci_config::linux_t::memory_policy_t::flag_t)
+#ifdef LINYAPS_BOX_ENABLE_SECCOMP
+ENABLE_BITMASK_OPERATORS(oci_config::linux_t::seccomp_t::flag_t)
+#endif
 
 } // namespace linyaps_box

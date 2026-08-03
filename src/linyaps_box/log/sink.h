@@ -6,6 +6,8 @@
 
 #include "linyaps_box/log/sinks/file_sink.h"
 
+#include <variant>
+
 #ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
 #  include "linyaps_box/log/sinks/journald_sink.h"
 #endif

@@ -5,7 +5,6 @@
 #include "linyaps_box/protocol/message_channel.h"
 
 #include "linyaps_box/log/logger.h"
-#include "linyaps_box/os/socket.h"
 #include "linyaps_box/utils/span.h"
 #include "linyaps_box/utils/utils.h"
 
@@ -23,9 +22,25 @@ namespace linyaps_box::protocol {
 
 namespace {
 
+auto forward_log_to_parent(const msg::log &l) noexcept
+{
+    auto tp = std::chrono::system_clock::time_point{
+        std::chrono::duration_cast<std::chrono::system_clock::duration>(l.time)
+    };
+
+    const linyaps_box::log::log_context ctx{
+        l.lvl,  l.message,  tp,     l.pid, l.errno_,
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+        l.file, l.function, l.line,
+#endif
+    };
+
+    linyaps_box::log::global_logger::instance().dispatch_raw(ctx);
+}
+
 auto send_raw(const infra::unix_socket &socket,
               utils::span<const std::byte> buffer,
-              utils::span<const utils::file_descriptor> fds) -> void
+              utils::span<const utils::file_descriptor_ref> fds) -> void
 {
     if (UNLIKELY(fds.size() > linyaps_box::infra::kMaxScmFds)) {
         throw std::logic_error(fmt::format("message_channel: fds count {} exceeds maximum {}, "
@@ -34,12 +49,21 @@ auto send_raw(const infra::unix_socket &socket,
                                            linyaps_box::infra::kMaxScmFds));
     }
 
-    if (fds.empty()) {
-        socket.send(buffer);
-        return;
+    // message_channel sockets are always SOCK_SEQPACKET, which sends each
+    // datagram atomically; a short write would silently truncate the message
+    // and can only mean the socket was misused (e.g. a stream socket).
+    auto sent = fds.empty() ? socket.send(buffer) : socket.send_data_with_fds(buffer, fds);
+    if (UNLIKELY(!sent)) {
+        throw std::system_error(std::move(sent).error(), "failed to send message_channel datagram");
     }
 
-    socket.send_data_with_fds(buffer, fds);
+    if (UNLIKELY(*sent != buffer.size())) {
+        throw std::system_error(
+          std::make_error_code(std::errc::io_error),
+          fmt::format("short write on message_channel socket, sent {} of {} bytes",
+                      *sent,
+                      buffer.size()));
+    }
 }
 
 struct raw_packet
@@ -65,13 +89,15 @@ auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>;
 auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>
 {
     std::byte dummy{ };
-    auto peek = os::recv(socket.fd().get(), &dummy, 0, MSG_PEEK | MSG_TRUNC);
+    auto peek = socket.recv(utils::span<std::byte>(&dummy, static_cast<std::size_t>(0)),
+                            os::sys::recv_flag::peek | os::sys::recv_flag::trunc);
     if (!peek) {
-        if (peek.error == ECONNRESET || peek.error == ENOTCONN || peek.error == EPIPE) {
+        const auto err = peek.error().value();
+        if (err == ECONNRESET || err == ENOTCONN || err == EPIPE) {
             return std::nullopt;
         }
 
-        throw std::system_error(peek.error, std::system_category(), "recv");
+        throw std::system_error(std::move(peek).error(), "failed to peek message_channel datagram");
     }
 
     // PEER-CLOSE DETECTION ON SEQPACKET
@@ -82,13 +108,25 @@ auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>
     // second phase: after receiving exec_ready, CLOEXEC socket close signals
     // exec success, while a die message signals exec failure.  Close-before-
     // exec_ready is still treated as an error.
-    if (peek.bytes == 0) {
+    if (*peek == 0) {
         return std::nullopt;
     }
 
-    std::vector<std::byte> data(static_cast<std::size_t>(peek.bytes));
-    auto [fds, n] = socket.recv_data_with_fds(utils::span<std::byte>(data.data(), data.size()));
+    // TODO: this vector is allocated on every received message, which is on
+    // the log-forwarding hot path.  Consider reusing a thread_local buffer
+    // (sized from the peek) instead.
+    std::vector<std::byte> data(static_cast<std::size_t>(*peek));
+    auto result = socket.recv_data_with_fds(utils::span<std::byte>(data.data(), data.size()));
+    if (!result) {
+        const auto err = result.error().value();
+        if (err == ECONNRESET || err == ENOTCONN || err == EPIPE) {
+            return std::nullopt;
+        }
 
+        throw std::system_error(std::move(result).error(), "recvmsg");
+    }
+
+    auto &[fds, n] = *result;
     if (UNLIKELY(n < sizeof(msg_id))) {
         throw std::runtime_error("truncated message");
     }
@@ -104,7 +142,7 @@ message_channel_base::message_channel_base(infra::unix_socket socket) noexcept
 }
 
 auto message_channel_base::send(const msg::message &body,
-                                utils::span<const utils::file_descriptor> fds) const -> void
+                                utils::span<const utils::file_descriptor_ref> fds) const -> void
 {
     auto buffer = msg::serialize(body);
     send_raw(socket_, utils::span<const std::byte>(buffer.data(), buffer.size()), fds);
@@ -131,21 +169,6 @@ auto message_channel_base::recv() const -> msg::datagram
     return std::move(inc).value();
 }
 
-void forward_log_to_parent(msg::log l)
-{
-    auto tp = std::chrono::system_clock::time_point{
-        std::chrono::duration_cast<std::chrono::system_clock::duration>(l.time)
-    };
-
-    const linyaps_box::log::log_context ctx{
-        l.lvl,  l.message,  tp,     l.pid, l.errno_,
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        l.file, l.function, l.line,
-#endif
-    };
-    linyaps_box::log::global_logger::instance().dispatch_raw(ctx);
-}
-
 parent_message_channel::parent_message_channel(infra::unix_socket socket) noexcept
     : message_channel_base(std::move(socket))
 {
@@ -164,7 +187,7 @@ auto parent_message_channel::wait_for(stage::type expected) const -> void
         std::visit(utils::Overload{
                      [&](msg::log &l) {
                          assert(inc->fds.empty());
-                         forward_log_to_parent(std::move(l));
+                         forward_log_to_parent(l);
                      },
                      [&](const msg::stage &s) {
                          if (UNLIKELY(s.value != expected)) {
@@ -216,7 +239,7 @@ auto parent_message_channel::wait_for_close() const -> void
                              saved_errno = l.errno_;
                          }
 
-                         forward_log_to_parent(std::move(l));
+                         forward_log_to_parent(l);
                      },
                      [&](const auto &) {
                          throw std::runtime_error("unexpected message after exec_ready");
@@ -239,7 +262,7 @@ auto parent_message_channel::drain_logs() const -> msg::datagram
         }
 
         assert(inc->fds.empty());
-        forward_log_to_parent(std::move(std::get<msg::log>(inc->body)));
+        forward_log_to_parent(std::get<msg::log>(inc->body));
     }
 }
 
@@ -282,7 +305,8 @@ auto child_message_channel::wait_for_proceed() const -> void
 
 auto create_message_socketpair() -> std::pair<parent_message_channel, child_message_channel>
 {
-    auto [c1, c2] = infra::unix_socket::create_socketpair();
+    auto [c1, c2] = infra::unix_socket::create_pair(os::sys::socket_type::seqpacket,
+                                                    os::sys::socket_flag::cloexec);
     return { parent_message_channel(std::move(c1)), child_message_channel(std::move(c2)) };
 }
 
