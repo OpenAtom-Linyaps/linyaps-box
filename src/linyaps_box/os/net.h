@@ -26,17 +26,18 @@ enum class send_flag : uint16_t {
     eor = MSG_EOR,
     more = MSG_MORE,
     nosignal = MSG_NOSIGNAL,
-    oob = MSG_OOB
+    oob = MSG_OOB,
+    LINYAPS_MARK_AS_BITMASK_ENUM(more),
 };
-LINYAPS_REGISTER_BITMASK_ENUM(send_flag,
-                              { send_flag::none, "NONE" },
-                              { send_flag::confirm, "MSG_CONFIRM" },
-                              { send_flag::dontroute, "MSG_DONTROUTE" },
-                              { send_flag::dontwait, "MSG_DONTWAIT" },
-                              { send_flag::eor, "MSG_EOR" },
-                              { send_flag::more, "MSG_MORE" },
-                              { send_flag::nosignal, "MSG_NOSIGNAL" },
-                              { send_flag::oob, "MSG_OOB" })
+LINYAPS_REGISTER_ENUM(send_flag,
+                      { send_flag::none, "NONE" },
+                      { send_flag::confirm, "MSG_CONFIRM" },
+                      { send_flag::dontroute, "MSG_DONTROUTE" },
+                      { send_flag::dontwait, "MSG_DONTWAIT" },
+                      { send_flag::eor, "MSG_EOR" },
+                      { send_flag::more, "MSG_MORE" },
+                      { send_flag::nosignal, "MSG_NOSIGNAL" },
+                      { send_flag::oob, "MSG_OOB" })
 
 enum class recv_flag : uint32_t {
     none = 0,
@@ -46,17 +47,18 @@ enum class recv_flag : uint32_t {
     oob = MSG_OOB,
     peek = MSG_PEEK,
     trunc = MSG_TRUNC,
-    waitall = MSG_WAITALL
+    waitall = MSG_WAITALL,
+    LINYAPS_MARK_AS_BITMASK_ENUM(cmsg_cloexec),
 };
-LINYAPS_REGISTER_BITMASK_ENUM(recv_flag,
-                              { recv_flag::none, "NONE" },
-                              { recv_flag::cmsg_cloexec, "MSG_CMSG_CLOEXEC" },
-                              { recv_flag::dontwait, "MSG_DONTWAIT" },
-                              { recv_flag::errqueue, "MSG_ERRQUEUE" },
-                              { recv_flag::oob, "MSG_OOB" },
-                              { recv_flag::peek, "MSG_PEEK" },
-                              { recv_flag::trunc, "MSG_TRUNC" },
-                              { recv_flag::waitall, "MSG_WAITALL" })
+LINYAPS_REGISTER_ENUM(recv_flag,
+                      { recv_flag::none, "NONE" },
+                      { recv_flag::cmsg_cloexec, "MSG_CMSG_CLOEXEC" },
+                      { recv_flag::dontwait, "MSG_DONTWAIT" },
+                      { recv_flag::errqueue, "MSG_ERRQUEUE" },
+                      { recv_flag::oob, "MSG_OOB" },
+                      { recv_flag::peek, "MSG_PEEK" },
+                      { recv_flag::trunc, "MSG_TRUNC" },
+                      { recv_flag::waitall, "MSG_WAITALL" })
 
 enum class return_flag : uint32_t {
     none = 0,
@@ -65,16 +67,17 @@ enum class return_flag : uint32_t {
     trunc = MSG_TRUNC,
     ctrunc = MSG_CTRUNC,
     errqueue = MSG_ERRQUEUE,
-    cmsg_cloexec = MSG_CMSG_CLOEXEC
+    cmsg_cloexec = MSG_CMSG_CLOEXEC,
+    LINYAPS_MARK_AS_BITMASK_ENUM(cmsg_cloexec),
 };
-LINYAPS_REGISTER_BITMASK_ENUM(return_flag,
-                              { return_flag::none, "NONE" },
-                              { return_flag::oob, "MSG_OOB" },
-                              { return_flag::eor, "MSG_EOR" },
-                              { return_flag::trunc, "MSG_TRUNC" },
-                              { return_flag::ctrunc, "MSG_CTRUNC" },
-                              { return_flag::errqueue, "MSG_ERRQUEUE" },
-                              { return_flag::cmsg_cloexec, "MSG_CMSG_CLOEXEC" })
+LINYAPS_REGISTER_ENUM(return_flag,
+                      { return_flag::none, "NONE" },
+                      { return_flag::oob, "MSG_OOB" },
+                      { return_flag::eor, "MSG_EOR" },
+                      { return_flag::trunc, "MSG_TRUNC" },
+                      { return_flag::ctrunc, "MSG_CTRUNC" },
+                      { return_flag::errqueue, "MSG_ERRQUEUE" },
+                      { return_flag::cmsg_cloexec, "MSG_CMSG_CLOEXEC" })
 
 enum class address_family : uint8_t { unspecified = AF_UNSPEC, unix = AF_UNIX };
 LINYAPS_REGISTER_ENUM(address_family,
@@ -95,11 +98,16 @@ LINYAPS_REGISTER_ENUM(socket_type,
                       { socket_type::rdm, "SOCK_RDM" },
                       { socket_type::seqpacket, "SOCK_SEQPACKET" })
 
-enum class socket_flag : uint32_t { none = 0, nonblock = SOCK_NONBLOCK, cloexec = SOCK_CLOEXEC };
-LINYAPS_REGISTER_BITMASK_ENUM(socket_flag,
-                              { socket_flag::none, "NONE" },
-                              { socket_flag::nonblock, "SOCK_NONBLOCK" },
-                              { socket_flag::cloexec, "SOCK_CLOEXEC" })
+enum class socket_flag : uint32_t {
+    none = 0,
+    nonblock = SOCK_NONBLOCK,
+    cloexec = SOCK_CLOEXEC,
+    LINYAPS_MARK_AS_BITMASK_ENUM(cloexec),
+};
+LINYAPS_REGISTER_ENUM(socket_flag,
+                      { socket_flag::none, "NONE" },
+                      { socket_flag::nonblock, "SOCK_NONBLOCK" },
+                      { socket_flag::cloexec, "SOCK_CLOEXEC" })
 
 namespace cmsg {
 
