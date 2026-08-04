@@ -126,6 +126,7 @@ struct oci_config
                 KEEP_PARAMS = SCHED_FLAG_KEEP_PARAMS,
                 UTIL_CLAMP_MIN = static_cast<uint8_t>(kernel::sched_flag_util_clamp_min),
                 UTIL_CLAMP_MAX = static_cast<uint8_t>(kernel::sched_flag_util_clamp_max),
+                LINYAPS_MARK_AS_BITMASK_ENUM(UTIL_CLAMP_MAX),
             };
 
             std::optional<flag_t> flags;
@@ -190,6 +191,7 @@ struct oci_config
             NONE = 0,
             COPY_SYMLINK = (1U << 0U),
             TMPCOPYUP = (1U << 1U),
+            LINYAPS_MARK_AS_BITMASK_ENUM(TMPCOPYUP),
         };
 
         enum class idmap_type : std::uint8_t { IDMAP, RIDMAP };
@@ -242,6 +244,7 @@ struct oci_config
                 USER = CLONE_NEWUSER,
                 CGROUP = CLONE_NEWCGROUP,
                 TIME = kernel::clone_newtime,
+                LINYAPS_MARK_AS_BITMASK_ENUM(NET),
             };
 
             type type_;
@@ -429,6 +432,7 @@ struct oci_config
                 NUMA_BALANCING = static_cast<uint16_t>(kernel::mpol_f_numa_balancing),
                 RELATIVE_NODES = static_cast<uint16_t>(MPOL_F_RELATIVE_NODES),
                 STATIC_NODES = static_cast<uint16_t>(MPOL_F_STATIC_NODES),
+                LINYAPS_MARK_AS_BITMASK_ENUM(STATIC_NODES),
             };
             std::optional<flag_t> flags;
         };
@@ -490,6 +494,7 @@ struct oci_config
                 SPEC_ALLOW = static_cast<std::uint8_t>(kernel::seccomp_filter_flag_spec_allow),
                 WAIT_KILLABLE_RECV =
                   static_cast<std::uint8_t>(kernel::seccomp_filter_flag_wait_killable_recv),
+                LINYAPS_MARK_AS_BITMASK_ENUM(WAIT_KILLABLE_RECV),
             };
             std::optional<flag_t> flags;
 
@@ -589,13 +594,5 @@ void validate_namespace_path(const oci_config::linux_t::namespace_t &ns);
 void from_json(const nlohmann::json &j, oci_config &v);
 
 void from_json(const nlohmann::json &j, oci_config::process_t &v);
-
-ENABLE_BITMASK_OPERATORS(oci_config::linux_t::namespace_t::type)
-ENABLE_BITMASK_OPERATORS(oci_config::process_t::scheduler_t::flag_t)
-ENABLE_BITMASK_OPERATORS(oci_config::mount_t::extension)
-ENABLE_BITMASK_OPERATORS(oci_config::linux_t::memory_policy_t::flag_t)
-#ifdef LINYAPS_BOX_ENABLE_SECCOMP
-ENABLE_BITMASK_OPERATORS(oci_config::linux_t::seccomp_t::flag_t)
-#endif
 
 } // namespace linyaps_box
