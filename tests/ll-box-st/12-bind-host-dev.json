@@ -15,6 +15,10 @@
 	},
 	"mounts": [
 		{
+			"type": "proc",
+			"destination": "/proc"
+		},
+		{
 			"source": "/dev",
 			"destination": "/dev",
 			"type": "bind",
