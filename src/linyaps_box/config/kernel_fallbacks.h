@@ -109,6 +109,13 @@ inline constexpr unsigned int ms_nosymfollow = MS_NOSYMFOLLOW;
 inline constexpr unsigned int ms_nosymfollow = 256U;
 #endif
 
+// ST_NOSYMFOLLOW: statfs(2)/fstatfs(2) f_flags bit reported for a mount that
+// has MS_NOSYMFOLLOW set. The kernel reports mount options in the ST_*
+// namespace, so this is NOT the same value as MS_NOSYMFOLLOW (256); checking
+// the MS_* value against f_flags would never match.
+// See <linux/statfs.h> / <bits/statvfs.h>.
+inline constexpr unsigned int st_nosymfollow = 0x2000U;
+
 // MOUNT_ATTR_* for mount_setattr(2) since kernel 5.12
 #ifdef MOUNT_ATTR_RDONLY
 inline constexpr uint64_t mount_attr_rdonly = MOUNT_ATTR_RDONLY;
