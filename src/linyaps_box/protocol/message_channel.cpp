@@ -12,6 +12,7 @@
 
 #include <cassert>
 #include <cerrno>
+#include <cstring>
 #include <optional>
 #include <stdexcept>
 #include <system_error>

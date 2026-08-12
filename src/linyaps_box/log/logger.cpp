@@ -4,9 +4,8 @@
 
 #include "linyaps_box/log/logger.h"
 
+#include "linyaps_box/os/fs.h"
 #include "linyaps_box/utils/utils.h"
-
-#include <linyaps_box/utils/file.h>
 
 #include <chrono>
 
@@ -24,14 +23,22 @@ auto make_spec(std::string_view log_dest) -> sink_spec
             return stderr_spec{ };
         }
 
-        return file_spec{ utils::open(log_dest, file_log_flag, file_log_mod) };
+        return file_spec{ linyaps_box::os::throw_if_error(
+          linyaps_box::os::open(std::filesystem::path{ log_dest },
+                                linyaps_box::os::throw_if_error(
+                                  linyaps_box::os::sys::open_option::from_raw(file_log_flag)),
+                                static_cast<std::filesystem::perms>(file_log_mod))) };
     }
 
     auto scheme = log_dest.substr(0, idx);
     auto content = log_dest.substr(idx + 1);
 
     if (scheme == "file") {
-        return file_spec{ utils::open(content, file_log_flag, file_log_mod) };
+        return file_spec{ linyaps_box::os::throw_if_error(
+          linyaps_box::os::open(std::filesystem::path{ content },
+                                linyaps_box::os::throw_if_error(
+                                  linyaps_box::os::sys::open_option::from_raw(file_log_flag)),
+                                static_cast<std::filesystem::perms>(file_log_mod))) };
     }
 
     if (scheme == "syslog") {

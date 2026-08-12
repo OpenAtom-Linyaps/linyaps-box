@@ -6,7 +6,6 @@
 
 #include "linyaps_box/config.h"
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/utils/file.h"
 #include "linyaps_box/utils/platform.h"
 #include "linyaps_box/version.h"
 
@@ -23,8 +22,8 @@ namespace {
 auto socket_check(const std::string &str) noexcept -> std::string
 {
     try {
-        auto ret = linyaps_box::utils::lstat(str);
-        if (!linyaps_box::utils::is_type(ret.st_mode, std::filesystem::file_type::socket)) {
+        auto ret = std::filesystem::symlink_status(str);
+        if (!std::filesystem::is_socket(ret)) {
             return "console-socket must be an existing socket file";
         }
     } catch (const std::system_error &e) {
