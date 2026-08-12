@@ -40,7 +40,7 @@ auto get_exit_code(int status) noexcept -> Result<int>
         return 128 + WTERMSIG(status);
     }
 
-    return unexpected(make_error_code(EINVAL));
+    return unexpected(std::make_error_code(std::errc::invalid_argument));
 }
 
 } // namespace linyaps_box::os

@@ -57,16 +57,17 @@ class file_descriptor_ref
 public:
     constexpr file_descriptor_ref() noexcept = default;
 
-    constexpr explicit file_descriptor_ref(int fd) noexcept
-        : fd_(fd)
-    {
-    }
-
     file_descriptor_ref(const file_descriptor &fd) noexcept;
 
     [[nodiscard]] constexpr int get() const noexcept { return fd_; }
 
-    [[nodiscard]] constexpr bool is_valid() const noexcept { return fd_ >= 0; }
+    [[nodiscard]] constexpr bool is_valid() const noexcept { return fd_ >= 0 || fd_ == AT_FDCWD; }
+
+    [[nodiscard]] auto proc_path() const -> std::filesystem::path;
+
+    [[nodiscard]] auto current_path() const -> std::filesystem::path;
+
+    static auto cwd() -> file_descriptor_ref;
 
     constexpr operator int() const noexcept { return fd_; }
 
@@ -81,6 +82,11 @@ public:
     constexpr bool operator!=(int raw_fd) const noexcept { return fd_ != raw_fd; }
 
 private:
+    explicit file_descriptor_ref(int fd) noexcept
+        : fd_(fd)
+    {
+    }
+
     int fd_{ -1 };
 };
 
@@ -117,12 +123,6 @@ public:
     auto operator<<(const std::byte &byte) -> file_descriptor &;
 
     auto operator>>(std::byte &byte) -> file_descriptor &;
-
-    [[nodiscard]] auto proc_path() const -> std::filesystem::path;
-
-    [[nodiscard]] auto current_path() const -> std::filesystem::path;
-
-    static auto cwd() -> file_descriptor;
 
     [[nodiscard]] auto type() const -> std::filesystem::file_type;
 
@@ -193,10 +193,8 @@ public:
 
     [[nodiscard]] auto ref() const noexcept -> file_descriptor_ref
     {
-        return file_descriptor_ref{ fd_ };
+        return file_descriptor_ref{ *this };
     }
-
-    operator file_descriptor_ref() const noexcept { return ref(); }
 
 private:
     int fd_{ -1 };

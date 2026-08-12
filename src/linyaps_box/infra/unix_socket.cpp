@@ -6,7 +6,6 @@
 
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/result.h"
-#include "linyaps_box/utils/inspect.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
@@ -46,9 +45,7 @@ auto unix_socket::recv(utils::span<std::byte> buf, os::sys::recv_flag flags) con
 
 auto unix_socket::send_fd(utils::file_descriptor_ref fd) const -> os::Result<void>
 {
-    LINYAPS_BOX_LOG_DEBUG("Send fd {} to socket {}",
-                          utils::inspect_fd(fd.get()),
-                          utils::inspect_fd(fd_.get()));
+    LINYAPS_BOX_LOG_DEBUG("Send fd {} to socket {}", fd.get(), fd_.get());
     std::byte placeholder{ };
     auto ret = send_data_with_fds(utils::span(&placeholder, 1), utils::span(&fd, 1));
     if (!ret) {
@@ -96,7 +93,7 @@ auto unix_socket::send_data_with_fds(utils::span<const std::byte> data,
     LINYAPS_BOX_LOG_DEBUG("Send {} fd(s) with {} data bytes to socket {}",
                           fds.size(),
                           data.size(),
-                          utils::inspect_fd(fd_.get()));
+                          fd_.get());
 
     std::array<std::byte, os::sys::cmsg::buffer_size(os::sys::cmsg::rights{ kMaxScmFds })>
       ctrl_buf{ };
@@ -111,8 +108,6 @@ auto unix_socket::send_data_with_fds(utils::span<const std::byte> data,
 
 auto unix_socket::recv_data_with_fds(utils::span<std::byte> data) const -> os::Result<recv_result>
 {
-    LINYAPS_BOX_LOG_DEBUG("Receive data with fd from socket {}", utils::inspect_fd(fd_.get()));
-
     std::array<std::byte, os::sys::cmsg::buffer_size(os::sys::cmsg::rights{ kMaxScmFds })>
       ctrl_buf{ };
 

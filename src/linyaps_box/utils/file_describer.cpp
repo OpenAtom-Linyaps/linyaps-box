@@ -5,7 +5,7 @@
 #include "linyaps_box/utils/file_describer.h"
 
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/utils/file.h"
+#include "linyaps_box/os/fs.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <algorithm>
@@ -123,19 +123,7 @@ auto linyaps_box::utils::file_descriptor::duplicate() const -> linyaps_box::util
         throw file_descriptor_invalid_exception("cannot duplicate AT_FDCWD");
     }
 
-    auto ret = dup(fd_);
-    if (UNLIKELY(ret < 0)) {
-        throw std::system_error(errno, std::system_category(), "dup");
-    }
-
-    file_descriptor new_fd{ ret };
-
-    // dup will lost the close-on-exec flag
-    // and we don't want to use FD_DUPFD_CLOEXEC due to it require a specific fd number
-    auto flag = fcntl(*this, F_GETFD);
-    fcntl(new_fd, F_SETFD, flag);
-
-    return new_fd;
+    return os::throw_if_error(os::fcntl_dupfd_cloexec(ref(), 0));
 }
 
 auto linyaps_box::utils::file_descriptor::duplicate_to(int target, int flags) const -> void
@@ -200,34 +188,9 @@ auto linyaps_box::utils::file_descriptor::operator>>(std::byte &byte)
     }
 }
 
-auto linyaps_box::utils::file_descriptor::proc_path() const -> std::filesystem::path
+auto linyaps_box::utils::file_descriptor_ref::cwd() -> file_descriptor_ref
 {
-    if (UNLIKELY(fd_ < 0)) {
-        throw file_descriptor_invalid_exception("invalid fd");
-    }
-
-    if (fd_ == AT_FDCWD) {
-        return std::filesystem::current_path();
-    }
-
-    return "/proc/self/fd/" + std::to_string(fd_);
-}
-
-auto linyaps_box::utils::file_descriptor::current_path() const -> std::filesystem::path
-{
-    std::error_code ec;
-    auto p_path = proc_path();
-    auto path = std::filesystem::read_symlink(p_path, ec);
-    if (UNLIKELY(!!ec)) {
-        LINYAPS_BOX_LOG_ERROR("failed to read symlink {}: {}", p_path, ec.message());
-    }
-
-    return path;
-}
-
-auto linyaps_box::utils::file_descriptor::cwd() -> file_descriptor
-{
-    return file_descriptor{ AT_FDCWD };
+    return file_descriptor_ref{ AT_FDCWD };
 }
 
 auto linyaps_box::utils::file_descriptor::nonblock() const -> bool
@@ -242,25 +205,30 @@ auto linyaps_box::utils::file_descriptor::set_nonblock(bool nonblock) const & ->
 
     auto flags = this->flags();
     auto new_flags = nonblock ? (flags | O_NONBLOCK) : (flags & ~static_cast<unsigned>(O_NONBLOCK));
-    fcntl(*this, F_SETFL, new_flags);
+    os::throw_if_error(os::fcntl_setfl(ref(), static_cast<os::sys::open_flag>(new_flags)));
 }
 
 auto linyaps_box::utils::file_descriptor::flags() const -> unsigned int
 {
-    return fcntl(*this, F_GETFL);
+    auto res = os::fcntl_getfl(ref());
+    if (UNLIKELY(!res)) {
+        throw std::system_error(res.error());
+    }
+
+    return static_cast<int>(res->flags());
 }
 
 auto linyaps_box::utils::file_descriptor::set_flags(unsigned int flags) const & -> void
 {
     LINYAPS_BOX_LOG_DEBUG("set fd {} flags to {:x}", fd_, flags);
 
-    fcntl(*this, F_SETFL, flags);
+    os::throw_if_error(os::fcntl_setfl(ref(), static_cast<os::sys::open_flag>(flags)));
 }
 
 auto linyaps_box::utils::file_descriptor::type() const -> std::filesystem::file_type
 {
-    auto stat = linyaps_box::utils::fstat(*this);
-    return linyaps_box::utils::to_fs_file_type(stat.st_mode);
+    auto stat = os::throw_if_error(os::fstat(ref()));
+    return linyaps_box::os::to_fs_file_type(stat.st_mode);
 }
 
 auto linyaps_box::utils::file_descriptor::read_span(span<std::byte> ws) const -> IOResult
@@ -466,4 +434,29 @@ auto linyaps_box::utils::file_descriptor::write_vecs(span<const struct iovec> rs
     }
 
     return { IOStatus::Success, total_bytes_written };
+}
+
+auto linyaps_box::utils::file_descriptor_ref::proc_path() const -> std::filesystem::path
+{
+    if (UNLIKELY(fd_ < 0)) {
+        throw file_descriptor_invalid_exception("invalid fd");
+    }
+
+    if (fd_ == AT_FDCWD) {
+        return std::filesystem::current_path();
+    }
+
+    return "/proc/self/fd/" + std::to_string(fd_);
+}
+
+auto linyaps_box::utils::file_descriptor_ref::current_path() const -> std::filesystem::path
+{
+    std::error_code ec;
+    auto p_path = proc_path();
+    auto path = std::filesystem::read_symlink(p_path, ec);
+    if (UNLIKELY(!!ec)) {
+        LINYAPS_BOX_LOG_ERROR("failed to read symlink {}: {}", p_path, ec.message());
+    }
+
+    return path;
 }
