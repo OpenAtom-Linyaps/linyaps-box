@@ -170,6 +170,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/impl/json_printer.h
     src/linyaps_box/impl/table_printer.cpp
     src/linyaps_box/impl/table_printer.h
+    src/linyaps_box/infra/rootfs.cpp
+    src/linyaps_box/infra/rootfs.h
     src/linyaps_box/infra/unix_socket.cpp
     src/linyaps_box/infra/unix_socket.h
     src/linyaps_box/interface.cpp
@@ -197,6 +199,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/log/sinks/syslog_sink.h
     src/linyaps_box/log/utils.cpp
     src/linyaps_box/log/utils.h
+    src/linyaps_box/os/fs.cpp
+    src/linyaps_box/os/fs.h
     src/linyaps_box/os/io.h
     src/linyaps_box/os/net.cpp
     src/linyaps_box/os/net.h
@@ -230,17 +234,9 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/enum_traits.h
     src/linyaps_box/utils/epoll.cpp
     src/linyaps_box/utils/epoll.h
-    src/linyaps_box/utils/file.cpp
     src/linyaps_box/utils/file_describer.cpp
     src/linyaps_box/utils/file_describer.h
-    src/linyaps_box/utils/file.h
-    src/linyaps_box/utils/inspect.cpp
-    src/linyaps_box/utils/inspect.h
     src/linyaps_box/utils/ioctl.h
-    src/linyaps_box/utils/mkdir.cpp
-    src/linyaps_box/utils/mkdir.h
-    src/linyaps_box/utils/mknod.cpp
-    src/linyaps_box/utils/mknod.h
     src/linyaps_box/utils/mman.cpp
     src/linyaps_box/utils/mman.h
     src/linyaps_box/utils/platform.cpp
@@ -256,8 +252,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/signal.cpp
     src/linyaps_box/utils/signal.h
     src/linyaps_box/utils/span.h
-    src/linyaps_box/utils/symlink.cpp
-    src/linyaps_box/utils/symlink.h
     src/linyaps_box/utils/terminal.cpp
     src/linyaps_box/utils/terminal.h
     src/linyaps_box/utils/utils.h)
@@ -329,16 +323,16 @@ if(linyaps-box_ENABLE_CPM)
     OPTIONS "JSON_BuildTests OFF")
   CPMFindPackage(
     NAME CLI11
-    VERSION 2.5.0
+    VERSION 2.6.0
     GITHUB_REPOSITORY CLIUtils/CLI11
-    GIT_TAG v2.6.2
+    GIT_TAG v2.7.2
     EXCLUDE_FROM_ALL ON
     OPTIONS "CLI11_BUILD_TESTS OFF")
   CPMFindPackage(
     NAME zeus_expected
-    VERSION 1.3.3
+    VERSION 1.4.0
     GITHUB_REPOSITORY zeus-cpp/expected
-    GIT_TAG v1.3.3
+    GIT_TAG v1.4.0
     EXCLUDE_FROM_ALL ON
     OPTIONS "BUILD_TESTING OFF")
   CPMFindPackage(
@@ -364,12 +358,12 @@ endif()
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
      nlohmann_json::nlohmann_json)
 
-find_package(CLI11 2.5.0 QUIET)
+find_package(CLI11 2.6.0 QUIET)
 if(NOT CLI11_FOUND)
   add_subdirectory(external/CLI11)
   list(APPEND CMAKE_MODULE_PATH
        "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
-  find_package(CLI11 2.5.0 REQUIRED)
+  find_package(CLI11 2.6.0 REQUIRED)
   message(STATUS "use vendor CLI11 ${CLI11_VERSION}")
 else()
   message(STATUS "use system CLI11 ${CLI11_VERSION}")
@@ -401,12 +395,12 @@ endif()
 
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES ${FMT_TARGET})
 
-find_package(zeus_expected 1.3.3 QUIET)
+find_package(zeus_expected 1.4.0 QUIET)
 if(NOT zeus_expected_FOUND)
   add_subdirectory(external/zeus_expected)
   list(APPEND CMAKE_MODULE_PATH
        "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/zeus_expected")
-  find_package(zeus_expected 1.3.3 REQUIRED)
+  find_package(zeus_expected 1.4.0 REQUIRED)
   message(STATUS "use vendor zeus_expected ${zeus_expected_VERSION}")
 endif()
 
