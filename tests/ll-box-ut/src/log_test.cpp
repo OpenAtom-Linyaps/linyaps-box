@@ -352,7 +352,7 @@ TEST(LogConfig, MakeSpec)
 
     auto s2 = make_spec("file:/tmp/test.log");
     ASSERT_TRUE(std::holds_alternative<file_spec>(s2));
-    EXPECT_EQ(std::get<file_spec>(s2).fd.current_path(), "/tmp/test.log");
+    EXPECT_EQ(std::get<file_spec>(s2).fd.ref().current_path(), "/tmp/test.log");
 
     auto s3 = make_spec("syslog:myapp");
     ASSERT_TRUE(std::holds_alternative<syslog_spec>(s3));
@@ -360,7 +360,7 @@ TEST(LogConfig, MakeSpec)
 
     auto s4 = make_spec("/tmp/default.log");
     ASSERT_TRUE(std::holds_alternative<file_spec>(s4));
-    EXPECT_EQ(std::get<file_spec>(s4).fd.current_path(), "/tmp/default.log");
+    EXPECT_EQ(std::get<file_spec>(s4).fd.ref().current_path(), "/tmp/default.log");
 
 #ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
 

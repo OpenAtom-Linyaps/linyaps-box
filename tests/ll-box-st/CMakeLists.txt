@@ -11,7 +11,7 @@ set(linyaps-box_SMOKE_TESTS
     ./06-check-cwd.json
     ./07-check-capability.json
     ./08-check-umask.json
-    ./09-check-rlimit.json
+    ./09-check-rlimits.json
     ./10-check-oom.json
     ./11-output-to-null.json
     ./12-bind-host-dev.json
