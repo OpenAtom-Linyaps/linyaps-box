@@ -5,9 +5,9 @@
 #include "linyaps_box/container_monitor.h"
 
 #include "linyaps_box/log/macro.h"
+#include "linyaps_box/os/fs.h"
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/os/tty.h"
-#include "linyaps_box/utils/file.h"
 #include "linyaps_box/utils/signal.h"
 #include "linyaps_box/utils/utils.h"
 
@@ -20,7 +20,7 @@ namespace {
 
 // Detect a local terminal to mirror window-resize events from.
 // Prefers stdin, then stdout; falls back to /dev/tty.
-auto detect_host_tty() -> terminal_slave
+auto detect_host_tty() -> std::optional<terminal_slave>
 {
     LINYAPS_BOX_LOG_DEBUG("detect host available tty");
 
@@ -28,7 +28,7 @@ auto detect_host_tty() -> terminal_slave
         utils::file_descriptor fd{ io, false };
         auto ret = os::isatty(fd);
         if (UNLIKELY(!ret)) {
-            throw std::system_error(std::move(ret).error());
+            continue;
         }
 
         if (ret.value()) {
@@ -36,17 +36,18 @@ auto detect_host_tty() -> terminal_slave
         }
     }
 
-    auto tty = utils::open("/dev/tty", O_RDONLY | O_CLOEXEC);
+    auto tty_res =
+      os::open("/dev/tty", { os::sys::open_flag::cloexec, os::sys::access_mode::read_only });
+    if (!tty_res) {
+        return std::nullopt;
+    }
+    auto tty = std::move(*tty_res);
     auto ret = os::isatty(tty);
-    if (LIKELY(ret && ret)) {
+    if (LIKELY(ret && ret.value())) {
         return terminal_slave{ std::move(tty) };
     }
 
-    if (!ret) {
-        throw std::system_error(std::move(ret).error());
-    }
-
-    throw std::runtime_error("no available tty");
+    return std::nullopt;
 }
 
 // Dispatch EPOLLERR / EPOLLHUP on a forwarder's src/dst fds.
@@ -176,7 +177,9 @@ auto container_monitor::enable_io_forwarding(terminal_master pty,
                                              const linyaps_box::utils::file_descriptor &out) -> void
 {
     host_tty = detect_host_tty();
-    host_tty->set_raw();
+    if (host_tty) {
+        host_tty->set_raw();
+    }
 
     master = std::move(pty);
 
@@ -212,6 +215,7 @@ auto container_monitor::enable_io_forwarding(terminal_master pty,
         if (!fwd) {
             return;
         }
+
         fwd->drive();
         if (fwd->is_finished()) {
             fwd.reset();

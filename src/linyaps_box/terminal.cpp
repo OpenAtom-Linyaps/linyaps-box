@@ -5,7 +5,7 @@
 #include "linyaps_box/terminal.h"
 
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/utils/file.h"
+#include "linyaps_box/os/fs.h"
 #include "linyaps_box/utils/ioctl.h"
 #include "linyaps_box/utils/terminal.h"
 
@@ -15,16 +15,25 @@
 
 namespace linyaps_box {
 
-auto create_pty_pair() -> std::pair<terminal_master, terminal_slave>
+auto create_pty_pair() -> pty_data
 {
     // let the container process control the terminal instead of OCI Runtime
-    auto master = utils::open("/dev/ptmx", O_RDWR | O_CLOEXEC | O_NOCTTY);
+    auto master = linyaps_box::os::throw_if_error(linyaps_box::os::open(
+      "/dev/ptmx",
+      { linyaps_box::os::sys::open_flag::cloexec | linyaps_box::os::sys::open_flag::no_ctty,
+        linyaps_box::os::sys::access_mode::read_write }));
 
     auto pts = utils::ptsname(master);
     unlockpt(master);
-    auto slave = utils::open(pts, O_RDWR | O_CLOEXEC);
+    auto slave = linyaps_box::os::throw_if_error(linyaps_box::os::open(
+      pts,
+      { linyaps_box::os::sys::open_flag::cloexec, linyaps_box::os::sys::access_mode::read_write }));
 
-    return { terminal_master{ std::move(master) }, terminal_slave{ std::move(slave) } };
+    return {
+        terminal_slave{ std::move(slave) },
+        pts,
+        terminal_master{ std::move(master) },
+    };
 }
 
 auto terminal_master::resize(struct winsize size) -> void
@@ -62,7 +71,10 @@ auto terminal_slave::setup_stdio() -> void
 auto terminal_slave::set_size(struct winsize size) -> void
 {
     if (size.ws_col == 0 || size.ws_row == 0) {
-        auto default_tty = utils::open("/dev/tty", O_RDWR | O_CLOEXEC);
+        auto default_tty = linyaps_box::os::throw_if_error(
+          linyaps_box::os::open("/dev/tty",
+                                { linyaps_box::os::sys::open_flag::cloexec,
+                                  linyaps_box::os::sys::access_mode::read_write }));
         std::ignore = utils::ioctl(default_tty, TIOCGWINSZ, &size);
     }
 
