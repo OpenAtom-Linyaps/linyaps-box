@@ -71,6 +71,13 @@ private:
     std::optional<struct termios> termios;
 };
 
-auto create_pty_pair() -> std::pair<terminal_master, terminal_slave>;
+struct pty_data
+{
+    terminal_slave slave;
+    std::filesystem::path path;
+    terminal_master master;
+};
+
+auto create_pty_pair() -> pty_data;
 
 } // namespace linyaps_box

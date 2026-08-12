@@ -105,7 +105,7 @@ void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
         return;
     }
 
-    auto [master, slave] = linyaps_box::create_pty_pair();
+    auto [slave, path, master] = linyaps_box::create_pty_pair();
 
     slave.setup_stdio();
     if (proc.console_size) {
