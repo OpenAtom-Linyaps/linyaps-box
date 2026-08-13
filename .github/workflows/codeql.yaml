@@ -33,6 +33,7 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: manual
           queries: security-extended
+          config-file: .github/codeql/codeql-config.yaml
 
       - name: Install Build Dependencies
         run: |
