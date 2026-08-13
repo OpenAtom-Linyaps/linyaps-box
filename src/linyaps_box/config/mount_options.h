@@ -4,16 +4,12 @@
 
 #pragma once
 
-#include <sys/mount.h>
+#include "linyaps_box/os/kernel_constants.h"
 
 #include <array>
 #include <sstream>
 #include <string>
 #include <string_view>
-
-// clang-format off
-#include "linyaps_box/config/kernel_fallbacks.h"
-// clang-format on
 
 namespace linyaps_box::config::mount_options {
 
@@ -36,7 +32,7 @@ constexpr std::array<flag_entry, 19> vfs{ {
   { MS_NODIRATIME, "nodiratime" },
   { MS_NOEXEC, "noexec" },
   { MS_NOSUID, "nosuid" },
-  { kernel::ms_nosymfollow, "nosymfollow" },
+  { os::sys::ms_nosymfollow, "nosymfollow" },
   { MS_BIND | MS_REC, "rbind" },
   { MS_RELATIME, "relatime" },
   { MS_REMOUNT, "remount" },
@@ -61,7 +57,7 @@ constexpr std::array<flag_entry, 14> unset{ {
   { MS_STRICTATIME, "nostrictatime" },
   { MS_RDONLY, "rw" },
   { MS_NOSUID, "suid" },
-  { kernel::ms_nosymfollow, "symfollow" },
+  { os::sys::ms_nosymfollow, "symfollow" },
 } };
 
 // Propagation flags — applied as separate mount(2) calls after the main mount.
@@ -84,26 +80,26 @@ constexpr std::array<flag_entry, 8> propagation{ {
 //       set/cleared, MOUNT_ATTR__ATIME must appear in attr_clr to reset the
 //       field before applying the new mode.
 constexpr std::array<flag_entry, 9> recursive_attr_set{ {
-  { static_cast<unsigned long>(kernel::mount_attr_rdonly), "rro" },
-  { static_cast<unsigned long>(kernel::mount_attr_nosuid), "rnosuid" },
-  { static_cast<unsigned long>(kernel::mount_attr_nodev), "rnodev" },
-  { static_cast<unsigned long>(kernel::mount_attr_noexec), "rnoexec" },
-  { static_cast<unsigned long>(kernel::mount_attr_nodiratime), "rnodiratime" },
-  { static_cast<unsigned long>(kernel::mount_attr_noatime), "rnoatime" },
-  { static_cast<unsigned long>(kernel::mount_attr_strictatime), "rstrictatime" },
-  { static_cast<unsigned long>(kernel::mount_attr_nosymfollow), "rnosymfollow" },
+  { static_cast<unsigned long>(os::sys::mount_attr_rdonly), "rro" },
+  { static_cast<unsigned long>(os::sys::mount_attr_nosuid), "rnosuid" },
+  { static_cast<unsigned long>(os::sys::mount_attr_nodev), "rnodev" },
+  { static_cast<unsigned long>(os::sys::mount_attr_noexec), "rnoexec" },
+  { static_cast<unsigned long>(os::sys::mount_attr_nodiratime), "rnodiratime" },
+  { static_cast<unsigned long>(os::sys::mount_attr_noatime), "rnoatime" },
+  { static_cast<unsigned long>(os::sys::mount_attr_strictatime), "rstrictatime" },
+  { static_cast<unsigned long>(os::sys::mount_attr_nosymfollow), "rnosymfollow" },
   { 0, "rrelatime" },
 } };
 
 constexpr std::array<flag_entry, 9> recursive_attr_clr{ {
-  { static_cast<unsigned long>(kernel::mount_attr_rdonly), "rrw" },
-  { static_cast<unsigned long>(kernel::mount_attr_nosuid), "rsuid" },
-  { static_cast<unsigned long>(kernel::mount_attr_nodev), "rdev" },
-  { static_cast<unsigned long>(kernel::mount_attr_noexec), "rexec" },
-  { static_cast<unsigned long>(kernel::mount_attr_nodiratime), "rdiratime" },
-  { static_cast<unsigned long>(kernel::mount_attr_noatime), "ratime" },
-  { static_cast<unsigned long>(kernel::mount_attr_strictatime), "rnostrictatime" },
-  { static_cast<unsigned long>(kernel::mount_attr_nosymfollow), "rsymfollow" },
+  { static_cast<unsigned long>(os::sys::mount_attr_rdonly), "rrw" },
+  { static_cast<unsigned long>(os::sys::mount_attr_nosuid), "rsuid" },
+  { static_cast<unsigned long>(os::sys::mount_attr_nodev), "rdev" },
+  { static_cast<unsigned long>(os::sys::mount_attr_noexec), "rexec" },
+  { static_cast<unsigned long>(os::sys::mount_attr_nodiratime), "rdiratime" },
+  { static_cast<unsigned long>(os::sys::mount_attr_noatime), "ratime" },
+  { static_cast<unsigned long>(os::sys::mount_attr_strictatime), "rnostrictatime" },
+  { static_cast<unsigned long>(os::sys::mount_attr_nosymfollow), "rsymfollow" },
   { 0, "rnorelatime" },
 } };
 

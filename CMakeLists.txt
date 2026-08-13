@@ -154,7 +154,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/command/run.h
     src/linyaps_box/config.cpp
     src/linyaps_box/config.h
-    src/linyaps_box/config/kernel_fallbacks.h
     src/linyaps_box/config/mount_options.h
     src/linyaps_box/container.cpp
     src/linyaps_box/container.h
@@ -201,7 +200,9 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/log/utils.h
     src/linyaps_box/os/fs.cpp
     src/linyaps_box/os/fs.h
+    src/linyaps_box/os/io.cpp
     src/linyaps_box/os/io.h
+    src/linyaps_box/os/kernel_constants.h
     src/linyaps_box/os/net.cpp
     src/linyaps_box/os/net.h
     src/linyaps_box/os/process.cpp

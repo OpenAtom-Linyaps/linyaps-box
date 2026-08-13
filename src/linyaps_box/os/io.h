@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/os/result.h"
+#include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/span.h"
 
 #include <type_traits>
@@ -88,5 +90,8 @@ static_assert(alignof(mutable_io_slice) == alignof(struct iovec),
               "Alignment mismatch with struct iovec");
 static_assert(std::is_standard_layout_v<mutable_io_slice>,
               "mutable_io_slice must be standard layout");
+
+auto read(utils::file_descriptor_ref fd, utils::span<std::byte> buf) noexcept
+  -> Result<std::size_t>;
 
 } // namespace linyaps_box::os

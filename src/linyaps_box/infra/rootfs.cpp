@@ -6,6 +6,8 @@
 
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
+#include "linyaps_box/os/io.h"
+#include "linyaps_box/os/kernel_constants.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <linux/magic.h>
@@ -115,6 +117,88 @@ constexpr auto max_symlinks = 128;
     }
 
     return buf.f_type == PROC_SUPER_MAGIC || buf.f_type == AAFS_MAGIC;
+}
+
+// Cached copy of the fs.protected_symlinks sysctl.
+// Defaults to enabled on read failure (conservative).
+[[nodiscard]] auto protected_symlinks_enabled() noexcept -> bool
+{
+    static const auto protect_enabled = []() noexcept -> bool {
+        auto ret = os::open("/proc/sys/fs/protected_symlinks",
+                            { open_flag::cloexec, access_mode::read_only });
+        if (UNLIKELY(!ret)) {
+            return true;
+        }
+
+        auto fd = std::move(*ret);
+
+        char enabled{ '0' };
+        auto read_res = os::read(fd, utils::as_writable_bytes(utils::span{ &enabled, 1 }));
+
+        if (UNLIKELY(!read_res || *read_res == 0)) {
+            return true;
+        }
+
+        return enabled == '1';
+    }();
+
+    return protect_enabled;
+}
+
+// Verify that we should follow the symlink as per fs.protected_symlinks
+// and MS_NOSYMFOLLOW.  Because we emulate symlink following in userspace,
+// the kernel cannot apply these restrictions so we need to emulate them.
+[[nodiscard]] auto may_follow_link(utils::file_descriptor_ref dir_fd,
+                                   utils::file_descriptor_ref link_fd) noexcept -> Result<void>
+{
+    // MS_NOSYMFOLLOW: if the symlink is on a mount with this flag, block
+    // resolution to match the behaviour of openat2.
+    auto stat = os::fstatfs(link_fd);
+    if (UNLIKELY(!stat)) {
+        return unexpected{ std::move(stat).error() };
+    }
+
+    if (UNLIKELY(static_cast<unsigned long>(stat->f_flags) & os::sys::st_nosymfollow) != 0) {
+        return unexpected{ std::make_error_code(std::errc::too_many_symbolic_link_levels) };
+    }
+
+    if (!protected_symlinks_enabled()) {
+        return { };
+    }
+
+    const auto fsuid = ::geteuid();
+
+    auto link_st = os::fstat(link_fd);
+    if (UNLIKELY(!link_st)) {
+        return unexpected{ std::move(link_st).error() };
+    }
+
+    // Allowed if follower (our euid) matches the symlink owner.
+    if (link_st->st_uid == fsuid) {
+        return { };
+    }
+
+    auto dir_st = os::fstat(dir_fd);
+    if (UNLIKELY(!dir_st)) {
+        return unexpected{ std::move(dir_st).error() };
+    }
+
+    constexpr auto sticky_writable =
+      std::filesystem::perms::sticky_bit | std::filesystem::perms::others_write;
+
+    auto fs_perm = std::filesystem::perms::mask & std::filesystem::perms{ dir_st->st_mode };
+
+    // Allowed if the parent directory is not sticky and world-writable.
+    if ((fs_perm & sticky_writable) != sticky_writable) {
+        return { };
+    }
+
+    // Allowed if parent directory owner matches the symlink owner.
+    if (link_st->st_uid == dir_st->st_uid) {
+        return { };
+    }
+
+    return unexpected{ std::make_error_code(std::errc::permission_denied) };
 }
 
 // Verifies via /proc/self/fd that the current fd matches the expected path
@@ -319,6 +403,10 @@ auto resolve_partial(utils::file_descriptor_ref root_fd,
 
             if (UNLIKELY(--budget < 0)) {
                 return unexpected{ std::make_error_code(std::errc::too_many_symbolic_link_levels) };
+            }
+
+            if (auto r = may_follow_link(current_ref, comp_ref); UNLIKELY(!r)) {
+                return unexpected{ std::move(r).error() };
             }
 
             auto target_res = os::readlinkat(comp_fd.ref(), "");
