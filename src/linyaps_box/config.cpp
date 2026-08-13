@@ -4,15 +4,15 @@
 
 #include "linyaps_box/config.h"
 
+#include "linyaps_box/config/enum_tables.h"
 #include "linyaps_box/config/mount_options.h"
+#include "linyaps_box/config/validate.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/platform.h"
 #include "linyaps_box/utils/semver.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <nlohmann/json.hpp>
 
-#include <bitset>
 #include <charconv>
 #include <fstream>
 #include <limits>
@@ -33,310 +33,39 @@ struct adl_serializer<std::optional<T>>
 };
 } // namespace nlohmann
 
+// Convenience aliases for tables defined in enum_tables.h
+constexpr auto rlimit_type_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::process_t::rlimit_t::type_t *>(nullptr));
+constexpr auto scheduler_policy_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::process_t::scheduler_t::policy_t *>(nullptr));
+constexpr auto scheduler_flag_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::process_t::scheduler_t::flag_t *>(nullptr));
+constexpr auto io_priority_class_table = get_enum_table(
+  static_cast<linyaps_box::oci_config::process_t::io_priority_t::class_t *>(nullptr));
+constexpr auto personality_domain_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::linux_t::personality_t::domain_t *>(nullptr));
+constexpr auto memory_policy_mode_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::linux_t::memory_policy_t::mode_t *>(nullptr));
+constexpr auto memory_policy_flag_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::linux_t::memory_policy_t::flag_t *>(nullptr));
+constexpr auto seccomp_op_table = get_enum_table(
+  static_cast<linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t *>(nullptr));
+constexpr auto seccomp_action_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::linux_t::seccomp_t::action_t *>(nullptr));
+constexpr auto seccomp_flag_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::linux_t::seccomp_t::flag_t *>(nullptr));
+constexpr auto extra_flags_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::mount_t::extension *>(nullptr));
+constexpr auto idmap_options_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::mount_t::idmap_type *>(nullptr));
+constexpr auto namespace_type_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::linux_t::namespace_t::type *>(nullptr));
+constexpr auto seccomp_arch_table =
+  get_enum_table(static_cast<linyaps_box::oci_config::linux_t::seccomp_t::arch_t *>(nullptr));
+
 namespace {
 
 namespace mo = linyaps_box::config::mount_options;
-
-constexpr auto rlimit_type_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::process_t::rlimit_t::type_t, 16>{
-      { { { linyaps_box::oci_config::process_t::rlimit_t::type_t::AS, "RLIMIT_AS" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::CORE, "RLIMIT_CORE" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::CPU, "RLIMIT_CPU" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::DATA, "RLIMIT_DATA" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::FSIZE, "RLIMIT_FSIZE" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::LOCKS, "RLIMIT_LOCKS" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::MEMLOCK, "RLIMIT_MEMLOCK" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::MSGQUEUE, "RLIMIT_MSGQUEUE" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::NICE, "RLIMIT_NICE" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::NOFILE, "RLIMIT_NOFILE" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::NPROC, "RLIMIT_NPROC" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::RSS, "RLIMIT_RSS" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::RTPRIO, "RLIMIT_RTPRIO" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::RTTIME, "RLIMIT_RTTIME" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::SIGPENDING, "RLIMIT_SIGPENDING" },
-          { linyaps_box::oci_config::process_t::rlimit_t::type_t::STACK, "RLIMIT_STACK" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(rlimit_type_table));
-
-constexpr auto scheduler_policy_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::process_t::scheduler_t::policy_t, 7>{
-      { { { linyaps_box::oci_config::process_t::scheduler_t::policy_t::OTHER, "SCHED_OTHER" },
-          { linyaps_box::oci_config::process_t::scheduler_t::policy_t::FIFO, "SCHED_FIFO" },
-          { linyaps_box::oci_config::process_t::scheduler_t::policy_t::RR, "SCHED_RR" },
-          { linyaps_box::oci_config::process_t::scheduler_t::policy_t::BATCH, "SCHED_BATCH" },
-          { linyaps_box::oci_config::process_t::scheduler_t::policy_t::ISO, "SCHED_ISO" },
-          { linyaps_box::oci_config::process_t::scheduler_t::policy_t::IDLE, "SCHED_IDLE" },
-          { linyaps_box::oci_config::process_t::scheduler_t::policy_t::DEADLINE,
-            "SCHED_DEADLINE" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(scheduler_policy_table));
-
-constexpr auto scheduler_flag_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::process_t::scheduler_t::flag_t, 7>{ { {
-    { linyaps_box::oci_config::process_t::scheduler_t::flag_t::RESET_ON_FORK,
-      "SCHED_FLAG_RESET_ON_FORK" },
-    { linyaps_box::oci_config::process_t::scheduler_t::flag_t::RECLAIM, "SCHED_FLAG_RECLAIM" },
-    { linyaps_box::oci_config::process_t::scheduler_t::flag_t::DL_OVERRUN,
-      "SCHED_FLAG_DL_OVERRUN" },
-    { linyaps_box::oci_config::process_t::scheduler_t::flag_t::KEEP_POLICY,
-      "SCHED_FLAG_KEEP_POLICY" },
-    { linyaps_box::oci_config::process_t::scheduler_t::flag_t::KEEP_PARAMS,
-      "SCHED_FLAG_KEEP_PARAMS" },
-    { linyaps_box::oci_config::process_t::scheduler_t::flag_t::UTIL_CLAMP_MIN,
-      "SCHED_FLAG_UTIL_CLAMP_MIN" },
-    { linyaps_box::oci_config::process_t::scheduler_t::flag_t::UTIL_CLAMP_MAX,
-      "SCHED_FLAG_UTIL_CLAMP_MAX" },
-  } } };
-
-static_assert(linyaps_box::utils::verify_enum_table(scheduler_flag_table));
-
-constexpr auto io_priority_class_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::process_t::io_priority_t::class_t, 3>{
-      { { { linyaps_box::oci_config::process_t::io_priority_t::class_t::RT, "IOPRIO_CLASS_RT" },
-          { linyaps_box::oci_config::process_t::io_priority_t::class_t::BEST_EFFORT,
-            "IOPRIO_CLASS_BE" },
-          { linyaps_box::oci_config::process_t::io_priority_t::class_t::IDLE,
-            "IOPRIO_CLASS_IDLE" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(io_priority_class_table));
-
-constexpr auto personality_domain_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::linux_t::personality_t::domain_t, 2>{
-      { { { linyaps_box::oci_config::linux_t::personality_t::domain_t::LINUX, "LINUX" },
-          { linyaps_box::oci_config::linux_t::personality_t::domain_t::LINUX32, "LINUX32" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(personality_domain_table));
-
-constexpr auto memory_policy_mode_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::linux_t::memory_policy_t::mode_t, 7>{
-      { { { linyaps_box::oci_config::linux_t::memory_policy_t::mode_t::DEFAULT, "MPOL_DEFAULT" },
-          { linyaps_box::oci_config::linux_t::memory_policy_t::mode_t::BIND, "MPOL_BIND" },
-          { linyaps_box::oci_config::linux_t::memory_policy_t::mode_t::INTERLEAVE,
-            "MPOL_INTERLEAVE" },
-          { linyaps_box::oci_config::linux_t::memory_policy_t::mode_t::WEIGHTED_INTERLEAVE,
-            "MPOL_WEIGHTED_INTERLEAVE" },
-          { linyaps_box::oci_config::linux_t::memory_policy_t::mode_t::PREFERRED,
-            "MPOL_PREFERRED" },
-          { linyaps_box::oci_config::linux_t::memory_policy_t::mode_t::PREFERRED_MANY,
-            "MPOL_PREFERRED_MANY" },
-          { linyaps_box::oci_config::linux_t::memory_policy_t::mode_t::LOCAL, "MPOL_LOCAL" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(memory_policy_mode_table));
-
-constexpr auto memory_policy_flag_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::linux_t::memory_policy_t::flag_t, 3>{
-      { { { linyaps_box::oci_config::linux_t::memory_policy_t::flag_t::NUMA_BALANCING,
-            "MPOL_F_NUMA_BALANCING" },
-          { linyaps_box::oci_config::linux_t::memory_policy_t::flag_t::RELATIVE_NODES,
-            "MPOL_F_RELATIVE_NODES" },
-          { linyaps_box::oci_config::linux_t::memory_policy_t::flag_t::STATIC_NODES,
-            "MPOL_F_STATIC_NODES" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(memory_policy_flag_table));
-
-#ifdef LINYAPS_BOX_ENABLE_SECCOMP
-constexpr auto seccomp_op_table = linyaps_box::utils::enum_table<
-  linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t,
-  7>{
-    { { { linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t::EQ, "SCMP_CMP_EQ" },
-        { linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t::NE, "SCMP_CMP_NE" },
-        { linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t::LT, "SCMP_CMP_LT" },
-        { linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t::LE, "SCMP_CMP_LE" },
-        { linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t::GT, "SCMP_CMP_GT" },
-        { linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t::GE, "SCMP_CMP_GE" },
-        { linyaps_box::oci_config::linux_t::seccomp_t::syscall_t::arg_t::op_t::MASKED_EQ,
-          "SCMP_CMP_MASKED_EQ" } } }
-};
-
-static_assert(linyaps_box::utils::verify_enum_table(seccomp_op_table));
-
-constexpr auto seccomp_action_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::linux_t::seccomp_t::action_t, 9>{
-      { { { linyaps_box::oci_config::linux_t::seccomp_t::action_t::ALLOW, "SCMP_ACT_ALLOW" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::action_t::ERRNO, "SCMP_ACT_ERRNO" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::action_t::KILL, "SCMP_ACT_KILL" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::action_t::KILL_PROCESS,
-            "SCMP_ACT_KILL_PROCESS" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::action_t::KILL_THREAD,
-            "SCMP_ACT_KILL_THREAD" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::action_t::LOG, "SCMP_ACT_LOG" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::action_t::NOTIFY, "SCMP_ACT_NOTIFY" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::action_t::TRACE, "SCMP_ACT_TRACE" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::action_t::TRAP, "SCMP_ACT_TRAP" } } }
-  };
-
-// SCMP_ACT_KILL is aliased to KILL_THREAD or KILL_PROCESS depending on the
-// libseccomp version — only (KILL, KILL_THREAD) or (KILL, KILL_PROCESS) may
-// share the same value.
-static_assert(linyaps_box::utils::verify_enum_table(
-  seccomp_action_table, [](const auto &a, const auto &b) noexcept {
-      if (a.name == b.name) {
-          return false;
-      }
-
-      if (a.value == b.value) {
-          return (a.name == "SCMP_ACT_KILL" && b.name == "SCMP_ACT_KILL_THREAD")
-            || (a.name == "SCMP_ACT_KILL_THREAD" && b.name == "SCMP_ACT_KILL")
-            || (a.name == "SCMP_ACT_KILL" && b.name == "SCMP_ACT_KILL_PROCESS")
-            || (a.name == "SCMP_ACT_KILL_PROCESS" && b.name == "SCMP_ACT_KILL");
-      }
-
-      return true;
-  }));
-
-constexpr auto seccomp_flag_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::linux_t::seccomp_t::flag_t, 4>{
-      { { { linyaps_box::oci_config::linux_t::seccomp_t::flag_t::TSYNC,
-            "SECCOMP_FILTER_FLAG_TSYNC" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::flag_t::LOG, "SECCOMP_FILTER_FLAG_LOG" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::flag_t::SPEC_ALLOW,
-            "SECCOMP_FILTER_FLAG_SPEC_ALLOW" },
-          { linyaps_box::oci_config::linux_t::seccomp_t::flag_t::WAIT_KILLABLE_RECV,
-            "SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(seccomp_flag_table));
-#endif
-
-constexpr auto extra_flags_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::mount_t::extension, 2>{
-      { { { linyaps_box::oci_config::mount_t::extension::COPY_SYMLINK, "copy-symlink" },
-          { linyaps_box::oci_config::mount_t::extension::TMPCOPYUP, "tmpcopyup" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(extra_flags_table));
-
-constexpr auto idmap_options_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::mount_t::idmap_type, 2>{
-      { { { linyaps_box::oci_config::mount_t::idmap_type::IDMAP, "idmap" },
-          { linyaps_box::oci_config::mount_t::idmap_type::RIDMAP, "ridmap" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(idmap_options_table));
-
-auto parse_mount_options(const std::vector<std::string> &options)
-  -> std::tuple<unsigned long,
-                unsigned long,
-                std::optional<linyaps_box::oci_config::mount_t::recursive_attr>,
-                linyaps_box::oci_config::mount_t::extension,
-                std::optional<linyaps_box::oci_config::mount_t::idmap_type>,
-                std::string>
-{
-    using extension = linyaps_box::oci_config::mount_t::extension;
-
-    auto vfs_flags{ 0UL };
-    auto propagation_flags{ 0UL };
-    std::optional<linyaps_box::oci_config::mount_t::recursive_attr> rec_attr;
-    auto extension_flags{ extension::NONE };
-    std::optional<linyaps_box::oci_config::mount_t::idmap_type> idmap;
-
-    std::string data;
-
-    for (const auto &opt : options) {
-        if (const auto *entry = mo::find(mo::vfs, opt)) {
-            vfs_flags |= entry->value;
-            continue;
-        }
-
-        if (const auto *entry = mo::find(mo::unset, opt)) {
-            vfs_flags &= ~entry->value;
-            continue;
-        }
-
-        if (const auto *entry = mo::find(mo::propagation, opt)) {
-            propagation_flags |= entry->value;
-            continue;
-        }
-
-        if (const auto *entry = mo::find(mo::recursive_attr_set, opt)) {
-            if (!rec_attr) {
-                rec_attr.emplace();
-            }
-            rec_attr->set |= entry->value;
-            continue;
-        }
-
-        if (const auto *entry = mo::find(mo::recursive_attr_clr, opt)) {
-            if (!rec_attr) {
-                rec_attr.emplace();
-            }
-            rec_attr->clr |= entry->value;
-            continue;
-        }
-
-        if (auto ev = extra_flags_table.from_name(opt)) {
-            extension_flags = extension_flags | *ev;
-            continue;
-        }
-
-        // TODO: handle inline mapping strings like "idmap=uids=0:1000:1,gids=0:1000:1"
-        if (auto iv = idmap_options_table.from_name(opt)) {
-            if (UNLIKELY(idmap.has_value() && *idmap != *iv)) {
-                throw std::runtime_error("idmap and ridmap options are mutually exclusive");
-            }
-
-            idmap.emplace(std::move(iv).value());
-            continue;
-        }
-
-        if (!data.empty()) {
-            data.push_back(',');
-        }
-
-        data.append(opt);
-    }
-
-    return { vfs_flags, propagation_flags, rec_attr, extension_flags, idmap, std::move(data) };
-}
-
-constexpr auto namespace_type_table =
-  linyaps_box::utils::enum_table<linyaps_box::oci_config::linux_t::namespace_t::type, 8>{
-      { { { linyaps_box::oci_config::linux_t::namespace_t::type::CGROUP, "cgroup" },
-          { linyaps_box::oci_config::linux_t::namespace_t::type::IPC, "ipc" },
-          { linyaps_box::oci_config::linux_t::namespace_t::type::MOUNT, "mount" },
-          { linyaps_box::oci_config::linux_t::namespace_t::type::NET, "network" },
-          { linyaps_box::oci_config::linux_t::namespace_t::type::PID, "pid" },
-          { linyaps_box::oci_config::linux_t::namespace_t::type::TIME, "time" },
-          { linyaps_box::oci_config::linux_t::namespace_t::type::USER, "user" },
-          { linyaps_box::oci_config::linux_t::namespace_t::type::UTS, "uts" } } }
-  };
-
-static_assert(linyaps_box::utils::verify_enum_table(namespace_type_table));
-
-#ifdef LINYAPS_BOX_ENABLE_SECCOMP
-using arch_t = linyaps_box::oci_config::linux_t::seccomp_t::arch_t;
-constexpr auto seccomp_arch_table =
-  linyaps_box::utils::enum_table<arch_t, 23>{ { { { arch_t::X86, "SCMP_ARCH_X86" },
-                                                  { arch_t::X86_64, "SCMP_ARCH_X86_64" },
-                                                  { arch_t::X32, "SCMP_ARCH_X32" },
-                                                  { arch_t::ARM, "SCMP_ARCH_ARM" },
-                                                  { arch_t::AARCH64, "SCMP_ARCH_AARCH64" },
-                                                  { arch_t::MIPS, "SCMP_ARCH_MIPS" },
-                                                  { arch_t::MIPS64, "SCMP_ARCH_MIPS64" },
-                                                  { arch_t::MIPS64N32, "SCMP_ARCH_MIPS64N32" },
-                                                  { arch_t::MIPSEL, "SCMP_ARCH_MIPSEL" },
-                                                  { arch_t::MIPSEL64, "SCMP_ARCH_MIPSEL64" },
-                                                  { arch_t::MIPSEL64N32, "SCMP_ARCH_MIPSEL64N32" },
-                                                  { arch_t::PPC, "SCMP_ARCH_PPC" },
-                                                  { arch_t::PPC64, "SCMP_ARCH_PPC64" },
-                                                  { arch_t::PPC64LE, "SCMP_ARCH_PPC64LE" },
-                                                  { arch_t::S390, "SCMP_ARCH_S390" },
-                                                  { arch_t::S390X, "SCMP_ARCH_S390X" },
-                                                  { arch_t::PARISC, "SCMP_ARCH_PARISC" },
-                                                  { arch_t::PARISC64, "SCMP_ARCH_PARISC64" },
-                                                  { arch_t::RISCV64, "SCMP_ARCH_RISCV64" },
-                                                  { arch_t::LOONGARCH64, "SCMP_ARCH_LOONGARCH64" },
-                                                  { arch_t::M68K, "SCMP_ARCH_M68K" },
-                                                  { arch_t::SH, "SCMP_ARCH_SH" },
-                                                  { arch_t::SHEB, "SCMP_ARCH_SHEB" } } } };
-static_assert(linyaps_box::utils::verify_enum_table(seccomp_arch_table));
-#endif
 
 auto parse_range_list(std::string_view s) -> std::vector<unsigned int>
 {
@@ -436,7 +165,217 @@ auto parse_range_list(std::string_view s) -> std::vector<unsigned int>
     return result;
 }
 
+auto parse_id_mapping_chunk(std::string_view chunk) -> linyaps_box::oci_config::id_mapping_t
+{
+    // format: "containerID:hostID:size"
+    auto first_colon = chunk.find(':');
+    if (UNLIKELY(first_colon == std::string_view::npos)) {
+        throw std::runtime_error("invalid id mapping: " + std::string(chunk));
+    }
+
+    auto second_colon = chunk.find(':', first_colon + 1);
+    if (UNLIKELY(second_colon == std::string_view::npos)) {
+        throw std::runtime_error("invalid id mapping: " + std::string(chunk));
+    }
+
+    linyaps_box::oci_config::id_mapping_t mapping{ };
+    auto [p1, ec1] =
+      std::from_chars(chunk.cbegin(), chunk.cbegin() + first_colon, mapping.container_id);
+    if (UNLIKELY(ec1 != std::errc{ })) {
+        throw std::runtime_error("invalid container id in mapping: " + std::string(chunk));
+    }
+
+    auto [p2, ec2] =
+      std::from_chars(chunk.data() + first_colon + 1, chunk.data() + second_colon, mapping.host_id);
+    if (UNLIKELY(ec2 != std::errc{ })) {
+        throw std::runtime_error("invalid host id in mapping: " + std::string(chunk));
+    }
+
+    auto [p3, ec3] =
+      std::from_chars(chunk.data() + second_colon + 1, chunk.data() + chunk.size(), mapping.size);
+    if (UNLIKELY(ec3 != std::errc{ })) {
+        throw std::runtime_error("invalid size in mapping: " + std::string(chunk));
+    }
+
+    return mapping;
+};
+
+auto parse_mappings(std::string_view value)
+  -> std::optional<std::vector<linyaps_box::oci_config::id_mapping_t>>
+{
+    std::vector<linyaps_box::oci_config::id_mapping_t> result;
+
+    while (!value.empty()) {
+        auto comma_pos = value.find(',');
+        auto chunk = value.substr(0, comma_pos);
+        result.push_back(parse_id_mapping_chunk(chunk));
+
+        if (comma_pos == std::string_view::npos) {
+            break;
+        }
+
+        value = value.substr(comma_pos + 1);
+    }
+
+    return result;
+}
+
+struct inline_idmap_result
+{
+    linyaps_box::oci_config::mount_t::idmap_type type;
+    std::optional<std::vector<linyaps_box::oci_config::id_mapping_t>> uid_mappings;
+    std::optional<std::vector<linyaps_box::oci_config::id_mapping_t>> gid_mappings;
+};
+
+auto parse_inline_idmap_option(std::string_view opt) -> inline_idmap_result
+{
+    auto eq_pos = opt.find('=');
+    auto prefix = opt.substr(0, eq_pos);
+    auto iv = idmap_options_table.from_name(prefix);
+    if (UNLIKELY(!iv)) {
+        throw std::runtime_error("unknown idmap option: " + std::string(opt));
+    }
+
+    inline_idmap_result result;
+    result.type = *iv;
+    auto rest = opt.substr(eq_pos + 1);
+
+    while (!rest.empty()) {
+        auto comma_pos = rest.find(',');
+        auto part = rest.substr(0, comma_pos);
+
+        auto eq2_pos = part.find('=');
+        if (eq2_pos == std::string_view::npos) {
+            throw std::runtime_error("invalid id mapping option: " + std::string(opt));
+        }
+
+        auto key = part.substr(0, eq2_pos);
+        auto value = part.substr(eq2_pos + 1);
+
+        if (key == "uids") {
+            result.uid_mappings = parse_mappings(value);
+        } else if (key == "gids") {
+            result.gid_mappings = parse_mappings(value);
+        } else {
+            throw std::runtime_error("unknown id mapping key: " + std::string(key));
+        }
+
+        if (comma_pos == std::string_view::npos) {
+            break;
+        }
+
+        rest = rest.substr(comma_pos + 1);
+    }
+
+    return result;
+}
+
 } // namespace
+
+auto parse_mount_options(const std::vector<std::string> &options)
+  -> std::tuple<unsigned long,
+                unsigned long,
+                std::optional<linyaps_box::oci_config::mount_t::recursive_attr>,
+                linyaps_box::oci_config::mount_t::extension,
+                std::optional<linyaps_box::oci_config::mount_t::idmap_type>,
+                std::optional<std::vector<linyaps_box::oci_config::id_mapping_t>>,
+                std::optional<std::vector<linyaps_box::oci_config::id_mapping_t>>,
+                std::string>
+{
+    using extension = linyaps_box::oci_config::mount_t::extension;
+    using id_mapping_t = linyaps_box::oci_config::id_mapping_t;
+
+    auto vfs_flags{ 0UL };
+    auto propagation_flags{ 0UL };
+    auto extension_flags{ extension::NONE };
+    std::optional<linyaps_box::oci_config::mount_t::recursive_attr> rec_attr;
+    std::optional<linyaps_box::oci_config::mount_t::idmap_type> idmap;
+    std::optional<std::vector<id_mapping_t>> uid_mappings;
+    std::optional<std::vector<id_mapping_t>> gid_mappings;
+    std::string data;
+
+    for (const auto &opt : options) {
+        if (const auto *entry = mo::find(mo::vfs, opt)) {
+            vfs_flags |= entry->value;
+            continue;
+        }
+
+        if (const auto *entry = mo::find(mo::unset, opt)) {
+            vfs_flags &= ~entry->value;
+            continue;
+        }
+
+        if (const auto *entry = mo::find(mo::propagation, opt)) {
+            propagation_flags |= entry->value;
+            continue;
+        }
+
+        if (const auto *entry = mo::find(mo::recursive_attr_set, opt)) {
+            if (!rec_attr) {
+                rec_attr.emplace();
+            }
+
+            rec_attr->set |= entry->value;
+            continue;
+        }
+
+        if (const auto *entry = mo::find(mo::recursive_attr_clr, opt)) {
+            if (!rec_attr) {
+                rec_attr.emplace();
+            }
+
+            rec_attr->clr |= entry->value;
+            continue;
+        }
+
+        if (auto ev = extra_flags_table.from_name(opt)) {
+            extension_flags = extension_flags | *ev;
+            continue;
+        }
+
+        // Handle simple "idmap" or "ridmap" flags
+        if (auto iv = idmap_options_table.from_name(opt)) {
+            if (UNLIKELY(idmap.has_value() && *idmap != *iv)) {
+                throw std::runtime_error("idmap and ridmap options are mutually exclusive");
+            }
+
+            idmap.emplace(std::move(iv).value());
+            continue;
+        }
+
+        // Handle inline mapping strings like "idmap=uids=0:1000:1,gids=0:1000:1"
+        if (auto eq_pos = opt.find('='); UNLIKELY(eq_pos != std::string_view::npos)) {
+            auto prefix = std::string_view{ opt }.substr(0, eq_pos);
+            if (auto iv = idmap_options_table.from_name(prefix)) {
+                if (UNLIKELY(idmap.has_value() && *idmap != *iv)) {
+                    throw std::runtime_error("idmap and ridmap options are mutually exclusive");
+                }
+
+                auto inline_result = parse_inline_idmap_option(opt);
+                idmap.emplace(inline_result.type);
+                uid_mappings = std::move(inline_result.uid_mappings);
+                gid_mappings = std::move(inline_result.gid_mappings);
+
+                continue;
+            }
+        }
+
+        if (!data.empty()) {
+            data.push_back(',');
+        }
+
+        data.append(opt);
+    }
+
+    return { vfs_flags,
+             propagation_flags,
+             rec_attr,
+             extension_flags,
+             idmap,
+             std::move(uid_mappings),
+             std::move(gid_mappings),
+             std::move(data) };
+}
 
 namespace linyaps_box {
 
@@ -472,19 +411,12 @@ void from_json(const nlohmann::json &j, oci_config::process_t::user_t &v)
     }
 }
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
 void from_json(const nlohmann::json &j, oci_config::process_t::capabilities_t &v)
 {
-    auto parse_set = [](const nlohmann::json &j, std::vector<cap_value_t> &set) {
+    auto parse_set = [](const nlohmann::json &j, std::vector<std::string> &set) {
         set.reserve(j.size());
         for (const auto &elem : j) {
-            const auto &name = elem.get_ref<const std::string &>();
-            cap_value_t val{ };
-            if (UNLIKELY(cap_from_name(name.c_str(), &val) < 0)) {
-                throw std::runtime_error("failed to parse cap " + name + ": " + ::strerror(errno));
-            }
-
-            set.push_back(val);
+            set.push_back(elem.get<std::string>());
         }
     };
 
@@ -509,8 +441,6 @@ void from_json(const nlohmann::json &j, oci_config::process_t::capabilities_t &v
     }
 }
 
-#endif // LINYAPS_BOX_ENABLE_CAP
-
 void from_json(const nlohmann::json &j, oci_config::process_t::io_priority_t &v)
 {
     auto name = j.at("class").get<std::string_view>();
@@ -521,11 +451,6 @@ void from_json(const nlohmann::json &j, oci_config::process_t::io_priority_t &v)
     v.class_ = *opt;
 
     v.priority = j.value("priority", 0);
-
-    if (UNLIKELY(v.priority < 0 || v.priority > 7)) {
-        throw std::runtime_error("io priority must be in range [0, 7], got: "
-                                 + std::to_string(v.priority));
-    }
 }
 
 void from_json(const nlohmann::json &j, oci_config::process_t::scheduler_t &v)
@@ -570,27 +495,6 @@ void from_json(const nlohmann::json &j, oci_config::process_t::scheduler_t &v)
     if (auto it = j.find("period"); it != j.end() && !it->is_null()) {
         it->get_to(v.period.emplace());
     }
-
-    if (v.nice) {
-        if (UNLIKELY(*v.nice < -20 || *v.nice > 19)) {
-            throw std::runtime_error("scheduler.nice must be in range [-20, 19]");
-        }
-    }
-
-    if (v.priority && *v.priority != 0) {
-        if (v.policy != oci_config::process_t::scheduler_t::policy_t::FIFO
-            && v.policy != oci_config::process_t::scheduler_t::policy_t::RR) {
-            throw std::runtime_error(
-              "scheduler.priority can only be specified for SCHED_FIFO or SCHED_RR");
-        }
-    }
-
-    if (v.runtime || v.deadline || v.period) {
-        if (v.policy != oci_config::process_t::scheduler_t::policy_t::DEADLINE) {
-            throw std::runtime_error(
-              "scheduler runtime/deadline/period can only be specified for SCHED_DEADLINE");
-        }
-    }
 }
 
 void from_json(const nlohmann::json &j, oci_config::process_t::exec_cpu_affinity_t &v)
@@ -617,51 +521,24 @@ void from_json(const nlohmann::json &j, oci_config::process_t &v)
     }
 
     j.at("cwd").get_to(v.cwd);
-    if (UNLIKELY(!v.cwd.is_absolute())) {
-        throw std::runtime_error("process.cwd must be an absolute path, got: " + v.cwd.string());
-    }
 
     if (auto it = j.find("env"); it != j.end() && !it->is_null()) {
         it->get_to(v.env.emplace());
-        auto invalid = std::find_if(v.env->cbegin(), v.env->cend(), utils::is_invalid_env);
-        if (UNLIKELY(invalid != v.env->cend())) {
-            throw std::runtime_error("process.env contains a invalid env: " + *invalid);
-        }
     }
 
     j.at("args").get_to(v.args);
-    if (UNLIKELY(v.args.empty())) {
-        throw std::runtime_error("process.args must not be empty");
-    }
 
     if (auto it = j.find("rlimits"); it != j.end() && !it->is_null()) {
         it->get_to(v.rlimits.emplace());
-
-        std::bitset<rlimit_type_table.entries.size()> seen;
-        for (const auto &rl : *v.rlimits) {
-            const auto type_val = static_cast<size_t>(rl.type);
-            if (UNLIKELY(type_val >= seen.size())) {
-                throw std::runtime_error("invalid rlimit type value out of range");
-            }
-
-            if (UNLIKELY(seen.test(type_val))) {
-                throw std::runtime_error(
-                  std::string{ "duplicate rlimit type: " }.append(to_string_view(rl.type)));
-            }
-
-            seen.set(type_val);
-        }
     }
 
     if (auto it = j.find("apparmorProfile"); it != j.end() && !it->is_null()) {
         it->get_to(v.apparmor_profile.emplace());
     }
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
     if (auto it = j.find("capabilities"); it != j.end() && !it->is_null()) {
         it->get_to(v.capabilities.emplace());
     }
-#endif
 
     if (auto it = j.find("noNewPrivileges"); it != j.end() && !it->is_null()) {
         it->get_to(v.no_new_privileges.emplace());
@@ -858,7 +735,6 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::resources_t::cpu_t 
     }
 
     if (auto it = j.find("idle"); it != j.end() && !it->is_null()) {
-        // TODO: move this logic to converter?
         auto val = it->get<int64_t>();
         v.idle.emplace((val == 1) ? oci_config::linux_t::resources_t::cpu_t::idle_t::IDLE
                                   : oci_config::linux_t::resources_t::cpu_t::idle_t::NONE);
@@ -1064,7 +940,6 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::personality_t &v)
     }
 }
 
-#ifdef LINYAPS_BOX_ENABLE_SECCOMP
 void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t::syscall_t::arg_t &v)
 {
     j.at("index").get_to(v.index);
@@ -1086,26 +961,16 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t::syscall_
 void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t::syscall_t &v)
 {
     j.at("names").get_to(v.names);
-    if (UNLIKELY(v.names.empty())) {
-        throw std::runtime_error("seccomp syscall names must not be empty");
-    }
 
-    using action_t = oci_config::linux_t::seccomp_t::action_t;
-    {
-        auto action_name = j.at("action").get<std::string_view>();
-        auto action_opt = seccomp_action_table.from_name(action_name);
-        if (UNLIKELY(!action_opt)) {
-            throw std::runtime_error("unknown value: " + std::string(action_name));
-        }
-        v.action = *action_opt;
+    auto action_name = j.at("action").get<std::string_view>();
+    auto action_opt = seccomp_action_table.from_name(action_name);
+    if (UNLIKELY(!action_opt)) {
+        throw std::runtime_error("unknown value: " + std::string(action_name));
     }
+    v.action = *action_opt;
 
     if (auto it = j.find("errnoRet"); it != j.end() && !it->is_null()) {
         it->get_to(v.errno_ret.emplace());
-        if (UNLIKELY(v.action != action_t::ERRNO && v.action != action_t::TRACE)) {
-            throw std::runtime_error(
-              "seccomp syscall errnoRet is only valid with SCMP_ACT_ERRNO or SCMP_ACT_TRACE");
-        }
     }
 
     if (auto it = j.find("args"); it != j.end() && !it->is_null()) {
@@ -1115,24 +980,16 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t::syscall_
 
 void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t &v)
 {
-    using action_t = oci_config::linux_t::seccomp_t::action_t;
-    {
-        auto action_name = j.at("defaultAction").get<std::string_view>();
-        auto action_opt = seccomp_action_table.from_name(action_name);
-        if (UNLIKELY(!action_opt)) {
-            throw std::runtime_error("unknown value: " + std::string(action_name));
-        }
-        v.default_action = *action_opt;
+
+    auto action_name = j.at("defaultAction").get<std::string_view>();
+    auto action_opt = seccomp_action_table.from_name(action_name);
+    if (UNLIKELY(!action_opt)) {
+        throw std::runtime_error("unknown value: " + std::string(action_name));
     }
+    v.default_action = *action_opt;
 
     if (auto it = j.find("defaultErrnoRet"); it != j.end() && !it->is_null()) {
         it->get_to(v.default_errno_ret.emplace());
-    }
-
-    if (UNLIKELY(v.default_errno_ret && v.default_action != action_t::ERRNO
-                 && v.default_action != action_t::TRACE)) {
-        throw std::runtime_error(
-          "seccomp defaultErrnoRet is only valid with SCMP_ACT_ERRNO or SCMP_ACT_TRACE");
     }
 
     if (auto it = j.find("architectures"); it != j.end() && !it->is_null()) {
@@ -1144,6 +1001,7 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t &v)
             if (UNLIKELY(!arch_opt)) {
                 throw std::runtime_error("unknown architecture: " + std::string(arch_str));
             }
+
             archs.push_back(*arch_opt);
         }
 
@@ -1151,7 +1009,7 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t &v)
     }
 
     if (auto it = j.find("flags"); it != j.end() && !it->is_null()) {
-        oci_config::linux_t::seccomp_t::flag_t flags{ };
+        auto flags = oci_config::linux_t::seccomp_t::flag_t::NONE;
         for (const auto &elem : *it) {
             auto flag_str = elem.get<std::string_view>();
             auto flag_opt = seccomp_flag_table.from_name(flag_str);
@@ -1173,20 +1031,10 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t &v)
         it->get_to(v.listener_metadata.emplace());
     }
 
-    if (UNLIKELY(v.default_action == action_t::NOTIFY && !v.listener_path)) {
-        throw std::runtime_error("seccomp SCMP_ACT_NOTIFY requires listenerPath");
-    }
-
     if (auto it = j.find("syscalls"); it != j.end() && !it->is_null()) {
         it->get_to(v.syscalls.emplace());
     }
-
-    if (UNLIKELY(v.listener_metadata && !v.listener_path)) {
-        throw std::runtime_error("seccomp listenerMetadata requires listenerPath to be set");
-    }
 }
-
-#endif
 
 void from_json(const nlohmann::json &j, oci_config::linux_t &v)
 {
@@ -1201,18 +1049,7 @@ void from_json(const nlohmann::json &j, oci_config::linux_t &v)
     if (auto it = j.find("namespaces"); it != j.end() && !it->is_null()) {
         it->get_to(v.namespaces.emplace());
 
-        auto seen{ 0U };
-        for (const auto &ns : *v.namespaces) {
-            // no need to use std::bitset
-            auto val = static_cast<unsigned int>(ns.type_);
-            if (UNLIKELY((seen & val) != 0)) {
-                throw std::runtime_error(
-                  std::string{ namespace_type_table.to_name(ns.type_).value_or("unknown") }
-                  + ": duplicate namespace type");
-            }
-
-            seen |= val;
-        }
+        // namespace type uniqueness is checked in validate()
     }
 
     if (auto it = j.find("devices"); it != j.end() && !it->is_null()) {
@@ -1307,37 +1144,25 @@ void from_json(const nlohmann::json &j, oci_config::linux_t &v)
         it->get_to(v.resources.emplace());
     }
 
-#ifdef LINYAPS_BOX_ENABLE_SECCOMP
     if (auto it = j.find("seccomp"); it != j.end() && !it->is_null()) {
         it->get_to(v.seccomp.emplace());
     }
-#endif
 }
 
 void from_json(const nlohmann::json &j, oci_config::hooks_t::hook_t &v)
 {
     j.at("path").get_to(v.path);
-    if (UNLIKELY(!v.path.is_absolute())) {
-        throw std::runtime_error("hook path must be absolute");
-    }
 
     if (auto it = j.find("args"); it != j.end() && !it->is_null()) {
         it->get_to(v.args.emplace());
     }
 
     if (auto it = j.find("env"); it != j.end() && !it->is_null()) {
-        const auto &env = it->get_to(v.env.emplace());
-        auto invalid = std::find_if(env.cbegin(), env.cend(), utils::is_invalid_env);
-        if (UNLIKELY(invalid != v.env->cend())) {
-            throw std::runtime_error("hook.env contains a invalid env: " + *invalid);
-        }
+        it->get_to(v.env.emplace());
     }
 
     if (auto it = j.find("timeout"); it != j.end() && !it->is_null()) {
         it->get_to(v.timeout.emplace());
-        if (UNLIKELY(v.timeout.value() <= 0)) {
-            throw std::runtime_error("hook timeout must be greater than zero");
-        }
     }
 }
 
@@ -1387,8 +1212,14 @@ void from_json(const nlohmann::json &j, oci_config::mount_t &v)
 
     if (auto it = j.find("options"); it != j.end() && !it->is_null()) {
         auto options = it->get<std::vector<std::string>>();
-        std::tie(v.vfs_flags, v.propagation_flags, v.rec_attr, v.extension_flags, v.idmap, v.data) =
-          parse_mount_options(options);
+        std::tie(v.vfs_flags,
+                 v.propagation_flags,
+                 v.rec_attr,
+                 v.extension_flags,
+                 v.idmap,
+                 v.uid_mappings,
+                 v.gid_mappings,
+                 v.data) = parse_mount_options(options);
     }
 }
 
@@ -1483,7 +1314,9 @@ auto validate_namespace_path(const oci_config::linux_t::namespace_t &ns) -> void
 
 auto oci_config::parse(std::string_view content) -> oci_config
 {
-    return nlohmann::json::parse(content).get<oci_config>();
+    auto config = nlohmann::json::parse(content).get<oci_config>();
+    validate(config);
+    return config;
 }
 
 auto oci_config::parse(const std::filesystem::path &path) -> oci_config
@@ -1496,7 +1329,9 @@ auto oci_config::parse(const std::filesystem::path &path) -> oci_config
           std::make_error_code(static_cast<std::errc>(errno)));
     }
 
-    return nlohmann::json::parse(stream).get<oci_config>();
+    auto config = nlohmann::json::parse(stream).get<oci_config>();
+    validate(config);
+    return config;
 }
 
 } // namespace linyaps_box

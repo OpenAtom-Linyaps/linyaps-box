@@ -17,6 +17,8 @@
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <sys/capability.h>
+
 #include <algorithm>
 #include <cassert>
 #include <csignal> // IWYU pragma: keep
@@ -237,7 +239,16 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
 
     // Drop every cap not in the bounding set.
     if (effective_caps->bounding) {
-        const auto &bounding_set = *effective_caps->bounding;
+        const auto &bounding_names = *effective_caps->bounding;
+        std::vector<cap_value_t> bounding_set;
+        bounding_set.reserve(bounding_names.size());
+        for (const auto &name : bounding_names) {
+            cap_value_t val{ };
+            if (cap_from_name(name.c_str(), &val) < 0) {
+                throw std::runtime_error("unknown capability: " + name);
+            }
+            bounding_set.push_back(val);
+        }
         std::ifstream cap_file("/proc/sys/kernel/cap_last_cap");
         unsigned long last_cap{ 0 };
         cap_file >> last_cap;
@@ -257,11 +268,26 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
     }
     const std::unique_ptr<_cap_struct, decltype(&cap_free)> caps(cap, cap_free);
 
-    auto set_cap_flag = [&caps](const std::vector<cap_value_t> &cap_set, cap_flag_t flag) {
+    auto to_cap_values = [](const std::vector<std::string> &names) {
+        std::vector<cap_value_t> vals;
+        vals.reserve(names.size());
+        for (const auto &name : names) {
+            cap_value_t val{ };
+            if (cap_from_name(name.c_str(), &val) < 0) {
+                throw std::runtime_error("unknown capability: " + name);
+            }
+            vals.push_back(val);
+        }
+        return vals;
+    };
+
+    auto set_cap_flag = [&caps, &to_cap_values](const std::vector<std::string> &cap_set,
+                                                cap_flag_t flag) {
         if (cap_set.empty()) {
             return;
         }
-        auto ret = cap_set_flag(caps.get(), flag, cap_set.size(), cap_set.data(), CAP_SET);
+        auto vals = to_cap_values(cap_set);
+        auto ret = cap_set_flag(caps.get(), flag, vals.size(), vals.data(), CAP_SET);
         if (ret < 0) {
             throw std::system_error(errno, std::system_category(), "cap_set_flag");
         }
@@ -292,7 +318,8 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
 #  ifdef PR_CAP_AMBIENT
     os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L));
     if (const auto &ambient_set = effective_caps->ambient; ambient_set) {
-        std::for_each(ambient_set->cbegin(), ambient_set->cend(), [](cap_value_t cap) {
+        auto ambient_caps = to_cap_values(*ambient_set);
+        std::for_each(ambient_caps.cbegin(), ambient_caps.cend(), [](cap_value_t cap) {
             os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap, 0L, 0L));
         });
     }

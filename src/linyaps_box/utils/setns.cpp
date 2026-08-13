@@ -38,6 +38,8 @@ auto to_proc_ns_string(linyaps_box::oci_config::linux_t::namespace_t::type type)
         return "cgroup";
     case linyaps_box::oci_config::linux_t::namespace_t::type::TIME:
         return "time";
+    case linyaps_box::oci_config::linux_t::namespace_t::type::NONE:
+        return "none";
     }
 
     __builtin_unreachable();

@@ -233,12 +233,13 @@ auto register_exec(CLI::App &app, linyaps_box::command::exec_options &opts) -> C
 #ifdef LINYAPS_BOX_ENABLE_CAP
     cmd->add_option("-c,--cap", opts.caps, "Set capabilities")
       ->type_name("CAP")
-      ->transform([](const std::string &str) -> std::string {
+      ->check([](const std::string &str) {
           cap_value_t val{ };
           if (cap_from_name(str.c_str(), &val) < 0) {
               throw CLI::ValidationError("--cap", "invalid capability: " + str);
           }
-          return std::to_string(val);
+
+          return std::string{ };
       });
 #endif
     cmd->add_flag("--no-new-privs",
