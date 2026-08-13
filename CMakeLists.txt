@@ -337,7 +337,7 @@ if(linyaps-box_ENABLE_CPM)
     OPTIONS "BUILD_TESTING OFF")
   CPMFindPackage(
     NAME fmt
-    VERSION 10.1.0
+    VERSION 10.1.1
     GITHUB_REPOSITORY fmtlib/fmt
     GIT_TAG 12.2.0
     EXCLUDE_FROM_ALL ON)
@@ -374,7 +374,7 @@ list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES CLI11::CLI11)
 set(FMT_TARGET
     "$<IF:$<BOOL:${linyaps-box_STATIC}>,fmt::fmt-header-only,fmt::fmt>")
 
-find_package(fmt 10.1.0 QUIET)
+find_package(fmt 10.1.1 QUIET)
 if(NOT fmt_FOUND)
   # if fmt is not found in local system. just use fmt::fmt with static linkage
   # for boosting compiling speed.
