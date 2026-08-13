@@ -121,7 +121,10 @@ constexpr auto bitmask_mask() noexcept -> enum_underlying_t<E>
 template <typename E>
 struct enum_entry
 {
-    E value;
+    // GCC 8's constexpr evaluator requires the defaulted default constructor
+    // to initialize every member; without `= {}` the implicit default ctor
+    // leaves `value` uninitialized and is not usable in constant expressions.
+    E value{ };
     std::string_view name;
 };
 
@@ -348,11 +351,15 @@ constexpr E &operator^=(E &lhs, E rhs) noexcept
 // table-registered enums verify_enum_table() enforces that at compile time.
 #define LINYAPS_MARK_AS_BITMASK_ENUM(LargestValue) LINYAPS_BITMASK_LARGEST_ENUMERATOR = LargestValue
 
+// GCC 8's constexpr evaluator may default-construct + copy the table
+// when binding a reference inside a direct static_assert(verify(table)).
+// Assigning to a constexpr variable first avoids that path.
 #define LINYAPS_REGISTER_ENUM(E, ...)                                                     \
     constexpr auto get_enum_table(E *) noexcept                                           \
     {                                                                                     \
         constexpr auto table = ::linyaps_box::utils::make_enum_table<E>({ __VA_ARGS__ }); \
-        static_assert(::linyaps_box::utils::verify_enum_table(table),                     \
+        constexpr auto valid = ::linyaps_box::utils::verify_enum_table(table);            \
+        static_assert(valid,                                                              \
                       "enum_table validation failed for " #E                              \
                       ": duplicate name or value detected!");                             \
         return table;                                                                     \
