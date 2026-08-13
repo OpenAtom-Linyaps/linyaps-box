@@ -45,7 +45,7 @@ struct mock_syslog_backend
 
     mutable std::vector<call> calls;
 
-    explicit mock_syslog_backend([[maybe_unused]] std::string mock) { }
+    explicit mock_syslog_backend(std::string) { } // NOLINT
 
     void syslog(linyaps_box::log::level priority, std::string_view msg) const noexcept
     {
