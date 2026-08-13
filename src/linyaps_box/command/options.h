@@ -54,7 +54,7 @@ struct exec_options
     std::vector<std::string> command;
     std::optional<user_spec> user;
 #ifdef LINYAPS_BOX_ENABLE_CAP
-    std::optional<std::vector<cap_value_t>> caps;
+    std::optional<std::vector<std::string>> caps;
 #endif
     std::string ID;
     std::optional<std::filesystem::path> cwd;

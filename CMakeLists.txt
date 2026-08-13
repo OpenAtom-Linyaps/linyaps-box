@@ -136,126 +136,61 @@ endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
 set(linyaps-box_LIBRARY_SOURCE
-    # find -regex '\./src/.+\.[ch]\(pp\)?' -type f -printf '%P\n'| sort
+    # find -regex '\./src/.+\.[c]\(pp\)?' -type f -printf '%P\n'| sort
     src/linyaps_box/app.cpp
-    src/linyaps_box/app.h
-    src/linyaps_box/cgroup.h
     src/linyaps_box/cgroup_manager.cpp
-    src/linyaps_box/cgroup_manager.h
     src/linyaps_box/command/exec.cpp
-    src/linyaps_box/command/exec.h
     src/linyaps_box/command/kill.cpp
-    src/linyaps_box/command/kill.h
     src/linyaps_box/command/list.cpp
-    src/linyaps_box/command/list.h
     src/linyaps_box/command/options.cpp
-    src/linyaps_box/command/options.h
     src/linyaps_box/command/run.cpp
-    src/linyaps_box/command/run.h
     src/linyaps_box/config.cpp
-    src/linyaps_box/config.h
-    src/linyaps_box/config/mount_options.h
+    src/linyaps_box/config/validate.cpp
     src/linyaps_box/container.cpp
-    src/linyaps_box/container.h
     src/linyaps_box/container_monitor.cpp
-    src/linyaps_box/container_monitor.h
     src/linyaps_box/container_ref.cpp
-    src/linyaps_box/container_ref.h
     src/linyaps_box/container_status.cpp
-    src/linyaps_box/container_status.h
     src/linyaps_box/impl/disabled_cgroup_manager.cpp
-    src/linyaps_box/impl/disabled_cgroup_manager.h
     src/linyaps_box/impl/json_printer.cpp
-    src/linyaps_box/impl/json_printer.h
     src/linyaps_box/impl/table_printer.cpp
-    src/linyaps_box/impl/table_printer.h
     src/linyaps_box/infra/rootfs.cpp
-    src/linyaps_box/infra/rootfs.h
     src/linyaps_box/infra/unix_socket.cpp
-    src/linyaps_box/infra/unix_socket.h
     src/linyaps_box/interface.cpp
-    src/linyaps_box/interface.h
     src/linyaps_box/io/epoll.cpp
-    src/linyaps_box/io/epoll.h
     src/linyaps_box/io/forwarder.cpp
-    src/linyaps_box/io/forwarder.h
     src/linyaps_box/log/formatter.cpp
-    src/linyaps_box/log/formatter.h
-    src/linyaps_box/log/log_api.h
     src/linyaps_box/log/logger.cpp
-    src/linyaps_box/log/logger.h
-    src/linyaps_box/log/macro.h
-    src/linyaps_box/log/sink.h
     src/linyaps_box/log/sinks/file_sink.cpp
-    src/linyaps_box/log/sinks/file_sink.h
     src/linyaps_box/log/sinks/journald_sink.cpp
-    src/linyaps_box/log/sinks/journald_sink.h
     src/linyaps_box/log/sinks/stderr_sink.cpp
-    src/linyaps_box/log/sinks/stderr_sink.h
     src/linyaps_box/log/sinks/sync_socket_sink.cpp
-    src/linyaps_box/log/sinks/sync_socket_sink.h
     src/linyaps_box/log/sinks/syslog_sink.cpp
-    src/linyaps_box/log/sinks/syslog_sink.h
     src/linyaps_box/log/utils.cpp
-    src/linyaps_box/log/utils.h
     src/linyaps_box/os/fs.cpp
-    src/linyaps_box/os/fs.h
     src/linyaps_box/os/io.cpp
-    src/linyaps_box/os/io.h
-    src/linyaps_box/os/kernel_constants.h
     src/linyaps_box/os/net.cpp
-    src/linyaps_box/os/net.h
     src/linyaps_box/os/process.cpp
-    src/linyaps_box/os/process.h
-    src/linyaps_box/os/result.h
     src/linyaps_box/os/tty.cpp
-    src/linyaps_box/os/tty.h
     src/linyaps_box/printer.cpp
-    src/linyaps_box/printer.h
     src/linyaps_box/protocol/message_channel.cpp
-    src/linyaps_box/protocol/message_channel.h
     src/linyaps_box/protocol/message.cpp
-    src/linyaps_box/protocol/message.h
-    src/linyaps_box/protocol/stage.h
     src/linyaps_box/runtime.cpp
-    src/linyaps_box/runtime.h
     src/linyaps_box/status_directory.cpp
-    src/linyaps_box/status_directory.h
     src/linyaps_box/status_directory_manager.cpp
-    src/linyaps_box/status_directory_manager.h
     src/linyaps_box/terminal.cpp
-    src/linyaps_box/terminal.h
     src/linyaps_box/utils/atomic_write.cpp
-    src/linyaps_box/utils/atomic_write.h
     src/linyaps_box/utils/cgroups.cpp
-    src/linyaps_box/utils/cgroups.h
     src/linyaps_box/utils/close_range.cpp
-    src/linyaps_box/utils/close_range.h
-    src/linyaps_box/utils/defer.h
-    src/linyaps_box/utils/enum_traits.h
     src/linyaps_box/utils/epoll.cpp
-    src/linyaps_box/utils/epoll.h
     src/linyaps_box/utils/file_describer.cpp
-    src/linyaps_box/utils/file_describer.h
-    src/linyaps_box/utils/ioctl.h
     src/linyaps_box/utils/mman.cpp
-    src/linyaps_box/utils/mman.h
     src/linyaps_box/utils/platform.cpp
-    src/linyaps_box/utils/platform.h
     src/linyaps_box/utils/ringbuffer.cpp
-    src/linyaps_box/utils/ringbuffer.h
     src/linyaps_box/utils/semver.cpp
-    src/linyaps_box/utils/semver.h
     src/linyaps_box/utils/session.cpp
-    src/linyaps_box/utils/session.h
     src/linyaps_box/utils/setns.cpp
-    src/linyaps_box/utils/setns.h
     src/linyaps_box/utils/signal.cpp
-    src/linyaps_box/utils/signal.h
-    src/linyaps_box/utils/span.h
-    src/linyaps_box/utils/terminal.cpp
-    src/linyaps_box/utils/terminal.h
-    src/linyaps_box/utils/utils.h)
+    src/linyaps_box/utils/terminal.cpp)
 
 if(NOT linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
   list(REMOVE_ITEM linyaps-box_LIBRARY_SOURCE

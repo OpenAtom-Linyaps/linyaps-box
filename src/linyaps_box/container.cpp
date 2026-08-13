@@ -23,6 +23,7 @@
 #include "utils/defer.h"
 
 #include <linux/magic.h>
+#include <linux/sched.h>
 #include <sys/mount.h>
 #include <sys/signalfd.h>
 #include <sys/statfs.h>
@@ -1402,7 +1403,11 @@ void set_capabilities(const oci_config &oci_config, int last_cap)
     const auto &bounding_set = capabilities->bounding;
     if (bounding_set) {
         std::vector<bool> keep_mask(last_cap + 1, false);
-        for (auto cap : *bounding_set) {
+        for (const auto &name : *bounding_set) {
+            cap_value_t cap{ };
+            if (cap_from_name(name.c_str(), &cap) < 0) {
+                throw std::runtime_error("unknown capability: " + name);
+            }
             keep_mask[cap] = true;
         }
 
@@ -1424,11 +1429,18 @@ void set_capabilities(const oci_config &oci_config, int last_cap)
     int ret{ -1 };
     const auto &effective_set = capabilities->effective;
     if (effective_set && !effective_set->empty()) {
-        ret = cap_set_flag(caps.get(),
-                           CAP_EFFECTIVE,
-                           effective_set->size(),
-                           effective_set->data(),
-                           CAP_SET);
+        std::vector<cap_value_t> cap_vals;
+        cap_vals.reserve(effective_set->size());
+        for (const auto &name : *effective_set) {
+            cap_value_t val{ };
+            if (cap_from_name(name.c_str(), &val) < 0) {
+                throw std::runtime_error("unknown capability: " + name);
+            }
+
+            cap_vals.push_back(val);
+        }
+
+        ret = cap_set_flag(caps.get(), CAP_EFFECTIVE, cap_vals.size(), cap_vals.data(), CAP_SET);
         if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno,
                                     std::system_category(),
@@ -1438,11 +1450,18 @@ void set_capabilities(const oci_config &oci_config, int last_cap)
 
     const auto &permitted_set = capabilities->permitted;
     if (permitted_set && !permitted_set->empty()) {
-        ret = cap_set_flag(caps.get(),
-                           CAP_PERMITTED,
-                           permitted_set->size(),
-                           permitted_set->data(),
-                           CAP_SET);
+        std::vector<cap_value_t> cap_vals;
+        cap_vals.reserve(permitted_set->size());
+        for (const auto &name : *permitted_set) {
+            cap_value_t val{ };
+            if (cap_from_name(name.c_str(), &val) < 0) {
+                throw std::runtime_error("unknown capability: " + name);
+            }
+
+            cap_vals.push_back(val);
+        }
+
+        ret = cap_set_flag(caps.get(), CAP_PERMITTED, cap_vals.size(), cap_vals.data(), CAP_SET);
         if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno,
                                     std::system_category(),
@@ -1452,11 +1471,17 @@ void set_capabilities(const oci_config &oci_config, int last_cap)
 
     const auto &inheritable_set = capabilities->inheritable;
     if (inheritable_set && !inheritable_set->empty()) {
-        ret = cap_set_flag(caps.get(),
-                           CAP_INHERITABLE,
-                           inheritable_set->size(),
-                           inheritable_set->data(),
-                           CAP_SET);
+        std::vector<cap_value_t> cap_vals;
+        cap_vals.reserve(inheritable_set->size());
+        for (const auto &name : *inheritable_set) {
+            cap_value_t val{ };
+            if (cap_from_name(name.c_str(), &val) < 0) {
+                throw std::runtime_error("unknown capability: " + name);
+            }
+            cap_vals.push_back(val);
+        }
+
+        ret = cap_set_flag(caps.get(), CAP_INHERITABLE, cap_vals.size(), cap_vals.data(), CAP_SET);
         if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno,
                                     std::system_category(),
@@ -1493,10 +1518,15 @@ void set_capabilities(const oci_config &oci_config, int last_cap)
 #  ifdef PR_CAP_AMBIENT
     os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L));
     if (const auto &ambient_set = capabilities->ambient; ambient_set) {
-        std::for_each(ambient_set->cbegin(), ambient_set->cend(), [](cap_value_t cap) {
+        for (const auto &name : *ambient_set) {
+            cap_value_t amb_cap{ };
+            if (cap_from_name(name.c_str(), &amb_cap) < 0) {
+                throw std::runtime_error("unknown capability: " + name);
+            }
+
             os::throw_if_error(
-              os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, static_cast<long>(cap), 0L, 0L));
-        });
+              os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, static_cast<long>(amb_cap), 0L, 0L));
+        }
     }
 #  endif
 
@@ -1765,10 +1795,40 @@ int clone_fn(void *data) noexcept
 // NOTE: All function in this namespace are running in the runtime namespace.
 namespace runtime_ns {
 
+[[nodiscard]] auto to_clone_flag(oci_config::linux_t::namespace_t::type type) noexcept
+  -> unsigned int
+{
+    using type_t = oci_config::linux_t::namespace_t::type;
+    switch (type) {
+    case type_t::NONE:
+        return 0;
+    case type_t::IPC:
+        return CLONE_NEWIPC;
+    case type_t::UTS:
+        return CLONE_NEWUTS;
+    case type_t::MOUNT:
+        return CLONE_NEWNS;
+    case type_t::PID:
+        return CLONE_NEWPID;
+    case type_t::NET:
+        return CLONE_NEWNET;
+    case type_t::USER:
+        return CLONE_NEWUSER;
+    case type_t::CGROUP:
+        return CLONE_NEWCGROUP;
+    case type_t::TIME:
+#ifdef CLONE_NEWTIME
+        return CLONE_NEWTIME;
+#else
+        return 0x00000080;
+#endif
+    }
+    __builtin_unreachable();
+}
+
 [[nodiscard]] unsigned
 generate_clone_flag(const std::optional<std::vector<oci_config::linux_t::namespace_t>> &namespaces)
 {
-    LINYAPS_BOX_LOG_DEBUG("Generate clone flags");
 
     unsigned flag = SIGCHLD;
     LINYAPS_BOX_LOG_DEBUG("Add SIGCHLD, flag=0x{:x}", flag);
@@ -1777,7 +1837,7 @@ generate_clone_flag(const std::optional<std::vector<oci_config::linux_t::namespa
     }
 
     for (const auto &ns : *namespaces) {
-        flag = flag | static_cast<unsigned int>(ns.type_);
+        flag = flag | to_clone_flag(ns.type_);
         LINYAPS_BOX_LOG_DEBUG("Add {} , flag=0x{:x}", to_string_view(ns.type_), flag);
     }
 
@@ -1828,13 +1888,53 @@ private:
     void *stack_low;
 };
 
+[[nodiscard]] auto to_rlimit_resource(oci_config::process_t::rlimit_t::type_t type) noexcept -> int
+{
+    using type_t = oci_config::process_t::rlimit_t::type_t;
+    switch (type) {
+    case type_t::AS:
+        return RLIMIT_AS;
+    case type_t::CORE:
+        return RLIMIT_CORE;
+    case type_t::CPU:
+        return RLIMIT_CPU;
+    case type_t::DATA:
+        return RLIMIT_DATA;
+    case type_t::FSIZE:
+        return RLIMIT_FSIZE;
+    case type_t::LOCKS:
+        return RLIMIT_LOCKS;
+    case type_t::MEMLOCK:
+        return RLIMIT_MEMLOCK;
+    case type_t::MSGQUEUE:
+        return RLIMIT_MSGQUEUE;
+    case type_t::NICE:
+        return RLIMIT_NICE;
+    case type_t::NOFILE:
+        return RLIMIT_NOFILE;
+    case type_t::NPROC:
+        return RLIMIT_NPROC;
+    case type_t::RSS:
+        return RLIMIT_RSS;
+    case type_t::RTPRIO:
+        return RLIMIT_RTPRIO;
+    case type_t::RTTIME:
+        return RLIMIT_RTTIME;
+    case type_t::SIGPENDING:
+        return RLIMIT_SIGPENDING;
+    case type_t::STACK:
+        return RLIMIT_STACK;
+    }
+    __builtin_unreachable();
+}
+
 void set_rlimits(const std::vector<oci_config::process_t::rlimit_t> &rlimits)
 {
     std::for_each(rlimits.begin(),
                   rlimits.end(),
                   [](const oci_config::process_t::rlimit_t &rlimit) {
                       const struct rlimit rl{ rlimit.soft, rlimit.hard };
-                      auto resource = static_cast<int>(rlimit.type);
+                      auto resource = to_rlimit_resource(rlimit.type);
                       LINYAPS_BOX_LOG_DEBUG("Set rlimit {}: Soft={}, Hard={}",
                                             to_string_view(rlimit.type),
                                             rlimit.soft,

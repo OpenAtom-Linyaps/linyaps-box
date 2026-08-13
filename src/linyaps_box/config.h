@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include <linux/ioprio.h>
-#include <linux/mempolicy.h>
-#include <linux/sched.h>
+#include "linyaps_box/utils/enum_traits.h"
+
 #include <nlohmann/json_fwd.hpp>
 
 #include <filesystem>
@@ -14,23 +13,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <sched.h>
-#include <sys/resource.h>
-
-#ifdef LINYAPS_BOX_ENABLE_SECCOMP
-#  include <seccomp.h>
-#endif
-
-#ifdef LINYAPS_BOX_ENABLE_CAP
-#  include <sys/capability.h>
-#endif
-
-#include "linyaps_box/utils/enum_traits.h"
-
-// clang-format off
-#include "linyaps_box/config/kernel_fallbacks.h"
-// clang-format on
 
 namespace linyaps_box {
 
@@ -59,23 +41,23 @@ struct oci_config
 
         struct rlimit_t
         {
-            enum class type_t : uint8_t {
-                AS = RLIMIT_AS,
-                CORE = RLIMIT_CORE,
-                CPU = RLIMIT_CPU,
-                DATA = RLIMIT_DATA,
-                FSIZE = RLIMIT_FSIZE,
-                LOCKS = RLIMIT_LOCKS,
-                MEMLOCK = RLIMIT_MEMLOCK,
-                MSGQUEUE = RLIMIT_MSGQUEUE,
-                NICE = RLIMIT_NICE,
-                NOFILE = RLIMIT_NOFILE,
-                NPROC = RLIMIT_NPROC,
-                RSS = RLIMIT_RSS,
-                RTPRIO = RLIMIT_RTPRIO,
-                RTTIME = RLIMIT_RTTIME,
-                SIGPENDING = RLIMIT_SIGPENDING,
-                STACK = RLIMIT_STACK,
+            enum class type_t : std::uint8_t {
+                AS,
+                CORE,
+                CPU,
+                DATA,
+                FSIZE,
+                LOCKS,
+                MEMLOCK,
+                MSGQUEUE,
+                NICE,
+                NOFILE,
+                NPROC,
+                RSS,
+                RTPRIO,
+                RTTIME,
+                SIGPENDING,
+                STACK,
             };
 
             type_t type;
@@ -86,46 +68,36 @@ struct oci_config
         std::optional<std::vector<rlimit_t>> rlimits;
         std::optional<std::string> apparmor_profile;
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
         struct capabilities_t
         {
-            std::optional<std::vector<cap_value_t>> effective;
-            std::optional<std::vector<cap_value_t>> bounding;
-            std::optional<std::vector<cap_value_t>> inheritable;
-            std::optional<std::vector<cap_value_t>> permitted;
-            std::optional<std::vector<cap_value_t>> ambient;
+            std::optional<std::vector<std::string>> effective;
+            std::optional<std::vector<std::string>> bounding;
+            std::optional<std::vector<std::string>> inheritable;
+            std::optional<std::vector<std::string>> permitted;
+            std::optional<std::vector<std::string>> ambient;
         };
 
         std::optional<capabilities_t> capabilities;
-#endif // LINYAPS_BOX_ENABLE_CAP
 
         std::optional<bool> no_new_privileges;
         std::optional<int> oom_score_adj;
 
         struct scheduler_t
         {
-            enum class policy_t : uint8_t {
-                OTHER = SCHED_OTHER,
-                FIFO = SCHED_FIFO,
-                RR = SCHED_RR,
-                BATCH = SCHED_BATCH,
-                ISO = kernel::sched_iso,
-                IDLE = SCHED_IDLE,
-                DEADLINE = SCHED_DEADLINE,
-            };
+            enum class policy_t : uint8_t { OTHER, FIFO, RR, BATCH, ISO, IDLE, DEADLINE };
 
             policy_t policy;
             std::optional<int32_t> nice;
             std::optional<int32_t> priority;
 
-            enum class flag_t : uint8_t {
-                RESET_ON_FORK = SCHED_FLAG_RESET_ON_FORK,
-                RECLAIM = SCHED_FLAG_RECLAIM,
-                DL_OVERRUN = SCHED_FLAG_DL_OVERRUN,
-                KEEP_POLICY = SCHED_FLAG_KEEP_POLICY,
-                KEEP_PARAMS = SCHED_FLAG_KEEP_PARAMS,
-                UTIL_CLAMP_MIN = static_cast<uint8_t>(kernel::sched_flag_util_clamp_min),
-                UTIL_CLAMP_MAX = static_cast<uint8_t>(kernel::sched_flag_util_clamp_max),
+            enum class flag_t : std::uint8_t {
+                RESET_ON_FORK,
+                RECLAIM,
+                DL_OVERRUN,
+                KEEP_POLICY,
+                KEEP_PARAMS,
+                UTIL_CLAMP_MIN,
+                UTIL_CLAMP_MAX,
                 LINYAPS_MARK_AS_BITMASK_ENUM(UTIL_CLAMP_MAX),
             };
 
@@ -142,9 +114,9 @@ struct oci_config
         struct io_priority_t
         {
             enum class class_t : uint8_t {
-                RT = IOPRIO_CLASS_RT,
-                BEST_EFFORT = IOPRIO_CLASS_BE,
-                IDLE = IOPRIO_CLASS_IDLE,
+                RT,
+                BEST_EFFORT,
+                IDLE,
             };
 
             class_t class_;
@@ -189,8 +161,8 @@ struct oci_config
     {
         enum class extension : std::uint8_t {
             NONE = 0,
-            COPY_SYMLINK = (1U << 0U),
-            TMPCOPYUP = (1U << 1U),
+            COPY_SYMLINK = (1U << 0),
+            TMPCOPYUP = (1U << 1),
             LINYAPS_MARK_AS_BITMASK_ENUM(TMPCOPYUP),
         };
 
@@ -235,16 +207,17 @@ struct oci_config
     {
         struct namespace_t
         {
-            enum class type : unsigned int {
-                IPC = CLONE_NEWIPC,
-                UTS = CLONE_NEWUTS,
-                MOUNT = CLONE_NEWNS,
-                PID = CLONE_NEWPID,
-                NET = CLONE_NEWNET,
-                USER = CLONE_NEWUSER,
-                CGROUP = CLONE_NEWCGROUP,
-                TIME = kernel::clone_newtime,
-                LINYAPS_MARK_AS_BITMASK_ENUM(NET),
+            enum class type : std::uint8_t {
+                NONE = 0U,
+                IPC = (1U << 0),
+                UTS = (1U << 1),
+                MOUNT = (1U << 2),
+                PID = (1U << 3),
+                NET = (1U << 4),
+                USER = (1U << 5),
+                CGROUP = (1U << 6),
+                TIME = (1U << 7),
+                LINYAPS_MARK_AS_BITMASK_ENUM(TIME),
             };
 
             type type_;
@@ -315,7 +288,7 @@ struct oci_config
 
             struct cpu_t
             {
-                enum class idle_t : uint8_t { NONE = 0, IDLE = 1 };
+                enum class idle_t : uint8_t { NONE, IDLE };
                 std::optional<uint64_t> shares;
                 std::optional<int64_t> quota;
                 std::optional<uint64_t> burst;
@@ -416,22 +389,22 @@ struct oci_config
         struct memory_policy_t
         {
             enum class mode_t : uint8_t {
-                DEFAULT = MPOL_DEFAULT,
-                BIND = MPOL_BIND,
-                INTERLEAVE = MPOL_INTERLEAVE,
-                WEIGHTED_INTERLEAVE = static_cast<int>(kernel::mpol_weighted_interleave),
-                PREFERRED = MPOL_PREFERRED,
-                PREFERRED_MANY = static_cast<int>(kernel::mpol_preferred_many),
-                LOCAL = MPOL_LOCAL,
+                DEFAULT,
+                BIND,
+                INTERLEAVE,
+                WEIGHTED_INTERLEAVE,
+                PREFERRED,
+                PREFERRED_MANY,
+                LOCAL,
             };
 
             mode_t mode;
             std::optional<std::vector<unsigned int>> nodes;
 
-            enum class flag_t : uint16_t {
-                NUMA_BALANCING = static_cast<uint16_t>(kernel::mpol_f_numa_balancing),
-                RELATIVE_NODES = static_cast<uint16_t>(MPOL_F_RELATIVE_NODES),
-                STATIC_NODES = static_cast<uint16_t>(MPOL_F_STATIC_NODES),
+            enum class flag_t : std::uint8_t {
+                NUMA_BALANCING = 1,
+                RELATIVE_NODES = 2,
+                STATIC_NODES = 4,
                 LINYAPS_MARK_AS_BITMASK_ENUM(STATIC_NODES),
             };
             std::optional<flag_t> flags;
@@ -441,19 +414,18 @@ struct oci_config
 
         std::optional<std::unordered_map<std::string, std::string>> sysctl;
 
-#ifdef LINYAPS_BOX_ENABLE_SECCOMP
         struct seccomp_t
         {
-            enum class action_t : std::uint32_t {
-                ALLOW = SCMP_ACT_ALLOW,
-                ERRNO = SCMP_ACT_ERRNO(0),
-                KILL = SCMP_ACT_KILL,
-                KILL_PROCESS = static_cast<std::uint32_t>(kernel::scmp_act_kill_process),
-                KILL_THREAD = static_cast<std::uint32_t>(kernel::scmp_act_kill_thread),
-                LOG = static_cast<std::uint32_t>(kernel::scmp_act_log),
-                NOTIFY = static_cast<std::uint32_t>(kernel::scmp_act_notify),
-                TRACE = SCMP_ACT_TRACE(0),
-                TRAP = SCMP_ACT_TRAP
+            enum class action_t : std::uint8_t {
+                ALLOW,
+                ERRNO,
+                KILL,
+                KILL_PROCESS,
+                KILL_THREAD,
+                LOG,
+                NOTIFY,
+                TRACE,
+                TRAP
             };
 
             action_t default_action;
@@ -489,11 +461,11 @@ struct oci_config
             std::optional<std::vector<arch_t>> architectures;
 
             enum class flag_t : std::uint8_t {
-                TSYNC = SECCOMP_FILTER_FLAG_TSYNC,
-                LOG = static_cast<std::uint8_t>(kernel::seccomp_filter_flag_log),
-                SPEC_ALLOW = static_cast<std::uint8_t>(kernel::seccomp_filter_flag_spec_allow),
-                WAIT_KILLABLE_RECV =
-                  static_cast<std::uint8_t>(kernel::seccomp_filter_flag_wait_killable_recv),
+                NONE = 0,
+                TSYNC = 1,
+                LOG = 2,
+                SPEC_ALLOW = 4,
+                WAIT_KILLABLE_RECV = 8,
                 LINYAPS_MARK_AS_BITMASK_ENUM(WAIT_KILLABLE_RECV),
             };
             std::optional<flag_t> flags;
@@ -509,18 +481,18 @@ struct oci_config
 
                 struct arg_t
                 {
-                    uint index;
-                    uint64_t value;
+                    uint index{ 0 };
+                    uint64_t value{ 0 };
                     std::optional<uint64_t> value_two;
 
                     enum class op_t : uint8_t {
-                        EQ = SCMP_CMP_EQ,
-                        NE = SCMP_CMP_NE,
-                        LT = SCMP_CMP_LT,
-                        LE = SCMP_CMP_LE,
-                        GT = SCMP_CMP_GT,
-                        GE = SCMP_CMP_GE,
-                        MASKED_EQ = SCMP_CMP_MASKED_EQ,
+                        EQ,
+                        NE,
+                        LT,
+                        LE,
+                        GT,
+                        GE,
+                        MASKED_EQ,
                     };
                     op_t op;
                 };
@@ -532,7 +504,6 @@ struct oci_config
         };
 
         std::optional<seccomp_t> seccomp;
-#endif
 
         unsigned long rootfs_propagation{ 0 };
 
