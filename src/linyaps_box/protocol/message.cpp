@@ -31,15 +31,16 @@ constexpr auto log_wire_overhead = sizeof(msg_id) + sizeof(uint8_t) + sizeof(int
 template <typename T>
 auto append_pod(std::vector<std::byte> &buf, const T &val) -> void
 {
-    static_assert(std::is_trivially_copyable_v<T>);
-    const auto *ptr = reinterpret_cast<const std::byte *>(&val); // NOLINT
-    buf.insert(buf.end(), ptr, ptr + sizeof(T));
+    static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
+    const auto old_size = buf.size();
+    buf.resize(old_size + sizeof(T));
+    std::memcpy(buf.data() + old_size, &val, sizeof(T));
 }
 
 template <typename T>
 auto read_pod(utils::span<const std::byte> data, std::size_t &offset) -> T
 {
-    static_assert(std::is_trivially_copyable_v<T>);
+    static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>);
     if (UNLIKELY(offset > data.size() || sizeof(T) > data.size() - offset)) {
         throw std::runtime_error("payload too short for pod read");
     }
