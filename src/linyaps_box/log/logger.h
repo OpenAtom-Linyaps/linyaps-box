@@ -4,13 +4,15 @@
 
 #pragma once
 
-#include "linyaps_box/log/sink.h"
+#include "linyaps_box/log/backend.h"
 
+#include <memory>
+#include <variant>
 #include <vector>
 
 namespace linyaps_box::log {
 
-// NOTE: The global logger state (level + sinks) is NOT thread-safe.
+// NOTE: The global logger state (level + backend) is NOT thread-safe.
 // The runtime operates in a multi-process single-threaded model: each
 // process (parent, child) has its own copy of the global state after
 // clone/fork, and within each process all logging happens on one thread.
@@ -30,12 +32,9 @@ public:
     auto set_level(level) noexcept -> void;
     [[nodiscard]] auto get_level() const noexcept -> level;
 
-    auto set_format(output_format fmt) noexcept -> void;
-    [[nodiscard]] auto get_format() const noexcept -> output_format;
-
-    auto set_sinks(std::vector<sink_variant> sinks) noexcept -> void;
-    auto set_sink(sink_variant sink) noexcept -> void;
-    auto unset_sink() noexcept -> void;
+    auto set_sinks(std::vector<std::unique_ptr<sink>> sinks) noexcept -> void;
+    auto set_forwarder(std::unique_ptr<forwarder> fwd) noexcept -> void;
+    auto unset_backend() noexcept -> void;
 
     auto dispatch_log(level lvl,
                       fmt::string_view fmt_str,
@@ -45,28 +44,16 @@ public:
                       int line,
                       int errno_val = 0) const noexcept -> void;
 
-    auto dispatch_to_sinks(const log_context &ctx) const noexcept -> void;
-
-    auto dispatch_raw(const log_context &ctx) const noexcept -> void;
+    auto dispatch_context(const log_context &ctx) const noexcept -> void;
 
 private:
-    global_logger() noexcept = default;
+    global_logger() noexcept;
 
-    std::vector<sink_variant> sinks_;
     level level_{ level::warn };
-    output_format format_{ output_format::text };
+
+    using backend =
+      std::variant<std::monostate, std::vector<std::unique_ptr<sink>>, std::unique_ptr<forwarder>>;
+    backend backend_;
 };
-
-using sink_spec = std::variant<stderr_spec,
-                               file_spec,
-                               syslog_spec
-#ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
-                               ,
-                               journald_spec
-#endif
-                               >;
-
-auto make_spec(std::string_view log_dest) -> sink_spec;
-auto make_sink(sink_spec spec) noexcept -> sink_variant;
 
 } // namespace linyaps_box::log

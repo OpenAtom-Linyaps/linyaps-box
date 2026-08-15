@@ -4,7 +4,6 @@
 
 #include "linyaps_box/log/formatter.h"
 
-#include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/utils.h"
 
 #include <fmt/chrono.h>
@@ -69,12 +68,20 @@ auto from_json(const nlohmann::json &j, level &lvl) -> void
     throw std::invalid_argument(std::string{ "unknown log level: " }.append(s));
 }
 
+namespace detail {
+struct oci_log_message
+{
+    std::string_view msg;
+    static constexpr std::string_view base_indent = "    ";
+};
+} // namespace detail
+
 namespace {
 
 auto append_strerror(fmt::memory_buffer &buf, int errno_val) noexcept -> void
 {
     if (errno_val != 0) {
-        fmt::format_to(std::back_inserter(buf), "\n{}", OciLogMessage::base_indent);
+        fmt::format_to(std::back_inserter(buf), "\n{}", detail::oci_log_message::base_indent);
         fmt::format_to(std::back_inserter(buf), "{}", ::strerror(errno_val));
     }
 }
@@ -88,13 +95,13 @@ auto to_json(nlohmann::json &j, const log_context &ctx) noexcept -> void
     fmt::format_to(std::back_inserter(time_str),
                    "{:%Y-%m-%dT%H:%M:%S}.{:09d}Z",
                    ctx.utc_tm(),
-                   subsec_ns(ctx.wall_time).count());
+                   subsec_ns(ctx.time).count());
 
     j = nlohmann::json{
         { "time", time_str },
         { "level", ctx.lvl },
         { "pid", ctx.pid },
-        { "msg", ctx.msg },
+        { "msg", ctx.message },
     };
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
     j["file"] = ctx.file;
@@ -115,7 +122,7 @@ auto format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_styl
     fmt::format_to(std::back_inserter(time_buf),
                    "{:%Y-%m-%dT%H:%M:%S}.{:09d}Z",
                    ctx.utc_tm(),
-                   subsec_ns(ctx.wall_time).count());
+                   subsec_ns(ctx.time).count());
 
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
     fmt::format_to(std::back_inserter(buf),
@@ -127,7 +134,7 @@ auto format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_styl
                    ctx.file,
                    ctx.line,
                    ctx.function,
-                   OciLogMessage{ ctx.msg });
+                   detail::oci_log_message{ ctx.message });
 #else
     fmt::format_to(std::back_inserter(buf),
                    style,
@@ -135,7 +142,7 @@ auto format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_styl
                    std::string_view{ time_buf.data(), time_buf.size() },
                    level_name(ctx.lvl),
                    ctx.pid,
-                   OciLogMessage{ ctx.msg });
+                   detail::oci_log_message{ ctx.message });
 #endif
     append_strerror(buf, ctx.errno_);
 
@@ -157,9 +164,50 @@ auto format_log(fmt::memory_buffer &buf,
     }
 }
 
-auto get_current_format() noexcept -> output_format
-{
-    return global_logger::instance().get_format();
-}
-
 } // namespace linyaps_box::log
+
+namespace fmt {
+template <>
+struct formatter<linyaps_box::log::detail::oci_log_message>
+{
+    constexpr auto parse(fmt::format_parse_context &ctx)
+    {
+        const auto *it = ctx.begin();
+        const auto *end = ctx.end();
+        if (it != end && *it != '}') {
+            throw fmt::format_error("oci_log_message does not accept format specs");
+        }
+        return it;
+    }
+
+    template <typename FormatContext>
+    auto format(const linyaps_box::log::detail::oci_log_message &lm, FormatContext &ctx) const
+    {
+        auto out = ctx.out();
+        auto text = lm.msg;
+
+        while (!text.empty() && text.back() == '\n') {
+            text.remove_suffix(1);
+        }
+
+        out = fmt::format_to(out, "{}", linyaps_box::log::detail::oci_log_message::base_indent);
+
+        std::string_view::size_type start = 0;
+        while (true) {
+            auto pos = text.find('\n', start);
+            if (pos == std::string_view::npos) {
+                out = fmt::format_to(out, "{}", text.substr(start));
+                break;
+            }
+
+            out = fmt::format_to(out,
+                                 "{}\n{}",
+                                 text.substr(start, pos - start),
+                                 linyaps_box::log::detail::oci_log_message::base_indent);
+            start = pos + 1;
+        }
+
+        return out;
+    }
+};
+} // namespace fmt

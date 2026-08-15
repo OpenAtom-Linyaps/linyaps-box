@@ -46,8 +46,8 @@ constexpr auto log_basename(std::string_view path) noexcept -> std::string_view
 struct log_context
 {
     level lvl{ };
-    std::string_view msg;
-    std::chrono::system_clock::time_point wall_time;
+    std::string_view message;
+    std::chrono::nanoseconds time{ };
     pid_t pid{ };
     int errno_{ 0 };
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
@@ -58,72 +58,22 @@ struct log_context
 
     [[nodiscard]] auto utc_tm() const noexcept -> std::tm
     {
-        auto t = std::chrono::system_clock::to_time_t(wall_time);
+        auto t =
+          std::chrono::system_clock::to_time_t(std::chrono::system_clock::time_point{ time });
         std::tm tm{ };
         gmtime_r(&t, &tm);
         return tm;
     }
 };
 
-inline auto subsec_ns(std::chrono::system_clock::time_point tp) noexcept -> std::chrono::nanoseconds
+inline auto subsec_ns(std::chrono::nanoseconds ns) noexcept -> std::chrono::nanoseconds
 {
     using namespace std::chrono;
-    auto as_ns = duration_cast<nanoseconds>(tp.time_since_epoch());
-    auto secs = duration_cast<seconds>(as_ns);
-    return as_ns - secs;
+    auto secs = duration_cast<seconds>(ns);
+    return ns - secs;
 }
 
 auto to_syslog_priority(level lvl) noexcept -> int;
 auto level_name(level lvl) noexcept -> const char *;
 
-struct OciLogMessage
-{
-    std::string_view msg;
-    static constexpr std::string_view base_indent = "    ";
-};
-
 } // namespace linyaps_box::log
-
-template <>
-struct fmt::formatter<linyaps_box::log::OciLogMessage>
-{
-    constexpr auto parse(fmt::format_parse_context &ctx)
-    {
-        const auto *it = ctx.begin();
-        const auto *end = ctx.end();
-        if (it != end && *it != '}') {
-            throw fmt::format_error("OciLogMessage does not accept format specs");
-        }
-        return it;
-    }
-
-    template <typename FormatContext>
-    auto format(const linyaps_box::log::OciLogMessage &lm, FormatContext &ctx) const
-    {
-        auto out = ctx.out();
-        auto text = lm.msg;
-
-        while (!text.empty() && text.back() == '\n') {
-            text.remove_suffix(1);
-        }
-
-        out = fmt::format_to(out, "{}", linyaps_box::log::OciLogMessage::base_indent);
-
-        std::string_view::size_type start = 0;
-        while (true) {
-            auto pos = text.find('\n', start);
-            if (pos == std::string_view::npos) {
-                out = fmt::format_to(out, "{}", text.substr(start));
-                break;
-            }
-
-            out = fmt::format_to(out,
-                                 "{}\n{}",
-                                 text.substr(start, pos - start),
-                                 linyaps_box::log::OciLogMessage::base_indent);
-            start = pos + 1;
-        }
-
-        return out;
-    }
-};

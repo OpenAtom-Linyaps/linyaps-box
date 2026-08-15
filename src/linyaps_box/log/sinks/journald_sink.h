@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "linyaps_box/log/backend.h"
 #include "linyaps_box/log/utils.h"
 #include "linyaps_box/utils/span.h"
 
@@ -42,7 +43,7 @@ struct journald_backend
 };
 
 template <typename Backend>
-class basic_journald_sink
+class basic_journald_sink : public sink
 {
     static_assert(detail::has_valid_journald_backend_v<Backend>,
                   "Journald backend policy must implement a static "
@@ -52,7 +53,7 @@ class basic_journald_sink
 
 public:
     template <typename T>
-    explicit basic_journald_sink(T spec) noexcept
+    explicit basic_journald_sink(T spec, [[maybe_unused]] output_format fmt) noexcept
         : ident_(std::move(spec.ident))
     {
     }
@@ -63,7 +64,8 @@ public:
     auto operator=(basic_journald_sink &&) noexcept -> basic_journald_sink & = default;
     ~basic_journald_sink() noexcept = default;
 
-    auto log(const log_context &ctx) const noexcept -> void
+    auto log([[maybe_unused]] fmt::memory_buffer &buf, const log_context &ctx) const noexcept
+      -> void final
     try {
         constexpr std::size_t max_fields =
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
@@ -73,7 +75,6 @@ public:
 #endif
           ;
 
-        fmt::memory_buffer buf;
         std::array<struct iovec, max_fields> iov{ };
         std::size_t n = 0;
 
@@ -84,7 +85,7 @@ public:
             ++n;
         };
 
-        add_field("MESSAGE", ctx.msg);
+        add_field("MESSAGE", ctx.message);
         add_field("PRIORITY", to_syslog_priority(ctx.lvl));
         add_field("SYSLOG_IDENTIFIER", ident_);
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
