@@ -14,6 +14,7 @@
 #include "linyaps_box/os/fs.h"
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/protocol/message_channel.h"
+#include "linyaps_box/protocol/sync_socket_forwarder.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/cgroups.h"
 #include "linyaps_box/utils/close_range.h"
@@ -246,7 +247,7 @@ void initialize_container(const oci_config &oci_config, child_message_channel &s
     LINYAPS_BOX_LOG_DEBUG("Request OCI runtime in runtime namespace to configure namespace");
 
     sync.send_stage(stage::type::namespace_ready);
-    sync.wait_for(stage::type::namespace_done);
+    sync.expect_stage(stage::type::namespace_done);
 
     LINYAPS_BOX_LOG_DEBUG("Container namespaces configured from runtime namespace");
 
@@ -1195,7 +1196,7 @@ void wait_prestart_hooks_result(const oci_config &oci_config, child_message_chan
 
     LINYAPS_BOX_LOG_DEBUG("Sync message sent, Wait prestart runtime result");
 
-    sync.wait_for(stage::type::prestart_done);
+    sync.expect_stage(stage::type::prestart_done);
 
     LINYAPS_BOX_LOG_DEBUG("Prestart hooks executed");
 }
@@ -1212,7 +1213,7 @@ void wait_create_runtime_result(const oci_config &oci_config, child_message_chan
 
     LINYAPS_BOX_LOG_DEBUG("Sync message sent, Wait create runtime result");
 
-    sync.wait_for(stage::type::createruntime_done);
+    sync.expect_stage(stage::type::createruntime_done);
 
     LINYAPS_BOX_LOG_DEBUG("Create runtime hooks executed");
 }
@@ -1669,8 +1670,7 @@ void configure_terminal(const container &container, protocol::child_message_chan
     std::ignore = container_ns::do_bind_mount(root, mount);
     auto console_fd = std::move(master).take();
     auto ref = console_fd.ref();
-    sync.send(protocol::msg::console_fd{ },
-              utils::span<const utils::file_descriptor_ref>{ &ref, 1 });
+    sync.send_console_fd(ref);
 }
 
 int clone_fn(void *data) noexcept
@@ -1683,8 +1683,7 @@ int clone_fn(void *data) noexcept
 
     try {
         auto &logger = log::global_logger::instance();
-        logger.unset_sink();
-        logger.set_sink(log::sync_socket_sink(args.sync));
+        logger.set_forwarder(std::make_unique<protocol::sync_socket_forwarder>(args.sync));
 
         if (getenv("LINYAPS_BOX_CONTAINER_PROCESS_TRACE_ME") != nullptr) {
             auto signal_USR1_handler = []([[maybe_unused]] int) {
@@ -2267,7 +2266,7 @@ void configure_container_namespaces(container &container, parent_message_channel
     LINYAPS_BOX_LOG_DEBUG(
       "Waiting OCI runtime in container namespace to request configure namespace");
 
-    sync.wait_for(stage::type::namespace_ready);
+    sync.wait_for_stage(stage::type::namespace_ready);
 
     LINYAPS_BOX_LOG_DEBUG("Start configure namespaces");
 
@@ -2323,7 +2322,7 @@ void prestart_hooks(const container &container, parent_message_channel &sync)
 
     LINYAPS_BOX_LOG_DEBUG("Waiting request to execute prestart hooks");
 
-    sync.wait_for(stage::type::prestart_ready);
+    sync.wait_for_stage(stage::type::prestart_ready);
 
     LINYAPS_BOX_LOG_DEBUG("Execute prestart hooks");
 
@@ -2347,7 +2346,7 @@ void create_runtime_hooks(const container &container, parent_message_channel &sy
 
     LINYAPS_BOX_LOG_DEBUG("Waiting request to execute create runtime hooks");
 
-    sync.wait_for(stage::type::createruntime_ready);
+    sync.wait_for_stage(stage::type::createruntime_ready);
 
     LINYAPS_BOX_LOG_DEBUG("Execute create runtime hooks");
 
@@ -2372,7 +2371,7 @@ void wait_create_container_result(const container &container, parent_message_cha
     LINYAPS_BOX_LOG_DEBUG(
       "Waiting OCI runtime in container namespace send create container hooks result");
 
-    sync.wait_for(stage::type::createcontainer_done);
+    sync.wait_for_stage(stage::type::createcontainer_done);
 
     LINYAPS_BOX_LOG_DEBUG("Create container hooks executed");
 }
@@ -2380,7 +2379,7 @@ void wait_create_container_result(const container &container, parent_message_cha
 void wait_container_started(parent_message_channel &sync)
 {
     LINYAPS_BOX_LOG_DEBUG("Waiting for container process to start");
-    sync.wait_for(stage::type::exec_ready);
+    sync.wait_for_stage(stage::type::exec_ready);
     sync.wait_for_close();
     LINYAPS_BOX_LOG_DEBUG("Container process started successfully");
 }
