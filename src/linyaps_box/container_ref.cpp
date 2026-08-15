@@ -9,6 +9,7 @@
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/protocol/message_channel.h"
+#include "linyaps_box/protocol/sync_socket_forwarder.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/defer.h"
@@ -116,8 +117,7 @@ void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
 
     auto console_fd = std::move(master).take();
     auto ref = console_fd.ref();
-    sync.send(protocol::msg::console_fd{ },
-              linyaps_box::utils::span<const linyaps_box::utils::file_descriptor_ref>{ &ref, 1 });
+    sync.send_console_fd(ref);
 }
 
 void child_apply_credentials(const linyaps_box::oci_config::process_t &proc)
@@ -335,8 +335,8 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
 {
     try {
         auto &logger = linyaps_box::log::global_logger::instance();
-        logger.unset_sink();
-        logger.set_sink(linyaps_box::log::sync_socket_sink(child_chan));
+        logger.set_forwarder(
+          std::make_unique<linyaps_box::protocol::sync_socket_forwarder>(child_chan));
 
         bool pid_ns{ false };
         if (config.linux && config.linux->namespaces) {
@@ -356,14 +356,14 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
             }
 
             if (grandchild > 0) {
-                child_chan.send(protocol::msg::pid_report{ static_cast<pid_t>(grandchild) });
+                child_chan.send_pid_report(static_cast<pid_t>(grandchild));
                 _exit(EXIT_SUCCESS);
             }
         } else {
-            child_chan.send(protocol::msg::pid_report{ ::getpid() });
+            child_chan.send_pid_report(::getpid());
         }
 
-        child_chan.wait_for_proceed();
+        child_chan.expect_proceed();
 
         linyaps_box::utils::setsid();
 
@@ -460,7 +460,7 @@ auto exec_parent_process(protocol::parent_message_channel sync,
     // Unblock the grandchild so it can proceed with terminal setup and exec.
     // In the future, cgroup/scheduler setup with the real pid goes here,
     // between pid_report and proceed.
-    sync.send(protocol::msg::proceed{ });
+    sync.send_proceed();
 
     auto in = linyaps_box::utils::file_descriptor{ STDIN_FILENO, false };
     auto out = linyaps_box::utils::file_descriptor{ STDOUT_FILENO, false };
@@ -513,7 +513,7 @@ auto exec_parent_process(protocol::parent_message_channel sync,
                        console_inc.body);
         }
 
-        sync.wait_for(protocol::stage::type::exec_ready);
+        sync.wait_for_stage(protocol::stage::type::exec_ready);
         sync.wait_for_close();
 
         return monitor.wait_container_exit();
