@@ -7,10 +7,10 @@
 #include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/log/sinks/sync_socket_sink.h"
-#include "linyaps_box/log/utils.h"
+#include "linyaps_box/log/sinks/stderr_sink.h"
 #include "linyaps_box/protocol/message.h"
 #include "linyaps_box/protocol/message_channel.h"
+#include "linyaps_box/protocol/sync_socket_forwarder.h"
 #include "linyaps_box/utils/span.h"
 
 #include <chrono>
@@ -26,6 +26,38 @@ namespace proto = linyaps_box::protocol;
 namespace msg = linyaps_box::protocol::msg;
 namespace log_lvl = linyaps_box::log;
 namespace os = linyaps_box::os;
+
+auto make_transport_pair()
+  -> std::pair<linyaps_box::protocol::channel_transport, linyaps_box::protocol::channel_transport>
+{
+    auto [c1, c2] =
+      linyaps_box::infra::unix_socket::create_pair(linyaps_box::os::sys::socket_type::seqpacket,
+                                                   linyaps_box::os::sys::socket_flag::cloexec);
+    return { linyaps_box::protocol::channel_transport(std::move(c1)),
+             linyaps_box::protocol::channel_transport(std::move(c2)) };
+}
+
+// Sets up a stderr sink on the global logger for tests that need log forwarding.
+// Returns the previous level to restore later.
+auto setup_logger_sink() -> linyaps_box::log::level
+{
+    auto &logger = linyaps_box::log::global_logger::instance();
+    auto saved = logger.get_level();
+    std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+    sinks.push_back(
+      std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                      linyaps_box::log::output_format::text));
+    logger.set_sinks(std::move(sinks));
+    logger.set_level(linyaps_box::log::level::debug);
+    return saved;
+}
+
+auto restore_logger_level(linyaps_box::log::level saved) -> void
+{
+    auto &logger = linyaps_box::log::global_logger::instance();
+    logger.unset_backend();
+    logger.set_level(saved);
+}
 
 auto make_log(log_lvl::level lvl = log_lvl::level::fatal,
               std::string_view message = "test",
@@ -45,16 +77,9 @@ auto make_log(log_lvl::level lvl = log_lvl::level::fatal,
                                        std::chrono::nanoseconds time = { }) -> log_lvl::log_context
 {
     return {
-        lvl,
-        message,
-        std::chrono::system_clock::time_point{
-          std::chrono::duration_cast<std::chrono::system_clock::duration>(time) },
-        pid,
-        0,
+        lvl,        message, time, pid, 0,
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        "test.cpp",
-        "f",
-        1,
+        "test.cpp", "f",     1,
 #endif
     };
 }
@@ -113,13 +138,13 @@ protected:
 
         auto &logger = linyaps_box::log::global_logger::instance();
         saved_level_ = logger.get_level();
-        logger.unset_sink();
+        logger.unset_backend();
     }
 
     void TearDown() override
     {
         auto &logger = linyaps_box::log::global_logger::instance();
-        logger.unset_sink();
+        logger.unset_backend();
         logger.set_level(saved_level_);
     }
 };
@@ -288,9 +313,9 @@ TEST(MessageChannel, SerializeProceed)
 
 TEST_F(ChannelTest, ChildToParentPidReport)
 {
-    child->send(msg::pid_report{ 42 });
+    child->send_pid_report(42);
 
-    auto inc = parent->recv();
+    auto inc = parent->drain_logs();
     ASSERT_TRUE(std::holds_alternative<msg::pid_report>(inc.body));
     EXPECT_EQ(std::get<msg::pid_report>(inc.body).value, 42);
 }
@@ -298,21 +323,25 @@ TEST_F(ChannelTest, ChildToParentPidReport)
 TEST_F(ChannelTest, SendRecvStage)
 {
     const thread_guard tg{ std::thread([&]() {
-        child->wait_for(proto::stage::type::namespace_ready);
+        child->expect_stage(proto::stage::type::namespace_ready);
         child->send_stage(proto::stage::type::namespace_done);
     }) };
 
     parent->send_stage(proto::stage::type::namespace_ready);
-    parent->wait_for(proto::stage::type::namespace_done);
+    parent->wait_for_stage(proto::stage::type::namespace_done);
 }
 
-TEST_F(ChannelTest, SendRecvLog)
+TEST(MessageChannel, SendRecvLog)
 {
-    child->send(make_log(log_lvl::level::fatal, "test error"));
+    auto [t1, t2] = make_transport_pair();
 
-    auto inc = parent->recv();
-    ASSERT_TRUE(std::holds_alternative<msg::log>(inc.body));
-    auto &d = std::get<msg::log>(inc.body);
+    auto log_msg = make_log(log_lvl::level::fatal, "test error");
+    t1.send(log_msg);
+
+    auto inc = t2.recv();
+    ASSERT_TRUE(inc.has_value());
+    ASSERT_TRUE(std::holds_alternative<msg::log>(inc->body));
+    auto &d = std::get<msg::log>(inc->body);
     EXPECT_EQ(d.lvl, log_lvl::level::fatal);
     EXPECT_EQ(d.message, "test error");
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
@@ -320,7 +349,7 @@ TEST_F(ChannelTest, SendRecvLog)
     EXPECT_EQ(d.line, 1);
 #endif
     EXPECT_EQ(d.time, std::chrono::nanoseconds{ 0 });
-    EXPECT_TRUE(inc.fds.empty());
+    EXPECT_TRUE(inc->fds.empty());
 }
 
 TEST_F(ChannelTest, WaitForUnexpectedStageThrows)
@@ -329,7 +358,8 @@ TEST_F(ChannelTest, WaitForUnexpectedStageThrows)
         child->send_stage(proto::stage::type::namespace_ready);
     }) };
 
-    EXPECT_THROW(parent->wait_for(proto::stage::type::createcontainer_done), std::runtime_error);
+    EXPECT_THROW(parent->wait_for_stage(proto::stage::type::createcontainer_done),
+                 std::runtime_error);
 }
 
 TEST_F(ChannelTest, TakeFdFromIncoming)
@@ -341,10 +371,9 @@ TEST_F(ChannelTest, TakeFdFromIncoming)
     std::vector<linyaps_box::utils::file_descriptor> fds;
     fds.emplace_back(b_fd, true);
     linyaps_box::utils::file_descriptor_ref ref{ fds.front() };
-    child->send(msg::stage{ proto::stage::type::namespace_ready },
-                linyaps_box::utils::span<const linyaps_box::utils::file_descriptor_ref>{ &ref, 1 });
+    child->send_console_fd(ref);
 
-    auto inc = parent->recv();
+    auto inc = parent->drain_logs();
     ASSERT_FALSE(inc.fds.empty());
 
     auto rec_fds = inc.take_fds();
@@ -364,39 +393,42 @@ TEST_F(ChannelTest, WaitForExecSocketCloseThrows)
     auto [parent, child] = proto::create_message_socketpair();
     child.close();
 
-    EXPECT_THROW(parent.wait_for(proto::stage::type::exec_ready), std::runtime_error);
+    EXPECT_THROW(parent.wait_for_stage(proto::stage::type::exec_ready), std::runtime_error);
 }
 
 TEST_F(ChannelTest, WaitForExecWithExecReady)
 {
     auto [parent, child] = proto::create_message_socketpair();
-    child.send(msg::stage{ proto::stage::type::exec_ready });
+    child.send_stage(proto::stage::type::exec_ready);
     child.close();
 
-    EXPECT_NO_THROW(parent.wait_for(proto::stage::type::exec_ready));
+    EXPECT_NO_THROW(parent.wait_for_stage(proto::stage::type::exec_ready));
     EXPECT_NO_THROW(parent.wait_for_close());
 }
 
 TEST_F(ChannelTest, WaitForExecFailedAfterReady)
 {
+    auto saved = setup_logger_sink();
     const thread_guard tg{ std::thread([&]() {
         child->send_stage(proto::stage::type::exec_ready);
-        child->send(make_log(log_lvl::level::fatal, "execvpe"));
+        proto::sync_socket_forwarder fwd(*child);
+        fwd.forward(make_log_context(log_lvl::level::fatal, "execvpe"));
         child.reset();
     }) };
 
-    EXPECT_NO_THROW(parent->wait_for(proto::stage::type::exec_ready));
+    EXPECT_NO_THROW(parent->wait_for_stage(proto::stage::type::exec_ready));
     EXPECT_THROW(parent->wait_for_close(), std::runtime_error);
+    restore_logger_level(saved);
 }
 
 TEST_F(ChannelTest, ChildWaitForUnexpected)
 {
-    parent->send(msg::pid_report{ 42 });
+    parent->send_proceed();
 
     EXPECT_THROW(
       {
           try {
-              child->wait_for(proto::stage::type::namespace_ready);
+              child->expect_stage(proto::stage::type::namespace_ready);
           } catch (const std::runtime_error &e) {
               EXPECT_NE(std::string(e.what()).find("unexpected"), std::string::npos);
               throw;
@@ -405,20 +437,24 @@ TEST_F(ChannelTest, ChildWaitForUnexpected)
       std::runtime_error);
 }
 
-TEST_F(ChannelTest, LargeLogMessageRoundTrip)
+TEST(MessageChannel, LargeLogMessageRoundTrip)
 {
-    const std::string long_msg(5000, 'x');
-    child->send(make_log(log_lvl::level::error, long_msg));
+    auto [t1, t2] = make_transport_pair();
 
-    auto inc = parent->recv();
-    ASSERT_TRUE(std::holds_alternative<msg::log>(inc.body));
-    auto &d = std::get<msg::log>(inc.body);
+    const std::string long_msg(5000, 'x');
+    auto log_msg = make_log(log_lvl::level::error, long_msg);
+    t1.send(log_msg);
+
+    auto inc = t2.recv();
+    ASSERT_TRUE(inc.has_value());
+    ASSERT_TRUE(std::holds_alternative<msg::log>(inc->body));
+    auto &d = std::get<msg::log>(inc->body);
     EXPECT_EQ(d.message, long_msg);
 }
 
-TEST_F(ChannelTest, FdsExceedLimitThrows)
+TEST(MessageChannel, FdsExceedLimitThrows)
 {
-    msg::stage m{ proto::stage::type::namespace_ready };
+    auto [t1, t2] = make_transport_pair();
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     for (int i = 0; i < 17; ++i) {
@@ -433,7 +469,8 @@ TEST_F(ChannelTest, FdsExceedLimitThrows)
         refs.emplace_back(fd.ref());
     }
 
-    EXPECT_THROW(child->send(m, refs), std::logic_error);
+    msg::stage m{ proto::stage::type::namespace_ready };
+    EXPECT_THROW(t1.send(m, refs), std::logic_error);
 }
 
 TEST_F(ChannelTest, SendRecvConsoleFd)
@@ -445,10 +482,9 @@ TEST_F(ChannelTest, SendRecvConsoleFd)
     std::vector<linyaps_box::utils::file_descriptor> fds;
     fds.emplace_back(b_fd, true);
     linyaps_box::utils::file_descriptor_ref ref{ fds.front() };
-    child->send(msg::console_fd{ },
-                linyaps_box::utils::span<const linyaps_box::utils::file_descriptor_ref>{ &ref, 1 });
+    child->send_console_fd(ref);
 
-    auto inc = parent->recv();
+    auto inc = parent->drain_logs();
     ASSERT_TRUE(std::holds_alternative<msg::console_fd>(inc.body));
     ASSERT_FALSE(inc.fds.empty());
 }
@@ -457,11 +493,13 @@ TEST_F(ChannelTest, SendOnClosedSocketThrows)
 {
     auto [parent, child] = proto::create_message_socketpair();
     parent.close();
-    EXPECT_THROW(child.send(make_log(log_lvl::level::fatal, "parent gone")), std::system_error);
+    EXPECT_THROW(child.send_stage(proto::stage::type::exec_ready), std::system_error);
 }
 
-TEST_F(ChannelTest, MaxFdsTransfer)
+TEST(MessageChannel, MaxFdsTransfer)
 {
+    auto [t1, t2] = make_transport_pair();
+
     std::vector<linyaps_box::utils::file_descriptor> fds;
     for (int i = 0; i < 16; ++i) {
         auto fd = ::open("/dev/null", O_RDONLY | O_CLOEXEC);
@@ -475,13 +513,14 @@ TEST_F(ChannelTest, MaxFdsTransfer)
         refs.emplace_back(fd.ref());
     }
 
-    child->send(msg::stage{ proto::stage::type::namespace_ready }, refs);
+    t1.send(msg::stage{ proto::stage::type::namespace_ready }, refs);
 
-    auto inc = parent->recv();
-    ASSERT_TRUE(std::holds_alternative<msg::stage>(inc.body));
-    ASSERT_EQ(inc.fds.size(), 16UL);
+    auto inc = t2.recv();
+    ASSERT_TRUE(inc.has_value());
+    ASSERT_TRUE(std::holds_alternative<msg::stage>(inc->body));
+    ASSERT_EQ(inc->fds.size(), 16UL);
 
-    for (const auto &fd : inc.fds) {
+    for (const auto &fd : inc->fds) {
         struct stat st{ };
         EXPECT_EQ(fstat(fd.get(), &st), 0);
         EXPECT_TRUE(S_ISCHR(st.st_mode));
@@ -491,72 +530,63 @@ TEST_F(ChannelTest, MaxFdsTransfer)
 TEST_F(ChannelTest, ProceedRoundTrip)
 {
     const thread_guard tg{ std::thread([&]() {
-        child->send(msg::pid_report{ 42 });
-        child->wait_for_proceed();
+        child->send_pid_report(42);
+        child->expect_proceed();
     }) };
 
-    auto inc = parent->recv();
+    auto inc = parent->drain_logs();
     ASSERT_TRUE(std::holds_alternative<msg::pid_report>(inc.body));
     EXPECT_EQ(std::get<msg::pid_report>(inc.body).value, 42);
 
-    parent->send(msg::proceed{ });
+    parent->send_proceed();
 }
 
-TEST_F(ChannelTest, SyncSocketSinkForwardsLogToParent)
+TEST_F(ChannelTest, SyncSocketForwarderEndToEnd)
 {
-    // Install a sync_socket_sink on the child side.  The child's log call
-    // should be serialized, sent over the socket, and arrive at the parent.
-    auto &logger = linyaps_box::log::global_logger::instance();
-    logger.unset_sink();
-    logger.set_sink(linyaps_box::log::sync_socket_sink{ *child });
-    logger.set_level(linyaps_box::log::level::debug);
+    auto saved = setup_logger_sink();
 
-    constexpr auto expected_line = __LINE__ + 1;
-    LINYAPS_BOX_LOG_ERROR("sync_sink_test {} {}", 42, "hello");
+    linyaps_box::protocol::sync_socket_forwarder fwd(*child);
+    auto ctx = make_log_context(log_lvl::level::error, "forwarder end_to_end");
+    fwd.forward(ctx);
 
-    // Read back on the parent side via drain_logs.
-    auto inc = parent->recv();
-    ASSERT_TRUE(std::holds_alternative<msg::log>(inc.body));
-    auto &d = std::get<msg::log>(inc.body);
-    EXPECT_EQ(d.lvl, log_lvl::level::error);
-    EXPECT_EQ(d.message, "sync_sink_test 42 hello");
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    EXPECT_NE(d.file.find("message_channel_test.cpp"), std::string::npos);
-    EXPECT_EQ(d.line, expected_line);
-#endif
-    EXPECT_GT(d.time.count(), 0);
+    child->send_stage(proto::stage::type::exec_ready);
+    EXPECT_NO_THROW(parent->wait_for_stage(proto::stage::type::exec_ready));
 
-    logger.unset_sink();
-    logger.set_level(linyaps_box::log::level::warn);
+    restore_logger_level(saved);
 }
 
 TEST_F(ChannelTest, WaitForDrainsInterleavedLogs)
 {
     const thread_guard tg{ std::thread([&]() {
-        child->send(make_log(log_lvl::level::debug, "dbg1"));
-        child->send(make_log(log_lvl::level::info, "info1"));
+        proto::sync_socket_forwarder fwd(*child);
+        fwd.forward(make_log_context(log_lvl::level::debug, "dbg1"));
+        fwd.forward(make_log_context(log_lvl::level::info, "info1"));
         child->send_stage(proto::stage::type::namespace_ready);
     }) };
 
-    EXPECT_NO_THROW(parent->wait_for(proto::stage::type::namespace_ready));
+    EXPECT_NO_THROW(parent->wait_for_stage(proto::stage::type::namespace_ready));
 }
 
 TEST_F(ChannelTest, WaitForDrainsLogsThenCloseThrows)
 {
+    auto saved = setup_logger_sink();
     const thread_guard tg{ std::thread([&]() {
-        child->send(make_log(log_lvl::level::error, "boom"));
+        proto::sync_socket_forwarder fwd(*child);
+        fwd.forward(make_log_context(log_lvl::level::error, "boom"));
         child.reset();
     }) };
 
-    EXPECT_THROW(parent->wait_for(proto::stage::type::exec_ready), std::runtime_error);
+    EXPECT_THROW(parent->wait_for_stage(proto::stage::type::exec_ready), std::runtime_error);
+    restore_logger_level(saved);
 }
 
 TEST_F(ChannelTest, DrainLogsReturnsNonLogDatagram)
 {
     const thread_guard tg{ std::thread([&]() {
-        child->send(make_log(log_lvl::level::info, "ignored"));
-        child->send(make_log(log_lvl::level::debug, "also ignored"));
-        child->send(msg::pid_report{ 7 });
+        proto::sync_socket_forwarder fwd(*child);
+        fwd.forward(make_log_context(log_lvl::level::info, "ignored"));
+        fwd.forward(make_log_context(log_lvl::level::debug, "also ignored"));
+        child->send_pid_report(7);
     }) };
 
     auto inc = parent->drain_logs();
@@ -567,7 +597,8 @@ TEST_F(ChannelTest, DrainLogsReturnsNonLogDatagram)
 TEST_F(ChannelTest, DrainLogsThrowsOnClose)
 {
     const thread_guard tg{ std::thread([&]() {
-        child->send(make_log(log_lvl::level::info, "x"));
+        proto::sync_socket_forwarder fwd(*child);
+        fwd.forward(make_log_context(log_lvl::level::info, "x"));
         child.reset();
     }) };
 
@@ -576,21 +607,24 @@ TEST_F(ChannelTest, DrainLogsThrowsOnClose)
 
 TEST_F(ChannelTest, WaitForCloseThrowsSystemErrorWithErrno)
 {
+    auto saved = setup_logger_sink();
     const thread_guard tg{ std::thread([&]() {
         child->send_stage(proto::stage::type::exec_ready);
-        auto l = make_log(log_lvl::level::fatal, "execvpe");
-        l.errno_ = ENOENT;
-        child->send(l);
+        auto ctx = make_log_context(log_lvl::level::fatal, "execvpe");
+        ctx.errno_ = ENOENT;
+        proto::sync_socket_forwarder fwd(*child);
+        fwd.forward(ctx);
         child.reset();
     }) };
 
-    EXPECT_NO_THROW(parent->wait_for(proto::stage::type::exec_ready));
+    EXPECT_NO_THROW(parent->wait_for_stage(proto::stage::type::exec_ready));
     try {
         parent->wait_for_close();
         FAIL() << "expected throw";
     } catch (const std::system_error &e) {
         EXPECT_EQ(e.code().value(), ENOENT);
     }
+    restore_logger_level(saved);
 }
 
 } // namespace

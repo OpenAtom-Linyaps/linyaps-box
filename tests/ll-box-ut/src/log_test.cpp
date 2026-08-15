@@ -7,7 +7,13 @@
 #include "linyaps_box/log/formatter.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/log/sink.h"
+#include "linyaps_box/log/sinks/file_sink.h"
+#include "linyaps_box/log/sinks/stderr_sink.h"
+#include "linyaps_box/log/sinks/syslog_sink.h"
+#ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
+#  include "linyaps_box/log/sinks/journald_sink.h"
+#endif
+#include "linyaps_box/log/sink_factory.h"
 
 #include <array>
 #include <chrono>
@@ -165,22 +171,19 @@ class LogFixture : public ::testing::Test
 {
 protected:
     linyaps_box::log::level saved_level_;
-    linyaps_box::log::output_format saved_format_;
 
     void SetUp() override
     {
         auto &logger = linyaps_box::log::global_logger::instance();
         saved_level_ = logger.get_level();
-        saved_format_ = logger.get_format();
-        logger.unset_sink();
+        logger.unset_backend();
     }
 
     void TearDown() override
     {
         auto &logger = linyaps_box::log::global_logger::instance();
-        logger.unset_sink();
+        logger.unset_backend();
         logger.set_level(saved_level_);
-        logger.set_format(saved_format_);
     }
 };
 
@@ -247,10 +250,16 @@ TEST_P(LevelFilterTest, Filtering)
 {
     auto &logger = linyaps_box::log::global_logger::instance();
     auto saved_level = logger.get_level();
-    logger.unset_sink();
+    logger.unset_backend();
 
     stderr_capture cap;
-    logger.set_sink(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
+    {
+        std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+        sinks.push_back(
+          std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                          linyaps_box::log::output_format::text));
+        logger.set_sinks(std::move(sinks));
+    }
     logger.set_level(GetParam().current_lvl);
 
     switch (GetParam().msg_lvl) {
@@ -274,7 +283,7 @@ TEST_P(LevelFilterTest, Filtering)
     auto output = cap.extract();
     EXPECT_EQ(!output.empty(), GetParam().expect_output);
 
-    logger.unset_sink();
+    logger.unset_backend();
     logger.set_level(saved_level);
 }
 
@@ -292,7 +301,13 @@ TEST_F(LogFixture, StderrSinkBasicOutput)
 {
     stderr_capture cap;
     auto &logger = linyaps_box::log::global_logger::instance();
-    logger.set_sink(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
+    {
+        std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+        sinks.push_back(
+          std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                          linyaps_box::log::output_format::text));
+        logger.set_sinks(std::move(sinks));
+    }
     logger.set_level(linyaps_box::log::level::debug);
 
     LINYAPS_BOX_LOG_INFO("hello {}", 42);
@@ -307,7 +322,13 @@ TEST_F(LogFixture, SourceLocationPropagation)
 {
     stderr_capture cap;
     auto &logger = linyaps_box::log::global_logger::instance();
-    logger.set_sink(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
+    {
+        std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+        sinks.push_back(
+          std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                          linyaps_box::log::output_format::text));
+        logger.set_sinks(std::move(sinks));
+    }
     logger.set_level(linyaps_box::log::level::debug);
 
     LINYAPS_BOX_LOG_INFO("loc");
@@ -326,8 +347,13 @@ TEST_F(LogFixture, FileSinkOutput)
     linyaps_box::utils::file_descriptor fd{ ret };
 
     auto &logger = linyaps_box::log::global_logger::instance();
-    linyaps_box::log::file_sink sink(linyaps_box::log::file_spec{ std::move(fd) });
-    logger.set_sink(std::move(sink));
+    {
+        std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+        sinks.push_back(std::make_unique<linyaps_box::log::file_sink>(
+          linyaps_box::log::file_spec{ std::move(fd) },
+          linyaps_box::log::output_format::text));
+        logger.set_sinks(std::move(sinks));
+    }
     logger.set_level(linyaps_box::log::level::debug);
 
     LINYAPS_BOX_LOG_INFO("file test {}", 99);
@@ -343,42 +369,20 @@ TEST_F(LogFixture, FileSinkOutput)
     std::filesystem::remove(tmp);
 }
 
-TEST(LogConfig, MakeSpec)
-{
-    using namespace linyaps_box::log;
-
-    auto s1 = make_spec("stderr");
-    EXPECT_TRUE(std::holds_alternative<stderr_spec>(s1));
-
-    auto s2 = make_spec("file:/tmp/test.log");
-    ASSERT_TRUE(std::holds_alternative<file_spec>(s2));
-    EXPECT_EQ(std::get<file_spec>(s2).fd.ref().current_path(), "/tmp/test.log");
-
-    auto s3 = make_spec("syslog:myapp");
-    ASSERT_TRUE(std::holds_alternative<syslog_spec>(s3));
-    EXPECT_EQ(std::get<syslog_spec>(s3).ident, "myapp");
-
-    auto s4 = make_spec("/tmp/default.log");
-    ASSERT_TRUE(std::holds_alternative<file_spec>(s4));
-    EXPECT_EQ(std::get<file_spec>(s4).fd.ref().current_path(), "/tmp/default.log");
-
-#ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
-
-    auto s5 = linyaps_box::log::make_spec("journald:app");
-    ASSERT_TRUE(std::holds_alternative<linyaps_box::log::journald_spec>(s5));
-    EXPECT_EQ(std::get<linyaps_box::log::journald_spec>(s5).ident, "app");
-
-#endif
-}
-
-TEST_F(LogFixture, DispatchRaw)
+TEST_F(LogFixture, DispatchContext)
 {
     stderr_capture cap;
     auto &logger = linyaps_box::log::global_logger::instance();
-    logger.set_sink(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
+    {
+        std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+        sinks.push_back(
+          std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                          linyaps_box::log::output_format::text));
+        logger.set_sinks(std::move(sinks));
+    }
 
     auto ctx = make_ctx(linyaps_box::log::level::error, "raw dispatch", "test.cpp", "fn", 42);
-    logger.dispatch_raw(ctx);
+    logger.dispatch_context(ctx);
 
     auto output = cap.extract();
     EXPECT_NE(output.find("raw dispatch"), std::string::npos);
@@ -390,12 +394,10 @@ TEST_F(LogFixture, DispatchRaw)
 
 TEST(SyslogSink, CeePrefixInJsonMode)
 {
-    auto &logger = linyaps_box::log::global_logger::instance();
-    auto saved_format = logger.get_format();
-    logger.set_format(linyaps_box::log::output_format::json);
-
-    const mock_syslog_sink sink(mock_syslog_spec{ "test_app", true });
-    sink.log(make_ctx(linyaps_box::log::level::error, "denied", "auth.cpp", "login", 42));
+    const mock_syslog_sink sink(mock_syslog_spec{ "test_app", true },
+                                linyaps_box::log::output_format::json);
+    fmt::memory_buffer buf;
+    sink.log(buf, make_ctx(linyaps_box::log::level::error, "denied", "auth.cpp", "login", 42));
 
     ASSERT_EQ(sink.backend().calls.size(), 1U);
     EXPECT_EQ(sink.backend().calls[0].msg.substr(0, 6), "@cee: ");
@@ -403,8 +405,20 @@ TEST(SyslogSink, CeePrefixInJsonMode)
     auto json = sink.backend().calls[0].msg.substr(6);
     EXPECT_NE(json.find(R"("msg":"denied")"), std::string::npos);
     EXPECT_NE(json.find(R"("level":"ERROR")"), std::string::npos);
+}
 
-    logger.set_format(saved_format);
+TEST(SyslogSink, TextModeNoCee)
+{
+    const mock_syslog_sink sink(mock_syslog_spec{ "test_app", false },
+                                linyaps_box::log::output_format::text);
+    fmt::memory_buffer buf;
+    sink.log(buf, make_ctx(linyaps_box::log::level::error, "denied", "auth.cpp", "login", 42));
+
+    ASSERT_EQ(sink.backend().calls.size(), 1U);
+    // text mode without cee: no @cee: prefix, should start with timestamp bracket
+    EXPECT_EQ(sink.backend().calls[0].msg.substr(0, 1), "[");
+    EXPECT_NE(sink.backend().calls[0].msg.find("denied"), std::string::npos);
+    EXPECT_NE(sink.backend().calls[0].msg.find("[ERROR]"), std::string::npos);
 }
 
 #ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
@@ -412,10 +426,12 @@ TEST(SyslogSink, CeePrefixInJsonMode)
 TEST(JournaldSink, PassesAllFields)
 {
     mock_journald_backend::calls.clear();
-    const mock_journald_sink sink(mock_journald_spec{ "myapp" });
+    const mock_journald_sink sink(mock_journald_spec{ "myapp" },
+                                  linyaps_box::log::output_format::text);
     auto ctx = make_ctx(linyaps_box::log::level::fatal, "segfault", "crash.c", "deref", 77);
     ctx.errno_ = 13;
-    sink.log(ctx);
+    fmt::memory_buffer buf;
+    sink.log(buf, ctx);
 
     ASSERT_EQ(mock_journald_backend::calls.size(), 1U);
     const auto &fields = mock_journald_backend::calls[0].fields;
@@ -444,9 +460,13 @@ TEST_F(LogFixture, MultiSinkOutput)
     ASSERT_GE(ret, 0);
     linyaps_box::utils::file_descriptor fd{ ret };
 
-    std::vector<linyaps_box::log::sink_variant> sinks;
-    sinks.emplace_back(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
-    sinks.emplace_back(linyaps_box::log::file_sink{ linyaps_box::log::file_spec{ std::move(fd) } });
+    std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+    sinks.emplace_back(
+      std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                      linyaps_box::log::output_format::text));
+    sinks.emplace_back(
+      std::make_unique<linyaps_box::log::file_sink>(linyaps_box::log::file_spec{ std::move(fd) },
+                                                    linyaps_box::log::output_format::text));
     logger.set_sinks(std::move(sinks));
     logger.set_level(linyaps_box::log::level::info);
 
@@ -466,16 +486,21 @@ TEST_F(LogFixture, MultiSinkOutput)
     EXPECT_NE(content.find("[INFO ]"), std::string::npos);
 
     std::filesystem::remove(tmp);
-    logger.unset_sink();
+    logger.unset_backend();
 }
 
 TEST_F(LogFixture, JsonFormatOutput)
 {
     stderr_capture cap;
     auto &logger = linyaps_box::log::global_logger::instance();
-    logger.set_sink(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
+    {
+        std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+        sinks.push_back(
+          std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                          linyaps_box::log::output_format::json));
+        logger.set_sinks(std::move(sinks));
+    }
     logger.set_level(linyaps_box::log::level::info);
-    logger.set_format(linyaps_box::log::output_format::json);
 
     LINYAPS_BOX_LOG_INFO("json test {}", 42);
 
@@ -491,7 +516,13 @@ TEST_F(LogFixture, ErrnoPropagationText)
 {
     stderr_capture cap;
     auto &logger = linyaps_box::log::global_logger::instance();
-    logger.set_sink(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
+    {
+        std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+        sinks.push_back(
+          std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                          linyaps_box::log::output_format::text));
+        logger.set_sinks(std::move(sinks));
+    }
     logger.set_level(linyaps_box::log::level::error);
 
     LINYAPS_BOX_LOG_ERROR_ERRNO(13, "operation failed");
@@ -505,9 +536,14 @@ TEST_F(LogFixture, ErrnoPropagationJson)
 {
     stderr_capture cap;
     auto &logger = linyaps_box::log::global_logger::instance();
-    logger.set_sink(linyaps_box::log::stderr_sink{ linyaps_box::log::stderr_spec{ } });
+    {
+        std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
+        sinks.push_back(
+          std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
+                                                          linyaps_box::log::output_format::json));
+        logger.set_sinks(std::move(sinks));
+    }
     logger.set_level(linyaps_box::log::level::error);
-    logger.set_format(linyaps_box::log::output_format::json);
 
     LINYAPS_BOX_LOG_ERROR_ERRNO(13, "operation failed");
 
@@ -527,8 +563,8 @@ auto make_ctx_with_time(std::chrono::system_clock::time_point tp,
 {
     linyaps_box::log::log_context ctx{ };
     ctx.lvl = lvl;
-    ctx.msg = msg;
-    ctx.wall_time = tp;
+    ctx.message = msg;
+    ctx.time = std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch());
     ctx.pid = 0;
     ctx.errno_ = errno_val;
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
@@ -616,5 +652,27 @@ TEST(FormatLog, JsonSourceLocationFields)
     EXPECT_NE(out.find(R"("function":"b")"), std::string::npos);
 }
 #endif
+
+TEST(LoggerDeathTest, DispatchLogWithoutBackendTerminates)
+{
+    auto &logger = linyaps_box::log::global_logger::instance();
+    logger.unset_backend();
+
+    EXPECT_DEATH(LINYAPS_BOX_LOG_ERROR("should crash"), "logger uninitialized");
+}
+
+TEST(LogConfig, MakeSink)
+{
+    using linyaps_box::log::output_format;
+
+    EXPECT_NO_THROW(std::ignore =
+                      linyaps_box::log::make_sink("stderr", output_format::text, false));
+    EXPECT_NO_THROW(std::ignore =
+                      linyaps_box::log::make_sink("syslog:test_ident", output_format::json, true));
+
+    EXPECT_THROW(std::ignore =
+                   linyaps_box::log::make_sink("unknown:xxx", output_format::text, false),
+                 std::runtime_error);
+}
 
 } // namespace
