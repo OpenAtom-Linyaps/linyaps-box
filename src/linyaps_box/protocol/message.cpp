@@ -16,20 +16,31 @@ namespace linyaps_box::protocol::msg {
 
 namespace {
 
+// Fixed wire-format overhead for a log message (excluding variable-length
+// string payloads).  Branch on source-location so the reserve hint is exact.
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+// msg_id + lvl + (errno + line)*int + pid + time + (message+file+function)*uint32
+constexpr auto log_wire_overhead = sizeof(msg_id) + sizeof(uint8_t) + (2 * sizeof(int))
+  + sizeof(pid_t) + sizeof(std::int64_t) + (3 * sizeof(uint32_t));
+#else
+// msg_id + lvl + errno*int + pid + time + message*uint32
+constexpr auto log_wire_overhead = sizeof(msg_id) + sizeof(uint8_t) + sizeof(int) + sizeof(pid_t)
+  + sizeof(std::int64_t) + sizeof(uint32_t);
+#endif
+
 template <typename T>
 auto append_pod(std::vector<std::byte> &buf, const T &val) -> void
 {
     static_assert(std::is_trivially_copyable_v<T>);
-    const auto *ptr = reinterpret_cast<const std::byte *>(&val);
-    const utils::span data_view{ ptr, sizeof(T) };
-    buf.insert(buf.end(), data_view.cbegin(), data_view.cend());
+    const auto *ptr = reinterpret_cast<const std::byte *>(&val); // NOLINT
+    buf.insert(buf.end(), ptr, ptr + sizeof(T));
 }
 
 template <typename T>
 auto read_pod(utils::span<const std::byte> data, std::size_t &offset) -> T
 {
     static_assert(std::is_trivially_copyable_v<T>);
-    if (UNLIKELY(sizeof(T) > data.size() - offset)) {
+    if (UNLIKELY(offset > data.size() || sizeof(T) > data.size() - offset)) {
         throw std::runtime_error("payload too short for pod read");
     }
 
@@ -41,9 +52,10 @@ auto read_pod(utils::span<const std::byte> data, std::size_t &offset) -> T
 
 auto append_string(std::vector<std::byte> &buf, std::string_view s) -> void
 {
-    if (s.size() > UINT32_MAX) {
+    if (UNLIKELY(s.size() > std::numeric_limits<uint32_t>::max())) {
         throw std::logic_error("string too large for wire format");
     }
+
     auto len = static_cast<uint32_t>(s.size());
     append_pod(buf, len);
     auto view = utils::as_bytes(utils::span{ s });
@@ -53,7 +65,7 @@ auto append_string(std::vector<std::byte> &buf, std::string_view s) -> void
 auto read_string(utils::span<const std::byte> data, std::size_t &offset) -> std::string
 {
     auto len = read_pod<uint32_t>(data, offset);
-    if (offset > data.size() || len > data.size() - offset) {
+    if (UNLIKELY(offset > data.size() || len > data.size() - offset)) {
         throw std::runtime_error("payload too short for string read");
     }
 
@@ -77,7 +89,9 @@ auto serialize(const message &msg) -> std::vector<std::byte>
 {
     return std::visit(utils::Overload{
                         [](const log &m) -> std::vector<std::byte> {
-                            return serialize_log(m);
+                            std::vector<std::byte> buf;
+                            serialize_log_into(buf, to_log_context(m));
+                            return buf;
                         },
                         [](const stage &m) -> std::vector<std::byte> {
                             std::vector<std::byte> buf;
@@ -176,95 +190,39 @@ auto deserialize(utils::span<const std::byte> wire) -> message
     }
 }
 
-namespace {
-
-auto serialize_log_into(std::vector<std::byte> &buf,
-                        uint8_t lvl,
-                        std::string_view message,
-                        int errno_val,
-                        pid_t pid,
-                        int64_t time_ns
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-                        ,
-                        std::string_view file,
-                        int line,
-                        std::string_view function
-#endif
-                        ) -> void
+auto serialize_log_into(std::vector<std::byte> &buf, const linyaps_box::log::log_context &ctx)
+  -> void
 {
+    buf.reserve(buf.size() + ctx.message.size()
+#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
+                + ctx.file.size() + ctx.function.size()
+#endif
+                + log_wire_overhead);
+
+    const auto ns = ctx.time.count();
+    static_assert(std::is_signed_v<decltype(ns)>);
+
     append_pod(buf, msg_id::log);
-    append_pod(buf, lvl);
-    append_string(buf, message);
+    append_pod(buf, static_cast<uint8_t>(ctx.lvl));
+    append_string(buf, ctx.message);
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    append_string(buf, file);
-    append_pod(buf, line);
-    append_string(buf, function);
+    append_string(buf, ctx.file);
+    append_pod(buf, ctx.line);
+    append_string(buf, ctx.function);
 #endif
-    append_pod(buf, errno_val);
-    append_pod(buf, pid);
-    append_pod<std::int64_t>(buf, time_ns);
+    append_pod(buf, ctx.errno_);
+    append_pod(buf, ctx.pid);
+    append_pod<std::int64_t>(buf, ns);
 }
 
-} // namespace
-
-auto serialize_log(const msg::log &m) -> std::vector<std::byte>
+auto to_log_context(const log &l) noexcept -> linyaps_box::log::log_context
 {
-    std::vector<std::byte> buf;
+    return {
+        l.lvl,  l.message,  l.time, l.pid, l.errno_,
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    buf.reserve(sizeof(msg_id) + 1 + m.message.size() + m.file.size() + m.function.size()
-                + sizeof(int) + sizeof(int) + sizeof(pid_t) + sizeof(std::int64_t)
-                + (3 * sizeof(uint32_t)));
-#else
-    buf.reserve(sizeof(msg_id) + 1 + m.message.size() + sizeof(int) + sizeof(pid_t)
-                + sizeof(std::int64_t) + sizeof(uint32_t));
+        l.file, l.function, l.line,
 #endif
-    const auto ns = m.time.count();
-    static_assert(std::is_signed_v<decltype(ns)>);
-    serialize_log_into(buf,
-                       static_cast<uint8_t>(m.lvl),
-                       m.message,
-                       m.errno_,
-                       m.pid,
-                       ns
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-                       ,
-                       m.file,
-                       m.line,
-                       m.function
-#endif
-    );
-    return buf;
-}
-
-auto serialize_log(const linyaps_box::log::log_context &ctx) -> std::vector<std::byte>
-{
-    std::vector<std::byte> buf;
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    buf.reserve(sizeof(msg_id) + 1 + ctx.msg.size() + ctx.file.size() + ctx.function.size()
-                + sizeof(int) + sizeof(int) + sizeof(pid_t) + sizeof(std::int64_t)
-                + (3 * sizeof(uint32_t)));
-#else
-    buf.reserve(sizeof(msg_id) + 1 + ctx.msg.size() + sizeof(int) + sizeof(pid_t)
-                + sizeof(std::int64_t) + sizeof(uint32_t));
-#endif
-    const auto ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(ctx.wall_time.time_since_epoch())
-        .count();
-    static_assert(std::is_signed_v<decltype(ns)>);
-    serialize_log_into(buf,
-                       static_cast<uint8_t>(ctx.lvl),
-                       ctx.msg,
-                       ctx.errno_,
-                       ctx.pid,
-                       ns
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-                       ,
-                       ctx.file,
-                       ctx.line,
-                       ctx.function
-#endif
-    );
-    return buf;
+    };
 }
 
 } // namespace linyaps_box::protocol::msg

@@ -21,27 +21,20 @@
 
 namespace linyaps_box::protocol {
 
-namespace {
-
-auto forward_log_to_parent(const msg::log &l) noexcept
+channel_transport::channel_transport(infra::unix_socket socket) noexcept
+    : socket(std::move(socket))
 {
-    auto tp = std::chrono::system_clock::time_point{
-        std::chrono::duration_cast<std::chrono::system_clock::duration>(l.time)
-    };
-
-    const linyaps_box::log::log_context ctx{
-        l.lvl,  l.message,  tp,     l.pid, l.errno_,
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-        l.file, l.function, l.line,
-#endif
-    };
-
-    linyaps_box::log::global_logger::instance().dispatch_raw(ctx);
 }
 
-auto send_raw(const infra::unix_socket &socket,
-              utils::span<const std::byte> buffer,
-              utils::span<const utils::file_descriptor_ref> fds) -> void
+auto channel_transport::send(const msg::message &body,
+                             utils::span<const utils::file_descriptor_ref> fds) -> void
+{
+    const auto buffer = msg::serialize(body);
+    send_bytes(buffer, fds);
+}
+
+auto channel_transport::send_bytes(utils::span<const std::byte> buffer,
+                                   utils::span<const utils::file_descriptor_ref> fds) -> void
 {
     if (UNLIKELY(fds.size() > linyaps_box::infra::kMaxScmFds)) {
         throw std::logic_error(fmt::format("message_channel: fds count {} exceeds maximum {}, "
@@ -67,30 +60,10 @@ auto send_raw(const infra::unix_socket &socket,
     }
 }
 
-struct raw_packet
-{
-    std::vector<std::byte> data;
-    std::vector<utils::file_descriptor> fds;
-};
-
-auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>;
-
-// Common helper: recv one message, deserialize, return nullopt on peer close.
-[[nodiscard]] auto recv_one(const infra::unix_socket &socket) -> std::optional<msg::datagram>
-{
-    auto raw = recv_raw(socket);
-    if (!raw) {
-        return std::nullopt;
-    }
-
-    auto body = msg::deserialize(utils::span<const std::byte>(raw->data.data(), raw->data.size()));
-    return msg::datagram{ std::move(body), std::move(raw->fds) };
-}
-
-auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>
+auto channel_transport::recv() -> std::optional<msg::datagram>
 {
     std::byte dummy{ };
-    auto peek = socket.recv(utils::span<std::byte>(&dummy, static_cast<std::size_t>(0)),
+    auto peek = socket.recv(utils::span(&dummy, static_cast<std::size_t>(0)),
                             os::sys::recv_flag::peek | os::sys::recv_flag::trunc);
     if (!peek) {
         const auto err = peek.error().value();
@@ -113,11 +86,8 @@ auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>
         return std::nullopt;
     }
 
-    // TODO: this vector is allocated on every received message, which is on
-    // the log-forwarding hot path.  Consider reusing a thread_local buffer
-    // (sized from the peek) instead.
-    std::vector<std::byte> data(static_cast<std::size_t>(*peek));
-    auto result = socket.recv_data_with_fds(utils::span<std::byte>(data.data(), data.size()));
+    data.resize(*peek);
+    auto result = socket.recv_data_with_fds(data);
     if (!result) {
         const auto err = result.error().value();
         if (err == ECONNRESET || err == ENOTCONN || err == EPIPE) {
@@ -127,101 +97,79 @@ auto recv_raw(const infra::unix_socket &socket) -> std::optional<raw_packet>
         throw std::system_error(std::move(result).error(), "recvmsg");
     }
 
-    auto &[fds, n] = *result;
+    auto [fds, n] = std::move(*result);
     if (UNLIKELY(n < sizeof(msg_id))) {
         throw std::runtime_error("truncated message");
     }
 
-    return raw_packet{ std::move(data), std::move(fds) };
-}
-
-} // namespace
-
-message_channel_base::message_channel_base(infra::unix_socket socket) noexcept
-    : socket_(std::move(socket))
-{
-}
-
-auto message_channel_base::send(const msg::message &body,
-                                utils::span<const utils::file_descriptor_ref> fds) const -> void
-{
-    auto buffer = msg::serialize(body);
-    send_raw(socket_, utils::span<const std::byte>(buffer.data(), buffer.size()), fds);
-}
-
-auto message_channel_base::send_stage(stage::type s) const -> void
-{
-    send(msg::stage{ s });
-}
-
-auto message_channel_base::send_log(const linyaps_box::log::log_context &ctx) const -> void
-{
-    auto buffer = msg::serialize_log(ctx);
-    send_raw(socket_, utils::span(buffer), { });
-}
-
-auto message_channel_base::recv() const -> msg::datagram
-{
-    auto inc = recv_one(socket_);
-    if (UNLIKELY(!inc)) {
-        throw std::runtime_error("socket closed by peer");
-    }
-
-    return std::move(inc).value();
+    auto body = msg::deserialize(utils::span(data.data(), n));
+    return msg::datagram{ std::move(body), std::move(fds) };
 }
 
 parent_message_channel::parent_message_channel(infra::unix_socket socket) noexcept
-    : message_channel_base(std::move(socket))
+    : transport(std::move(socket))
 {
 }
 
-auto parent_message_channel::wait_for(stage::type expected) const -> void
+auto parent_message_channel::send_stage(stage::type s) -> void
+{
+    transport.send(msg::stage{ s });
+}
+
+auto parent_message_channel::send_proceed() -> void
+{
+    transport.send(msg::proceed{ });
+}
+
+auto parent_message_channel::wait_for_stage(stage::type expected) -> void
 {
     while (true) {
-        auto inc = recv_one(socket_);
+        auto inc = transport.recv();
         if (UNLIKELY(!inc)) {
             throw std::runtime_error(
               fmt::format("container process exited before reaching expected stage {}", expected));
         }
 
-        bool matched{ false };
-        std::visit(utils::Overload{
-                     [&](msg::log &l) {
-                         assert(inc->fds.empty());
-                         forward_log_to_parent(l);
-                     },
-                     [&](const msg::stage &s) {
-                         if (UNLIKELY(s.value != expected)) {
-                             throw std::runtime_error(
-                               fmt::format("expected stage {} but got {}", expected, s.value));
-                         }
+        const auto done =
+          std::visit(utils::Overload{
+                       [&](msg::log &l) {
+                           assert(inc->fds.empty());
+                           log::global_logger::instance().dispatch_context(msg::to_log_context(l));
+                           return false;
+                       },
+                       [&](const msg::stage &s) {
+                           if (UNLIKELY(s.value != expected)) {
+                               throw std::runtime_error(
+                                 fmt::format("expected stage {} but got {}", expected, s.value));
+                           }
 
-                         matched = true;
+                           return true;
+                       },
+                       [&](const auto &) -> bool {
+                           throw std::runtime_error("unexpected message during wait_for_stage");
+                       },
                      },
-                     [&](const auto &) {
-                         throw std::runtime_error("unexpected message during wait_for");
-                     },
-                   },
-                   inc->body);
+                     inc->body);
 
-        if (matched) {
+        if (done) {
             return;
         }
     }
 }
 
-auto parent_message_channel::wait_for_close() const -> void
+auto parent_message_channel::wait_for_close() -> void
 {
     // Contract: a socket close without any preceding FATAL log is treated as
-    // "exec succeeded".  The child's exit code is not known here — it is
-    // reaped later by container_monitor::wait_container_exit().  Callers that
-    // need to distinguish "exec ok" from "child died silently (e.g. OOM/signal
+    // "exec succeeded".
+    // The child's exit code is not known here — it is
+    // reaped later by container_monitor::wait_container_exit().
+    // Callers that need to distinguish "exec ok" from "child died silently (e.g. OOM/signal
     // before it could log FATAL)" must additionally consult the monitor; this
     // function cannot tell those apart.
     bool saw_log{ false };
     int saved_errno{ 0 };
     while (true) {
-        auto inc = recv_one(socket_);
+        auto inc = transport.recv();
         if (!inc) {
             if (UNLIKELY(saw_log)) {
                 throw std::system_error(saved_errno,
@@ -240,7 +188,7 @@ auto parent_message_channel::wait_for_close() const -> void
                              saved_errno = l.errno_;
                          }
 
-                         forward_log_to_parent(l);
+                         log::global_logger::instance().dispatch_context(msg::to_log_context(l));
                      },
                      [&](const auto &) {
                          throw std::runtime_error("unexpected message after exec_ready");
@@ -250,10 +198,10 @@ auto parent_message_channel::wait_for_close() const -> void
     }
 }
 
-auto parent_message_channel::drain_logs() const -> msg::datagram
+auto parent_message_channel::drain_logs() -> msg::datagram
 {
     while (true) {
-        auto inc = recv_one(socket_);
+        auto inc = transport.recv();
         if (UNLIKELY(!inc)) {
             throw std::runtime_error("child process exited before sending expected message");
         }
@@ -263,18 +211,43 @@ auto parent_message_channel::drain_logs() const -> msg::datagram
         }
 
         assert(inc->fds.empty());
-        forward_log_to_parent(std::get<msg::log>(inc->body));
+        const auto &l = std::get<msg::log>(inc->body);
+        log::global_logger::instance().dispatch_context(msg::to_log_context(l));
     }
 }
 
 child_message_channel::child_message_channel(infra::unix_socket socket) noexcept
-    : message_channel_base(std::move(socket))
+    : transport(std::move(socket))
 {
 }
 
-auto child_message_channel::wait_for(stage::type expected) const -> void
+auto child_message_channel::send_stage(stage::type s) -> void
 {
-    auto inc = recv();
+    transport.send(msg::stage{ s });
+}
+
+auto child_message_channel::send_pid_report(pid_t pid) -> void
+{
+    transport.send(msg::pid_report{ pid });
+}
+
+auto child_message_channel::send_console_fd(utils::file_descriptor_ref fd) -> void
+{
+    transport.send(msg::console_fd{ }, utils::span<const utils::file_descriptor_ref>{ &fd, 1 });
+}
+
+auto child_message_channel::send_bytes(utils::span<const std::byte> buffer) -> void
+{
+    transport.send_bytes(buffer, { });
+}
+
+auto child_message_channel::expect_stage(stage::type expected) -> void
+{
+    auto inc = transport.recv();
+    if (UNLIKELY(!inc)) {
+        throw std::runtime_error(
+          fmt::format("container process exited before reaching expected stage {}", expected));
+    }
 
     std::visit(utils::Overload{
                  [&](const msg::stage &s) {
@@ -284,24 +257,27 @@ auto child_message_channel::wait_for(stage::type expected) const -> void
                      }
                  },
                  [&](const auto &) {
-                     throw std::runtime_error("unexpected message during child wait_for");
+                     throw std::runtime_error("unexpected message during expect_stage");
                  },
                },
-               inc.body);
+               inc->body);
 }
 
-auto child_message_channel::wait_for_proceed() const -> void
+auto child_message_channel::expect_proceed() -> void
 {
-    auto inc = recv();
+    auto inc = transport.recv();
+    if (UNLIKELY(!inc)) {
+        throw std::runtime_error("socket closed before receiving proceed");
+    }
 
     std::visit(utils::Overload{
                  [](const msg::proceed &) { },
                  [&](const auto &other) {
                      throw std::runtime_error(
-                       fmt::format("unexpected message during wait_for_proceed: {}", other));
+                       fmt::format("unexpected message during expect_proceed: {}", other));
                  },
                },
-               inc.body);
+               inc->body);
 }
 
 auto create_message_socketpair() -> std::pair<parent_message_channel, child_message_channel>

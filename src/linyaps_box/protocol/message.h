@@ -5,7 +5,6 @@
 #pragma once
 
 #include "linyaps_box/log/utils.h"
-#include "linyaps_box/protocol/stage.h"
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/span.h"
 
@@ -15,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -30,14 +30,68 @@ enum class msg_id : uint8_t {
     proceed,
 };
 
+namespace stage {
+
+enum class type : uint8_t {
+    namespace_ready,
+    namespace_done,
+    prestart_ready,
+    prestart_done,
+    createruntime_ready,
+    createruntime_done,
+    createcontainer_done,
+    exec_ready,
+};
+
+[[nodiscard]] inline auto to_string_view(type s) noexcept -> std::string_view
+{
+    using namespace std::string_view_literals;
+    switch (s) {
+    case type::namespace_ready:
+        return "namespace_ready"sv;
+    case type::namespace_done:
+        return "namespace_done"sv;
+    case type::prestart_ready:
+        return "prestart_ready"sv;
+    case type::prestart_done:
+        return "prestart_done"sv;
+    case type::createruntime_ready:
+        return "createruntime_ready"sv;
+    case type::createruntime_done:
+        return "createruntime_done"sv;
+    case type::createcontainer_done:
+        return "createcontainer_done"sv;
+    case type::exec_ready:
+        return "exec_ready"sv;
+    }
+
+    return "<invalid>"sv;
+}
+
+[[nodiscard]] constexpr auto is_valid(type s) noexcept -> bool
+{
+    switch (s) {
+    case type::namespace_ready:
+    case type::namespace_done:
+    case type::prestart_ready:
+    case type::prestart_done:
+    case type::createruntime_ready:
+    case type::createruntime_done:
+    case type::createcontainer_done:
+    case type::exec_ready:
+        return true;
+    }
+    return false;
+}
+
+} // namespace stage
+
 } // namespace linyaps_box::protocol
 
 namespace linyaps_box::protocol::msg {
 
 struct log
 {
-    static constexpr msg_id id = msg_id::log;
-
     std::string message;
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
     std::string file;
@@ -50,26 +104,24 @@ struct log
     linyaps_box::log::level lvl{ };
 };
 
+[[nodiscard]] auto to_log_context(const log &l) noexcept -> linyaps_box::log::log_context;
+
 struct stage
 {
-    static constexpr msg_id id = msg_id::stage;
     protocol::stage::type value{ };
 };
 
 struct pid_report
 {
-    static constexpr msg_id id = msg_id::pid_report;
     pid_t value{ };
 };
 
 struct console_fd
 {
-    static constexpr msg_id id = msg_id::console_fd;
 };
 
 struct proceed
 {
-    static constexpr msg_id id = msg_id::proceed;
 };
 
 using message = std::variant<log, stage, pid_report, console_fd, proceed>;
@@ -85,10 +137,8 @@ struct datagram
 
 [[nodiscard]] auto deserialize(utils::span<const std::byte> wire) -> message;
 
-[[nodiscard]] auto serialize_log(const msg::log &m) -> std::vector<std::byte>;
-
-[[nodiscard]] auto serialize_log(const linyaps_box::log::log_context &ctx)
-  -> std::vector<std::byte>;
+auto serialize_log_into(std::vector<std::byte> &buf, const linyaps_box::log::log_context &ctx)
+  -> void;
 
 } // namespace linyaps_box::protocol::msg
 
@@ -150,5 +200,14 @@ struct fmt::formatter<linyaps_box::protocol::msg::proceed> : fmt::formatter<std:
                 fmt::format_context &ctx) const
     {
         return fmt::format_to(ctx.out(), "proceed");
+    }
+};
+
+template <>
+struct fmt::formatter<linyaps_box::protocol::stage::type> : fmt::formatter<std::string>
+{
+    auto format(linyaps_box::protocol::stage::type s, fmt::format_context &ctx) const
+    {
+        return fmt::format_to(ctx.out(), "{}", linyaps_box::protocol::stage::to_string_view(s));
     }
 };
