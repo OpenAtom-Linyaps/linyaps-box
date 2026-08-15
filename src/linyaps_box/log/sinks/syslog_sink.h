@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "linyaps_box/log/backend.h"
 #include "linyaps_box/log/formatter.h"
 #include "linyaps_box/log/utils.h"
 
@@ -54,19 +55,21 @@ private:
 };
 
 template <typename Backend>
-class basic_syslog_sink
+class basic_syslog_sink : public sink
 {
     static_assert(detail::has_valid_syslog_backend_v<Backend>,
                   "Syslog backend policy must implement 'syslog(level, std::string_view)'");
 
     Backend backend_;
     bool cee_{ false };
+    output_format format_;
 
 public:
     template <typename T>
-    explicit basic_syslog_sink(T spec) noexcept
+    explicit basic_syslog_sink(T spec, output_format fmt) noexcept
         : backend_(std::move(spec.ident))
         , cee_(spec.cee)
+        , format_(fmt)
     {
     }
 
@@ -78,15 +81,13 @@ public:
 
     auto &backend() const noexcept { return backend_; }
 
-    auto log(const log_context &ctx) const noexcept -> void
+    auto log(fmt::memory_buffer &buf, const log_context &ctx) const noexcept -> void final
     try {
-        fmt::memory_buffer buf;
-        const auto format = get_current_format();
-        if (format == output_format::json && cee_) {
+        if (format_ == output_format::json && cee_) {
             buf.append(fmt::string_view("@cee: "));
         }
 
-        format_log(buf, ctx, format, { });
+        format_log(buf, ctx, format_, { });
         backend_.syslog(ctx.lvl, std::string_view{ buf.data(), buf.size() });
     } catch (...) { // NOLINT
         // swallow

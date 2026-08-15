@@ -160,10 +160,11 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/io/forwarder.cpp
     src/linyaps_box/log/formatter.cpp
     src/linyaps_box/log/logger.cpp
+    src/linyaps_box/log/sink_factory.cpp
     src/linyaps_box/log/sinks/file_sink.cpp
     src/linyaps_box/log/sinks/journald_sink.cpp
     src/linyaps_box/log/sinks/stderr_sink.cpp
-    src/linyaps_box/log/sinks/sync_socket_sink.cpp
+    src/linyaps_box/protocol/sync_socket_forwarder.cpp
     src/linyaps_box/log/sinks/syslog_sink.cpp
     src/linyaps_box/log/utils.cpp
     src/linyaps_box/os/fs.cpp

@@ -4,31 +4,31 @@
 
 #pragma once
 
+#include "linyaps_box/log/backend.h"
 #include "linyaps_box/log/utils.h"
 #include "linyaps_box/utils/file_describer.h"
 
 namespace linyaps_box::log {
-
-class file_sink;
 
 struct file_spec
 {
     utils::file_descriptor fd;
 };
 
-class file_sink
+class file_sink final : public sink
 {
 public:
-    explicit file_sink(file_spec spec);
+    explicit file_sink(file_spec spec, output_format fmt);
     file_sink(file_sink &&) noexcept = default;
     file_sink &operator=(file_sink &&) noexcept = default;
     file_sink(const file_sink &) = delete;
     file_sink &operator=(const file_sink &) = delete;
     ~file_sink() noexcept = default;
-    auto log(const log_context &ctx) const noexcept -> void;
+    auto log(fmt::memory_buffer &buf, const log_context &ctx) const noexcept -> void final;
 
 private:
     utils::file_descriptor fd;
+    output_format format_;
 };
 
 } // namespace linyaps_box::log

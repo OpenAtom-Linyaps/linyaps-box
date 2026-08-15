@@ -16,6 +16,4 @@ auto format_log(fmt::memory_buffer &buf,
                 output_format fmt,
                 fmt::text_style style) noexcept -> void;
 
-[[nodiscard]] auto get_current_format() noexcept -> output_format;
-
 } // namespace linyaps_box::log

@@ -10,7 +10,7 @@
 #include "linyaps_box/command/run.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/log/sink.h"
+#include "linyaps_box/log/sink_factory.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <iostream>
@@ -18,30 +18,25 @@
 namespace linyaps_box {
 
 namespace {
+
 auto initialize_logger(const linyaps_box::command::global_options &opts) -> bool
 try {
     auto &logger = log::global_logger::instance();
     logger.set_level(opts.log_level);
-    logger.set_format(opts.log_format);
 
-    // Build the full sink list in a temp vector, then move-assign once
-    // so no half-built list is ever observed.
+    auto fmt = opts.log_format;
 
     if (opts.log.empty()) {
-        std::vector<log::sink_variant> sinks;
-        sinks.emplace_back(log::stderr_sink{ log::stderr_spec{ } });
+        std::vector<std::unique_ptr<log::sink>> sinks;
+        sinks.push_back(log::make_sink("stderr", fmt, false));
         logger.set_sinks(std::move(sinks));
         return true;
     }
 
-    std::vector<log::sink_variant> sinks;
+    std::vector<std::unique_ptr<log::sink>> sinks;
+    sinks.reserve(opts.log.size());
     for (const auto &spec_str : opts.log) {
-        auto spec = log::make_spec(spec_str);
-        if (opts.cee_syslog && std::holds_alternative<log::syslog_spec>(spec)) {
-            std::get<log::syslog_spec>(spec).cee = true;
-        }
-
-        sinks.push_back(log::make_sink(std::move(spec)));
+        sinks.push_back(log::make_sink(spec_str, fmt, opts.cee_syslog));
     }
 
     logger.set_sinks(std::move(sinks));
@@ -53,6 +48,7 @@ try {
     fmt::println(std::cerr, "failed to initialize logger: unknown exception");
     return false;
 }
+
 } // namespace
 
 // The main function of the ll-box
