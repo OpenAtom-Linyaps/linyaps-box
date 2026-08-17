@@ -1359,6 +1359,26 @@ void set_umask(const std::optional<mode_t> &mask)
     umask(mask.value());
 }
 
+void apply_credentials(const oci_config::process_t &process)
+{
+    int ret = setresgid(process.user.gid, process.user.gid, process.user.gid);
+    if (UNLIKELY(ret < 0)) {
+        throw std::system_error(errno, std::system_category(), "setresgid");
+    }
+
+    if (process.user.additional_gids) {
+        ret = setgroups(process.user.additional_gids->size(), process.user.additional_gids->data());
+        if (UNLIKELY(ret < 0)) {
+            throw std::system_error(errno, std::system_category(), "setgroups");
+        }
+    }
+
+    ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
+    if (UNLIKELY(ret < 0)) {
+        throw std::system_error(errno, std::system_category(), "setresuid");
+    }
+}
+
 unsigned long get_last_cap()
 {
     static const auto last_cap = []() -> unsigned long {
@@ -1388,149 +1408,104 @@ security_status get_runtime_security_status()
     return status;
 }
 
-void set_capabilities(const oci_config &oci_config, int last_cap)
+void drop_privileges(const oci_config &oci_config, int last_cap)
 {
+    const auto &process = *oci_config.process;
+
 #ifdef LINYAPS_BOX_ENABLE_CAP
     LINYAPS_BOX_LOG_DEBUG("Set capabilities");
     const auto &capabilities = oci_config.process->capabilities;
-    if (!capabilities) {
-        return;
-    }
-
-    if (UNLIKELY(last_cap <= 0)) {
-        throw std::runtime_error("kernel does not support capabilities");
-    }
-
-    const auto &bounding_set = capabilities->bounding;
-    if (bounding_set) {
-        std::vector<bool> keep_mask(last_cap + 1, false);
-        for (const auto &name : *bounding_set) {
-            cap_value_t cap{ };
-            if (cap_from_name(name.c_str(), &cap) < 0) {
-                throw std::runtime_error("unknown capability: " + name);
-            }
-            keep_mask[cap] = true;
+    std::unique_ptr<_cap_struct, decltype(&cap_free)> caps(nullptr, cap_free);
+    if (capabilities) {
+        if (UNLIKELY(last_cap <= 0)) {
+            throw std::runtime_error("kernel does not support capabilities");
         }
 
-        for (int cap = 0; cap <= last_cap; ++cap) {
-            if (!keep_mask[cap]) {
-                if (UNLIKELY(cap_drop_bound(cap) < 0)) {
-                    throw std::system_error(errno, std::system_category(), "cap_drop_bound");
+        auto *raw = cap_init();
+        if (UNLIKELY(raw == nullptr)) {
+            throw std::system_error(errno, std::system_category(), "failed to init cap");
+        }
+        caps.reset(raw);
+
+        auto set_cap_set = [&caps](const std::optional<std::vector<std::string>> &names,
+                                   cap_flag_t flag,
+                                   std::string_view label) {
+            if (!names || names->empty()) {
+                return;
+            }
+
+            std::vector<cap_value_t> vals;
+            vals.reserve(names->size());
+            for (const auto &name : *names) {
+                cap_value_t v{ };
+                if (cap_from_name(name.c_str(), &v) < 0) {
+                    throw std::runtime_error("unknown capability: " + name);
+                }
+
+                vals.push_back(v);
+            }
+
+            if (UNLIKELY(cap_set_flag(caps.get(), flag, vals.size(), vals.data(), CAP_SET) < 0)) {
+                throw std::system_error(errno, std::system_category(), std::string{ label });
+            }
+        };
+
+        set_cap_set(capabilities->effective, CAP_EFFECTIVE, "set effective capabilities");
+        set_cap_set(capabilities->permitted, CAP_PERMITTED, "set permitted capabilities");
+        set_cap_set(capabilities->inheritable, CAP_INHERITABLE, "set inheritable capabilities");
+
+        const auto &bounding_set = capabilities->bounding;
+        if (bounding_set) {
+            std::vector<bool> keep(last_cap + 1, false);
+            for (const auto &name : *bounding_set) {
+                cap_value_t cap{ };
+                if (cap_from_name(name.c_str(), &cap) < 0) {
+                    throw std::runtime_error(fmt::format("unknown capability: {}", name));
+                }
+
+                keep[cap] = true;
+            }
+
+            for (int cap = 0; cap <= last_cap; ++cap) {
+                if (!keep[cap]) {
+                    if (UNLIKELY(cap_drop_bound(cap) < 0)) {
+                        throw std::system_error(errno, std::system_category(), "cap_drop_bound");
+                    }
                 }
             }
         }
+
+        // keep current capabilities, we need these caps on later
+        os::throw_if_error(os::prctl(PR_SET_KEEPCAPS, 1L, 0L, 0L, 0L));
     }
+#endif
 
-    auto *cap = cap_init();
-    if (UNLIKELY(cap == nullptr)) {
-        throw std::system_error(errno, std::system_category(), "failed to init cap");
-    }
-    const std::unique_ptr<_cap_struct, decltype(&cap_free)> caps(cap, cap_free);
+    apply_credentials(process);
 
-    int ret{ -1 };
-    const auto &effective_set = capabilities->effective;
-    if (effective_set && !effective_set->empty()) {
-        std::vector<cap_value_t> cap_vals;
-        cap_vals.reserve(effective_set->size());
-        for (const auto &name : *effective_set) {
-            cap_value_t val{ };
-            if (cap_from_name(name.c_str(), &val) < 0) {
-                throw std::runtime_error("unknown capability: " + name);
-            }
-
-            cap_vals.push_back(val);
+#ifdef LINYAPS_BOX_ENABLE_CAP
+    if (capabilities) {
+        if (UNLIKELY(cap_set_proc(caps.get()) < 0)) {
+            throw std::system_error(errno, std::system_category(), "cap_set_proc");
         }
-
-        ret = cap_set_flag(caps.get(), CAP_EFFECTIVE, cap_vals.size(), cap_vals.data(), CAP_SET);
-        if (UNLIKELY(ret < 0)) {
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    "failed to set effective capabilities");
-        }
-    }
-
-    const auto &permitted_set = capabilities->permitted;
-    if (permitted_set && !permitted_set->empty()) {
-        std::vector<cap_value_t> cap_vals;
-        cap_vals.reserve(permitted_set->size());
-        for (const auto &name : *permitted_set) {
-            cap_value_t val{ };
-            if (cap_from_name(name.c_str(), &val) < 0) {
-                throw std::runtime_error("unknown capability: " + name);
-            }
-
-            cap_vals.push_back(val);
-        }
-
-        ret = cap_set_flag(caps.get(), CAP_PERMITTED, cap_vals.size(), cap_vals.data(), CAP_SET);
-        if (UNLIKELY(ret < 0)) {
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    "failed to set permitted capabilities");
-        }
-    }
-
-    const auto &inheritable_set = capabilities->inheritable;
-    if (inheritable_set && !inheritable_set->empty()) {
-        std::vector<cap_value_t> cap_vals;
-        cap_vals.reserve(inheritable_set->size());
-        for (const auto &name : *inheritable_set) {
-            cap_value_t val{ };
-            if (cap_from_name(name.c_str(), &val) < 0) {
-                throw std::runtime_error("unknown capability: " + name);
-            }
-            cap_vals.push_back(val);
-        }
-
-        ret = cap_set_flag(caps.get(), CAP_INHERITABLE, cap_vals.size(), cap_vals.data(), CAP_SET);
-        if (UNLIKELY(ret < 0)) {
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    "failed to set inheritable capabilities");
-        }
-    }
-
-    // keep current capabilities, we need these caps on later
-    os::throw_if_error(os::prctl(PR_SET_KEEPCAPS, 1L, 0L, 0L, 0L));
-
-    const auto &process = *oci_config.process;
-    ret = setresgid(process.user.gid, process.user.gid, process.user.gid);
-    if (UNLIKELY(ret < 0)) {
-        throw std::system_error(errno, std::system_category(), "setresgid");
-    }
-
-    if (process.user.additional_gids) {
-        ret = setgroups(process.user.additional_gids->size(), process.user.additional_gids->data());
-        if (UNLIKELY(ret < 0)) {
-            throw std::system_error(errno, std::system_category(), "setgroups");
-        }
-    }
-
-    ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
-    if (UNLIKELY(ret < 0)) {
-        throw std::system_error(errno, std::system_category(), "setresuid");
-    }
-
-    ret = cap_set_proc(caps.get());
-    if (UNLIKELY(ret < 0)) {
-        throw std::system_error(errno, std::system_category(), "cap_set_proc");
-    }
 
 #  ifdef PR_CAP_AMBIENT
-    os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L));
-    if (const auto &ambient_set = capabilities->ambient; ambient_set) {
-        for (const auto &name : *ambient_set) {
-            cap_value_t amb_cap{ };
-            if (cap_from_name(name.c_str(), &amb_cap) < 0) {
-                throw std::runtime_error("unknown capability: " + name);
+        os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L));
+        if (const auto &ambient_set = capabilities->ambient; ambient_set) {
+            for (const auto &name : *ambient_set) {
+                cap_value_t amb_cap{ };
+                if (cap_from_name(name.c_str(), &amb_cap) < 0) {
+                    throw std::runtime_error(fmt::format("unknown capability: {}", name));
+                }
+
+                os::throw_if_error(os::prctl(PR_CAP_AMBIENT,
+                                             PR_CAP_AMBIENT_RAISE,
+                                             static_cast<long>(amb_cap),
+                                             0L,
+                                             0L));
             }
-
-            os::throw_if_error(
-              os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, static_cast<long>(amb_cap), 0L, 0L));
         }
-    }
 #  endif
-
+    }
 #endif
 
     if (oci_config.process->no_new_privileges) {
@@ -1756,7 +1731,7 @@ int clone_fn(void *data) noexcept
         set_umask(container.get_config().process->user.umask);
         // processing all extensions before drop capabilities
         processing_extensions(oci_config);
-        set_capabilities(oci_config, runtime_cap);
+        drop_privileges(oci_config, runtime_cap);
         start_container_hooks(container, status);
 
         // unblock and reset all signals before we execute the target
