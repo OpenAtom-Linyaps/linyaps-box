@@ -40,6 +40,16 @@ auto throw_if_error(Result<T> &&res) -> T
     return std::move(res).value();
 }
 
+template <typename T>
+auto throw_if_error(Result<T> &&res, std::string_view context)
+{
+    if (!res) {
+        throw std::system_error(res.error(), context.data());
+    }
+
+    return std::move(res).value();
+}
+
 inline auto make_error_code(int err) noexcept
 {
     return std::error_code{ err, std::generic_category() };
