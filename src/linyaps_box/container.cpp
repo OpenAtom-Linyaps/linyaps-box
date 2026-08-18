@@ -15,6 +15,7 @@
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/protocol/sync_socket_forwarder.h"
+#include "linyaps_box/security/privilege.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/cgroups.h"
 #include "linyaps_box/utils/close_range.h"
@@ -45,10 +46,6 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-
-#ifdef LINYAPS_BOX_ENABLE_CAP
-#  include <sys/capability.h>
-#endif
 
 using namespace linyaps_box;
 
@@ -84,11 +81,6 @@ namespace stage = protocol::stage;
 
     return std::string{ pid_ns.substr(prefix_len, pid_ns.size() - total_wrapper_len) };
 }
-
-struct security_status
-{
-    unsigned long cap{ 0 };
-};
 
 void execute_hook(const oci_config::hooks_t::hook_t &hook, const container_status_t &state)
 {
@@ -1348,172 +1340,6 @@ void do_pivot_root(const container &container,
       container.rootfs_propagation());
 }
 
-void set_umask(const std::optional<mode_t> &mask)
-{
-    if (!mask) {
-        LINYAPS_BOX_LOG_DEBUG("Skip set umask");
-        return;
-    }
-
-    LINYAPS_BOX_LOG_DEBUG("Set umask: 0{:o}", mask.value());
-    umask(mask.value());
-}
-
-void apply_credentials(const oci_config::process_t &process)
-{
-    int ret = setresgid(process.user.gid, process.user.gid, process.user.gid);
-    if (UNLIKELY(ret < 0)) {
-        throw std::system_error(errno, std::system_category(), "setresgid");
-    }
-
-    if (process.user.additional_gids) {
-        ret = setgroups(process.user.additional_gids->size(), process.user.additional_gids->data());
-        if (UNLIKELY(ret < 0)) {
-            throw std::system_error(errno, std::system_category(), "setgroups");
-        }
-    }
-
-    ret = setresuid(process.user.uid, process.user.uid, process.user.uid);
-    if (UNLIKELY(ret < 0)) {
-        throw std::system_error(errno, std::system_category(), "setresuid");
-    }
-}
-
-unsigned long get_last_cap()
-{
-    static const auto last_cap = []() -> unsigned long {
-        const auto *file = "/proc/sys/kernel/cap_last_cap";
-        std::ifstream ifs(file);
-        if (!ifs) {
-            throw std::runtime_error("Can't open " + std::string(file));
-        }
-
-        unsigned long val{ 0 };
-        ifs >> val;
-        return val;
-    }();
-
-    return last_cap;
-}
-
-security_status get_runtime_security_status()
-{
-    // TODO: selinux/apparmor
-    security_status status;
-
-#ifdef LINYAPS_BOX_ENABLE_CAP
-    status.cap = get_last_cap();
-#endif
-
-    return status;
-}
-
-void drop_privileges(const oci_config &oci_config, int last_cap)
-{
-    const auto &process = *oci_config.process;
-
-#ifdef LINYAPS_BOX_ENABLE_CAP
-    LINYAPS_BOX_LOG_DEBUG("Set capabilities");
-    const auto &capabilities = oci_config.process->capabilities;
-    std::unique_ptr<_cap_struct, decltype(&cap_free)> caps(nullptr, cap_free);
-    if (capabilities) {
-        if (UNLIKELY(last_cap <= 0)) {
-            throw std::runtime_error("kernel does not support capabilities");
-        }
-
-        auto *raw = cap_init();
-        if (UNLIKELY(raw == nullptr)) {
-            throw std::system_error(errno, std::system_category(), "failed to init cap");
-        }
-        caps.reset(raw);
-
-        auto set_cap_set = [&caps](const std::optional<std::vector<std::string>> &names,
-                                   cap_flag_t flag,
-                                   std::string_view label) {
-            if (!names || names->empty()) {
-                return;
-            }
-
-            std::vector<cap_value_t> vals;
-            vals.reserve(names->size());
-            for (const auto &name : *names) {
-                cap_value_t v{ };
-                if (cap_from_name(name.c_str(), &v) < 0) {
-                    throw std::runtime_error("unknown capability: " + name);
-                }
-
-                vals.push_back(v);
-            }
-
-            if (UNLIKELY(cap_set_flag(caps.get(), flag, vals.size(), vals.data(), CAP_SET) < 0)) {
-                throw std::system_error(errno, std::system_category(), std::string{ label });
-            }
-        };
-
-        set_cap_set(capabilities->effective, CAP_EFFECTIVE, "set effective capabilities");
-        set_cap_set(capabilities->permitted, CAP_PERMITTED, "set permitted capabilities");
-        set_cap_set(capabilities->inheritable, CAP_INHERITABLE, "set inheritable capabilities");
-
-        const auto &bounding_set = capabilities->bounding;
-        if (bounding_set) {
-            std::vector<bool> keep(last_cap + 1, false);
-            for (const auto &name : *bounding_set) {
-                cap_value_t cap{ };
-                if (cap_from_name(name.c_str(), &cap) < 0) {
-                    throw std::runtime_error(fmt::format("unknown capability: {}", name));
-                }
-
-                keep[cap] = true;
-            }
-
-            for (int cap = 0; cap <= last_cap; ++cap) {
-                if (!keep[cap]) {
-                    if (UNLIKELY(cap_drop_bound(cap) < 0)) {
-                        throw std::system_error(errno, std::system_category(), "cap_drop_bound");
-                    }
-                }
-            }
-        }
-
-        // keep current capabilities, we need these caps on later
-        os::throw_if_error(os::prctl(PR_SET_KEEPCAPS, 1L, 0L, 0L, 0L));
-    }
-#endif
-
-    apply_credentials(process);
-
-#ifdef LINYAPS_BOX_ENABLE_CAP
-    if (capabilities) {
-        if (UNLIKELY(cap_set_proc(caps.get()) < 0)) {
-            throw std::system_error(errno, std::system_category(), "cap_set_proc");
-        }
-
-#  ifdef PR_CAP_AMBIENT
-        os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L));
-        if (const auto &ambient_set = capabilities->ambient; ambient_set) {
-            for (const auto &name : *ambient_set) {
-                cap_value_t amb_cap{ };
-                if (cap_from_name(name.c_str(), &amb_cap) < 0) {
-                    throw std::runtime_error(fmt::format("unknown capability: {}", name));
-                }
-
-                os::throw_if_error(os::prctl(PR_CAP_AMBIENT,
-                                             PR_CAP_AMBIENT_RAISE,
-                                             static_cast<long>(amb_cap),
-                                             0L,
-                                             0L));
-            }
-        }
-#  endif
-    }
-#endif
-
-    if (oci_config.process->no_new_privileges) {
-        LINYAPS_BOX_LOG_DEBUG("Set no new privileges");
-        os::throw_if_error(os::prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L));
-    }
-}
-
 void start_container_hooks(const container &container, const container_status_t &status)
 {
     const auto &oci_config = container.get_config();
@@ -1702,8 +1528,12 @@ int clone_fn(void *data) noexcept
             rootfs = std::filesystem::canonical(container.get_bundle() / rootfs);
         }
 
+        // Prime the cap_last_cap cache before pivot_root, since
+        // /proc/sys/kernel/cap_last_cap may not be available in the
+        // container rootfs after the root switch.
+        std::ignore = security::last_cap();
+
         container_ns::initialize_container(container.get_config(), sync);
-        auto [runtime_cap] = get_runtime_security_status(); // get runtime status before pivot root
         container_ns::configure_mounts(container, rootfs);
         wait_prestart_hooks_result(oci_config, sync);
         wait_create_runtime_result(oci_config, sync);
@@ -1728,10 +1558,18 @@ int clone_fn(void *data) noexcept
             configure_terminal(container, sync);
         }
 
-        set_umask(container.get_config().process->user.umask);
+        if (container.get_config().process->user.umask) {
+            auto val = container.get_config().process->user.umask.value();
+            os::throw_if_error(os::umask(val), fmt::format("failed to set umask {}", val));
+        }
         // processing all extensions before drop capabilities
         processing_extensions(oci_config);
-        drop_privileges(oci_config, runtime_cap);
+
+        security::privilege_context ctx{ oci_config.process->user };
+        ctx.set_capabilities(oci_config.process->capabilities)
+          .set_no_new_privs(oci_config.process->no_new_privileges.value_or(false));
+        ctx.apply();
+
         start_container_hooks(container, status);
 
         // unblock and reset all signals before we execute the target
@@ -2477,7 +2315,7 @@ int container::run(run_container_options_t options)
 {
     int container_process_exit_code{ EXIT_FAILURE };
 
-    os::throw_if_error(os::prctl(PR_SET_CHILD_SUBREAPER, 1L, 0L, 0L, 0L));
+    os::throw_if_error(os::set_child_subreaper(true));
 
     // Declared outside try so catch blocks can access it for cleanup
     std::optional<container_monitor> monitor;

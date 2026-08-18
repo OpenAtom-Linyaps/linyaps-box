@@ -150,6 +150,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/container_monitor.cpp
     src/linyaps_box/container_ref.cpp
     src/linyaps_box/container_status.cpp
+    src/linyaps_box/security/privilege.cpp
     src/linyaps_box/impl/disabled_cgroup_manager.cpp
     src/linyaps_box/impl/json_printer.cpp
     src/linyaps_box/impl/table_printer.cpp

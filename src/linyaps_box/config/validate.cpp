@@ -61,6 +61,14 @@ void validate(const oci_config::process_t &v)
 #endif
     }
 
+    if (v.user.umask) {
+        auto val = v.user.umask.value();
+        if (UNLIKELY((val & ~std::filesystem::perms::all) != std::filesystem::perms::none)) {
+            throw std::runtime_error(
+              fmt::format("process.user.umask is invalid: 0{:o}", static_cast<mode_t>(val)));
+        }
+    }
+
     if (!v.cwd.is_absolute()) {
         throw std::runtime_error(
           fmt::format("process.cwd must be an absolute path, got: {}", v.cwd));

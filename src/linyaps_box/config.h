@@ -137,7 +137,7 @@ struct oci_config
         {
             uid_t uid;
             gid_t gid;
-            std::optional<mode_t> umask;
+            std::optional<std::filesystem::perms> umask;
             std::optional<std::vector<gid_t>> additional_gids;
         };
 

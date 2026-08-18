@@ -7,9 +7,11 @@
 #include "linyaps_box/container_monitor.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
+#include "linyaps_box/os/fs.h" // IWYU pragma: keep
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/protocol/sync_socket_forwarder.h"
+#include "linyaps_box/security/privilege.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/defer.h"
@@ -18,17 +20,13 @@
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/utils.h"
 
-#include <sys/capability.h>
-
 #include <algorithm>
 #include <cassert>
 #include <csignal> // IWYU pragma: keep
-#include <fstream>
 #include <limits>
 #include <utility>
 #include <vector>
 
-#include <grp.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -120,40 +118,6 @@ void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
     sync.send_console_fd(ref);
 }
 
-void child_apply_credentials(const linyaps_box::oci_config::process_t &proc)
-{
-    if (proc.user.umask) {
-        ::umask(*proc.user.umask);
-    }
-
-    if (proc.user.uid == 0 && proc.user.gid == 0 && !proc.user.additional_gids) {
-        return;
-    }
-
-    if (::setresgid(proc.user.gid, proc.user.gid, proc.user.gid) != 0) {
-        _exit(EXIT_FAILURE);
-    }
-
-    if (proc.user.additional_gids) {
-        if (::setgroups(proc.user.additional_gids->size(), proc.user.additional_gids->data())
-            != 0) {
-            _exit(EXIT_FAILURE);
-        }
-    }
-
-    if (::setresuid(proc.user.uid, proc.user.uid, proc.user.uid) != 0) {
-        _exit(EXIT_FAILURE);
-    }
-
-    for (auto fd : { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO }) {
-        if (::fchown(fd, proc.user.uid, proc.user.gid) != 0) {
-            if (errno != EINVAL && errno != ENOSYS) {
-                _exit(EXIT_FAILURE);
-            }
-        }
-    }
-}
-
 void child_apply_environment(const linyaps_box::oci_config::process_t &proc,
                              const linyaps_box::oci_config &config)
 {
@@ -194,138 +158,6 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
         }
     }
 }
-
-#ifdef LINYAPS_BOX_ENABLE_CAP
-void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
-                              const linyaps_box::oci_config &config)
-{
-    LINYAPS_BOX_LOG_DEBUG("apply capabilities");
-    // Determine which caps to apply: prefer the exec-specific set, fall back to
-    // the container's config.json default if the exec set is entirely empty.
-    auto effective_caps =
-      [&]() -> std::optional<linyaps_box::oci_config::process_t::capabilities_t> {
-        if (!proc.capabilities) {
-            return config.process->capabilities;
-        }
-
-        auto all_empty = [](const linyaps_box::oci_config::process_t::capabilities_t &c) {
-            return (!c.effective || c.effective->empty()) && (!c.bounding || c.bounding->empty())
-              && (!c.inheritable || c.inheritable->empty())
-              && (!c.permitted || c.permitted->empty()) && (!c.ambient || c.ambient->empty());
-        };
-
-        if (all_empty(*proc.capabilities)) {
-            return config.process->capabilities;
-        }
-
-        return proc.capabilities;
-    }();
-
-    if (!effective_caps) {
-        return;
-    }
-
-    auto should_apply = [](const linyaps_box::oci_config::process_t::capabilities_t &c) {
-        return (c.effective && !c.effective->empty()) || (c.bounding && !c.bounding->empty())
-          || (c.inheritable && !c.inheritable->empty()) || (c.permitted && !c.permitted->empty())
-          || (c.ambient && !c.ambient->empty());
-    };
-
-    if (!should_apply(*effective_caps)) {
-        return;
-    }
-
-    LINYAPS_BOX_LOG_DEBUG("Set capabilities for exec");
-
-    // Drop every cap not in the bounding set.
-    if (effective_caps->bounding) {
-        const auto &bounding_names = *effective_caps->bounding;
-        std::vector<cap_value_t> bounding_set;
-        bounding_set.reserve(bounding_names.size());
-        for (const auto &name : bounding_names) {
-            cap_value_t val{ };
-            if (cap_from_name(name.c_str(), &val) < 0) {
-                throw std::runtime_error("unknown capability: " + name);
-            }
-            bounding_set.push_back(val);
-        }
-        std::ifstream cap_file("/proc/sys/kernel/cap_last_cap");
-        unsigned long last_cap{ 0 };
-        cap_file >> last_cap;
-        for (unsigned long cap = 0; cap < last_cap; ++cap) {
-            if (std::find(bounding_set.cbegin(), bounding_set.cend(), static_cast<int>(cap))
-                == bounding_set.cend()) {
-                if (cap_drop_bound(static_cast<int>(cap)) < 0) {
-                    throw std::system_error(errno, std::system_category(), "cap_drop_bound");
-                }
-            }
-        }
-    }
-
-    auto *cap = cap_init();
-    if (cap == nullptr) {
-        throw std::system_error(errno, std::system_category(), "cap_init");
-    }
-    const std::unique_ptr<_cap_struct, decltype(&cap_free)> caps(cap, cap_free);
-
-    auto to_cap_values = [](const std::vector<std::string> &names) {
-        std::vector<cap_value_t> vals;
-        vals.reserve(names.size());
-        for (const auto &name : names) {
-            cap_value_t val{ };
-            if (cap_from_name(name.c_str(), &val) < 0) {
-                throw std::runtime_error("unknown capability: " + name);
-            }
-            vals.push_back(val);
-        }
-        return vals;
-    };
-
-    auto set_cap_flag = [&caps, &to_cap_values](const std::vector<std::string> &cap_set,
-                                                cap_flag_t flag) {
-        if (cap_set.empty()) {
-            return;
-        }
-        auto vals = to_cap_values(cap_set);
-        auto ret = cap_set_flag(caps.get(), flag, vals.size(), vals.data(), CAP_SET);
-        if (ret < 0) {
-            throw std::system_error(errno, std::system_category(), "cap_set_flag");
-        }
-    };
-
-    if (effective_caps->effective) {
-        set_cap_flag(*effective_caps->effective, CAP_EFFECTIVE);
-    }
-
-    if (effective_caps->permitted) {
-        set_cap_flag(*effective_caps->permitted, CAP_PERMITTED);
-    }
-
-    if (effective_caps->inheritable) {
-        set_cap_flag(*effective_caps->inheritable, CAP_INHERITABLE);
-    }
-
-    if (cap_set_proc(caps.get()) < 0) {
-        throw std::system_error(errno, std::system_category(), "cap_set_proc");
-    }
-
-    os::throw_if_error(os::prctl(PR_SET_KEEPCAPS, 1L, 0L, 0L, 0L));
-
-    if (cap_set_proc(caps.get()) < 0) {
-        throw std::system_error(errno, std::system_category(), "cap_set_proc");
-    }
-
-#  ifdef PR_CAP_AMBIENT
-    os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0L, 0L, 0L));
-    if (const auto &ambient_set = effective_caps->ambient; ambient_set) {
-        auto ambient_caps = to_cap_values(*ambient_set);
-        std::for_each(ambient_caps.cbegin(), ambient_caps.cend(), [](cap_value_t cap) {
-            os::throw_if_error(os::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap, 0L, 0L));
-        });
-    }
-#  endif
-}
-#endif // LINYAPS_BOX_ENABLE_CAP
 
 [[noreturn]] auto exec_child_process(pid_t target_pid,
                                      const linyaps_box::oci_config &config,
@@ -379,16 +211,45 @@ void child_apply_capabilities(const linyaps_box::oci_config::process_t &proc,
                                         std::numeric_limits<unsigned>::max(),
                                         CLOSE_RANGE_CLOEXEC);
 
-        child_apply_credentials(proc);
-
-        if (proc.no_new_privileges) {
-            LINYAPS_BOX_LOG_DEBUG("Set no new privileges");
-            os::throw_if_error(os::prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L));
+        if (proc.user.umask) {
+            auto val = proc.user.umask.value();
+            os::throw_if_error(os::umask(val), fmt::format("failed to set umask {}", val));
         }
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
-        child_apply_capabilities(proc, config);
-#endif
+        security::privilege_context ctx{ proc.user };
+
+        auto effective_caps = [&]() -> std::optional<oci_config::process_t::capabilities_t> {
+            if (!proc.capabilities) {
+                return config.process->capabilities;
+            }
+
+            const auto &caps = *proc.capabilities;
+            auto all_empty = (!caps.effective || caps.effective->empty())
+              && (!caps.bounding || caps.bounding->empty())
+              && (!caps.inheritable || caps.inheritable->empty())
+              && (!caps.permitted || caps.permitted->empty())
+              && (!caps.ambient || caps.ambient->empty());
+
+            if (all_empty) {
+                return config.process->capabilities;
+            }
+
+            return proc.capabilities;
+        }();
+
+        ctx.set_capabilities(std::move(effective_caps))
+          .set_no_new_privs(proc.no_new_privileges.value_or(false));
+
+        // change before we drop caps
+        for (auto fd : { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO }) {
+            if (::fchown(fd, proc.user.uid, proc.user.gid) != 0) {
+                if (errno != EINVAL && errno != ENOSYS) {
+                    throw std::system_error(errno, std::system_category(), "fchown");
+                }
+            }
+        }
+
+        ctx.apply();
 
         std::vector<const char *> c_args;
         c_args.reserve(proc.args.size() + 1);
@@ -556,7 +417,7 @@ auto container_ref::exec(exec_container_option option) const -> int
 {
     auto target_pid = this->status().PID;
 
-    os::throw_if_error(os::prctl(PR_SET_CHILD_SUBREAPER, 1L, 0L, 0L, 0L));
+    os::throw_if_error(os::set_child_subreaper(true));
 
     auto config = oci_config::parse(status_dir_.config());
     auto &proc = resolve_final_process(option, config);
