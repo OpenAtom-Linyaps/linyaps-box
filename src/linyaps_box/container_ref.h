@@ -46,7 +46,7 @@ public:
     container_ref(container_ref &&) = default;
     auto operator=(container_ref &&) -> container_ref & = default;
 
-    [[nodiscard]] auto status() const -> container_status_t;
+    [[nodiscard]] auto status() const -> container_status;
     void kill(int signal) const;
     [[nodiscard]] auto exec(exec_container_option option) const -> int;
 

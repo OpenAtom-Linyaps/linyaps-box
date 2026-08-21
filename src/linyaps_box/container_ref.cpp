@@ -199,7 +199,7 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
 
         linyaps_box::utils::setsid();
 
-        if (proc.terminal) {
+        if (proc.terminal.value_or(false)) {
             child_setup_terminal(proc, child_chan);
         }
 
@@ -394,28 +394,27 @@ container_ref::container_ref(status_directory status_dir, std::string id)
 
 container_ref::~container_ref() noexcept = default;
 
-container_status_t linyaps_box::container_ref::status() const
+container_status linyaps_box::container_ref::status() const
 {
     return status_dir_.read();
 }
 
 void container_ref::kill(int signal) const
 {
-    auto pid = this->status().PID;
+    auto pid = this->status().pid;
 
-    LINYAPS_BOX_LOG_DEBUG("kill process {} with signal {}", pid, signal);
     if (::kill(pid, signal) == 0) {
         return;
     }
 
-    std::stringstream ss;
-    ss << "failed to kill process " << pid << " with signal " << signal;
-    throw std::system_error(errno, std::system_category(), std::move(ss).str());
+    throw std::system_error(errno,
+                            std::system_category(),
+                            fmt::format("failed to kill process {} with signal {}", pid, signal));
 }
 
 auto container_ref::exec(exec_container_option option) const -> int
 {
-    auto target_pid = this->status().PID;
+    auto target_pid = this->status().pid;
 
     os::throw_if_error(os::set_child_subreaper(true));
 

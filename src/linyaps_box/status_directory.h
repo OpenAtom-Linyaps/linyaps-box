@@ -16,8 +16,8 @@ class status_directory
 public:
     explicit status_directory(std::filesystem::path path);
 
-    auto write(const container_status_t &status) const -> void;
-    [[nodiscard]] auto read() const -> container_status_t;
+    auto write(const container_status &status) const -> void;
+    [[nodiscard]] auto read() const -> container_status;
     auto remove() const -> void;
 
     auto write_config(std::string_view config) const -> void;

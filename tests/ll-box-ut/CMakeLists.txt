@@ -1,7 +1,12 @@
 set(linyaps-box_UNIT_TESTS ll-box-ut)
 set(linyaps-box_UNIT_TESTS_SOURCE
-    ./src/test.cpp ./src/semver_test.cpp ./src/span_test.cpp
-    ./src/message_channel_test.cpp ./src/log_test.cpp ./src/vfs_test.cpp)
+    ./src/main.cpp
+    ./src/test.cpp
+    ./src/semver_test.cpp
+    ./src/span_test.cpp
+    ./src/message_channel_test.cpp
+    ./src/log_test.cpp
+    ./src/vfs_test.cpp)
 set(linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
 set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -24,12 +29,7 @@ check_cxx_source_compiles(
 
 include(GoogleTest)
 
-if(NOT TARGET GTest::gtest_main AND TARGET GTest::Main)
-  add_library(GTest::gtest_main INTERFACE IMPORTED)
-  target_link_libraries(GTest::gtest_main INTERFACE GTest::Main)
-endif()
-
-list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES GTest::gtest_main)
+list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES GTest::gtest)
 
 add_executable("${linyaps-box_UNIT_TESTS}" ${linyaps-box_UNIT_TESTS_SOURCE})
 

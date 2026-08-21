@@ -5,12 +5,12 @@
 #include "linyaps_box/log/formatter.h"
 
 #include "linyaps_box/log/utils.h"
+#include "linyaps_box/os/result.h"
+#include "linyaps_box/utils/time.h"
 
-#include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
-#include <cstring>
 #include <stdexcept>
 #include <string_view>
 
@@ -76,32 +76,20 @@ struct oci_log_message
 };
 } // namespace detail
 
-namespace {
-
-auto append_strerror(fmt::memory_buffer &buf, int errno_val) noexcept -> void
-{
-    if (errno_val != 0) {
-        fmt::format_to(std::back_inserter(buf), "\n{}", detail::oci_log_message::base_indent);
-        fmt::format_to(std::back_inserter(buf), "{}", ::strerror(errno_val));
-    }
-}
-
-} // namespace
-
 auto to_json(nlohmann::json &j, const log_context &ctx) noexcept -> void
 {
-    std::string time_str;
-    time_str.reserve(32);
-    fmt::format_to(std::back_inserter(time_str),
-                   "{:%Y-%m-%dT%H:%M:%S}.{:09d}Z",
-                   ctx.utc_tm(),
-                   subsec_ns(ctx.time).count());
+    std::array<char, 30> time_buf{ };
+    auto len =
+      linyaps_box::utils::to_created_time(linyaps_box::utils::span{ time_buf },
+                                          std::chrono::system_clock::time_point{ ctx.time },
+                                          linyaps_box::utils::subsecond_precision::nanoseconds);
+    std::string_view time_str{ time_buf.begin(), len };
 
     j = nlohmann::json{
         { "time", time_str },
         { "level", ctx.lvl },
         { "pid", ctx.pid },
-        { "msg", ctx.message },
+        { "message", ctx.message },
     };
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
     j["file"] = ctx.file;
@@ -109,26 +97,25 @@ auto to_json(nlohmann::json &j, const log_context &ctx) noexcept -> void
     j["function"] = ctx.function;
 #endif
     if (ctx.errno_ != 0) {
-        j["errno"] = ctx.errno_;
-        j["strerror"] = ::strerror(ctx.errno_);
+        j["error_code"] = ctx.errno_;
+        j["error_message"] = os::make_error_code(ctx.errno_).message();
     }
 }
 
 auto format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_style style) -> void
 {
     // Format time into a local buffer first to avoid writing raw bytes to output
-    thread_local fmt::memory_buffer time_buf;
-    time_buf.clear();
-    fmt::format_to(std::back_inserter(time_buf),
-                   "{:%Y-%m-%dT%H:%M:%S}.{:09d}Z",
-                   ctx.utc_tm(),
-                   subsec_ns(ctx.time).count());
+    thread_local std::array<char, 30> time_buf{ };
+    auto len =
+      linyaps_box::utils::to_created_time(linyaps_box::utils::span{ time_buf },
+                                          std::chrono::system_clock::time_point{ ctx.time },
+                                          linyaps_box::utils::subsecond_precision::nanoseconds);
 
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
     fmt::format_to(std::back_inserter(buf),
                    style,
                    "[{}] [{:<5}] [{}] [{}:{} {}]:\n{}",
-                   std::string_view{ time_buf.data(), time_buf.size() },
+                   std::string_view{ time_buf.data(), len },
                    level_name(ctx.lvl),
                    ctx.pid,
                    ctx.file,
@@ -139,12 +126,15 @@ auto format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_styl
     fmt::format_to(std::back_inserter(buf),
                    style,
                    "[{}] [{:<5}] [{}]:\n{}",
-                   std::string_view{ time_buf.data(), time_buf.size() },
+                   std::string_view{ time_buf, len },
                    level_name(ctx.lvl),
                    ctx.pid,
                    detail::oci_log_message{ ctx.message });
 #endif
-    append_strerror(buf, ctx.errno_);
+    if (ctx.errno_ != 0) {
+        fmt::format_to(std::back_inserter(buf), "\n{}", detail::oci_log_message::base_indent);
+        fmt::format_to(std::back_inserter(buf), "{}", os::make_error_code(ctx.errno_).message());
+    }
 
     buf.push_back('\n');
 }
@@ -166,9 +156,8 @@ auto format_log(fmt::memory_buffer &buf,
 
 } // namespace linyaps_box::log
 
-namespace fmt {
 template <>
-struct formatter<linyaps_box::log::detail::oci_log_message>
+struct fmt::formatter<linyaps_box::log::detail::oci_log_message>
 {
     constexpr auto parse(fmt::format_parse_context &ctx)
     {
@@ -210,4 +199,3 @@ struct formatter<linyaps_box::log::detail::oci_log_message>
         return out;
     }
 };
-} // namespace fmt

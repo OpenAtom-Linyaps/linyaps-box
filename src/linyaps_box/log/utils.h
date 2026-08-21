@@ -8,7 +8,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <ctime>
 #include <string_view>
 
 #include <sys/types.h>
@@ -55,23 +54,7 @@ struct log_context
     std::string_view function;
     int line{ };
 #endif
-
-    [[nodiscard]] auto utc_tm() const noexcept -> std::tm
-    {
-        auto t =
-          std::chrono::system_clock::to_time_t(std::chrono::system_clock::time_point{ time });
-        std::tm tm{ };
-        gmtime_r(&t, &tm);
-        return tm;
-    }
 };
-
-inline auto subsec_ns(std::chrono::nanoseconds ns) noexcept -> std::chrono::nanoseconds
-{
-    using namespace std::chrono;
-    auto secs = duration_cast<seconds>(ns);
-    return ns - secs;
-}
 
 auto to_syslog_priority(level lvl) noexcept -> int;
 auto level_name(level lvl) noexcept -> const char *;
