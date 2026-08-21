@@ -4,8 +4,12 @@
 
 #pragma once
 
+#include "linyaps_box/utils/time.h"
+
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -13,22 +17,88 @@
 
 namespace linyaps_box {
 
-struct container_status_t
+struct container_status
 {
-    std::string ID;
-    pid_t PID;
-
-    std::string oci_version;
-    enum class runtime_status : std::uint8_t { CREATING, CREATED, RUNNING, STOPPED };
-    runtime_status status;
-    std::filesystem::path bundle;
-    std::string created; // extension field
-    std::string owner;   // extension field
     std::unordered_map<std::string, std::string> annotations;
+    std::filesystem::path bundle;
+    std::string id;
+    std::string oci_version;
+    std::string owner; // extension field
+    std::uint64_t process_start_time;
+    std::chrono::system_clock::time_point created; // extension field
+    pid_t pid;
 };
 
-auto to_string_view(linyaps_box::container_status_t::runtime_status status) -> std::string_view;
-auto from_string_view(std::string_view status) -> linyaps_box::container_status_t::runtime_status;
-auto status_to_json(const linyaps_box::container_status_t &status) -> nlohmann::json;
+auto from_json(const nlohmann::json &j, container_status &s) -> void;
+auto to_json(nlohmann::json &j, const container_status &s) -> void;
+
+enum class runtime_status : std::uint8_t { CREATING, CREATED, RUNNING, STOPPED };
+
+auto to_string_view(runtime_status s) -> std::string_view;
+auto derive_status(const container_status &s) -> runtime_status;
+
+auto to_oci_json(container_status s, runtime_status rs) -> nlohmann::json;
 
 } // namespace linyaps_box
+
+template <>
+struct fmt::formatter<linyaps_box::container_status>
+{
+    enum class Presentation : uint8_t { plaintext, json, pretty_json };
+    Presentation presentation{ Presentation::plaintext };
+
+    constexpr auto parse(fmt::format_parse_context &ctx)
+    {
+        const auto *it = ctx.begin();
+        const auto *end = ctx.end();
+
+        if (it == end || *it == '}') {
+            return it;
+        }
+
+        switch (*it) {
+        case 't': {
+            presentation = Presentation::plaintext;
+        } break;
+        case 'j': {
+            presentation = Presentation::json;
+        } break;
+        case 'p': {
+            presentation = Presentation::pretty_json;
+        } break;
+        default:
+            throw fmt::format_error("invalid format specifier for linyaps_box::container::status");
+        }
+
+        if (it != end && *it != '}') {
+            throw fmt::format_error("unexpected trailing characters in format specifier");
+        }
+
+        return it;
+    }
+
+    template <typename FormatContext>
+    auto format(const linyaps_box::container_status &status, FormatContext &ctx) const
+    {
+        if (presentation == Presentation::plaintext) {
+            std::array<char, 30> time_buf{ };
+            auto len = linyaps_box::utils::to_created_time(linyaps_box::utils::span{ time_buf },
+                                                           status.created);
+            return fmt::format_to(
+              ctx.out(),
+              "status{{ ociVersion: {}, id: {}, pid: {}, bundle: {}, annotations: {}, owner: {}, "
+              "process_start_time: {}, created: {} }}",
+              status.oci_version,
+              status.id,
+              status.pid,
+              status.annotations,
+              status.owner,
+              status.process_start_time,
+              std::string_view{ time_buf.data(), len });
+        }
+
+        auto json = nlohmann::json(status);
+        auto tab = presentation == Presentation::pretty_json ? 4 : -1;
+        return fmt::format_to(ctx.out(), "{}", json.dump(tab));
+    }
+};

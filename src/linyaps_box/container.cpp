@@ -20,6 +20,7 @@
 #include "linyaps_box/utils/cgroups.h"
 #include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/file_describer.h"
+#include "linyaps_box/utils/process_stat.h"
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/signal.h"
 #include "utils/defer.h"
@@ -82,7 +83,7 @@ namespace stage = protocol::stage;
     return std::string{ pid_ns.substr(prefix_len, pid_ns.size() - total_wrapper_len) };
 }
 
-void execute_hook(const oci_config::hooks_t::hook_t &hook, const container_status_t &state)
+void execute_hook(const oci_config::hooks_t::hook_t &hook, const container_status &state)
 {
     // FIXME: hook state JSON is sent over a SEQPACKET socketpair, which discards
     //  bytes beyond the hook's first read() buffer (e.g. Python's 8K) when the
@@ -142,7 +143,7 @@ void execute_hook(const oci_config::hooks_t::hook_t &hook, const container_statu
     }
     parent.close();
 
-    auto state_json = status_to_json(state).dump();
+    auto state_json = nlohmann::json(state).dump();
     const auto *data = reinterpret_cast<const std::byte *>(state_json.data());
     auto remaining = state_json.size();
 
@@ -1211,7 +1212,7 @@ void wait_create_runtime_result(const oci_config &oci_config, child_message_chan
 }
 
 void create_container_hooks(const container &container,
-                            const container_status_t &status,
+                            const container_status &status,
                             child_message_channel &sync)
 {
     const auto &oci_config = container.get_config();
@@ -1340,7 +1341,7 @@ void do_pivot_root(const container &container,
       container.rootfs_propagation());
 }
 
-void start_container_hooks(const container &container, const container_status_t &status)
+void start_container_hooks(const container &container, const container_status &status)
 {
     const auto &oci_config = container.get_config();
     if (!oci_config.hooks || !oci_config.hooks->start_container) {
@@ -1554,7 +1555,7 @@ int clone_fn(void *data) noexcept
         // access from both sides after the root switch if we need in the future.
 
         utils::setsid();
-        if (container.get_config().process->terminal) {
+        if (container.get_config().process->terminal.value_or(false)) {
             configure_terminal(container, sync);
         }
 
@@ -2083,7 +2084,7 @@ void configure_container_namespaces(container &container, parent_message_channel
 
     LINYAPS_BOX_LOG_DEBUG("Start configure namespaces");
 
-    if (auto pid = container.status().PID; pid > 0) {
+    if (auto pid = container.status().pid; pid > 0) {
         LINYAPS_BOX_LOG_DEBUG("Container PID={}", pid);
     }
 
@@ -2103,7 +2104,7 @@ void configure_container_namespaces(container &container, parent_message_channel
                                  return ns.type_ == oci_config::linux_t::namespace_t::type::USER;
                              })
                 != namespaces->end()) {
-                auto pid = container.status().PID;
+                auto pid = container.status().pid;
 
                 // TODO: if not mapping a range of uid/gid, we could set uid/gid in the
                 // container process
@@ -2266,28 +2267,6 @@ container::container(status_directory status_dir, const create_container_options
     host_uid_ = ::geteuid();
     host_gid_ = ::getegid();
 
-#ifndef LINYAPS_BOX_STATIC_LINK
-    auto *pw = getpwuid(host_uid_);
-    if (pw == nullptr) {
-        throw std::system_error(errno, std::system_category(), "getpwuid");
-    }
-#endif
-    {
-        container_status_t status;
-        status.oci_version = oci_config::version;
-        status.ID = options.ID;
-        status.PID = getpid();
-        status.status = container_status_t::runtime_status::CREATING;
-        status.bundle = bundle;
-        status.created = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                          std::chrono::system_clock::now().time_since_epoch())
-                                          .count());
-#ifndef LINYAPS_BOX_STATIC_LINK
-        status.owner = pw->pw_name;
-#endif
-        this->status_dir().write(status);
-    }
-
     this->status_dir().save_config(config_path);
 
     switch (options.manager) {
@@ -2338,16 +2317,34 @@ int container::run(run_container_options_t options)
 
         monitor.emplace(child_pid);
 
-        {
-            auto status = this->status();
-            if (status.status != container_status_t::runtime_status::CREATING) {
-                throw std::runtime_error("unexpected container status before creating: "
-                                         + std::to_string(static_cast<int>(status.status)));
-            }
-            status.PID = child_pid;
-            status.status = container_status_t::runtime_status::CREATED;
-            this->status_dir().write(status);
+        container_status status;
+        status.oci_version = oci_config::version;
+        status.id = this->get_id();
+        status.pid = child_pid;
+        status.bundle = this->bundle;
+        status.created = std::chrono::system_clock::now();
+
+        auto start_time = utils::read_process_start_time(child_pid);
+        if (UNLIKELY(!start_time)) {
+            throw std::runtime_error(
+              fmt::format("failed to get container process start time: {}", start_time.error()));
         }
+        status.process_start_time = start_time.value();
+
+        std::string owner;
+#ifndef LINYAPS_BOX_STATIC_LINK
+        auto *pw = getpwuid(host_uid_);
+        if (pw != nullptr) {
+            owner = pw->pw_name;
+        }
+#endif
+        status.owner = owner;
+
+        if (this->config.annotations) {
+            status.annotations = *this->config.annotations;
+        }
+
+        this->status_dir().write(status);
 
         runtime_ns::configure_container_namespaces(*this, sync);
         runtime_ns::prestart_hooks(*this, sync);
@@ -2355,7 +2352,7 @@ int container::run(run_container_options_t options)
         runtime_ns::wait_create_container_result(*this, sync);
 
         std::optional<terminal_master> master;
-        if (config.process->terminal) {
+        if (config.process->terminal.value_or(false)) {
             auto console_inc = sync.drain_logs();
             std::visit(utils::Overload{
                          [&](const protocol::msg::console_fd &) {
@@ -2377,18 +2374,6 @@ int container::run(run_container_options_t options)
         }
 
         runtime_ns::wait_container_started(sync);
-
-        {
-            auto status = this->status();
-            if (status.status != container_status_t::runtime_status::CREATED) {
-                throw std::runtime_error("unexpected container status before running: "
-                                         + std::to_string(static_cast<int>(status.status)));
-            }
-
-            status.PID = child_pid;
-            status.status = container_status_t::runtime_status::RUNNING;
-            this->status_dir().write(status);
-        }
 
         runtime_ns::poststart_hooks(*this);
 
@@ -2433,13 +2418,6 @@ int container::run(run_container_options_t options)
         }();
 
         container_process_exit_code = monitor->wait_container_exit();
-
-        {
-            auto status = this->status();
-            status.PID = child_pid;
-            status.status = container_status_t::runtime_status::STOPPED;
-            this->status_dir().write(status);
-        }
 
         runtime_ns::poststop_hooks(*this);
     } catch (const std::exception &e) {

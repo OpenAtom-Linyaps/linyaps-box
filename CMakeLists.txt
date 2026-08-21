@@ -152,13 +152,12 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/container_status.cpp
     src/linyaps_box/security/privilege.cpp
     src/linyaps_box/impl/disabled_cgroup_manager.cpp
-    src/linyaps_box/impl/json_printer.cpp
-    src/linyaps_box/impl/table_printer.cpp
     src/linyaps_box/infra/rootfs.cpp
     src/linyaps_box/infra/unix_socket.cpp
     src/linyaps_box/interface.cpp
     src/linyaps_box/io/epoll.cpp
     src/linyaps_box/io/forwarder.cpp
+    src/linyaps_box/io/stream.cpp
     src/linyaps_box/log/formatter.cpp
     src/linyaps_box/log/logger.cpp
     src/linyaps_box/log/sink_factory.cpp
@@ -173,14 +172,13 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/os/net.cpp
     src/linyaps_box/os/process.cpp
     src/linyaps_box/os/tty.cpp
-    src/linyaps_box/printer.cpp
     src/linyaps_box/protocol/message_channel.cpp
     src/linyaps_box/protocol/message.cpp
     src/linyaps_box/runtime.cpp
     src/linyaps_box/status_directory.cpp
     src/linyaps_box/status_directory_manager.cpp
     src/linyaps_box/terminal.cpp
-    src/linyaps_box/utils/atomic_write.cpp
+    src/linyaps_box/utils/process_stat.cpp
     src/linyaps_box/utils/cgroups.cpp
     src/linyaps_box/utils/close_range.cpp
     src/linyaps_box/utils/epoll.cpp
@@ -192,7 +190,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/session.cpp
     src/linyaps_box/utils/setns.cpp
     src/linyaps_box/utils/signal.cpp
-    src/linyaps_box/utils/terminal.cpp)
+    src/linyaps_box/utils/terminal.cpp
+    src/linyaps_box/utils/time.cpp)
 
 if(NOT linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
   list(REMOVE_ITEM linyaps-box_LIBRARY_SOURCE

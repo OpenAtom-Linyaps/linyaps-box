@@ -4,55 +4,90 @@
 
 #include "linyaps_box/status_directory.h"
 
+#include "linyaps_box/io/stream.h"
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/utils/atomic_write.h"
-#include "nlohmann/json.hpp"
+#include "linyaps_box/os/fs.h"
+#include "linyaps_box/utils/defer.h"
+#include "linyaps_box/utils/file_describer.h"
+#include "linyaps_box/utils/utils.h"
 
-#include <csignal> // IWYU pragma: keep
-#include <fstream>
-#include <utility>
-
-#include <unistd.h>
+#include <fmt/format.h>
+#include <nlohmann/json.hpp>
 
 namespace {
 
-auto read_status(const std::filesystem::path &path) -> linyaps_box::container_status_t
+void atomic_write(const std::filesystem::path &path, std::string_view content)
 {
-    nlohmann::json j;
-    {
-        std::ifstream istrm(path);
-        if (istrm.fail()) {
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    "failed to open status file: " + path.string());
+    using namespace linyaps_box::os;
+    using namespace linyaps_box::utils;
+
+    auto dir = path.parent_path();
+    auto dirfd =
+      throw_if_error(open(dir,
+                          sys::open_option{ sys::open_flag::directory | sys::open_flag::cloexec,
+                                            sys::access_mode::read_only }));
+
+    int max_retries{ 7 };
+
+    std::string temp_name(".tmp-XXXXXX");
+    file_descriptor fd;
+    for (; max_retries >= 0; --max_retries) {
+        temp_name.replace(5, 6, gen_random_string(6));
+        auto temp_path = dir / temp_name;
+        auto temp = open(temp_path,
+                         sys::open_option{ sys::open_flag::create | sys::open_flag::exclusive
+                                             | sys::open_flag::cloexec | sys::open_flag::no_follow,
+                                           sys::access_mode::read_write },
+                         std::filesystem::perms::owner_all);
+        if (LIKELY(temp.has_value())) {
+            fd = std::move(*temp);
+            break;
         }
 
-        istrm >> j;
-    }
-
-    linyaps_box::container_status_t ret{ };
-
-    j.at("ociVersion").get_to(ret.oci_version);
-    j.at("pid").get_to(ret.PID);
-    j.at("id").get_to(ret.ID);
-    ret.status = linyaps_box::from_string_view(j.at("status").get<std::string_view>());
-    if (::kill(ret.PID, 0) != 0) {
-        if (errno == ESRCH) {
-            ret.status = linyaps_box::container_status_t::runtime_status::STOPPED;
-        } else if (errno != EPERM) {
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    "kill(" + std::to_string(ret.PID) + ", 0)");
+        const auto &err = temp.error();
+        if (err == std::errc::file_exists) {
+            continue;
         }
-        // EPERM: process exists but we lack permission, keep status from JSON
+
+        throw std::system_error(err, "failed to create temporary status file");
     }
 
-    j.at("bundle").get_to(ret.bundle);
-    j.at("created").get_to(ret.created);
-    j.at("owner").get_to(ret.owner);
-    j.at("annotations").get_to(ret.annotations);
+    if (max_retries < 0) {
+        throw std::runtime_error("maximum number of attempts to create a temporary file reached");
+    }
 
-    return ret;
+    auto cleanup = make_errdefer([&dirfd, &temp_name]() noexcept {
+        std::ignore = unlinkat(dirfd, temp_name);
+    });
+
+    throw_if_error(linyaps_box::io::write_all(fd, as_bytes(span(content))));
+
+    if (::fsync(fd.get()) != 0) {
+        LINYAPS_BOX_LOG_WARN("fsync failed for status file: {}",
+                             std::generic_category().message(errno));
+    }
+
+    auto ref = dirfd.ref();
+    throw_if_error(renameat2(ref, temp_name, ref, path.filename(), sys::rename_flag::none));
+
+    if (::fsync(ref) != 0) {
+        LINYAPS_BOX_LOG_WARN("fsync failed for status directory: {}",
+                             std::generic_category().message(errno));
+    }
+}
+
+auto read_status(const std::filesystem::path &path) -> linyaps_box::container_status
+{
+    using namespace linyaps_box::os;
+
+    auto fd = throw_if_error(
+      open(path, sys::open_option{ sys::open_flag::cloexec, sys::access_mode::read_only }));
+
+    linyaps_box::utils::uninit_vector<std::byte> buf;
+    std::ignore = throw_if_error(linyaps_box::io::read_to_end(fd, buf));
+
+    const auto j = nlohmann::json::parse(buf.cbegin(), buf.cend());
+    return j.get<linyaps_box::container_status>();
 }
 
 } // namespace
@@ -67,21 +102,13 @@ linyaps_box::status_directory::status_directory(std::filesystem::path path)
     throw std::runtime_error("failed to create status directory: " + path_.string());
 }
 
-void linyaps_box::status_directory::write(const container_status_t &status) const
+void linyaps_box::status_directory::write(const container_status &status) const
 {
-    auto j = nlohmann::json::object({ { "id", status.ID },
-                                      { "pid", status.PID },
-                                      { "status", to_string_view(status.status) },
-                                      { "bundle", status.bundle },
-                                      { "created", status.created },
-                                      { "owner", status.owner },
-                                      { "annotations", status.annotations },
-                                      { "ociVersion", status.oci_version } });
-
-    utils::atomic_write(path_ / "status.json", j.dump());
+    auto j = nlohmann::json(status);
+    ::atomic_write(path_ / "status.json", j.dump());
 }
 
-auto linyaps_box::status_directory::read() const -> container_status_t
+auto linyaps_box::status_directory::read() const -> container_status
 {
     return read_status(path_ / "status.json");
 }
@@ -94,7 +121,7 @@ void linyaps_box::status_directory::remove() const
 
 auto linyaps_box::status_directory::write_config(std::string_view config) const -> void
 {
-    utils::atomic_write(path_ / "config.json", config);
+    ::atomic_write(path_ / "config.json", config);
 }
 
 auto linyaps_box::status_directory::save_config(const std::filesystem::path &src) const -> void
