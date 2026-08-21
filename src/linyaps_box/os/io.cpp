@@ -22,4 +22,21 @@ auto read(utils::file_descriptor_ref fd, utils::span<std::byte> buf) noexcept ->
         return unexpected{ make_error_code(errno) };
     }
 }
+
+auto write(utils::file_descriptor_ref fd, utils::span<const std::byte> buf) noexcept
+  -> Result<std::size_t>
+{
+    while (true) {
+        auto ret = ::write(fd, buf.data(), buf.size());
+        if (LIKELY(ret >= 0)) {
+            return ret;
+        }
+
+        if (errno == EINTR) {
+            continue;
+        }
+
+        return unexpected{ make_error_code(errno) };
+    }
+}
 } // namespace linyaps_box::os

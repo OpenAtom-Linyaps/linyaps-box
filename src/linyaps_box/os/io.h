@@ -94,4 +94,7 @@ static_assert(std::is_standard_layout_v<mutable_io_slice>,
 auto read(utils::file_descriptor_ref fd, utils::span<std::byte> buf) noexcept
   -> Result<std::size_t>;
 
+auto write(utils::file_descriptor_ref fd, utils::span<const std::byte> buf) noexcept
+  -> Result<std::size_t>;
+
 } // namespace linyaps_box::os
