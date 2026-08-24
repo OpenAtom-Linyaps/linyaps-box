@@ -11,7 +11,7 @@
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/utils.h"
 
-#include <fmt/format.h>
+#include <fmt/std.h>
 #include <nlohmann/json.hpp>
 
 namespace {

@@ -7,7 +7,7 @@
 #include "linyaps_box/utils/time.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -38,6 +38,10 @@ auto to_string_view(runtime_status s) -> std::string_view;
 auto derive_status(const container_status &s) -> runtime_status;
 
 auto to_oci_json(container_status s, runtime_status rs) -> nlohmann::json;
+
+namespace detail {
+auto format_container_status_json(const container_status &status, bool pretty) -> std::string;
+} // namespace detail
 
 } // namespace linyaps_box
 
@@ -97,8 +101,9 @@ struct fmt::formatter<linyaps_box::container_status>
               std::string_view{ time_buf.data(), len });
         }
 
-        auto json = nlohmann::json(status);
-        auto tab = presentation == Presentation::pretty_json ? 4 : -1;
-        return fmt::format_to(ctx.out(), "{}", json.dump(tab));
+        auto json_str = linyaps_box::detail::format_container_status_json(
+          status,
+          presentation == Presentation::pretty_json);
+        return fmt::format_to(ctx.out(), "{}", json_str);
     }
 };

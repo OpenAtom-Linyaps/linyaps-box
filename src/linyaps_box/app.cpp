@@ -13,6 +13,8 @@
 #include "linyaps_box/log/sink_factory.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <fmt/ostream.h>
+
 #include <iostream>
 
 namespace linyaps_box {

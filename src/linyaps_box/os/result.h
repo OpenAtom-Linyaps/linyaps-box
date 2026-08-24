@@ -4,8 +4,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
 #include <zeus/expected.hpp>
+
+#include <string_view>
+#include <system_error>
 
 namespace linyaps_box::os {
 

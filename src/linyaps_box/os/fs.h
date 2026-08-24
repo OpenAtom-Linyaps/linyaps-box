@@ -5,7 +5,7 @@
 #pragma once
 
 #include "linyaps_box/os/result.h"
-#include "linyaps_box/utils/enum_traits.h"
+#include "linyaps_box/utils/enum_formatter.h"
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/utils.h"
 

@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include <chrono>
 #include <cstdint>
 #include <string_view>
