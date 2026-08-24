@@ -150,7 +150,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/container_monitor.cpp
     src/linyaps_box/container_ref.cpp
     src/linyaps_box/container_status.cpp
-    src/linyaps_box/security/privilege.cpp
     src/linyaps_box/impl/disabled_cgroup_manager.cpp
     src/linyaps_box/infra/rootfs.cpp
     src/linyaps_box/infra/unix_socket.cpp
@@ -164,33 +163,34 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/log/sinks/file_sink.cpp
     src/linyaps_box/log/sinks/journald_sink.cpp
     src/linyaps_box/log/sinks/stderr_sink.cpp
-    src/linyaps_box/protocol/sync_socket_forwarder.cpp
     src/linyaps_box/log/sinks/syslog_sink.cpp
     src/linyaps_box/log/utils.cpp
     src/linyaps_box/os/fs.cpp
     src/linyaps_box/os/io.cpp
     src/linyaps_box/os/net.cpp
     src/linyaps_box/os/process.cpp
-    src/linyaps_box/os/tty.cpp
+    src/linyaps_box/os/pty.cpp
+    src/linyaps_box/os/termios.cpp
     src/linyaps_box/protocol/message_channel.cpp
     src/linyaps_box/protocol/message.cpp
+    src/linyaps_box/protocol/sync_socket_forwarder.cpp
     src/linyaps_box/runtime.cpp
+    src/linyaps_box/security/privilege.cpp
     src/linyaps_box/status_directory.cpp
     src/linyaps_box/status_directory_manager.cpp
     src/linyaps_box/terminal.cpp
-    src/linyaps_box/utils/process_stat.cpp
     src/linyaps_box/utils/cgroups.cpp
     src/linyaps_box/utils/close_range.cpp
     src/linyaps_box/utils/epoll.cpp
     src/linyaps_box/utils/file_describer.cpp
     src/linyaps_box/utils/mman.cpp
     src/linyaps_box/utils/platform.cpp
+    src/linyaps_box/utils/process_stat.cpp
     src/linyaps_box/utils/ringbuffer.cpp
     src/linyaps_box/utils/semver.cpp
     src/linyaps_box/utils/session.cpp
     src/linyaps_box/utils/setns.cpp
     src/linyaps_box/utils/signal.cpp
-    src/linyaps_box/utils/terminal.cpp
     src/linyaps_box/utils/time.cpp)
 
 if(NOT linyaps-box_ENABLE_SYSTEMD_INTEGRATION)

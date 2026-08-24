@@ -5,7 +5,7 @@
 #include "linyaps_box/log/sinks/stderr_sink.h"
 
 #include "linyaps_box/log/formatter.h"
-#include "linyaps_box/os/tty.h"
+#include "linyaps_box/os/termios.h"
 #include "linyaps_box/utils/span.h"
 
 #include <fmt/color.h>
@@ -16,7 +16,7 @@ namespace linyaps_box::log {
 stderr_sink::stderr_sink([[maybe_unused]] stderr_spec spec, output_format fmt) noexcept
     : stderr_fd(STDERR_FILENO, false)
     , format_(fmt)
-    , color(os::isatty(stderr_fd).value_or(false))
+    , color(os::isatty(stderr_fd))
 {
 }
 

@@ -6,8 +6,9 @@
 
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
+#include "linyaps_box/os/pty.h"
+#include "linyaps_box/os/termios.h"
 #include "linyaps_box/utils/ioctl.h"
-#include "linyaps_box/utils/terminal.h"
 
 #include <utility>
 
@@ -23,15 +24,19 @@ auto create_pty_pair() -> pty_data
       { linyaps_box::os::sys::open_flag::cloexec | linyaps_box::os::sys::open_flag::no_ctty,
         linyaps_box::os::sys::access_mode::read_write }));
 
-    auto pts = utils::ptsname(master);
-    unlockpt(master);
+    constexpr auto max_len = std::string_view::traits_type::length("/dev/pts/") + NAME_MAX + 1;
+    std::array<char, max_len> buf; // NOLINT
+    auto name = os::throw_if_error(os::ptsname(master, buf), "failed to get pty path");
+    os::throw_if_error(os::unlockpt(master), "failed to unlock pty");
+
+    auto pts = std::filesystem::path{ name };
     auto slave = linyaps_box::os::throw_if_error(linyaps_box::os::open(
       pts,
       { linyaps_box::os::sys::open_flag::cloexec, linyaps_box::os::sys::access_mode::read_write }));
 
     return {
         terminal_slave{ std::move(slave) },
-        pts,
+        std::move(pts),
         terminal_master{ std::move(master) },
     };
 }
@@ -89,13 +94,13 @@ auto terminal_slave::set_raw() -> void
 
     LINYAPS_BOX_LOG_DEBUG("Set terminal {} to raw mode", slave_.get());
 
-    struct termios orig_term{ };
-    utils::tcgetattr(slave_, orig_term);
+    auto orig_term = os::throw_if_error(os::tcgetattr(slave_), "failed to get original termios");
 
     auto raw = orig_term;
     ::cfmakeraw(&raw);
 
-    utils::tcsetattr(slave_, TCSANOW, raw);
+    os::throw_if_error(os::tcsetattr(slave_, os::optional_action::now, raw),
+                       "failed to set raw mode to slave pty");
 
     termios = orig_term;
 }
@@ -111,7 +116,7 @@ terminal_slave::~terminal_slave() noexcept
 
 try {
     if (termios && slave_.valid()) {
-        utils::tcsetattr(slave_, TCSANOW, termios.value());
+        os::tcsetattr(slave_, os::optional_action::now, termios.value());
     }
 } catch (std::exception &e) {
     LINYAPS_BOX_LOG_ERROR("Failed to restore terminal:{}", e.what());
