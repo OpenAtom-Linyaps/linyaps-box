@@ -8,6 +8,8 @@
 #include "linyaps_box/os/fs.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <fmt/std.h>
+
 #include <algorithm>
 #include <array>
 #include <climits> // IWYU pragma: keep

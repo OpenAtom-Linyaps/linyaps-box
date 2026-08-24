@@ -7,7 +7,7 @@
 #include "linyaps_box/config/enum_tables.h"
 #include "linyaps_box/config/mount_options.h"
 #include "linyaps_box/config/validate.h"
-#include "linyaps_box/utils/enum_traits.h"
+#include "linyaps_box/utils/enum_formatter.h"
 #include "linyaps_box/utils/semver.h"
 #include "linyaps_box/utils/utils.h"
 

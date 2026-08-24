@@ -10,10 +10,12 @@
 #include "linyaps_box/os/kernel_constants.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <fmt/std.h>
 #include <linux/magic.h>
 #include <sys/statfs.h>
 #include <sys/syscall.h>
 
+#include <algorithm>
 #include <deque>
 #include <memory>
 #include <string>

@@ -27,6 +27,7 @@
 
 #include <linux/magic.h>
 #include <linux/sched.h>
+#include <nlohmann/json.hpp>
 #include <sys/mount.h>
 #include <sys/signalfd.h>
 #include <sys/statfs.h>

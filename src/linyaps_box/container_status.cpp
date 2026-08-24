@@ -8,6 +8,8 @@
 #include "linyaps_box/utils/time.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <nlohmann/json.hpp>
+
 #include <csignal> // IWYU pragma: keep
 #include <system_error>
 
@@ -113,5 +115,15 @@ auto to_oci_json(container_status s, runtime_status rs) -> nlohmann::json
                                     { "annotations", std::move(s.annotations) },
                                     { "ociVersion", std::move(s.oci_version) } });
 }
+
+namespace detail {
+
+auto format_container_status_json(const container_status &status, bool pretty) -> std::string
+{
+    auto json = nlohmann::json(status);
+    return json.dump(pretty ? 4 : -1);
+}
+
+} // namespace detail
 
 } // namespace linyaps_box

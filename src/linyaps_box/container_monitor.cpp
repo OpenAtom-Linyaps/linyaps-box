@@ -11,6 +11,7 @@
 #include "linyaps_box/utils/signal.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <fmt/std.h>
 #include <sys/signalfd.h>
 
 #include <algorithm>

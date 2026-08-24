@@ -9,8 +9,10 @@
 #include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <fmt/std.h>
 #include <sys/prctl.h>
 
+#include <algorithm>
 #include <fstream>
 #include <system_error>
 
