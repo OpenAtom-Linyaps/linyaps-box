@@ -4,6 +4,7 @@
 
 #include "linyaps_box/os/process.h"
 
+#include "linyaps_box/os/details/ioctl_wrapper.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <sys/prctl.h>
@@ -14,11 +15,12 @@
 namespace linyaps_box::os {
 
 namespace {
+
 auto prctl(int option,
            unsigned long arg2 = 0,
            unsigned long arg3 = 0,
            unsigned long arg4 = 0,
-           unsigned long arg5 = 0) -> Result<int>
+           unsigned long arg5 = 0) noexcept -> Result<int>
 {
     auto ret = ::prctl(option, arg2, arg3, arg4, arg5);
     if (UNLIKELY(ret < 0)) {
@@ -27,6 +29,7 @@ auto prctl(int option,
 
     return ret;
 }
+
 } // namespace
 
 auto waitpid(pid_t pid, int &status, int options) noexcept -> Result<int>
@@ -98,6 +101,11 @@ auto clear_ambient_capability_set() noexcept -> Result<void>
 auto add_ambient_capability(long cap) noexcept -> Result<void>
 {
     return prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap).transform([](int) { });
+}
+
+auto set_control_terminal(utils::file_descriptor_ref fd) noexcept -> Result<void>
+{
+    return details::ioctl(fd, TIOCSCTTY, 0).transform([](int) { });
 }
 
 } // namespace linyaps_box::os

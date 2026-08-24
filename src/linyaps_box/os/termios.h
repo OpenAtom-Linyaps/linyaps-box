@@ -5,6 +5,8 @@
 #include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/file_describer.h"
 
+#include <sys/ioctl.h>
+
 #include <termios.h>
 
 namespace linyaps_box::os {
@@ -17,6 +19,11 @@ enum class optional_action : uint8_t {
     drain = TCSADRAIN,
     flush = TCSAFLUSH,
 };
-auto tcsetattr(utils::file_descriptor_ref fd, optional_action action, const struct termios &termios)
-  -> Result<void>;
+auto tcsetattr(utils::file_descriptor_ref fd,
+               optional_action action,
+               const struct termios &termios) noexcept -> Result<void>;
+
+auto tcsetwinsize(utils::file_descriptor_ref fd, winsize size) noexcept -> Result<void>;
+
+auto tcgetwinsize(utils::file_descriptor_ref fd) noexcept -> Result<winsize>;
 } // namespace linyaps_box::os
