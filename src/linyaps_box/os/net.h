@@ -6,7 +6,7 @@
 
 #include "linyaps_box/os/io.h"
 #include "linyaps_box/os/result.h"
-#include "linyaps_box/utils/enum_formatter.h"
+#include "linyaps_box/utils/enum_traits.h"
 #include "linyaps_box/utils/file_describer.h"
 
 #include <cstring>

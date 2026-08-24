@@ -8,7 +8,7 @@
 #include "linyaps_box/utils/file_describer.h"
 
 namespace linyaps_box::os {
-
-auto isatty(const utils::file_descriptor &fd) noexcept -> Result<bool>;
-
-}
+auto unlockpt(utils::file_descriptor_ref fd) noexcept -> Result<void>;
+auto ptsname(utils::file_descriptor_ref fd, utils::span<char> buf) noexcept
+  -> Result<std::string_view>;
+} // namespace linyaps_box::os

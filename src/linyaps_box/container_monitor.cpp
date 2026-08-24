@@ -7,7 +7,7 @@
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
 #include "linyaps_box/os/process.h"
-#include "linyaps_box/os/tty.h"
+#include "linyaps_box/os/termios.h"
 #include "linyaps_box/utils/signal.h"
 #include "linyaps_box/utils/utils.h"
 
@@ -32,9 +32,7 @@ auto detect_host_tty() -> std::optional<terminal_slave>
             continue;
         }
 
-        if (ret.value()) {
-            return terminal_slave{ std::move(fd) };
-        }
+        return terminal_slave{ std::move(fd) };
     }
 
     auto tty_res =
@@ -42,9 +40,9 @@ auto detect_host_tty() -> std::optional<terminal_slave>
     if (!tty_res) {
         return std::nullopt;
     }
+
     auto tty = std::move(*tty_res);
-    auto ret = os::isatty(tty);
-    if (LIKELY(ret && ret.value())) {
+    if (LIKELY(os::isatty(tty))) {
         return terminal_slave{ std::move(tty) };
     }
 

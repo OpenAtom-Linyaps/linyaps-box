@@ -74,28 +74,6 @@ auto str_to_signal(std::string_view str) -> int
     return it->value;
 }
 
-auto get_path_max(const std::filesystem::path &fs_dir) noexcept -> std::size_t
-{
-    errno = 0;
-    auto max = pathconf(fs_dir.c_str(), _PC_PATH_MAX);
-    if (max == -1) {
-        if (errno != 0) {
-            auto saved_errno = errno;
-            LINYAPS_BOX_LOG_WARN("Failed to get pathconf: {}, use default value",
-                                 ::strerror(saved_errno));
-            errno = 0;
-        }
-#ifdef PATH_MAX
-        return PATH_MAX;
-#else
-        // Should we make the default value to be configured value?
-        return 4096;
-#endif
-    }
-
-    return static_cast<std::size_t>(max);
-}
-
 auto get_page_size() noexcept -> std::size_t
 {
     static const auto page_size = []() noexcept -> std::size_t {
