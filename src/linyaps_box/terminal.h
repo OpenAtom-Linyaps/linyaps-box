@@ -78,6 +78,6 @@ struct pty_data
     terminal_master master;
 };
 
-auto create_pty_pair() -> pty_data;
+[[nodiscard]] auto create_pty_pair() -> pty_data;
 
 } // namespace linyaps_box

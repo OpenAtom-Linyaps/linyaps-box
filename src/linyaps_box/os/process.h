@@ -5,6 +5,7 @@
 #pragma once
 
 #include "linyaps_box/os/result.h"
+#include "linyaps_box/utils/file_describer.h"
 
 #include <filesystem>
 
@@ -21,6 +22,8 @@ auto set_no_new_privileges(bool state) noexcept -> Result<void>;
 auto clear_ambient_capability_set() noexcept -> Result<void>;
 
 auto add_ambient_capability(long cap) noexcept -> Result<void>;
+
+auto set_control_terminal(utils::file_descriptor_ref fd) noexcept -> Result<void>;
 
 [[nodiscard]] auto umask(std::filesystem::perms perm) noexcept -> Result<std::filesystem::perms>;
 

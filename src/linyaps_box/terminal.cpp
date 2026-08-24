@@ -6,13 +6,9 @@
 
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
+#include "linyaps_box/os/process.h"
 #include "linyaps_box/os/pty.h"
 #include "linyaps_box/os/termios.h"
-#include "linyaps_box/utils/ioctl.h"
-
-#include <utility>
-
-#include <fcntl.h>
 
 namespace linyaps_box {
 
@@ -43,7 +39,7 @@ auto create_pty_pair() -> pty_data
 
 auto terminal_master::resize(struct winsize size) -> void
 {
-    std::ignore = utils::ioctl(master_, TIOCSWINSZ, &size);
+    os::throw_if_error(os::tcsetwinsize(master_, size), "failed to resize terminal");
 }
 
 terminal_slave::terminal_slave(terminal_slave &&other) noexcept
@@ -70,7 +66,7 @@ auto terminal_slave::setup_stdio() -> void
     slave_.duplicate_to(STDIN_FILENO, 0);
     slave_.duplicate_to(STDOUT_FILENO, 0);
     slave_.duplicate_to(STDERR_FILENO, 0);
-    std::ignore = utils::ioctl(slave_, TIOCSCTTY, 0);
+    std::ignore = os::set_control_terminal(slave_);
 }
 
 auto terminal_slave::set_size(struct winsize size) -> void
@@ -80,10 +76,10 @@ auto terminal_slave::set_size(struct winsize size) -> void
           linyaps_box::os::open("/dev/tty",
                                 { linyaps_box::os::sys::open_flag::cloexec,
                                   linyaps_box::os::sys::access_mode::read_write }));
-        std::ignore = utils::ioctl(default_tty, TIOCGWINSZ, &size);
+        size = os::throw_if_error(os::tcgetwinsize(default_tty));
     }
 
-    std::ignore = utils::ioctl(slave_, TIOCSWINSZ, &size);
+    os::throw_if_error(os::tcsetwinsize(slave_, size));
 }
 
 auto terminal_slave::set_raw() -> void
@@ -107,9 +103,7 @@ auto terminal_slave::set_raw() -> void
 
 auto terminal_slave::get_size() -> struct winsize
 {
-    struct winsize size{ };
-    std::ignore = utils::ioctl(slave_, TIOCGWINSZ, &size);
-    return size;
+    return os::throw_if_error(os::tcgetwinsize(slave_));
 }
 
 terminal_slave::~terminal_slave() noexcept
