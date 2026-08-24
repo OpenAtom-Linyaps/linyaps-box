@@ -146,41 +146,47 @@ inline auto debug(std::string_view file,
 
 #define LINYAPS_BOX_LOG_DEFAULT_LEVEL ::linyaps_box::log::level::LINYAPS_BOX_DEFAULT_LOG_LEVEL_NAME
 
-// FATAL/ERROR are always compiled in and unconditionally dispatched: they are
-// never filtered out at compile time, and dispatch_log applies the runtime
-// level filter (so the formatted message is still skipped when below level).
-#define LINYAPS_BOX_LOG_FATAL(...)                                            \
-    do {                                                                      \
-        ::linyaps_box::log::fatal(::linyaps_box::log::log_basename(__FILE__), \
-                                  __func__,                                   \
-                                  __LINE__,                                   \
-                                  __VA_ARGS__);                               \
+// FATAL/ERROR are always compiled in
+#define LINYAPS_BOX_LOG_FATAL(...)                                                             \
+    do {                                                                                       \
+        if (::linyaps_box::log::get_current_log_level() >= ::linyaps_box::log::level::fatal) { \
+            ::linyaps_box::log::fatal(::linyaps_box::log::log_basename(__FILE__),              \
+                                      __func__,                                                \
+                                      __LINE__,                                                \
+                                      __VA_ARGS__);                                            \
+        }                                                                                      \
     } while (false)
 
-#define LINYAPS_BOX_LOG_FATAL_ERRNO(errno_val, ...)                           \
-    do {                                                                      \
-        ::linyaps_box::log::fatal(::linyaps_box::log::log_basename(__FILE__), \
-                                  __func__,                                   \
-                                  __LINE__,                                   \
-                                  errno_val,                                  \
-                                  __VA_ARGS__);                               \
+#define LINYAPS_BOX_LOG_FATAL_ERRNO(errno_val, ...)                                            \
+    do {                                                                                       \
+        if (::linyaps_box::log::get_current_log_level() >= ::linyaps_box::log::level::fatal) { \
+            ::linyaps_box::log::fatal(::linyaps_box::log::log_basename(__FILE__),              \
+                                      __func__,                                                \
+                                      __LINE__,                                                \
+                                      errno_val,                                               \
+                                      __VA_ARGS__);                                            \
+        }                                                                                      \
     } while (false)
 
-#define LINYAPS_BOX_LOG_ERROR(...)                                            \
-    do {                                                                      \
-        ::linyaps_box::log::error(::linyaps_box::log::log_basename(__FILE__), \
-                                  __func__,                                   \
-                                  __LINE__,                                   \
-                                  __VA_ARGS__);                               \
+#define LINYAPS_BOX_LOG_ERROR(...)                                                             \
+    do {                                                                                       \
+        if (::linyaps_box::log::get_current_log_level() >= ::linyaps_box::log::level::error) { \
+            ::linyaps_box::log::error(::linyaps_box::log::log_basename(__FILE__),              \
+                                      __func__,                                                \
+                                      __LINE__,                                                \
+                                      __VA_ARGS__);                                            \
+        }                                                                                      \
     } while (false)
 
-#define LINYAPS_BOX_LOG_ERROR_ERRNO(errno_val, ...)                           \
-    do {                                                                      \
-        ::linyaps_box::log::error(::linyaps_box::log::log_basename(__FILE__), \
-                                  __func__,                                   \
-                                  __LINE__,                                   \
-                                  errno_val,                                  \
-                                  __VA_ARGS__);                               \
+#define LINYAPS_BOX_LOG_ERROR_ERRNO(errno_val, ...)                                            \
+    do {                                                                                       \
+        if (::linyaps_box::log::get_current_log_level() >= ::linyaps_box::log::level::error) { \
+            ::linyaps_box::log::error(::linyaps_box::log::log_basename(__FILE__),              \
+                                      __func__,                                                \
+                                      __LINE__,                                                \
+                                      errno_val,                                               \
+                                      __VA_ARGS__);                                            \
+        }                                                                                      \
     } while (false)
 
 #define LINYAPS_BOX_LOG_WARN(...)                                                                 \

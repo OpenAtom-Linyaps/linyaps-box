@@ -657,9 +657,13 @@ TEST(FormatLog, JsonSourceLocationFields)
 TEST(LoggerDeathTest, DispatchLogWithoutBackendTerminates)
 {
     auto &logger = linyaps_box::log::global_logger::instance();
+    const auto saved_level = logger.get_level();
     logger.unset_backend();
+    logger.set_level(linyaps_box::log::level::debug);
 
     EXPECT_DEATH(LINYAPS_BOX_LOG_ERROR("should crash"), "logger uninitialized");
+
+    logger.set_level(saved_level);
 }
 
 TEST(LogConfig, MakeSink)
