@@ -10,6 +10,9 @@
 
 namespace linyaps_box::log {
 
+// The caller clears buf before each sink call, so the
+// sink may assume it starts empty.
+// Sinks must not retain buf across calls
 class sink
 {
 public:
