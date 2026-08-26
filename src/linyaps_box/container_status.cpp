@@ -4,16 +4,12 @@
 
 #include "linyaps_box/container_status.h"
 
-#include "linyaps_box/utils/process_stat.h"
+#include "linyaps_box/infra/process_handle.h"
+#include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/time.h"
-#include "linyaps_box/utils/utils.h"
 
+#include <fmt/std.h>
 #include <nlohmann/json.hpp>
-
-#include <csignal> // IWYU pragma: keep
-#include <system_error>
-
-#include <unistd.h>
 
 namespace linyaps_box {
 
@@ -67,30 +63,32 @@ auto derive_status(const container_status &s) -> runtime_status
         return runtime_status::CREATING;
     }
 
-    if (::kill(s.pid, 0) != 0) {
-        if (errno == ESRCH) {
+    auto handle = infra::process_handle::open(s.pid);
+    if (!handle) {
+        if (handle.error() == std::errc::no_such_process) {
             return runtime_status::STOPPED;
         }
 
-        if (UNLIKELY(errno != EPERM)) {
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    fmt::format("failed to detect process {}", s.pid));
-        }
-
-        // EPERM: process exists but we lack permission.
-        // Without /proc access we cannot verify the start time, so assume RUNNING.
+        LINYAPS_BOX_LOG_INFO("failed to get container process handle: {}", handle.error());
+        // optimistic on uncertainty.
+        // EPERM or other errors mean we cannot inspect the process,
+        // assume RUNNING rather than reporting a false STOPPED.
         return runtime_status::RUNNING;
     }
 
-    // Process is alive. Verify it is the same process (not a recycled PID).
-    auto actual = utils::read_process_start_time(s.pid);
-    if (!actual) {
-        // assume it running
+    auto stat = handle->status();
+    if (!stat) {
+        LINYAPS_BOX_LOG_INFO("failed to get container process stat: {}", stat.error());
+        // Cannot read the pinned process's stat — assume RUNNING (optimistic).
         return runtime_status::RUNNING;
     }
 
-    if (*actual != s.process_start_time) {
+    if (stat->state == infra::process_state::zombie || stat->state == infra::process_state::dead) {
+        return runtime_status::STOPPED;
+    }
+
+    if (stat->start_time != s.process_start_time) {
+        // PID was recycled: the original container process is gone.
         return runtime_status::STOPPED;
     }
 
