@@ -6,8 +6,8 @@
 
 #include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/log/logger.h"
-#include "linyaps_box/log/macro.h"
 #include "linyaps_box/log/sinks/stderr_sink.h"
+#include "linyaps_box/os/fs.h"
 #include "linyaps_box/protocol/message.h"
 #include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/protocol/sync_socket_forwarder.h"
@@ -20,12 +20,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace {
-
 namespace proto = linyaps_box::protocol;
 namespace msg = linyaps_box::protocol::msg;
 namespace log_lvl = linyaps_box::log;
 namespace os = linyaps_box::os;
+
+namespace {
 
 auto make_transport_pair()
   -> std::pair<linyaps_box::protocol::channel_transport, linyaps_box::protocol::channel_transport>
@@ -458,9 +458,11 @@ TEST(MessageChannel, FdsExceedLimitThrows)
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     for (int i = 0; i < 17; ++i) {
-        auto fd = ::open("/dev/null", O_RDONLY | O_CLOEXEC);
-        ASSERT_GE(fd, 0);
-        fds.emplace_back(fd, true);
+        auto fd = os::open("/dev/null",
+                           { linyaps_box::os::sys::open_flag::cloexec,
+                             linyaps_box::os::sys::access_mode::read_only });
+        ASSERT_TRUE(fd);
+        fds.emplace_back(std::move(*fd));
     }
 
     std::vector<linyaps_box::utils::file_descriptor_ref> refs;
@@ -502,9 +504,11 @@ TEST(MessageChannel, MaxFdsTransfer)
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     for (int i = 0; i < 16; ++i) {
-        auto fd = ::open("/dev/null", O_RDONLY | O_CLOEXEC);
-        ASSERT_GE(fd, 0);
-        fds.emplace_back(fd, true);
+        auto fd = os::open("/dev/null",
+                           { linyaps_box::os::sys::open_flag::cloexec,
+                             linyaps_box::os::sys::access_mode::read_only });
+        ASSERT_TRUE(fd);
+        fds.emplace_back(std::move(*fd));
     }
 
     std::vector<linyaps_box::utils::file_descriptor_ref> refs;
