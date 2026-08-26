@@ -93,9 +93,9 @@ set(linyaps-box_ACTIVE_LOG_LEVEL
       "Compile-time log level; fatal/error always kept. Default 'info' eliminates debug only."
 )
 
-set(linyaps-box_ENABLE_CPM
+set(linyaps-box_OFFLINE_BUILD
     OFF
-    CACHE BOOL "enable CPM")
+    CACHE BOOL "when set, fall back to vendored sources instead of CPM fetch")
 
 set(linyaps-box_HARDENING
     ON
@@ -103,10 +103,12 @@ set(linyaps-box_HARDENING
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if(CMAKE_VERSION VERSION_LESS "3.14")
-  set(linyaps-box_ENABLE_CPM OFF)
+if(CMAKE_VERSION VERSION_LESS "3.14" AND NOT linyaps-box_OFFLINE_BUILD)
+  set(linyaps-box_OFFLINE_BUILD ON)
   message(
-    STATUS "cmake version ${CMAKE_VERSION} not compatible with CPM.cmake.")
+    STATUS
+      "cmake version ${CMAKE_VERSION} not compatible with CPM.cmake; forcing offline mode."
+  )
 endif()
 
 # if just want to try local packages at first set CPM_USE_LOCAL_PACKAGES ON
@@ -130,8 +132,9 @@ if(linyaps-box_ENABLE_SANITIZER)
   endif()
 
   message(STATUS "enable address and undefined sanitizer")
-  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g3)
-  add_link_options(-fsanitize=address,undefined)
+  add_compile_options(-fsanitize=address,undefined,leak -fno-omit-frame-pointer
+                      -g3)
+  add_link_options(-fsanitize=address,undefined,leak)
 endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
@@ -243,104 +246,74 @@ if(linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
   list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PRIVATE PkgConfig::libsystemd)
 endif()
 
-if(linyaps-box_ENABLE_CPM)
+function(linyaps_box_dependency name min_version repo tag)
+  cmake_parse_arguments(ARG "" "" "OPTIONS" ${ARGN})
+
+  find_package(${name} ${min_version} QUIET)
+  if(${name}_FOUND)
+    message(STATUS "use system ${name} ${${name}_VERSION}")
+    return()
+  endif()
+
+  if(linyaps-box_OFFLINE_BUILD)
+    list(APPEND CMAKE_MODULE_PATH
+         "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/${name}")
+    add_subdirectory(external/${name})
+    find_package(${name} ${min_version} REQUIRED)
+    message(STATUS "use vendor ${name} ${${name}_VERSION}")
+  else()
+    if(ARG_OPTIONS)
+      CPMAddPackage(
+        NAME ${name}
+        GITHUB_REPOSITORY ${repo}
+        GIT_TAG ${tag}
+        EXCLUDE_FROM_ALL ON
+        OPTIONS ${ARG_OPTIONS})
+    else()
+      CPMAddPackage(
+        NAME ${name}
+        GITHUB_REPOSITORY ${repo}
+        GIT_TAG ${tag}
+        EXCLUDE_FROM_ALL ON)
+    endif()
+  endif()
+endfunction()
+
+if(NOT linyaps-box_OFFLINE_BUILD)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
   include(CPM)
 
   if(linyaps-box_CPM_LOCAL_PACKAGES_ONLY)
     set(CPM_USE_LOCAL_PACKAGES ON)
   endif()
-
-  CPMFindPackage(
-    NAME nlohmann_json
-    VERSION 3.11.3
-    GITHUB_REPOSITORY nlohmann/json
-    GIT_TAG v3.12.0
-    EXCLUDE_FROM_ALL ON
-    OPTIONS "JSON_BuildTests OFF")
-  CPMFindPackage(
-    NAME CLI11
-    VERSION 2.6.0
-    GITHUB_REPOSITORY CLIUtils/CLI11
-    GIT_TAG v2.7.2
-    EXCLUDE_FROM_ALL ON
-    OPTIONS "CLI11_BUILD_TESTS OFF")
-  CPMFindPackage(
-    NAME zeus_expected
-    VERSION 1.4.0
-    GITHUB_REPOSITORY zeus-cpp/expected
-    GIT_TAG v1.4.0
-    EXCLUDE_FROM_ALL ON
-    OPTIONS "BUILD_TESTING OFF")
-  CPMFindPackage(
-    NAME fmt
-    VERSION 10.1.1
-    GITHUB_REPOSITORY fmtlib/fmt
-    GIT_TAG 12.2.0
-    EXCLUDE_FROM_ALL ON)
 endif()
 
-# find minimal version
-find_package(nlohmann_json 3.11.3 QUIET)
-if(NOT nlohmann_json_FOUND)
-  add_subdirectory(external/nlohmann_json)
-  list(APPEND CMAKE_MODULE_PATH
-       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/nlohmann_json")
-  find_package(nlohmann_json 3.11.3 REQUIRED)
-  message(STATUS "use vendor nlohmann_json ${nlohmann_json_VERSION}")
-else()
-  message(STATUS "use system nlohmann_json ${nlohmann_json_VERSION}")
-endif()
-
+linyaps_box_dependency(nlohmann_json 3.11.3 nlohmann/json v3.12.0 OPTIONS
+                       "JSON_BuildTests OFF")
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
      nlohmann_json::nlohmann_json)
 
-find_package(CLI11 2.6.0 QUIET)
-if(NOT CLI11_FOUND)
-  add_subdirectory(external/CLI11)
-  list(APPEND CMAKE_MODULE_PATH
-       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/CLI11")
-  find_package(CLI11 2.6.0 REQUIRED)
-  message(STATUS "use vendor CLI11 ${CLI11_VERSION}")
-else()
-  message(STATUS "use system CLI11 ${CLI11_VERSION}")
-endif()
-
+linyaps_box_dependency(CLI11 2.6.0 CLIUtils/CLI11 v2.7.2 OPTIONS
+                       "CLI11_BUILD_TESTS OFF")
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES CLI11::CLI11)
 
 set(FMT_TARGET
     "$<IF:$<BOOL:${linyaps-box_STATIC}>,fmt::fmt-header-only,fmt::fmt>")
 
-find_package(fmt 10.1.1 QUIET)
-if(NOT fmt_FOUND)
-  # if fmt is not found in local system. just use fmt::fmt with static linkage
-  # for boosting compiling speed.
+if(linyaps-box_OFFLINE_BUILD)
+  # vendored fmt is built as a static library to boost compiling speed
   set(FMT_TARGET fmt::fmt)
-
   set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
   set(BUILD_SHARED_LIBS OFF)
-
-  list(APPEND CMAKE_MODULE_PATH
-       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/fmt")
-  add_subdirectory(external/fmt)
-
-  set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
-  message(STATUS "use vendor fmt ${fmt_VERSION}")
-else()
-  message(STATUS "use system fmt ${fmt_VERSION}")
 endif()
-
+linyaps_box_dependency(fmt 10.1.1 fmtlib/fmt 12.2.0)
+if(linyaps-box_OFFLINE_BUILD)
+  set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
+endif()
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES ${FMT_TARGET})
 
-find_package(zeus_expected 1.4.0 QUIET)
-if(NOT zeus_expected_FOUND)
-  add_subdirectory(external/zeus_expected)
-  list(APPEND CMAKE_MODULE_PATH
-       "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/zeus_expected")
-  find_package(zeus_expected 1.4.0 REQUIRED)
-  message(STATUS "use vendor zeus_expected ${zeus_expected_VERSION}")
-endif()
-
+linyaps_box_dependency(zeus_expected 1.4.0 zeus-cpp/expected v1.4.0 OPTIONS
+                       "BUILD_TESTING OFF")
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES zeus::expected)
 
 add_library("${linyaps-box_LIBRARY}" STATIC ${linyaps-box_LIBRARY_SOURCE})
