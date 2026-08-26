@@ -186,7 +186,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/file_describer.cpp
     src/linyaps_box/utils/mman.cpp
     src/linyaps_box/utils/platform.cpp
-    src/linyaps_box/utils/process_stat.cpp
     src/linyaps_box/utils/ringbuffer.cpp
     src/linyaps_box/utils/semver.cpp
     src/linyaps_box/utils/session.cpp

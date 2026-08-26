@@ -7,6 +7,7 @@
 #include "linyaps_box/config/mount_options.h"
 #include "linyaps_box/container_monitor.h"
 #include "linyaps_box/impl/disabled_cgroup_manager.h"
+#include "linyaps_box/infra/process_handle.h"
 #include "linyaps_box/infra/rootfs.h"
 #include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/log/logger.h"
@@ -20,7 +21,6 @@
 #include "linyaps_box/utils/cgroups.h"
 #include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/file_describer.h"
-#include "linyaps_box/utils/process_stat.h"
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/signal.h"
 #include "utils/defer.h"
@@ -2325,12 +2325,20 @@ int container::run(run_container_options_t options)
         status.bundle = this->bundle;
         status.created = std::chrono::system_clock::now();
 
-        auto start_time = utils::read_process_start_time(child_pid);
-        if (UNLIKELY(!start_time)) {
-            throw std::runtime_error(
-              fmt::format("failed to get container process start time: {}", start_time.error()));
+        // TODO: use clone3 to eliminate racing window
+        auto child_handle = infra::process_handle::open(child_pid);
+        if (UNLIKELY(!child_handle)) {
+            throw std::runtime_error(fmt::format("failed to open container process {}: {}",
+                                                 child_pid,
+                                                 child_handle.error().message()));
         }
-        status.process_start_time = start_time.value();
+
+        auto stat = child_handle->status();
+        if (UNLIKELY(!stat)) {
+            throw std::runtime_error(fmt::format("failed to get container process start time: {}",
+                                                 stat.error().message()));
+        }
+        status.process_start_time = stat->start_time;
 
         std::string owner;
 #ifndef LINYAPS_BOX_STATIC_LINK

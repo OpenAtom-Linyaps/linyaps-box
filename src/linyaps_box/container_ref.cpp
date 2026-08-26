@@ -5,6 +5,7 @@
 #include "linyaps_box/container_ref.h"
 
 #include "linyaps_box/container_monitor.h"
+#include "linyaps_box/infra/process_handle.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h" // IWYU pragma: keep
@@ -20,16 +21,7 @@
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/utils.h"
 
-#include <algorithm>
-#include <cassert>
-#include <csignal> // IWYU pragma: keep
-#include <limits>
-#include <utility>
-#include <vector>
-
 #include <sys/resource.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 namespace linyaps_box {
 
@@ -399,22 +391,71 @@ container_status linyaps_box::container_ref::status() const
     return status_dir_.read();
 }
 
-void container_ref::kill(int signal) const
-{
-    auto pid = this->status().pid;
+namespace {
 
-    if (::kill(pid, signal) == 0) {
-        return;
+// the handle pins the process, but confirming that the pinned process
+// is still the original container init is an operation-semantics check
+// (pessimistic — refuse on uncertainty).
+auto verify_container_process(const infra::process_handle &handle,
+                              const container_status &st,
+                              std::string_view action) -> void
+{
+    auto stat = handle.status();
+    if (UNLIKELY(!stat)) {
+        throw std::system_error(stat.error(),
+                                fmt::format("cannot read status of container process {} "
+                                            "before {}",
+                                            st.pid,
+                                            action));
     }
 
-    throw std::system_error(errno,
-                            std::system_category(),
-                            fmt::format("failed to kill process {} with signal {}", pid, signal));
+    if (UNLIKELY(stat->state == infra::process_state::zombie
+                 || stat->state == infra::process_state::dead)) {
+        throw std::system_error(std::make_error_code(std::errc::no_such_process),
+                                fmt::format("container process {} is not running", st.pid));
+    }
+
+    if (UNLIKELY(stat->start_time != st.process_start_time)) {
+        throw std::system_error(std::make_error_code(std::errc::no_such_process),
+                                fmt::format("container PID {} was reused by another process; "
+                                            "refusing to {}",
+                                            st.pid,
+                                            action));
+    }
+}
+
+} // anonymous namespace
+
+void container_ref::kill(int signal) const
+{
+    auto st = this->status();
+
+    auto handle = infra::process_handle::open(st.pid);
+    if (UNLIKELY(!handle)) {
+        throw std::system_error(handle.error(),
+                                fmt::format("failed to open container process {}", st.pid));
+    }
+
+    verify_container_process(*handle, st, "send signal");
+
+    os::throw_if_error(handle->send_signal(signal),
+                       fmt::format("failed to kill container process {}", st.pid));
 }
 
 auto container_ref::exec(exec_container_option option) const -> int
 {
-    auto target_pid = this->status().pid;
+    auto st = this->status();
+
+    // Defense against PID reuse
+    auto handle = infra::process_handle::open(st.pid);
+    if (UNLIKELY(!handle)) {
+        throw std::system_error(handle.error(),
+                                fmt::format("failed to open container process {}", st.pid));
+    }
+
+    verify_container_process(*handle, st, "exec process");
+
+    auto target_pid = handle->pid();
 
     os::throw_if_error(os::set_child_subreaper(true));
 
