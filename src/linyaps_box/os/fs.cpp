@@ -6,21 +6,14 @@
 
 #include "linyaps_box/utils/utils.h"
 
-#include <sys/sysmacros.h>
-
-#include <memory>
-
-#include <unistd.h>
+#include <sys/stat.h>
 
 #ifdef LINYAPS_BOX_HAVE_OPENAT2_H
 #  include <linux/openat2.h>
 #endif
 
-constexpr auto openat2_sys =
 #ifndef __NR_openat2
-  437;
-#else
-  __NR_openat2;
+#  define __NR_openat2 437
 #endif
 
 #include <sys/syscall.h>
@@ -71,8 +64,7 @@ auto open(const std::filesystem::path &path,
             continue;
         }
 
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+        return unexpected{ make_error_code(errno) };
     }
 }
 
@@ -94,8 +86,7 @@ auto openat(utils::file_descriptor_ref dirfd,
             continue;
         }
 
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+        return unexpected{ make_error_code(errno) };
     }
 }
 
@@ -114,7 +105,7 @@ auto openat2(utils::file_descriptor_ref dirfd,
 
     while (true) {
         const auto fd = static_cast<int>(
-          ::syscall(openat2_sys, dirfd, path.c_str(), &linux_open_how, sizeof(linux_open_how)));
+          ::syscall(__NR_openat2, dirfd, path.c_str(), &linux_open_how, sizeof(linux_open_how)));
         if (LIKELY(fd >= 0)) {
             return utils::file_descriptor{ fd };
         }
@@ -123,8 +114,7 @@ auto openat2(utils::file_descriptor_ref dirfd,
             continue;
         }
 
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+        return unexpected{ make_error_code(errno) };
     }
 }
 
@@ -133,8 +123,8 @@ auto unlinkat(utils::file_descriptor_ref dirfd,
               sys::at_flag flags) noexcept -> Result<void>
 {
     if (UNLIKELY(::unlinkat(dirfd, path.c_str(), static_cast<int>(flags)) < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+
+        return unexpected{ make_error_code(errno) };
     }
 
     return { };
@@ -145,8 +135,7 @@ auto mkdirat(utils::file_descriptor_ref dirfd,
              std::filesystem::perms perm) noexcept -> Result<void>
 {
     if (UNLIKELY(::mkdirat(dirfd, path.c_str(), static_cast<mode_t>(perm)) < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+        return unexpected{ make_error_code(errno) };
     }
 
     return { };
@@ -157,8 +146,7 @@ auto symlinkat(const std::filesystem::path &target,
                const std::filesystem::path &linkpath) noexcept -> Result<void>
 {
     if (UNLIKELY(::symlinkat(target.c_str(), newdirfd, linkpath.c_str()) < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+        return unexpected{ make_error_code(errno) };
     }
 
     return { };
@@ -173,8 +161,8 @@ auto renameat2(utils::file_descriptor_ref olddirfd,
     if (UNLIKELY(
           ::renameat2(olddirfd, oldpath.c_str(), newdirfd, newpath.c_str(), static_cast<int>(flags))
           < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+
+        return unexpected{ make_error_code(errno) };
     }
 
     return { };
@@ -184,8 +172,8 @@ auto fstat(utils::file_descriptor_ref fd) noexcept -> Result<struct stat>
 {
     struct stat st{ };
     if (UNLIKELY(::fstat(fd, &st) < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+
+        return unexpected{ make_error_code(errno) };
     }
 
     return st;
@@ -197,8 +185,8 @@ auto fstatat(utils::file_descriptor_ref dirfd,
 {
     struct stat st{ };
     if (UNLIKELY(::fstatat(dirfd, path.c_str(), &st, static_cast<int>(flags)) < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+
+        return unexpected{ make_error_code(errno) };
     }
 
     return st;
@@ -222,15 +210,18 @@ auto readlinkat(utils::file_descriptor_ref dirfd,
     }
 
     auto cap = hint == 0 ? 512 : std::max(hint + 1, static_cast<std::size_t>(512));
+    utils::uninit_vector<char> buf;
     while (true) {
-        auto buf = std::make_unique<char[]>(cap);
-        const auto n = ::readlinkat(dirfd, path.c_str(), buf.get(), cap);
+        buf.resize(cap);
+
+        const auto n = ::readlinkat(dirfd, path.c_str(), buf.data(), cap);
         if (UNLIKELY(n < 0)) {
             return unexpected{ make_error_code(errno) };
         }
 
         if (static_cast<std::size_t>(n) < cap) {
-            return std::filesystem::path(std::string_view(buf.get(), static_cast<std::size_t>(n)));
+            buf.resize(n);
+            return std::filesystem::path(std::string_view(buf.data(), static_cast<std::size_t>(n)));
         }
 
         if (UNLIKELY(cap > std::numeric_limits<std::size_t>::max() / 2)) {
@@ -274,8 +265,8 @@ auto mknodat(utils::file_descriptor_ref dirfd,
 
     const mode_t mode = type_mask | static_cast<mode_t>(perm);
     if (UNLIKELY(::mknodat(dirfd, path.c_str(), mode, dev) < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+
+        return unexpected{ make_error_code(errno) };
     }
 
     return { };
@@ -290,8 +281,8 @@ auto linkat(utils::file_descriptor_ref olddirfd,
     if (UNLIKELY(
           ::linkat(olddirfd, oldpath.c_str(), newdirfd, newpath.c_str(), static_cast<int>(flags))
           < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+
+        return unexpected{ make_error_code(errno) };
     }
 
     return { };
@@ -322,8 +313,8 @@ auto fcntl_dupfd_cloexec(utils::file_descriptor_ref fd, int newfd) noexcept
 auto fcntl_setfl(utils::file_descriptor_ref fd, sys::open_flag flag) noexcept -> Result<void>
 {
     if (UNLIKELY(::fcntl(fd, F_SETFL, fmt::underlying(flag)) < 0)) {
-        const auto err = errno;
-        return unexpected(make_error_code(err));
+
+        return unexpected(make_error_code(errno));
     }
 
     return { };
@@ -342,8 +333,8 @@ auto fcntl_getfl(utils::file_descriptor_ref fd) noexcept -> Result<sys::open_opt
 auto fcntl_setfd(utils::file_descriptor_ref fd, sys::fd_flag flag) noexcept -> Result<void>
 {
     if (UNLIKELY(::fcntl(fd, F_SETFD, fmt::underlying(flag)) < 0)) {
-        const auto err = errno;
-        return unexpected(make_error_code(err));
+
+        return unexpected(make_error_code(errno));
     }
 
     return { };
@@ -366,8 +357,8 @@ auto getdents64(utils::file_descriptor_ref fd, utils::span<std::byte> buf) noexc
     // so use syscall directly
     auto ret = syscall(SYS_getdents64, fd, buf.data(), buf.size());
     if (UNLIKELY(ret < 0)) {
-        const auto err = errno;
-        return unexpected{ make_error_code(err) };
+
+        return unexpected{ make_error_code(errno) };
     }
 
     return ret;
@@ -377,8 +368,7 @@ auto fstatfs(utils::file_descriptor_ref fd) noexcept -> Result<struct statfs>
 {
     struct statfs sf{ };
     if (UNLIKELY(::fstatfs(fd, &sf) < 0)) {
-        auto err = errno;
-        return unexpected{ make_error_code(err) };
+        return unexpected{ make_error_code(errno) };
     }
 
     return sf;
@@ -388,12 +378,11 @@ auto fchmod(utils::file_descriptor_ref fd, std::filesystem::perms perm) noexcept
 {
     while (true) {
         if (UNLIKELY(::fchmod(fd, static_cast<mode_t>(perm)) < 0)) {
-            const auto err = errno;
-            if (err == EINTR) {
+            if (errno == EINTR) {
                 continue;
             }
 
-            return unexpected{ make_error_code(err) };
+            return unexpected{ make_error_code(errno) };
         }
 
         return { };
@@ -409,12 +398,11 @@ auto fchmodat(utils::file_descriptor_ref dirfd,
         if (UNLIKELY(
               ::fchmodat(dirfd, path.c_str(), static_cast<mode_t>(perm), static_cast<int>(flags))
               < 0)) {
-            const auto err = errno;
-            if (err == EINTR) {
+            if (errno == EINTR) {
                 continue;
             }
 
-            return unexpected{ make_error_code(err) };
+            return unexpected{ make_error_code(errno) };
         }
 
         return { };
@@ -426,12 +414,11 @@ auto fchmodat(utils::file_descriptor_ref dirfd,
 {
     while (true) {
         if (UNLIKELY(::fchown(fd, owner, group) < 0)) {
-            const auto err = errno;
-            if (err == EINTR) {
+            if (errno == EINTR) {
                 continue;
             }
 
-            return unexpected{ make_error_code(err) };
+            return unexpected{ make_error_code(errno) };
         }
 
         return { };
@@ -446,12 +433,11 @@ auto fchmodat(utils::file_descriptor_ref dirfd,
 {
     while (true) {
         if (UNLIKELY(::fchownat(dirfd, path.c_str(), owner, group, static_cast<int>(flags)) < 0)) {
-            const auto err = errno;
-            if (err == EINTR) {
+            if (errno == EINTR) {
                 continue;
             }
 
-            return unexpected{ make_error_code(err) };
+            return unexpected{ make_error_code(errno) };
         }
 
         return { };

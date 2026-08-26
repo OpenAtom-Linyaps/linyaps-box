@@ -8,9 +8,18 @@
 #include "linyaps_box/utils/utils.h"
 
 #include <sys/prctl.h>
+#include <sys/syscall.h>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
+
+#ifndef __NR_pidfd_open
+#  define __NR_pidfd_open 434
+#endif
+
+#ifndef __NR_pidfd_send_signal
+#  define __NR_pidfd_send_signal 424
+#endif
 
 namespace linyaps_box::os {
 
@@ -31,6 +40,26 @@ auto prctl(int option,
 }
 
 } // namespace
+
+auto pidfd_open(pid_t pid) noexcept -> Result<utils::file_descriptor>
+{
+    const auto fd = ::syscall(__NR_pidfd_open, pid, 0);
+    if (LIKELY(fd >= 0)) {
+        return utils::file_descriptor{ static_cast<int>(fd) };
+    }
+
+    return unexpected{ make_error_code(errno) };
+}
+
+auto pidfd_send_signal(utils::file_descriptor_ref pidfd, int signal) noexcept -> Result<void>
+{
+    auto ret = ::syscall(__NR_pidfd_send_signal, pidfd.get(), signal, nullptr, 0U);
+    if (LIKELY(ret == 0)) {
+        return { };
+    }
+
+    return unexpected{ make_error_code(errno) };
+}
 
 auto waitpid(pid_t pid, int &status, int options) noexcept -> Result<int>
 {
@@ -106,6 +135,16 @@ auto add_ambient_capability(long cap) noexcept -> Result<void>
 auto set_control_terminal(utils::file_descriptor_ref fd) noexcept -> Result<void>
 {
     return details::ioctl(fd, TIOCSCTTY, 0).transform([](int) { });
+}
+
+[[nodiscard]] auto kill_process(pid_t pid, int signal) noexcept -> Result<void>
+{
+    auto ret = ::kill(pid, signal);
+    if (LIKELY(ret == 0)) {
+        return { };
+    }
+
+    return unexpected{ make_error_code(errno) };
 }
 
 } // namespace linyaps_box::os

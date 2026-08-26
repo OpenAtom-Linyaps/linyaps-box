@@ -72,10 +72,14 @@ struct uninit_allocator
     void deallocate(T *p, [[maybe_unused]] std::size_t size) noexcept { ::operator delete(p); }
 
     template <typename U, typename... Args>
-    void construct([[maybe_unused]] U *ptr, [[maybe_unused]] Args &&...args) noexcept
+    void construct(U *ptr, Args &&...args) noexcept
     {
         static_assert(std::is_trivially_copyable_v<U>,
                       "uninit_allocator requires trivially copyable types");
+
+        if constexpr (sizeof...(Args) > 0) {
+            ::new (static_cast<void *>(ptr)) U(std::forward<Args>(args)...);
+        }
     }
 
     template <typename U>

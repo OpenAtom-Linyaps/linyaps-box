@@ -462,3 +462,8 @@ auto linyaps_box::utils::file_descriptor_ref::current_path() const -> std::files
 
     return path;
 }
+
+bool linyaps_box::utils::file_descriptor_ref::is_valid() const noexcept
+{
+    return fd_ >= 0 || fd_ == AT_FDCWD;
+}
