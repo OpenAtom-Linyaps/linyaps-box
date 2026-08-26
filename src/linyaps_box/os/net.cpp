@@ -11,11 +11,28 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <cstring>
 #include <vector>
 
 #include <sys/un.h>
 
 namespace linyaps_box::os {
+
+namespace sys::cmsg {
+
+std::optional<credentials::value_type> credentials::parse(utils::span<const std::byte> raw) noexcept
+{
+    constexpr auto data_size = sizeof(value_type);
+    if (raw.size() < data_size) {
+        return std::nullopt;
+    }
+
+    value_type cred{ };
+    std::memcpy(&cred, raw.data(), data_size);
+    return cred;
+}
+
+} // namespace sys::cmsg
 
 endpoint::endpoint(const sockaddr *addr, socklen_t len) noexcept
 {

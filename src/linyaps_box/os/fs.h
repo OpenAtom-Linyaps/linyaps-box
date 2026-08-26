@@ -5,19 +5,16 @@
 #pragma once
 
 #include "linyaps_box/os/result.h"
-#include "linyaps_box/utils/enum_formatter.h"
+#include "linyaps_box/utils/enum_traits.h"
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <fmt/format.h>
 #include <sys/statfs.h>
 
-#include <cstdint>
 #include <filesystem>
-#include <string_view>
 
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 namespace linyaps_box::os {
 

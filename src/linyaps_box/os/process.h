@@ -11,19 +11,29 @@
 
 namespace linyaps_box::os {
 
+// currently we don't use any pidfd flags
+// support these flags in the future if we need
+[[nodiscard]] auto pidfd_open(pid_t pid) noexcept -> Result<utils::file_descriptor>;
+
+// TODO: introducing strong typed signal
+[[nodiscard]] auto pidfd_send_signal(utils::file_descriptor_ref pidfd, int signal) noexcept
+  -> Result<void>;
+
+[[nodiscard]] auto kill_process(pid_t pid, int signal) noexcept -> Result<void>;
+
 [[nodiscard]] auto waitpid(pid_t pid, int &status, int options) noexcept -> Result<int>;
 
-auto set_child_subreaper(bool enabled) noexcept -> Result<void>;
+[[nodiscard]] auto set_child_subreaper(bool enabled) noexcept -> Result<void>;
 
-auto set_keep_capabilities(bool enabled) noexcept -> Result<void>;
+[[nodiscard]] auto set_keep_capabilities(bool enabled) noexcept -> Result<void>;
 
-auto set_no_new_privileges(bool state) noexcept -> Result<void>;
+[[nodiscard]] auto set_no_new_privileges(bool state) noexcept -> Result<void>;
 
-auto clear_ambient_capability_set() noexcept -> Result<void>;
+[[nodiscard]] auto clear_ambient_capability_set() noexcept -> Result<void>;
 
-auto add_ambient_capability(long cap) noexcept -> Result<void>;
+[[nodiscard]] auto add_ambient_capability(long cap) noexcept -> Result<void>;
 
-auto set_control_terminal(utils::file_descriptor_ref fd) noexcept -> Result<void>;
+[[nodiscard]] auto set_control_terminal(utils::file_descriptor_ref fd) noexcept -> Result<void>;
 
 [[nodiscard]] auto umask(std::filesystem::perms perm) noexcept -> Result<std::filesystem::perms>;
 

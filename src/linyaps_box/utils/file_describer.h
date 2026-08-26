@@ -8,7 +8,6 @@
 
 #include <filesystem>
 
-#include <fcntl.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -61,7 +60,7 @@ public:
 
     [[nodiscard]] constexpr int get() const noexcept { return fd_; }
 
-    [[nodiscard]] constexpr bool is_valid() const noexcept { return fd_ >= 0 || fd_ == AT_FDCWD; }
+    [[nodiscard]] bool is_valid() const noexcept;
 
     [[nodiscard]] auto proc_path() const -> std::filesystem::path;
 
@@ -71,7 +70,7 @@ public:
 
     constexpr operator int() const noexcept { return fd_; }
 
-    [[nodiscard]] constexpr explicit operator bool() const noexcept { return is_valid(); }
+    [[nodiscard]] explicit operator bool() const noexcept { return is_valid(); }
 
     constexpr bool operator==(file_descriptor_ref other) const noexcept { return fd_ == other.fd_; }
 

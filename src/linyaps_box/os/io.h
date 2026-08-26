@@ -8,10 +8,6 @@
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/span.h"
 
-#include <type_traits>
-
-#include <sys/uio.h>
-
 namespace linyaps_box::os {
 
 class io_slice

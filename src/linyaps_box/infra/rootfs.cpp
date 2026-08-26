@@ -10,24 +10,11 @@
 #include "linyaps_box/os/kernel_constants.h"
 #include "linyaps_box/utils/utils.h"
 
-#include <fmt/std.h>
+#include <fmt/std.h> // for std::filesystem::path
 #include <linux/magic.h>
-#include <sys/statfs.h>
-#include <sys/syscall.h>
 
 #include <algorithm>
 #include <deque>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 namespace linyaps_box::infra {
 namespace {
@@ -111,14 +98,13 @@ constexpr auto max_symlinks = 128;
 
 // Filesystems known to use nd_jump_link() for magic-links.
 // Following absolute symlinks on these filesystems in userspace is unsafe.
-[[nodiscard]] auto is_magiclink_filesystem(const file_descriptor &fd) noexcept -> bool
+[[nodiscard]] auto is_magiclink_filesystem(utils::file_descriptor_ref fd) noexcept -> bool
 {
-    struct statfs buf{ };
-    if (UNLIKELY(::fstatfs(fd.get(), &buf) < 0)) {
-        return false;
-    }
-
-    return buf.f_type == PROC_SUPER_MAGIC || buf.f_type == AAFS_MAGIC;
+    return os::fstatfs(fd)
+      .transform([](struct statfs s) {
+          return s.f_type == PROC_SUPER_MAGIC || s.f_type == AAFS_MAGIC;
+      })
+      .value_or(false);
 }
 
 // Cached copy of the fs.protected_symlinks sysctl.

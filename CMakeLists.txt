@@ -151,6 +151,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/container_ref.cpp
     src/linyaps_box/container_status.cpp
     src/linyaps_box/impl/disabled_cgroup_manager.cpp
+    src/linyaps_box/infra/process_handle.cpp
     src/linyaps_box/infra/rootfs.cpp
     src/linyaps_box/infra/unix_socket.cpp
     src/linyaps_box/interface.cpp

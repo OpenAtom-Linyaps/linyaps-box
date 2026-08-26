@@ -9,9 +9,6 @@
 #include "linyaps_box/utils/enum_traits.h"
 #include "linyaps_box/utils/file_describer.h"
 
-#include <cstring>
-#include <vector>
-
 #include <sys/socket.h>
 
 namespace linyaps_box::os {
@@ -140,17 +137,7 @@ struct credentials
 
     [[nodiscard]] constexpr std::size_t payload_size() const noexcept { return sizeof(::ucred); }
 
-    [[nodiscard]] static std::optional<value_type> parse(utils::span<const std::byte> raw) noexcept
-    {
-        constexpr auto data_size = sizeof(value_type);
-        if (raw.size() < data_size) {
-            return std::nullopt;
-        }
-
-        value_type cred{ };
-        std::memcpy(&cred, raw.data(), data_size);
-        return cred;
-    }
+    [[nodiscard]] static std::optional<value_type> parse(utils::span<const std::byte> raw) noexcept;
 };
 
 template <typename... Tags>
