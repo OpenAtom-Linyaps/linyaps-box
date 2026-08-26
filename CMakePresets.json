@@ -64,26 +64,8 @@
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
 				"CMAKE_COLOR_DIAGNOSTICS": true,
-				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror $env{CXXFLAGS}",
+				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -g3 -static-libasan $env{CXXFLAGS}",
 				"linyaps-box_ENABLE_SANITIZER": true,
-				"linyaps-box_ENABLE_COVERAGE": true,
-				"linyaps-box_ENABLE_SMOKE_TESTS": false,
-				"linyaps-box_DEFAULT_LOG_LEVEL": "debug",
-				"linyaps-box_ACTIVE_LOG_LEVEL": "debug",
-				"linyaps-box_ENABLE_CPM": "OFF"
-			}
-		},
-		{
-			"name": "codeql",
-			"displayName": "The CodeQL profile",
-			"description": "Configuration for CodeQL static analysis",
-			"binaryDir": "${sourceDir}/build-codeql",
-			"generator": "Ninja",
-			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
-				"CMAKE_COLOR_DIAGNOSTICS": true,
-				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -g3 $env{CXXFLAGS}",
-				"linyaps-box_ENABLE_UNIT_TESTS": false,
 				"linyaps-box_ENABLE_SMOKE_TESTS": false,
 				"linyaps-box_DEFAULT_LOG_LEVEL": "debug",
 				"linyaps-box_ACTIVE_LOG_LEVEL": "debug",
@@ -103,10 +85,6 @@
 		{
 			"name": "ci",
 			"configurePreset": "ci"
-		},
-		{
-			"name": "codeql",
-			"configurePreset": "codeql"
 		},
 		{
 			"name": "static",
@@ -214,21 +192,6 @@
 				{
 					"type": "test",
 					"name": "ci"
-				}
-			]
-		},
-		{
-			"name": "codeql",
-			"displayName": "The default workflow for CodeQL",
-			"description": "Configure and build for CodeQL analysis",
-			"steps": [
-				{
-					"type": "configure",
-					"name": "codeql"
-				},
-				{
-					"type": "build",
-					"name": "codeql"
 				}
 			]
 		},

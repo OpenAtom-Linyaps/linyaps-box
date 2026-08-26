@@ -1,0 +1,14 @@
+name: 'Setup build dependencies'
+description: 'Install the system packages required to configure and build linyaps-box'
+
+runs:
+  using: composite
+  steps:
+    - name: Install System Dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build build-essential pkgconf \
+                                libcap-dev libseccomp-dev nlohmann-json3-dev \
+                                libcli11-dev libgtest-dev libsystemd-dev \
+                                libfmt-dev
