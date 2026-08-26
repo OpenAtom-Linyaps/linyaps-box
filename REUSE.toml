@@ -2,6 +2,7 @@ version = 1
 SPDX-PackageName = "linyaps-box"
 SPDX-PackageSupplier = "UnionTech Software Technology Co., Ltd."
 SPDX-PackageDownloadLocation = "https://github.com/OpenAtom-Linyaps/linyaps-box"
+SPDX-PackageLicenseConcluded = "LGPL-3.0-or-later"
 
 [[annotations]]
 path = [
@@ -16,6 +17,7 @@ path = [
     "cmake.external/CLI11/**",
     "cmake.external/nlohmann_json/**",
     "cmake.external/zeus_expected/**",
+    "cmake.external/fmt/Findfmt.cmake",
     "external/CLI11/CMakeLists.txt",
     "external/nlohmann_json/CMakeLists.txt",
     "external/zeus_expected/CMakeLists.txt",
@@ -29,7 +31,7 @@ path = [
     ".github/**",
     ".gitlab-ci.yml",
     ".obs/workflows.yml",
-    "tests/ll-box-st/**.json",
+    "tests/ll-box-st/*.json",
     "tests/ll-box-st/*.txt",
     "tests/ll-box-ut/data/**",
 ]
@@ -70,7 +72,7 @@ SPDX-FileCopyrightText = "2024 zeus-cpp"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
-path = ["external/fmt/**", "cmake.external/fmt/JoinPaths.py"]
+path = ["external/fmt/**", "cmake.external/fmt/JoinPaths.cmake"]
 precedence = "override"
 SPDX-FileCopyrightText = "2012 - present, Victor Zverovich and {fmt} contributors"
 SPDX-License-Identifier = "MIT"

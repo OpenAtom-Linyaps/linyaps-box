@@ -23,8 +23,7 @@
 				"linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": "",
 				"linyaps-box_ENABLE_SMOKE_TESTS": true,
 				"linyaps-box_DEFAULT_LOG_LEVEL": "debug",
-				"linyaps-box_ACTIVE_LOG_LEVEL": "debug",
-				"linyaps-box_ENABLE_CPM": "ON"
+				"linyaps-box_ACTIVE_LOG_LEVEL": "debug"
 			}
 		},
 		{
@@ -64,12 +63,12 @@
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
 				"CMAKE_COLOR_DIAGNOSTICS": true,
-				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -g3 -static-libasan $env{CXXFLAGS}",
+				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -static-libasan $env{CXXFLAGS}",
 				"linyaps-box_ENABLE_SANITIZER": true,
 				"linyaps-box_ENABLE_SMOKE_TESTS": false,
 				"linyaps-box_DEFAULT_LOG_LEVEL": "debug",
 				"linyaps-box_ACTIVE_LOG_LEVEL": "debug",
-				"linyaps-box_ENABLE_CPM": "OFF"
+				"linyaps-box_OFFLINE_BUILD": true
 			}
 		}
 	],
