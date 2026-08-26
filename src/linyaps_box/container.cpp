@@ -14,6 +14,7 @@
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
 #include "linyaps_box/os/process.h"
+#include "linyaps_box/os/system.h"
 #include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/protocol/sync_socket_forwarder.h"
 #include "linyaps_box/security/privilege.h"
@@ -244,6 +245,32 @@ void initialize_container(const oci_config &oci_config, child_message_channel &s
     sync.expect_stage(stage::type::namespace_done);
 
     LINYAPS_BOX_LOG_DEBUG("Container namespaces configured from runtime namespace");
+
+    const auto &linux = oci_config.linux;
+    const auto has_uts_namespace = linux && linux->namespaces
+      && std::any_of(linux->namespaces->cbegin(),
+                     linux->namespaces->cend(),
+                     [](const oci_config::linux_t::namespace_t &ns) {
+                         return ns.type_ == oci_config::linux_t::namespace_t::type::UTS;
+                     });
+
+    if (oci_config.hostname) {
+        if (UNLIKELY(!has_uts_namespace)) {
+            throw std::runtime_error("hostname requires the UTS namespace");
+        }
+
+        LINYAPS_BOX_LOG_DEBUG("Set container hostname to {}", oci_config.hostname.value());
+        os::throw_if_error(os::sethostname(oci_config.hostname.value()));
+    }
+
+    if (oci_config.domainname) {
+        if (UNLIKELY(!has_uts_namespace)) {
+            throw std::runtime_error("domainname requires the UTS namespace");
+        }
+
+        LINYAPS_BOX_LOG_DEBUG("Set container domainname to {}", oci_config.domainname.value());
+        os::throw_if_error(os::setdomainname(oci_config.domainname.value()));
+    }
 
     if (oci_config.process->oom_score_adj) {
         auto score = std::to_string(oci_config.process->oom_score_adj.value());
