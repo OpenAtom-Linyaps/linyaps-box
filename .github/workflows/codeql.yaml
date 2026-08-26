@@ -5,8 +5,6 @@ on:
     branches: ['master']
   pull_request:
     branches: ['master']
-  schedule:
-    - cron: '39 22 * * 5'
 
 jobs:
   analyze:
@@ -36,14 +34,11 @@ jobs:
           config-file: .github/codeql/codeql-config.yaml
 
       - name: Install Build Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build build-essential pkgconf \
-                                  libcap-dev libseccomp-dev libsystemd-dev
+        uses: ./.github/actions/setup-deps
 
-      - name: Configure and Build
+      - name: Configure, Build and Test
         run: |
-          cmake --workflow --preset=codeql
+          cmake --workflow --preset=ci
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
