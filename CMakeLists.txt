@@ -174,6 +174,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/os/net.cpp
     src/linyaps_box/os/process.cpp
     src/linyaps_box/os/pty.cpp
+    src/linyaps_box/os/system.cpp
     src/linyaps_box/os/termios.cpp
     src/linyaps_box/protocol/message_channel.cpp
     src/linyaps_box/protocol/message.cpp
