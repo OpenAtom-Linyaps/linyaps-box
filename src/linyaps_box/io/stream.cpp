@@ -15,9 +15,8 @@ namespace linyaps_box::io {
 
 namespace {
 
-constexpr auto probe_size = 32;
-constexpr auto default_chunk_size = 8192;
-constexpr auto max_chunk_size = 64UL * 1024;
+constexpr std::size_t probe_size = 32;
+constexpr std::size_t default_buf_size = 8192;
 
 auto detect_file_size_hint(utils::file_descriptor_ref fd) noexcept -> std::size_t
 {
@@ -37,99 +36,83 @@ auto detect_file_size_hint(utils::file_descriptor_ref fd) noexcept -> std::size_
     return 0;
 }
 
-auto probe_and_grow(utils::file_descriptor_ref fd, utils::uninit_vector<std::byte> &buf) noexcept
-  -> os::Result<bool>
+auto probe_read(utils::file_descriptor_ref fd, utils::uninit_vector<std::byte> &buf) noexcept
+  -> os::Result<std::size_t>
 {
     std::array<std::byte, probe_size> probe; // NOLINT
-    auto probe_n = os::read(fd, probe);
-    if (UNLIKELY(!probe_n)) {
-        return os::unexpected{ probe_n.error() };
+    auto n = os::read(fd, probe);
+    if (UNLIKELY(!n)) {
+        return os::unexpected{ n.error() };
     }
 
-    if (*probe_n == 0) {
-        return true; // EOF
+    const auto bytes_read = *n;
+    if (bytes_read > 0) {
+        const auto old_size = buf.size();
+        buf.resize(old_size + bytes_read);
+        std::memcpy(buf.data() + old_size, probe.data(), bytes_read);
     }
 
-    if (*probe_n == probe_size) {
-        buf.reserve(buf.size() + probe_size + default_chunk_size);
-    }
-
-    const auto old_size = buf.size();
-    buf.resize(old_size + *probe_n);
-    std::memcpy(buf.data() + old_size, probe.data(), *probe_n);
-
-    return *probe_n < probe_size;
+    return bytes_read;
 }
 } // namespace
 
 auto read_to_end(utils::file_descriptor_ref fd, utils::uninit_vector<std::byte> &buf) noexcept
   -> os::Result<std::size_t>
 {
-    const auto initial_size = buf.size();
-    const auto initial_cap = buf.capacity();
-
+    const auto start_len = buf.size();
     const auto size_hint = detect_file_size_hint(fd);
     if (size_hint > 0) {
-        buf.reserve(buf.size() + size_hint + 1024);
+        buf.reserve(buf.size() + size_hint + 1);
+    } else if (buf.capacity() - buf.size() < default_buf_size) {
+        buf.reserve(buf.size() + default_buf_size);
     }
 
-    if (size_hint == 0 && buf.capacity() - buf.size() < probe_size) {
-        auto done = probe_and_grow(fd, buf);
-        if (UNLIKELY(!done)) {
-            return os::unexpected{ done.error() };
+    const auto start_cap = buf.capacity();
+    if (start_cap - buf.size() < probe_size) {
+        auto read_res = probe_read(fd, buf);
+        if (UNLIKELY(!read_res)) {
+            return os::unexpected{ read_res.error() };
         }
 
-        if (*done) {
-            return buf.size() - initial_size;
+        if (*read_res == 0) {
+            return 0; // EOF
         }
     }
 
-    std::size_t chunk_size = default_chunk_size;
+    std::size_t max_read_size =
+      (size_hint > 0) ? std::max(size_hint, default_buf_size) : default_buf_size;
 
     while (true) {
         if (buf.size() == buf.capacity()) {
-            if (buf.capacity() == initial_cap && initial_cap > 0) {
-                auto done = probe_and_grow(fd, buf);
-                if (UNLIKELY(!done)) {
-                    return os::unexpected{ done.error() };
-                }
-
-                if (*done) {
-                    break;
-                }
-            } else {
-                buf.reserve(buf.size() + chunk_size);
-            }
+            const auto current_cap = buf.capacity();
+            const auto growth = std::max(current_cap, default_buf_size);
+            buf.reserve(current_cap + growth);
         }
 
         const auto old_size = buf.size();
-        const auto available = buf.capacity() - old_size;
-        const auto to_read = std::min(available, chunk_size);
+        const auto spare_capacity = buf.capacity() - old_size;
+        const auto to_read = std::min(spare_capacity, max_read_size);
 
-        buf.resize(old_size + to_read);
-        const utils::span available_space{ buf.data() + old_size, to_read };
+        const utils::span spare_space{ buf.data() + old_size, to_read };
 
-        auto n = os::read(fd, available_space);
+        auto n = os::read(fd, spare_space);
         if (UNLIKELY(!n)) {
-            buf.resize(old_size);
             return os::unexpected{ n.error() };
         }
 
-        if (*n == 0) {
-            buf.resize(old_size);
+        const auto bytes_read = *n;
+        if (bytes_read == 0) {
             break;
         }
 
-        if (*n < to_read) {
-            buf.resize(old_size + *n);
-        }
+        buf.resize(old_size + bytes_read);
 
-        if (*n == to_read && chunk_size < max_chunk_size) {
-            chunk_size *= 2;
+        if (size_hint == 0 && to_read >= max_read_size && bytes_read == to_read) {
+            max_read_size = std::min(max_read_size * 2, static_cast<std::size_t>(1024 * 1024));
         }
     }
 
-    return buf.size() - initial_size;
+    return buf.size() - start_len;
 }
 
 auto write_all(utils::file_descriptor_ref fd, utils::span<const std::byte> buf) noexcept
