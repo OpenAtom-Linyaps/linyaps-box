@@ -101,6 +101,7 @@ auto register_global(CLI::App &app, linyaps_box::command::global_options &opts) 
 
     app.add_option("--log-format", opts.log_format, "Set log format: text (default) or json")
       ->type_name("FORMAT")
+      ->envname("LINYAPS_BOX_LOG_FORMAT")
       ->transform(CLI::CheckedTransformer(format_map, CLI::ignore_case))
       ->default_val(linyaps_box::log::output_format::text);
 
@@ -112,6 +113,7 @@ auto register_global(CLI::App &app, linyaps_box::command::global_options &opts) 
 
     app.add_option("--log", opts.log, std::move(help))
       ->type_name("SINK")
+      ->envname("LINYAPS_BOX_LOG_DESTINATION")
       ->check([](const std::string &s) -> std::string {
           if (s.empty()) {
               return "empty log destination";
