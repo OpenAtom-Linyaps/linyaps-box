@@ -316,7 +316,7 @@ struct linux_dirent64
 
 [[nodiscard]] auto readlinkat(utils::file_descriptor_ref dirfd,
                               const std::filesystem::path &path,
-                              std::size_t hint = 0) noexcept -> Result<std::filesystem::path>;
+                              std::size_t hint = 0) noexcept -> Result<std::string>;
 
 [[nodiscard]] auto mknodat(utils::file_descriptor_ref dirfd,
                            const std::filesystem::path &path,

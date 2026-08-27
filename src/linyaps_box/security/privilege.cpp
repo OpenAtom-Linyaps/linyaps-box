@@ -5,6 +5,8 @@
 #include "linyaps_box/security/privilege.h"
 
 #include "linyaps_box/log/macro.h"
+#include "linyaps_box/os/fs.h"
+#include "linyaps_box/os/io.h"
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/utils.h"
@@ -13,6 +15,7 @@
 #include <sys/prctl.h>
 
 #include <algorithm>
+#include <charconv>
 #include <fstream>
 #include <system_error>
 
@@ -28,14 +31,27 @@ namespace linyaps_box::security {
 unsigned long last_cap()
 {
     static const auto cached = []() -> unsigned long {
-        std::ifstream ifs("/proc/sys/kernel/cap_last_cap");
-        if (!ifs) {
-            throw std::runtime_error("failed to read /proc/sys/kernel/cap_last_cap");
+        auto fd = os::open("/proc/sys/kernel/cap_last_cap",
+                           { os::sys::open_flag::cloexec, os::sys::access_mode::read_only });
+        if (UNLIKELY(!fd)) {
+            throw std::system_error(fd.error(), "failed to open cap_last_cap");
         }
 
-        unsigned long val{ };
-        ifs >> val;
-        return val;
+        std::array<char, std::numeric_limits<int>::digits10 + 1> buf{ };
+        auto bytes_read = os::read(fd.value(), utils::as_writable_bytes(utils::span{ buf }));
+        if (UNLIKELY(!bytes_read)) {
+            throw std::system_error(bytes_read.error(), "failed to read cap_last_cap");
+        }
+
+        int cap_last_cap{ };
+        auto [ptr, ec] =
+          std::from_chars(buf.begin(), buf.begin() + bytes_read.value(), cap_last_cap);
+        if (UNLIKELY(ec != std::errc{ })) {
+            throw std::runtime_error(
+              fmt::format("failed to parse cap_last_cap: {}", std::make_error_code(ec).message()));
+        }
+
+        return cap_last_cap;
     }();
 
     return cached;

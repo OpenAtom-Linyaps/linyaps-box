@@ -440,27 +440,27 @@ auto linyaps_box::utils::file_descriptor::write_vecs(span<const struct iovec> rs
 
 auto linyaps_box::utils::file_descriptor_ref::proc_path() const -> std::filesystem::path
 {
-    if (UNLIKELY(fd_ < 0)) {
-        throw file_descriptor_invalid_exception("invalid fd");
+    if (LIKELY(fd_ >= 0)) {
+        return fmt::format("/proc/self/fd/{}", fd_);
     }
 
     if (fd_ == AT_FDCWD) {
-        return std::filesystem::current_path();
+        return std::filesystem::current_path().string();
     }
 
-    return "/proc/self/fd/" + std::to_string(fd_);
+    throw file_descriptor_invalid_exception("invalid fd");
 }
 
 auto linyaps_box::utils::file_descriptor_ref::current_path() const -> std::filesystem::path
 {
-    std::error_code ec;
     auto p_path = proc_path();
-    auto path = std::filesystem::read_symlink(p_path, ec);
-    if (UNLIKELY(!!ec)) {
-        LINYAPS_BOX_LOG_ERROR("failed to read symlink {}: {}", p_path, ec.message());
+    auto ret = os::readlinkat(utils::file_descriptor_ref::cwd(), p_path);
+
+    if (UNLIKELY(!ret)) {
+        throw std::system_error(ret.error(), fmt::format("failed to read symlink {}", p_path));
     }
 
-    return path;
+    return std::move(ret).value();
 }
 
 bool linyaps_box::utils::file_descriptor_ref::is_valid() const noexcept

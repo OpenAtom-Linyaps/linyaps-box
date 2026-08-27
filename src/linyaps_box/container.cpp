@@ -63,7 +63,7 @@ namespace stage = protocol::stage;
 {
     auto result =
       os::throw_if_error(os::readlinkat(utils::file_descriptor_ref::cwd(), "/proc/self/ns/pid"));
-    const std::string_view pid_ns = result.native();
+    const std::string_view pid_ns = result;
 
     constexpr std::string_view prefix = "pid:[";
     constexpr char suffix = ']';
@@ -577,9 +577,10 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
     } else {
         // mount other types
         destination_fd = ensure_mount_destination(root, mount, true);
+        const auto dest_proc_path = destination_fd.ref().proc_path();
         try {
             syscall_mount(mount.source ? mount.source.value().c_str() : nullptr,
-                          destination_fd.ref().proc_path().c_str(),
+                          dest_proc_path.c_str(),
                           mount.type ? mount.type.value().c_str() : nullptr,
                           mount.vfs_flags,
                           mount.data.empty() ? nullptr : mount.data.c_str());
@@ -590,7 +591,7 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
                 if (linux && linux->uid_mappings && !linux->uid_mappings->empty()) {
                     LINYAPS_BOX_LOG_DEBUG("sysfs mount failed, fallback to bind mount /sys");
                     syscall_mount("/sys",
-                                  destination_fd.ref().proc_path().c_str(),
+                                  dest_proc_path.c_str(),
                                   nullptr,
                                   MS_BIND | MS_REC,
                                   nullptr);
@@ -1998,7 +1999,7 @@ void configure_gid_mapping(pid_t pid, container &container)
 
     throw std::system_error{ errno,
                              std::system_category(),
-                             "write to " + file.ref().current_path().string() };
+                             fmt::format("failed to write {}", file.ref().current_path()) };
 }
 
 void configure_uid_mapping(pid_t pid, const container &container)
@@ -2092,7 +2093,7 @@ void configure_uid_mapping(pid_t pid, const container &container)
 
     throw std::system_error{ errno,
                              std::system_category(),
-                             "write to " + file.ref().current_path().string() };
+                             fmt::format("failed to write {}", file.ref().current_path()) };
 }
 
 void configure_container_cgroup([[maybe_unused]] const container &container)
