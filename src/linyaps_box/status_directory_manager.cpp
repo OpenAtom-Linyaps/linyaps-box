@@ -35,18 +35,20 @@ status_directory_manager::status_directory_manager(std::filesystem::path root)
 auto status_directory_manager::list() const -> std::vector<std::string>
 {
     std::vector<std::string> ret;
+    std::error_code ec;
+
     for (const auto &entry : std::filesystem::directory_iterator(root_)) {
-        if (!entry.is_directory()) {
+        if (!entry.is_directory(ec) || ec) {
             continue;
         }
 
-        auto id = entry.path().filename().string();
-        auto status_file = entry.path() / "status.json";
-        if (!std::filesystem::exists(status_file)) {
+        const auto &path = entry.path();
+        auto status_file = path / "status.json";
+        if (!std::filesystem::exists(status_file, ec) || ec) {
             continue;
         }
 
-        ret.push_back(std::move(id));
+        ret.push_back(path.filename());
     }
 
     return ret;

@@ -194,14 +194,15 @@ auto fstatat(utils::file_descriptor_ref dirfd,
 
 auto readlinkat(utils::file_descriptor_ref dirfd,
                 const std::filesystem::path &path,
-                std::size_t hint) noexcept -> Result<std::filesystem::path>
+                std::size_t hint) noexcept -> Result<std::string>
 {
     if (hint < 256) {
-        std::array<char, 256> stack_buf{ };
+        std::array<char, 256> stack_buf; // NOLINT
         const auto n = ::readlinkat(dirfd, path.c_str(), stack_buf.data(), stack_buf.size());
         if (LIKELY(n >= 0 && static_cast<std::size_t>(n) < stack_buf.size())) {
-            return std::filesystem::path(
-              std::string_view(stack_buf.data(), static_cast<std::size_t>(n)));
+            stack_buf[n] = 0;
+
+            return std::string(stack_buf.data());
         }
 
         if (UNLIKELY(n < 0)) {
@@ -210,7 +211,7 @@ auto readlinkat(utils::file_descriptor_ref dirfd,
     }
 
     auto cap = hint == 0 ? 512 : std::max(hint + 1, static_cast<std::size_t>(512));
-    utils::uninit_vector<char> buf;
+    std::string buf;
     while (true) {
         buf.resize(cap);
 
@@ -221,7 +222,7 @@ auto readlinkat(utils::file_descriptor_ref dirfd,
 
         if (static_cast<std::size_t>(n) < cap) {
             buf.resize(n);
-            return std::filesystem::path(std::string_view(buf.data(), static_cast<std::size_t>(n)));
+            return buf;
         }
 
         if (UNLIKELY(cap > std::numeric_limits<std::size_t>::max() / 2)) {

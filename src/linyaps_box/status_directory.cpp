@@ -126,6 +126,7 @@ auto linyaps_box::status_directory::write_config(std::string_view config) const 
 
 auto linyaps_box::status_directory::save_config(const std::filesystem::path &src) const -> void
 {
+    // TODO: refactor to policy based copy
     std::filesystem::copy(src, path_ / "config.json");
 }
 

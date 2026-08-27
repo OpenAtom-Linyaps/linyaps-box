@@ -401,7 +401,7 @@ auto resolve_partial(utils::file_descriptor_ref root_fd,
             if (UNLIKELY(!target_res)) {
                 return unexpected{ std::move(target_res).error() };
             }
-            const auto &target = *target_res;
+            const auto target = std::filesystem::path(std::move(*target_res));
             LINYAPS_BOX_LOG_DEBUG("symlink -> {}", target);
 
             // Save walk state before entering the symlink target.

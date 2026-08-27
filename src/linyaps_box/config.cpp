@@ -7,21 +7,20 @@
 #include "linyaps_box/config/enum_tables.h"
 #include "linyaps_box/config/mount_options.h"
 #include "linyaps_box/config/validate.h"
-#include "linyaps_box/utils/enum_formatter.h"
+#include "linyaps_box/io/stream.h"
+#include "linyaps_box/os/fs.h"
 #include "linyaps_box/utils/semver.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <nlohmann/json.hpp>
 
 #include <charconv>
-#include <fstream>
 #include <limits>
 
 namespace nlohmann {
 template <typename T>
 struct adl_serializer<std::optional<T>>
 {
-
     static void from_json(const json &j, std::optional<T> &opt)
     {
         if (j.is_null()) {
@@ -204,6 +203,9 @@ auto parse_mappings(std::string_view value)
   -> std::optional<std::vector<linyaps_box::oci_config::id_mapping_t>>
 {
     std::vector<linyaps_box::oci_config::id_mapping_t> result;
+    // Estimate capacity from comma count to avoid realloc during push_back
+    auto commas = std::count(value.begin(), value.end(), ',');
+    result.reserve(static_cast<std::size_t>(commas) + 1);
 
     while (!value.empty()) {
         auto comma_pos = value.find(',');
@@ -1321,17 +1323,21 @@ auto oci_config::parse(std::string_view content) -> oci_config
 
 auto oci_config::parse(const std::filesystem::path &path) -> oci_config
 {
-    std::ifstream stream{ path, std::ios::binary | std::ios::in };
-    if (UNLIKELY(!stream.is_open())) {
-        throw std::filesystem::filesystem_error(
-          "failed to open oci_config file",
-          path,
-          std::make_error_code(static_cast<std::errc>(errno)));
+    auto fd = os::open(path, { os::sys::open_flag::cloexec, os::sys::access_mode::read_only });
+    if (UNLIKELY(!fd)) {
+        throw std::filesystem::filesystem_error("failed to open oci_config file", path, fd.error());
     }
 
-    auto config = nlohmann::json::parse(stream).get<oci_config>();
-    validate(config);
-    return config;
+    utils::uninit_vector<std::byte> buf;
+    auto ret = io::read_to_end(fd.value(), buf);
+    if (UNLIKELY(!ret)) {
+        throw std::system_error(ret.error(), "failed to read config file");
+    }
+
+    const std::string_view content_view{ reinterpret_cast<const char *>(buf.data()), // NOLINT
+                                         ret.value() };
+
+    return parse(content_view);
 }
 
 } // namespace linyaps_box
