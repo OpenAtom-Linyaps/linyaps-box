@@ -20,7 +20,7 @@ auto to_json(nlohmann::json &j, const container_status &s) -> void
       linyaps_box::utils::to_created_time(linyaps_box::utils::span{ created_buf }, s.created);
     j = nlohmann::json::object({ { "id", s.id },
                                  { "pid", s.pid },
-                                 { "process-start-time", s.process_start_time },
+                                 { "process-start-time", s.process_start_time.value_or(0) },
                                  { "bundle", s.bundle.string() },
                                  { "created", std::string_view{ created_buf.data(), len } },
                                  { "owner", s.owner },
@@ -32,7 +32,12 @@ auto from_json(const nlohmann::json &j, container_status &s) -> void
 {
     j.at("id").get_to(s.id);
     j.at("pid").get_to(s.pid);
-    j.at("process-start-time").get_to(s.process_start_time);
+    if (auto it = j.find("process-start-time"); it != j.end()) {
+        s.process_start_time = it->get<std::uint64_t>();
+    } else {
+        // Legacy status files (2.2.x) predate the start-time field.
+        s.process_start_time.reset();
+    }
     s.bundle = j.at("bundle").get<std::string>();
     s.created = utils::from_created_time(j.at("created").get_ref<const std::string &>());
     j.at("owner").get_to(s.owner);
@@ -87,7 +92,7 @@ auto derive_status(const container_status &s) -> runtime_status
         return runtime_status::STOPPED;
     }
 
-    if (stat->start_time != s.process_start_time) {
+    if (s.process_start_time && stat->start_time != *s.process_start_time) {
         // PID was recycled: the original container process is gone.
         return runtime_status::STOPPED;
     }

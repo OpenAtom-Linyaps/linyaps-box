@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <cstdint>
 #include <stdexcept>
 
 namespace linyaps_box::utils {
@@ -51,6 +52,15 @@ auto to_created_time(span<char> buf,
 
 auto from_created_time(const std::string &str) -> std::chrono::system_clock::time_point
 {
+    // Legacy 2.2.x status files stored "created" as nanoseconds since epoch.
+    if (!str.empty() && str.find_first_not_of("0123456789") == std::string::npos) {
+        std::uint64_t ns{ 0 };
+        const auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), ns);
+        if (ec == std::errc{ } && ptr == str.data() + str.size()) {
+            return std::chrono::system_clock::time_point{ std::chrono::nanoseconds{ ns } };
+        }
+    }
+
     std::tm tm{ };
 
     auto *end = ::strptime(str.c_str(), "%Y-%m-%dT%H:%M:%S", &tm);

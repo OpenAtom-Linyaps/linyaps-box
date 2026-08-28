@@ -415,7 +415,17 @@ auto verify_container_process(const infra::process_handle &handle,
                                 fmt::format("container process {} is not running", st.pid));
     }
 
-    if (UNLIKELY(stat->start_time != st.process_start_time)) {
+    if (UNLIKELY(!st.process_start_time)) {
+        // Legacy status files have no recorded start time, so the pinned process
+        // identity cannot be verified. Refuse rather than signal an unknown PID.
+        throw std::system_error(std::make_error_code(std::errc::no_such_process),
+                                fmt::format("cannot verify container process {} (no recorded "
+                                            "start time); refusing to {}",
+                                            st.pid,
+                                            action));
+    }
+
+    if (UNLIKELY(stat->start_time != *st.process_start_time)) {
         throw std::system_error(std::make_error_code(std::errc::no_such_process),
                                 fmt::format("container PID {} was reused by another process; "
                                             "refusing to {}",

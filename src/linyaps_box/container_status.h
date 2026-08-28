@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -24,7 +25,8 @@ struct container_status
     std::string id;
     std::string oci_version;
     std::string owner; // extension field
-    std::uint64_t process_start_time;
+    // std::nullopt when the status file predates the start-time field (legacy 2.2.x state).
+    std::optional<std::uint64_t> process_start_time;
     std::chrono::system_clock::time_point created; // extension field
     pid_t pid;
 };
@@ -97,7 +99,7 @@ struct fmt::formatter<linyaps_box::container_status>
               status.pid,
               status.annotations,
               status.owner,
-              status.process_start_time,
+              status.process_start_time.value_or(0),
               std::string_view{ time_buf.data(), len });
         }
 
