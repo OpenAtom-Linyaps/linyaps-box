@@ -2,6 +2,7 @@ set(linyaps-box_UNIT_TESTS ll-box-ut)
 set(linyaps-box_UNIT_TESTS_SOURCE
     ./src/main.cpp
     ./src/test.cpp
+    ./src/enum_traits_test.cpp
     ./src/semver_test.cpp
     ./src/span_test.cpp
     ./src/message_channel_test.cpp

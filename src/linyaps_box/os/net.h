@@ -99,7 +99,10 @@ enum class socket_flag : uint32_t {
     none = 0,
     nonblock = SOCK_NONBLOCK,
     cloexec = SOCK_CLOEXEC,
-    LINYAPS_MARK_AS_BITMASK_ENUM(cloexec),
+    // SOCK_NONBLOCK may be higher than SOCK_CLOEXEC (e.g. sw_64), so the
+    // sentinel must track the larger flag to keep the bitmask mask correct.
+    LINYAPS_MARK_AS_BITMASK_ENUM((SOCK_NONBLOCK) > (SOCK_CLOEXEC) ? (SOCK_NONBLOCK)
+                                                                  : (SOCK_CLOEXEC)),
 };
 LINYAPS_REGISTER_ENUM(socket_flag,
                       { socket_flag::none, "NONE" },
