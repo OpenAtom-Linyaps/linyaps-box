@@ -14,7 +14,7 @@ auto isatty(utils::file_descriptor_ref fd) noexcept -> bool;
 
 auto tcgetattr(utils::file_descriptor_ref fd) noexcept -> Result<struct termios>;
 
-enum class optional_action : uint8_t {
+enum class optional_action : int {
     now = TCSANOW,
     drain = TCSADRAIN,
     flush = TCSAFLUSH,
