@@ -294,6 +294,8 @@ linyaps_box_dependency(nlohmann_json 3.11.3 nlohmann/json v3.12.0 OPTIONS
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC
      nlohmann_json::nlohmann_json)
 
+# Need a fix which was introduced after 2.6.0
+# https://github.com/CLIUtils/CLI11/commit/7ff65c16f272ea8f0d98bb6458740f626c8924cb
 linyaps_box_dependency(CLI11 2.6.0 CLIUtils/CLI11 v2.7.2 OPTIONS
                        "CLI11_BUILD_TESTS OFF")
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES CLI11::CLI11)
@@ -307,7 +309,10 @@ if(linyaps-box_OFFLINE_BUILD)
   set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
   set(BUILD_SHARED_LIBS OFF)
 endif()
-linyaps_box_dependency(fmt 10.1.1 fmtlib/fmt 12.2.0)
+
+# fmt 10.1.1 announced its version number as 10.1.0
+# https://github.com/fmtlib/fmt/blob/f5e54359df4c26b6230fc61d38aa294581393084/include/fmt/core.h#L21
+linyaps_box_dependency(fmt 10.1.0 fmtlib/fmt 12.2.0)
 if(linyaps-box_OFFLINE_BUILD)
   set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
 endif()
