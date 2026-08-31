@@ -10,6 +10,9 @@
 #include "linyaps_box/os/pty.h"
 #include "linyaps_box/os/termios.h"
 
+// for NAME_MAX
+#include <climits> // IWYU pragma: keep
+
 namespace linyaps_box {
 
 auto create_pty_pair() -> pty_data
