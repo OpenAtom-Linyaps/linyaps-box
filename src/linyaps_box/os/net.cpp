@@ -61,10 +61,10 @@ auto endpoint::from_path(const std::filesystem::path &path) noexcept -> os::Resu
 
 auto send(utils::file_descriptor_ref fd,
           utils::span<const std::byte> buf,
-          sys::send_flag flags) noexcept -> Result<std::size_t>
+          utils::bitflags<sys::send_flag> flags) noexcept -> Result<std::size_t>
 {
     while (true) {
-        auto ret = ::send(fd, buf.data(), buf.size(), static_cast<int>(flags));
+        auto ret = ::send(fd, buf.data(), buf.size(), flags.to_raw());
         if (UNLIKELY(ret < 0)) {
             if (errno == EINTR) {
                 continue;
@@ -80,7 +80,7 @@ auto send(utils::file_descriptor_ref fd,
 auto sendmsg(utils::file_descriptor_ref fd,
              const io_slice &iov,
              ancillary_buffer_writer &control,
-             sys::send_flag flags) noexcept -> Result<std::size_t>
+             utils::bitflags<sys::send_flag> flags) noexcept -> Result<std::size_t>
 {
     struct msghdr msg{ };
 
@@ -94,7 +94,7 @@ auto sendmsg(utils::file_descriptor_ref fd,
     }
 
     while (true) {
-        auto ret = ::sendmsg(fd, &msg, static_cast<int>(flags));
+        auto ret = ::sendmsg(fd, &msg, flags.to_raw());
         if (UNLIKELY(ret < 0)) {
             if (errno == EINTR) {
                 continue;
@@ -107,11 +107,12 @@ auto sendmsg(utils::file_descriptor_ref fd,
     }
 }
 
-auto recv(utils::file_descriptor_ref fd, utils::span<std::byte> buf, sys::recv_flag flags) noexcept
-  -> Result<std::size_t>
+auto recv(utils::file_descriptor_ref fd,
+          utils::span<std::byte> buf,
+          utils::bitflags<sys::recv_flag> flags) noexcept -> Result<std::size_t>
 {
     while (true) {
-        auto ret = ::recv(fd, buf.data(), buf.size(), static_cast<int>(flags));
+        auto ret = ::recv(fd, buf.data(), buf.size(), flags.to_raw());
         if (UNLIKELY(ret < 0)) {
             if (errno == EINTR) {
                 continue;
@@ -127,7 +128,7 @@ auto recv(utils::file_descriptor_ref fd, utils::span<std::byte> buf, sys::recv_f
 auto recvmsg(utils::file_descriptor_ref fd,
              const mutable_io_slice &iov,
              ancillary_buffer &control,
-             sys::recv_flag flags) noexcept -> Result<RecvMsg>
+             utils::bitflags<sys::recv_flag> flags) noexcept -> Result<RecvMsg>
 {
     struct msghdr msg{ };
 
@@ -142,7 +143,7 @@ auto recvmsg(utils::file_descriptor_ref fd,
     msg.msg_namelen = linyaps_box::os::endpoint::capacity();
 
     while (true) {
-        auto ret = ::recvmsg(fd.get(), &msg, static_cast<int>(flags));
+        auto ret = ::recvmsg(fd.get(), &msg, flags.to_raw());
         if (UNLIKELY(ret < 0)) {
             if (errno == EINTR) {
                 continue;
@@ -153,7 +154,7 @@ auto recvmsg(utils::file_descriptor_ref fd,
 
         RecvMsg res{ };
         res.bytes = static_cast<std::size_t>(ret);
-        res.flags = static_cast<sys::return_flag>(msg.msg_flags);
+        res.flags = sys::return_flag(msg.msg_flags);
 
         if (msg.msg_namelen > 0) {
             res.address.emplace(peer_ep.data(), msg.msg_namelen);
@@ -223,11 +224,10 @@ auto ancillary_message_view::raw_data() const noexcept -> utils::span<const std:
 
 auto socket(sys::address_family domain,
             sys::socket_type type,
-            sys::socket_flag flag,
+            utils::bitflags<sys::socket_flag> flag,
             int protocol) noexcept -> Result<utils::file_descriptor>
 {
-    auto fd =
-      ::socket(static_cast<int>(domain), static_cast<int>(type) | static_cast<int>(flag), protocol);
+    auto fd = ::socket(static_cast<int>(domain), static_cast<int>(type) | flag.to_raw(), protocol);
     if (UNLIKELY(fd == -1)) {
         return unexpected{ make_error_code(errno) };
     }
@@ -237,13 +237,13 @@ auto socket(sys::address_family domain,
 
 auto socketpair(sys::address_family domain,
                 sys::socket_type type,
-                sys::socket_flag flag,
+                utils::bitflags<sys::socket_flag> flag,
                 int protocol) noexcept
   -> Result<std::pair<utils::file_descriptor, utils::file_descriptor>>
 {
     std::array<int, 2> fds{ };
     if (UNLIKELY(::socketpair(static_cast<int>(domain),
-                              static_cast<int>(type) | static_cast<int>(flag),
+                              static_cast<int>(type) | flag.to_raw(),
                               protocol,
                               fds.data())
                  == -1)) {

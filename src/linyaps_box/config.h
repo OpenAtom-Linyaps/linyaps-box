@@ -98,7 +98,6 @@ struct oci_config
                 KEEP_PARAMS,
                 UTIL_CLAMP_MIN,
                 UTIL_CLAMP_MAX,
-                LINYAPS_MARK_AS_BITMASK_ENUM(UTIL_CLAMP_MAX),
             };
 
             std::optional<flag_t> flags;
@@ -163,7 +162,6 @@ struct oci_config
             NONE = 0,
             COPY_SYMLINK = (1U << 0),
             TMPCOPYUP = (1U << 1),
-            LINYAPS_MARK_AS_BITMASK_ENUM(TMPCOPYUP),
         };
 
         enum class idmap_type : std::uint8_t { IDMAP, RIDMAP };
@@ -217,7 +215,6 @@ struct oci_config
                 USER = (1U << 5),
                 CGROUP = (1U << 6),
                 TIME = (1U << 7),
-                LINYAPS_MARK_AS_BITMASK_ENUM(TIME),
             };
 
             type type_;
@@ -405,7 +402,6 @@ struct oci_config
                 NUMA_BALANCING = 1,
                 RELATIVE_NODES = 2,
                 STATIC_NODES = 4,
-                LINYAPS_MARK_AS_BITMASK_ENUM(STATIC_NODES),
             };
             std::optional<flag_t> flags;
         };
@@ -466,7 +462,6 @@ struct oci_config
                 LOG = 2,
                 SPEC_ALLOW = 4,
                 WAIT_KILLABLE_RECV = 8,
-                LINYAPS_MARK_AS_BITMASK_ENUM(WAIT_KILLABLE_RECV),
             };
             std::optional<flag_t> flags;
 
@@ -555,6 +550,12 @@ struct oci_config
 
     std::optional<std::unordered_map<std::string, std::string>> annotations;
 };
+
+LINYAPS_ENABLE_BITMASK_ENUM(oci_config::process_t::scheduler_t::flag_t);
+LINYAPS_ENABLE_BITMASK_ENUM(oci_config::mount_t::extension);
+LINYAPS_ENABLE_BITMASK_ENUM(oci_config::linux_t::namespace_t::type);
+LINYAPS_ENABLE_BITMASK_ENUM(oci_config::linux_t::memory_policy_t::flag_t);
+LINYAPS_ENABLE_BITMASK_ENUM(oci_config::linux_t::seccomp_t::flag_t);
 
 auto to_string_view(oci_config::linux_t::namespace_t::type type) noexcept -> std::string_view;
 

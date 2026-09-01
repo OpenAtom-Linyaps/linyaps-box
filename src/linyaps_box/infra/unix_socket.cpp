@@ -37,7 +37,7 @@ auto unix_socket::send(utils::span<const std::byte> data) const -> os::Result<st
     return os::send(fd_.ref(), data);
 }
 
-auto unix_socket::recv(utils::span<std::byte> buf, os::sys::recv_flag flags) const
+auto unix_socket::recv(utils::span<std::byte> buf, utils::bitflags<os::sys::recv_flag> flags) const
   -> os::Result<std::size_t>
 {
     return os::recv(fd_.ref(), buf, flags);

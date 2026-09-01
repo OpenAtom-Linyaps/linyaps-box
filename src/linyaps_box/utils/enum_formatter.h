@@ -15,54 +15,68 @@
 // bitmask / enum-table infrastructure (e.g. config.h) do not pull in
 // <fmt/format.h>.
 
-template <typename E, std::size_t N>
-template <typename OutputIt>
-OutputIt linyaps_box::utils::enum_table<E, N>::format_to(OutputIt out, E value) const
+namespace linyaps_box::utils::detail {
+
+struct enum_entry_view
 {
-    if constexpr (is_bitmask_enum_v<E>) {
-        return format_flags_to(out, value);
-    } else {
-        return format_single_to(out, value);
+    std::string_view name;
+    uint64_t value;
+};
+
+template <typename T>
+struct enum_or_bitflags_traits
+{
+    using enum_type = T;
+    using underlying_type = enum_underlying_t<T>;
+
+    static constexpr auto to_raw(T val) noexcept -> underlying_type
+    {
+        return static_cast<underlying_type>(val);
     }
-}
+};
 
-template <typename E, std::size_t N>
-template <typename OutputIt>
-OutputIt linyaps_box::utils::enum_table<E, N>::format_single_to(OutputIt out, E value) const
+template <typename E>
+struct enum_or_bitflags_traits<bitflags<E>>
 {
-    if (auto name = to_name(value)) {
-        return std::copy(name->begin(), name->end(), out);
+    using enum_type = E;
+    using underlying_type = typename bitflags<E>::underlying_type;
+
+    static constexpr auto to_raw(bitflags<E> val) noexcept -> underlying_type
+    {
+        return val.to_raw();
     }
+};
 
-    using U = std::underlying_type_t<E>;
-    return fmt::format_to(out, "{}", static_cast<U>(value));
-}
-
-template <typename E, std::size_t N>
 template <typename OutputIt>
-OutputIt linyaps_box::utils::enum_table<E, N>::format_flags_to(OutputIt out, E flags) const
+OutputIt format_flags_impl(OutputIt out,
+                           uint64_t val,
+                           std::string_view type_name,
+                           const enum_entry_view *entries,
+                           std::size_t count)
 {
-    using U = std::underlying_type_t<E>;
-    auto val = static_cast<U>(flags);
-
     if (val == 0) {
-        if (auto name = to_name(flags)) {
-            return std::copy(name->begin(), name->end(), out);
+        for (std::size_t i = 0; i < count; ++i) {
+            if (entries[i].value == 0) {
+                return std::copy(entries[i].name.cbegin(), entries[i].name.cend(), out);
+            }
         }
 
         static constexpr std::string_view none_sv = "none";
-        return std::copy(none_sv.begin(), none_sv.end(), out);
+        return std::copy(none_sv.cbegin(), none_sv.cend(), out);
     }
 
-    bool first = true;
-    for (const auto &entry : entries) {
-        const auto mask = static_cast<U>(entry.value);
+    std::copy(type_name.cbegin(), type_name.cend(), out);
+    *out++ = '(';
+
+    bool first{ true };
+    for (std::size_t i = 0; i < count; ++i) {
+        const auto mask = entries[i].value;
         if (mask != 0 && (val & mask) == mask) {
             if (!first) {
                 *out++ = '|';
             }
 
-            out = std::copy(entry.name.begin(), entry.name.end(), out);
+            out = std::copy(entries[i].name.cbegin(), entries[i].name.cend(), out);
             first = false;
             val &= ~mask;
 
@@ -80,11 +94,14 @@ OutputIt linyaps_box::utils::enum_table<E, N>::format_flags_to(OutputIt out, E f
         out = fmt::format_to(out, "0x{:x}", val);
     }
 
+    *out++ = ')';
     return out;
 }
 
-template <typename E>
-struct fmt::formatter<E, std::enable_if_t<linyaps_box::utils::has_enum_table_v<E>, char>>
+} // namespace linyaps_box::utils::detail
+
+template <typename T>
+struct fmt::formatter<T, std::enable_if_t<linyaps_box::utils::has_enum_table_v<T>, char>>
 {
     enum class Presentation : uint8_t { Default, Hex, Decimal };
     Presentation presentation{ Presentation::Default };
@@ -105,22 +122,63 @@ struct fmt::formatter<E, std::enable_if_t<linyaps_box::utils::has_enum_table_v<E
             ++it;
         }
 
+        if (it != end && *it != '}') {
+            throw fmt::format_error("invalid format specifier for enum");
+        }
+
         return it;
     }
 
     template <typename FormatContext>
-    auto format(E value, FormatContext &ctx) const
+    auto format(const T &value, FormatContext &ctx) const
     {
-        using U = std::underlying_type_t<E>;
+        using Traits = linyaps_box::utils::detail::enum_or_bitflags_traits<T>;
+        using E = typename Traits::enum_type;
+        using U = typename Traits::underlying_type;
+
+        const U raw_val = Traits::to_raw(value);
+
         if (presentation == Presentation::Hex) {
-            return fmt::format_to(ctx.out(), "0x{:x}", static_cast<U>(value));
+            using UnsignedU = std::make_unsigned_t<U>;
+            return fmt::format_to(ctx.out(), "0x{:x}", static_cast<UnsignedU>(raw_val));
         }
 
         if (presentation == Presentation::Decimal) {
-            return fmt::format_to(ctx.out(), "{}", static_cast<U>(value));
+            return fmt::format_to(ctx.out(), "{}", raw_val);
         }
 
-        constexpr auto table = get_enum_table(static_cast<E *>(nullptr));
-        return table.format_to(ctx.out(), value);
+        if constexpr (linyaps_box::utils::is_bitmask_enum_v<E>) {
+            static constexpr auto enum_data = [] {
+                constexpr auto table = get_enum_table(static_cast<E *>(nullptr));
+
+                struct packed_view
+                {
+                    std::string_view type_name;
+                    std::array<linyaps_box::utils::detail::enum_entry_view, table.entries().size()>
+                      views;
+                };
+
+                packed_view result{ table.type_name(), { } };
+                for (std::size_t i = 0; i < table.entries().size(); ++i) {
+                    result.views[i] = { table.entries()[i].name,
+                                        static_cast<uint64_t>(table.entries()[i].value) };
+                }
+
+                return result;
+            }();
+
+            return linyaps_box::utils::detail::format_flags_impl(ctx.out(),
+                                                                 static_cast<uint64_t>(raw_val),
+                                                                 enum_data.type_name,
+                                                                 enum_data.views.data(),
+                                                                 enum_data.views.size());
+        } else {
+            constexpr auto table = get_enum_table(static_cast<E *>(nullptr));
+            if (auto name = table.to_name(static_cast<E>(raw_val))) {
+                return std::copy(name->cbegin(), name->cend(), ctx.out());
+            }
+
+            return fmt::format_to(ctx.out(), "{}", raw_val);
+        }
     }
 };

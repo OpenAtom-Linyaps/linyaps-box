@@ -331,7 +331,7 @@ auto parse_mount_options(const std::vector<std::string> &options)
         }
 
         if (auto ev = extra_flags_table.from_name(opt)) {
-            extension_flags = extension_flags | *ev;
+            extension_flags |= *ev;
             continue;
         }
 
@@ -480,7 +480,7 @@ void from_json(const nlohmann::json &j, oci_config::process_t::scheduler_t &v)
             if (UNLIKELY(!flag_opt)) {
                 throw std::runtime_error("unknown value: " + std::string(flag_str));
             }
-            flags = flags | *flag_opt;
+            flags |= *flag_opt;
         }
 
         v.flags = flags;
@@ -921,7 +921,7 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::memory_policy_t &v)
             if (UNLIKELY(!flag_opt)) {
                 throw std::runtime_error("unknown value: " + std::string(flag_str));
             }
-            flags = flags | *flag_opt;
+            flags |= *flag_opt;
         }
 
         v.flags = flags;
@@ -1019,7 +1019,7 @@ void from_json(const nlohmann::json &j, oci_config::linux_t::seccomp_t &v)
                 throw std::runtime_error("unknown value: " + std::string(flag_str));
             }
 
-            flags = flags | *flag_opt;
+            flags |= *flag_opt;
         }
 
         v.flags = flags;

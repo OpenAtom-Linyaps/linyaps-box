@@ -878,7 +878,7 @@ auto Root::create_directories(const std::filesystem::path &path,
 }
 
 auto Root::create_file(const std::filesystem::path &path,
-                       open_flag flags,
+                       utils::bitflags<open_flag> flags,
                        std::filesystem::perms perm) const noexcept -> os::Result<file_descriptor>
 {
     if (has_trailing_slash(path) || has_trailing_dot_or_dotdot(path)) {
