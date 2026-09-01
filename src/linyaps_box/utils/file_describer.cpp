@@ -217,7 +217,7 @@ auto linyaps_box::utils::file_descriptor::flags() const -> unsigned int
         throw std::system_error(res.error());
     }
 
-    return static_cast<int>(res->flags());
+    return res->flags().to_raw();
 }
 
 auto linyaps_box::utils::file_descriptor::set_flags(unsigned int flags) const & -> void

@@ -84,7 +84,7 @@ public:
 
     [[nodiscard]] auto
     create_file(const std::filesystem::path &path,
-                os::sys::open_flag flags = os::sys::open_flag::none,
+                utils::bitflags<os::sys::open_flag> flags = os::sys::open_flag::none,
                 std::filesystem::perms perm = os::default_new_file_perm) const noexcept
       -> os::Result<utils::file_descriptor>;
 

@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include "linyaps_box/utils/span.h"
+#include "linyaps_box/utils/utils.h"
+
 #include <array>
 #include <cstddef>
 #include <optional>
@@ -12,109 +15,84 @@
 
 namespace linyaps_box::utils {
 
-// Enum traits are built around two opt-in mechanisms:
-//
-// 1. Bitmask support is an intrinsic property of the enum, so the marker is
-//    written inside the enum body:
-//
-//        enum class some_flag : uint64_t {
-//            ...
-//            max = SOME_VALUE,
-//            LINYAPS_MARK_AS_BITMASK_ENUM(max),   // sentinel enumerator
-//        };
-//
-//    The macro injects a sentinel enumerator named
-//    `LINYAPS_BITMASK_LARGEST_ENUMERATOR` holding the highest flag bit.
-//    `is_bitmask_enum<E>` detects it by a plain member lookup, so no ADL free
-//    function is needed for detection. The operators (`| & ^ ~` and the
-//    compound forms) are defined once, at global scope, as templates
-//    SFINAE-constrained on `is_bitmask_enum_v<E>`; ADL finds them for a marked
-//    enum no matter which namespace it lives in, so they are usable anywhere in
-//    the project without per-enum macro expansion.
-//
-//    The sentinel's value (the largest flag bit) bounds `operator~` to the
-//    defined flag range via `bitmask_mask()`, so `~x` yields "all defined flags
-//    except x" instead of a value with unrelated high bits set.
-//
-//    The macro argument must be an *enumerator*, not a literal: its value is
-//    bound to the platform macro at the enum definition site, so it tracks the
-//    platform automatically. The one invariant to uphold is that the declared
-//    enumerator really is the maximum flag on every platform this code compiles
-//    on. For table-registered enums `verify_enum_table()` enforces this at
-//    compile time by requiring every entry's bits to fall within
-//    `bitmask_mask()`; an enum without a table has no such check, so its
-//    declared maximum must be verified by hand (all current ones are stable
-//    across Linux architectures).
-//
-// 2. The name table is extrinsic metadata: entries are `{value, name}` pairs
-//    that cannot be enumerators, so they cannot live inside the enum body. The
-//    table is registered right after the enum instead:
-//
-//        LINYAPS_REGISTER_ENUM(some_flag, { some_flag::none, "NONE" }, ...);
-//
-//    which generates a `get_enum_table(E*)` free function in the enum's
-//    namespace. `has_enum_table<E>` and the `fmt::formatter` specialization
-//    below look it up via ADL, giving table-driven `to_name`/`from_name` and
-//    automatic fmt formatting (splitting bitmask values into `A|B`).
-//
-// Limitation: `LINYAPS_MARK_AS_BITMASK_ENUM` injects a real enumerator. For an
-// unscoped enum that enumerator leaks into the enclosing scope, so two
-// unscoped bitmask enums in the same scope would collide on the sentinel name
-// (scoped `enum class` enums are unaffected). A non-intrusive variant (explicit specialization) can
-// be added later if that becomes a problem.
+namespace detail {
 
-template <typename E>
-using enum_underlying_t = std::underlying_type_t<E>;
-
-template <typename E, typename = void>
-struct is_bitmask_enum : std::false_type
+template <typename T, std::size_t N, typename Compare>
+constexpr void shell_sort(span<T, N> entries, Compare comp) noexcept
 {
-};
+    for (const std::size_t gap : { 123, 54, 23, 10, 4, 1 }) {
+        if (gap >= N) {
+            continue;
+        }
 
-template <typename E>
-struct is_bitmask_enum<E, std::void_t<decltype(E::LINYAPS_BITMASK_LARGEST_ENUMERATOR)>>
-    : std::true_type
-{
-};
+        for (auto i = gap; i < N; ++i) {
+            auto temp = entries[i];
+            auto j = i;
 
-template <typename E>
-inline constexpr bool is_bitmask_enum_v = is_bitmask_enum<E>::value;
+            while (j >= gap && comp(temp, entries[j - gap])) {
+                entries[j] = entries[j - gap];
+                j -= gap;
+            }
 
-template <typename E, typename = void>
-struct largest_bitmask_enum_bit
-{
-};
-
-template <typename E>
-struct largest_bitmask_enum_bit<E, std::void_t<decltype(E::LINYAPS_BITMASK_LARGEST_ENUMERATOR)>>
-{
-    using underlying_t = enum_underlying_t<E>;
-    static constexpr underlying_t value =
-      static_cast<underlying_t>(E::LINYAPS_BITMASK_LARGEST_ENUMERATOR);
-};
-
-// Smallest power of two strictly greater than `value`. On overflow (top bit
-// set) the propagation fills the whole width and `+ 1` wraps to 0
-template <typename T>
-constexpr auto next_power_of_2(T value) noexcept -> T
-{
-    for (std::size_t shift = 1; shift < sizeof(T) * 8; shift <<= 1) {
-        value |= static_cast<T>(value >> shift);
+            entries[j] = temp;
+        }
     }
-
-    return static_cast<T>(value + 1);
 }
+
+template <typename E, bool = std::is_enum_v<E>>
+struct safe_underlying
+{
+    using type = E;
+};
 
 template <typename E>
-constexpr auto bitmask_mask() noexcept -> enum_underlying_t<E>
+struct safe_underlying<E, true>
 {
-    using U = enum_underlying_t<E>;
-    const auto largest = static_cast<U>(largest_bitmask_enum_bit<E>::value);
-    // Every bit up to (but not including) the next power of two above the
-    // largest flag: a contiguous 1-range covering every bit the enum can
-    // express.
-    return static_cast<U>(next_power_of_2(largest) - 1);
+    using type = std::underlying_type_t<E>;
+};
+
+template <typename E>
+using enum_underlying_t = typename safe_underlying<E>::type;
+
+template <typename T>
+constexpr auto popcount(T val) noexcept -> int
+{
+    if constexpr (std::is_enum_v<T>) {
+        using U = std::make_unsigned_t<enum_underlying_t<T>>;
+        return detail::popcount(static_cast<U>(val));
+    } else {
+        static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>,
+                      "popcount requires an integral or enum type (excluding bool)");
+
+        using U = std::make_unsigned_t<T>;
+        const auto uval = static_cast<U>(val);
+
+        if constexpr (sizeof(U) <= sizeof(unsigned int)) {
+            return __builtin_popcount(static_cast<unsigned int>(uval));
+        } else if constexpr (sizeof(U) <= sizeof(unsigned long long)) {
+            return __builtin_popcountll(static_cast<unsigned long long>(uval));
+        } else {
+            static_assert(sizeof(U) <= 16, "Types larger than 128-bit are not supported");
+            const auto low = static_cast<unsigned long long>(uval);
+            const auto high = static_cast<unsigned long long>(uval >> 64);
+            return __builtin_popcountll(low) + __builtin_popcountll(high);
+        }
+    }
 }
+
+template <typename T>
+constexpr auto enable_bitmask_enum_tag(T *) noexcept -> std::false_type;
+
+template <typename E>
+constexpr auto check_is_bitmask_enum() noexcept
+{
+    return decltype(enable_bitmask_enum_tag(static_cast<E *>(nullptr)))::value;
+}
+
+} // namespace detail
+
+template <typename E>
+inline constexpr bool is_bitmask_enum_v = detail::check_is_bitmask_enum<E>();
 
 template <typename E>
 struct enum_entry
@@ -130,13 +108,28 @@ template <typename E>
 enum_entry(E, std::string_view) -> enum_entry<E>;
 
 template <typename E, std::size_t N>
-struct enum_table
+class enum_table;
+
+template <typename E, std::size_t N>
+constexpr auto make_enum_table(std::string_view type_name, const enum_entry<E> (&arr)[N]) noexcept
+  -> enum_table<E, N>;
+
+template <typename E, std::size_t N>
+constexpr auto verify_enum_table(const enum_table<E, N> &entries) noexcept -> bool;
+
+template <typename E, std::size_t N>
+class enum_table
 {
-    std::array<enum_entry<E>, N> entries;
+public:
+    constexpr enum_table(std::string_view name, const enum_entry<E> (&arr)[N]) noexcept
+        : type_name_(name)
+        , entries_(utils::to_array(arr))
+    {
+    }
 
     [[nodiscard]] constexpr auto to_name(E value) const noexcept -> std::optional<std::string_view>
     {
-        for (const auto &entry : entries) {
+        for (const auto &entry : entries_) {
             if (entry.value == value) {
                 return entry.name;
             }
@@ -147,7 +140,7 @@ struct enum_table
 
     [[nodiscard]] constexpr auto from_name(std::string_view name) const noexcept -> std::optional<E>
     {
-        for (const auto &entry : entries) {
+        for (const auto &entry : entries_) {
             if (entry.name == name) {
                 return entry.value;
             }
@@ -156,153 +149,331 @@ struct enum_table
         return std::nullopt;
     }
 
-    template <typename OutputIt>
-    OutputIt format_to(OutputIt out, E value) const;
+    friend constexpr auto make_enum_table<>(std::string_view, const enum_entry<E> (&)[N]) noexcept
+      -> enum_table<E, N>;
+
+    friend constexpr auto verify_enum_table<>(const enum_table<E, N> &) noexcept -> bool;
+
+    [[nodiscard]] constexpr auto type_name() const noexcept -> std::string_view
+    {
+        return type_name_;
+    }
+
+    [[nodiscard]] constexpr auto entries() const noexcept -> const std::array<enum_entry<E>, N> &
+    {
+        return entries_;
+    }
 
 private:
-    template <typename OutputIt>
-    OutputIt format_single_to(OutputIt out, E value) const;
-
-    template <typename OutputIt>
-    OutputIt format_flags_to(OutputIt out, E flags) const;
+    std::string_view type_name_;
+    std::array<enum_entry<E>, N> entries_;
 };
-
-template <typename E, typename... Rest>
-enum_table(enum_entry<E>, Rest...) -> enum_table<E, 1 + sizeof...(Rest)>;
 
 template <typename E, typename = void>
-struct has_enum_table : std::false_type
-{
-};
+inline constexpr bool has_enum_table_v = false;
 
 template <typename E>
-struct has_enum_table<E, std::void_t<decltype(get_enum_table(static_cast<E *>(nullptr)))>>
-    : std::true_type
-{
-};
+inline constexpr bool
+  has_enum_table_v<E, std::void_t<decltype(get_enum_table(static_cast<E *>(nullptr)))>> = true;
 
+namespace detail {
+
+// The bitwise union of all declared (non-zero) flag values
 template <typename E>
-inline constexpr bool has_enum_table_v = has_enum_table<E>::value;
+constexpr auto known_mask() noexcept -> enum_underlying_t<E>
+{
+    using U = enum_underlying_t<E>;
+
+    if constexpr (has_enum_table_v<E>) {
+        constexpr auto table = get_enum_table(static_cast<E *>(nullptr));
+        U mask{ 0 };
+        for (const auto &entry : table.entries()) {
+            mask |= static_cast<U>(entry.value);
+        }
+
+        return mask;
+    } else {
+        // A bitmask enum must register a table for its known bits to be
+        // well-defined; otherwise truncate/all would silently no-op.
+        static_assert(
+          has_enum_table_v<E>,
+          "bitmask enum requires a registered enum table (LINYAPS_REGISTER_ENUM_TABLE)");
+    }
+}
+
+} // namespace detail
 
 template <typename E, std::size_t N>
-constexpr auto make_enum_table(const enum_entry<E> (&entries)[N]) noexcept -> enum_table<E, N>
+constexpr auto make_enum_table(std::string_view type_name,
+                               const enum_entry<E> (&entries)[N]) noexcept -> enum_table<E, N>
 {
-    enum_table<E, N> table{ };
-    for (std::size_t i = 0; i < N; ++i) {
-        table.entries[i] = entries[i];
+    enum_table table(type_name, entries);
+
+    // generate an ordered table at compile time
+    if constexpr (is_bitmask_enum_v<E>) {
+        using U = std::make_unsigned_t<detail::enum_underlying_t<E>>;
+
+        detail::shell_sort(span(table.entries_),
+                           [](const enum_entry<E> &a, const enum_entry<E> &b) {
+                               const auto a_u = static_cast<U>(a.value);
+                               const auto b_u = static_cast<U>(b.value);
+                               const auto a_pop = detail::popcount(a_u);
+                               const auto b_pop = detail::popcount(b_u);
+                               return a_pop > b_pop || (a_pop == b_pop && a_u < b_u);
+                           });
     }
+
     return table;
 }
 
 template <typename E, std::size_t N>
 constexpr auto verify_enum_table(const enum_table<E, N> &table) noexcept -> bool
 {
-    for (std::size_t i = 0; i < N; ++i) {
-        for (std::size_t j = i + 1; j < N; ++j) {
-            if (table.entries[i].name == table.entries[j].name
-                || table.entries[i].value == table.entries[j].value) {
+    // value duplicates: leverage existing sort order for bitmask enums
+    if constexpr (is_bitmask_enum_v<E>) {
+        for (std::size_t i = 1; i < N; ++i) {
+            if (table.entries_[i].value == table.entries_[i - 1].value) {
                 return false;
+            }
+        }
+    } else {
+        for (std::size_t i = 0; i < N; ++i) {
+            for (std::size_t j = i + 1; j < N; ++j) {
+                if (table.entries_[i].value == table.entries_[j].value) {
+                    return false;
+                }
             }
         }
     }
 
-    if constexpr (is_bitmask_enum_v<E>) {
-        using U = enum_underlying_t<E>;
-        constexpr auto mask = bitmask_mask<E>();
-        for (std::size_t i = 0; i < N; ++i) {
-            const auto value = static_cast<U>(table.entries[i].value);
-            if ((value & ~mask) != 0) {
-                return false;
-            }
+    // name duplicates: shell sort by name then check adjacent
+    std::array<enum_entry<E>, N> sorted;
+    for (std::size_t i = 0; i < N; ++i) {
+        sorted[i] = table.entries_[i];
+    }
+
+    detail::shell_sort(span(sorted), [](const enum_entry<E> &a, const enum_entry<E> &b) {
+        return a.name < b.name;
+    });
+
+    for (std::size_t i = 1; i < N; ++i) {
+        if (sorted[i].name == sorted[i - 1].name) {
+            return false;
         }
     }
 
     return true;
 }
 
-template <typename E, std::size_t N, typename Pred>
-constexpr auto verify_enum_table(const enum_table<E, N> &table, Pred is_valid) -> bool
+template <typename E, std::enable_if_t<is_bitmask_enum_v<E>, int> = 0>
+class bitflags
 {
-    for (std::size_t i = 0; i < N; ++i) {
-        for (std::size_t j = i + 1; j < N; ++j) {
-            if (!is_valid(table.entries[i], table.entries[j])) {
-                return false;
-            }
-        }
+public:
+    using underlying_type = detail::enum_underlying_t<E>;
+
+    static_assert(!std::is_signed_v<underlying_type>,
+                  "bitflags<E> requires an unsigned underlying type");
+
+    constexpr bitflags() noexcept = default;
+
+    constexpr bitflags(E flag) noexcept
+        : bits_(static_cast<underlying_type>(flag))
+    {
     }
 
-    return true;
+    [[nodiscard]] constexpr static auto from_raw(underlying_type bits) noexcept
+      -> std::optional<bitflags>
+    {
+        if ((bits & ~detail::known_mask<E>()) != 0) {
+            return std::nullopt;
+        }
+
+        return bitflags(bits);
+    }
+
+    // Drops unknown bits, keeping only the declared flags
+    constexpr static auto from_raw_truncate(underlying_type bits) noexcept -> bitflags
+    {
+        return bitflags(bits & detail::known_mask<E>());
+    }
+
+    constexpr static auto all() noexcept -> bitflags { return bitflags(detail::known_mask<E>()); }
+
+    [[nodiscard]] constexpr auto is_all() const noexcept -> bool
+    {
+        return bits_ == detail::known_mask<E>();
+    }
+
+    [[nodiscard]] constexpr auto to_raw() const noexcept -> underlying_type { return bits_; }
+
+    [[nodiscard]] constexpr auto empty() const noexcept -> bool { return bits_ == 0; }
+
+    [[nodiscard]] constexpr explicit operator bool() const noexcept { return !empty(); }
+
+    [[nodiscard]] constexpr auto contains(E flag) const noexcept -> bool
+    {
+        const auto f = static_cast<underlying_type>(flag);
+        return (bits_ & f) == f;
+    }
+
+    [[nodiscard]] constexpr auto contains(bitflags flags) const noexcept -> bool
+    {
+        return (bits_ & flags.bits_) == flags.bits_;
+    }
+
+    [[nodiscard]] constexpr auto intersects(bitflags flags) const noexcept -> bool
+    {
+        return (bits_ & flags.bits_) != 0;
+    }
+
+    constexpr auto set(E flag, bool value = true) noexcept -> bitflags &
+    {
+        if (value) {
+            bits_ |= static_cast<underlying_type>(flag);
+        } else {
+            bits_ &= ~static_cast<underlying_type>(flag);
+        }
+
+        return *this;
+    }
+
+    constexpr auto unset(E flag) noexcept -> bitflags & { return set(flag, false); }
+
+    constexpr auto toggle(E flag) noexcept -> bitflags &
+    {
+        bits_ ^= static_cast<underlying_type>(flag);
+        return *this;
+    }
+
+    constexpr auto clear() noexcept -> void { bits_ = 0; }
+
+    constexpr auto operator|=(bitflags rhs) noexcept -> bitflags &
+    {
+        bits_ |= rhs.bits_;
+        return *this;
+    }
+
+    constexpr auto operator&=(bitflags rhs) noexcept -> bitflags &
+    {
+        bits_ &= rhs.bits_;
+        return *this;
+    }
+
+    constexpr auto operator^=(bitflags rhs) noexcept -> bitflags &
+    {
+        bits_ ^= rhs.bits_;
+        return *this;
+    }
+
+    [[nodiscard]] friend constexpr auto operator|(bitflags lhs, bitflags rhs) noexcept -> bitflags
+    {
+        return bitflags{ static_cast<underlying_type>(lhs.bits_ | rhs.bits_) };
+    }
+
+    [[nodiscard]] friend constexpr auto operator&(bitflags lhs, bitflags rhs) noexcept -> bitflags
+    {
+        return bitflags{ static_cast<underlying_type>(lhs.bits_ & rhs.bits_) };
+    }
+
+    [[nodiscard]] friend constexpr auto operator^(bitflags lhs, bitflags rhs) noexcept -> bitflags
+    {
+        return bitflags{ static_cast<underlying_type>(lhs.bits_ ^ rhs.bits_) };
+    }
+
+    [[nodiscard]] friend constexpr auto operator~(bitflags rhs) noexcept -> bitflags
+    {
+        return bitflags{ static_cast<underlying_type>(~rhs.bits_)
+                         & static_cast<underlying_type>(detail::known_mask<E>()) };
+    }
+
+    [[nodiscard]] friend constexpr auto operator==(bitflags lhs, bitflags rhs) noexcept -> bool
+    {
+        return lhs.bits_ == rhs.bits_;
+    }
+
+    [[nodiscard]] friend constexpr auto operator!=(bitflags lhs, bitflags rhs) noexcept -> bool
+    {
+        return lhs.bits_ != rhs.bits_;
+    }
+
+private:
+    explicit constexpr bitflags(underlying_type bits) noexcept
+        : bits_(bits)
+    {
+    }
+
+    underlying_type bits_{ 0 };
+};
+
+template <typename E, std::enable_if_t<is_bitmask_enum_v<E>, int> = 0>
+constexpr auto get_enum_table([[maybe_unused]] bitflags<E> *ptr) noexcept
+{
+    return get_enum_table(static_cast<E *>(nullptr));
 }
 
 } // namespace linyaps_box::utils
 
-template <typename E, typename = std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>>>
-[[nodiscard]] constexpr E operator|(E lhs, E rhs) noexcept
+template <typename E, std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>, int> = 0>
+[[nodiscard]] constexpr auto operator|(E lhs, E rhs) noexcept -> linyaps_box::utils::bitflags<E>
 {
-    using U = linyaps_box::utils::enum_underlying_t<E>;
-    return static_cast<E>(static_cast<U>(lhs) | static_cast<U>(rhs));
+    return linyaps_box::utils::bitflags<E>(lhs) | linyaps_box::utils::bitflags<E>(rhs);
 }
 
-template <typename E, typename = std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>>>
-[[nodiscard]] constexpr E operator&(E lhs, E rhs) noexcept
+template <typename E, std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>, int> = 0>
+[[nodiscard]] constexpr auto operator&(E lhs, E rhs) noexcept -> linyaps_box::utils::bitflags<E>
 {
-    using U = linyaps_box::utils::enum_underlying_t<E>;
-    return static_cast<E>(static_cast<U>(lhs) & static_cast<U>(rhs));
+    return linyaps_box::utils::bitflags<E>(lhs) & linyaps_box::utils::bitflags<E>(rhs);
 }
 
-template <typename E, typename = std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>>>
-[[nodiscard]] constexpr E operator^(E lhs, E rhs) noexcept
+template <typename E, std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>, int> = 0>
+[[nodiscard]] constexpr auto operator^(E lhs, E rhs) noexcept -> linyaps_box::utils::bitflags<E>
 {
-    using U = linyaps_box::utils::enum_underlying_t<E>;
-    return static_cast<E>(static_cast<U>(lhs) ^ static_cast<U>(rhs));
+    return linyaps_box::utils::bitflags<E>(lhs) ^ linyaps_box::utils::bitflags<E>(rhs);
 }
 
-template <typename E, typename = std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>>>
-[[nodiscard]] constexpr E operator~(E rhs) noexcept
+template <typename E, std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>, int> = 0>
+[[nodiscard]] constexpr auto operator~(E rhs) noexcept -> linyaps_box::utils::bitflags<E>
 {
-    using U = linyaps_box::utils::enum_underlying_t<E>;
-    return static_cast<E>(~static_cast<U>(rhs) & linyaps_box::utils::bitmask_mask<E>());
+    return ~linyaps_box::utils::bitflags<E>(rhs);
 }
 
-template <typename E, typename = std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>>>
+template <typename E, std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>, int> = 0>
 constexpr E &operator|=(E &lhs, E rhs) noexcept
 {
-    return lhs = lhs | rhs;
+    using U = linyaps_box::utils::detail::enum_underlying_t<E>;
+    return lhs = static_cast<E>(static_cast<U>(lhs) | static_cast<U>(rhs));
 }
 
-template <typename E, typename = std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>>>
+template <typename E, std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>, int> = 0>
 constexpr E &operator&=(E &lhs, E rhs) noexcept
 {
-    return lhs = lhs & rhs;
+    using U = linyaps_box::utils::detail::enum_underlying_t<E>;
+    return lhs = static_cast<E>(static_cast<U>(lhs) & static_cast<U>(rhs));
 }
 
-template <typename E, typename = std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>>>
+template <typename E, std::enable_if_t<linyaps_box::utils::is_bitmask_enum_v<E>, int> = 0>
 constexpr E &operator^=(E &lhs, E rhs) noexcept
 {
-    return lhs = lhs ^ rhs;
+    using U = linyaps_box::utils::detail::enum_underlying_t<E>;
+    return lhs = static_cast<E>(static_cast<U>(lhs) ^ static_cast<U>(rhs));
 }
 
-// Opts an enum into bitmask operators. Write it inside the enum body; it
-// injects the sentinel enumerator LINYAPS_BITMASK_LARGEST_ENUMERATOR holding the
-// highest flag bit, which bounds operator~ to the defined flag range.
-//
-// The argument must be the *enumerator* with the highest flag bit, NOT a
-// literal: its value is bound to the platform macro at the enum definition site
-// (e.g. `tmpfile = O_TMPFILE`), so it tracks the platform automatically. It must
-// stay the true maximum on every platform this code compiles on; for
-// table-registered enums verify_enum_table() enforces that at compile time.
-#define LINYAPS_MARK_AS_BITMASK_ENUM(LargestValue) LINYAPS_BITMASK_LARGEST_ENUMERATOR = LargestValue
+#define LINYAPS_ENABLE_BITMASK_ENUM(E)                                           \
+    [[maybe_unused]] constexpr ::std::true_type enable_bitmask_enum_tag(         \
+      [[maybe_unused]] E *ptr) noexcept /* NOLINT(bugprone-macro-parentheses) */ \
+    {                                                                            \
+        return { };                                                              \
+    }
 
-// GCC 8's constexpr evaluator may default-construct + copy the table
-// when binding a reference inside a direct static_assert(verify(table)).
-// Assigning to a constexpr variable first avoids that path.
-#define LINYAPS_REGISTER_ENUM(E, ...)                                                     \
-    constexpr auto get_enum_table(E *) noexcept                                           \
-    {                                                                                     \
-        constexpr auto table = ::linyaps_box::utils::make_enum_table<E>({ __VA_ARGS__ }); \
-        constexpr auto valid = ::linyaps_box::utils::verify_enum_table(table);            \
-        static_assert(valid,                                                              \
-                      "enum_table validation failed for " #E                              \
-                      ": duplicate name or value detected!");                             \
-        return table;                                                                     \
+#define LINYAPS_REGISTER_ENUM_TABLE(E, COUNT, ...)                                                \
+    constexpr auto get_enum_table([[maybe_unused]] E *ptr) noexcept                               \
+    {                                                                                             \
+        constexpr auto table = ::linyaps_box::utils::make_enum_table<E>(#E, { __VA_ARGS__ });     \
+        constexpr auto valid = ::linyaps_box::utils::verify_enum_table(table);                    \
+        static_assert(valid,                                                                      \
+                      "enum_table validation failed for " #E                                      \
+                      ": duplicate name or value detected!");                                     \
+        static_assert(table.entries().size() == static_cast<std::size_t>(COUNT),                  \
+                      "enum_table entry count mismatch for " #E ": expected " #COUNT " entries"); \
+        return table;                                                                             \
     }

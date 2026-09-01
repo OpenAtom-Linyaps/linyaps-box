@@ -24,17 +24,18 @@ enum class send_flag : uint16_t {
     more = MSG_MORE,
     nosignal = MSG_NOSIGNAL,
     oob = MSG_OOB,
-    LINYAPS_MARK_AS_BITMASK_ENUM(more),
 };
-LINYAPS_REGISTER_ENUM(send_flag,
-                      { send_flag::none, "NONE" },
-                      { send_flag::confirm, "MSG_CONFIRM" },
-                      { send_flag::dontroute, "MSG_DONTROUTE" },
-                      { send_flag::dontwait, "MSG_DONTWAIT" },
-                      { send_flag::eor, "MSG_EOR" },
-                      { send_flag::more, "MSG_MORE" },
-                      { send_flag::nosignal, "MSG_NOSIGNAL" },
-                      { send_flag::oob, "MSG_OOB" })
+LINYAPS_ENABLE_BITMASK_ENUM(send_flag);
+LINYAPS_REGISTER_ENUM_TABLE(send_flag,
+                            8,
+                            { send_flag::none, "NONE" },
+                            { send_flag::confirm, "MSG_CONFIRM" },
+                            { send_flag::dontroute, "MSG_DONTROUTE" },
+                            { send_flag::dontwait, "MSG_DONTWAIT" },
+                            { send_flag::eor, "MSG_EOR" },
+                            { send_flag::more, "MSG_MORE" },
+                            { send_flag::nosignal, "MSG_NOSIGNAL" },
+                            { send_flag::oob, "MSG_OOB" })
 
 enum class recv_flag : uint32_t {
     none = 0,
@@ -45,17 +46,18 @@ enum class recv_flag : uint32_t {
     peek = MSG_PEEK,
     trunc = MSG_TRUNC,
     waitall = MSG_WAITALL,
-    LINYAPS_MARK_AS_BITMASK_ENUM(cmsg_cloexec),
 };
-LINYAPS_REGISTER_ENUM(recv_flag,
-                      { recv_flag::none, "NONE" },
-                      { recv_flag::cmsg_cloexec, "MSG_CMSG_CLOEXEC" },
-                      { recv_flag::dontwait, "MSG_DONTWAIT" },
-                      { recv_flag::errqueue, "MSG_ERRQUEUE" },
-                      { recv_flag::oob, "MSG_OOB" },
-                      { recv_flag::peek, "MSG_PEEK" },
-                      { recv_flag::trunc, "MSG_TRUNC" },
-                      { recv_flag::waitall, "MSG_WAITALL" })
+LINYAPS_ENABLE_BITMASK_ENUM(recv_flag);
+LINYAPS_REGISTER_ENUM_TABLE(recv_flag,
+                            8,
+                            { recv_flag::none, "NONE" },
+                            { recv_flag::cmsg_cloexec, "MSG_CMSG_CLOEXEC" },
+                            { recv_flag::dontwait, "MSG_DONTWAIT" },
+                            { recv_flag::errqueue, "MSG_ERRQUEUE" },
+                            { recv_flag::oob, "MSG_OOB" },
+                            { recv_flag::peek, "MSG_PEEK" },
+                            { recv_flag::trunc, "MSG_TRUNC" },
+                            { recv_flag::waitall, "MSG_WAITALL" })
 
 enum class return_flag : uint32_t {
     none = 0,
@@ -65,21 +67,23 @@ enum class return_flag : uint32_t {
     ctrunc = MSG_CTRUNC,
     errqueue = MSG_ERRQUEUE,
     cmsg_cloexec = MSG_CMSG_CLOEXEC,
-    LINYAPS_MARK_AS_BITMASK_ENUM(cmsg_cloexec),
 };
-LINYAPS_REGISTER_ENUM(return_flag,
-                      { return_flag::none, "NONE" },
-                      { return_flag::oob, "MSG_OOB" },
-                      { return_flag::eor, "MSG_EOR" },
-                      { return_flag::trunc, "MSG_TRUNC" },
-                      { return_flag::ctrunc, "MSG_CTRUNC" },
-                      { return_flag::errqueue, "MSG_ERRQUEUE" },
-                      { return_flag::cmsg_cloexec, "MSG_CMSG_CLOEXEC" })
+LINYAPS_ENABLE_BITMASK_ENUM(return_flag);
+LINYAPS_REGISTER_ENUM_TABLE(return_flag,
+                            7,
+                            { return_flag::none, "NONE" },
+                            { return_flag::oob, "MSG_OOB" },
+                            { return_flag::eor, "MSG_EOR" },
+                            { return_flag::trunc, "MSG_TRUNC" },
+                            { return_flag::ctrunc, "MSG_CTRUNC" },
+                            { return_flag::errqueue, "MSG_ERRQUEUE" },
+                            { return_flag::cmsg_cloexec, "MSG_CMSG_CLOEXEC" })
 
 enum class address_family : uint8_t { unspecified = AF_UNSPEC, unix = AF_UNIX };
-LINYAPS_REGISTER_ENUM(address_family,
-                      { address_family::unspecified, "AF_UNSPEC" },
-                      { address_family::unix, "AF_UNIX" })
+LINYAPS_REGISTER_ENUM_TABLE(address_family,
+                            2,
+                            { address_family::unspecified, "AF_UNSPEC" },
+                            { address_family::unix, "AF_UNIX" })
 
 enum class socket_type : uint8_t {
     stream = SOCK_STREAM,
@@ -88,23 +92,25 @@ enum class socket_type : uint8_t {
     rdm = SOCK_RDM,
     seqpacket = SOCK_SEQPACKET
 };
-LINYAPS_REGISTER_ENUM(socket_type,
-                      { socket_type::stream, "SOCK_STREAM" },
-                      { socket_type::datagram, "SOCK_DGRAM" },
-                      { socket_type::raw, "SOCK_RAW" },
-                      { socket_type::rdm, "SOCK_RDM" },
-                      { socket_type::seqpacket, "SOCK_SEQPACKET" })
+LINYAPS_REGISTER_ENUM_TABLE(socket_type,
+                            5,
+                            { socket_type::stream, "SOCK_STREAM" },
+                            { socket_type::datagram, "SOCK_DGRAM" },
+                            { socket_type::raw, "SOCK_RAW" },
+                            { socket_type::rdm, "SOCK_RDM" },
+                            { socket_type::seqpacket, "SOCK_SEQPACKET" })
 
 enum class socket_flag : uint32_t {
     none = 0,
     nonblock = SOCK_NONBLOCK,
     cloexec = SOCK_CLOEXEC,
-    LINYAPS_MARK_AS_BITMASK_ENUM(cloexec),
 };
-LINYAPS_REGISTER_ENUM(socket_flag,
-                      { socket_flag::none, "NONE" },
-                      { socket_flag::nonblock, "SOCK_NONBLOCK" },
-                      { socket_flag::cloexec, "SOCK_CLOEXEC" })
+LINYAPS_ENABLE_BITMASK_ENUM(socket_flag);
+LINYAPS_REGISTER_ENUM_TABLE(socket_flag,
+                            3,
+                            { socket_flag::none, "NONE" },
+                            { socket_flag::nonblock, "SOCK_NONBLOCK" },
+                            { socket_flag::cloexec, "SOCK_CLOEXEC" })
 
 namespace cmsg {
 
@@ -484,30 +490,34 @@ private:
 struct RecvMsg
 {
     std::size_t bytes{ 0 };
-    sys::return_flag flags{ sys::return_flag::none };
+    utils::bitflags<sys::return_flag> flags{ sys::return_flag::none };
     std::optional<endpoint> address;
     ancillary_buffer_view control;
 };
 
 auto send(utils::file_descriptor_ref fd,
           utils::span<const std::byte> buf,
-          sys::send_flag flags = sys::send_flag::none) noexcept -> Result<std::size_t>;
+          utils::bitflags<sys::send_flag> flags = sys::send_flag::none) noexcept
+  -> Result<std::size_t>;
 
 // sendmsg/recvmsg deliberately take a single iovec rather than a span of them.
 // If that ever changes, add a span<io_slice> overload back rather than changing this one.
 auto sendmsg(utils::file_descriptor_ref fd,
              const io_slice &iov,
              ancillary_buffer_writer &control,
-             sys::send_flag flags = sys::send_flag::none) noexcept -> Result<std::size_t>;
+             utils::bitflags<sys::send_flag> flags = sys::send_flag::none) noexcept
+  -> Result<std::size_t>;
 
 auto recv(utils::file_descriptor_ref fd,
           utils::span<std::byte> buf,
-          sys::recv_flag flags = sys::recv_flag::none) noexcept -> Result<std::size_t>;
+          utils::bitflags<sys::recv_flag> flags = sys::recv_flag::none) noexcept
+  -> Result<std::size_t>;
 
 auto recvmsg(utils::file_descriptor_ref fd,
              const mutable_io_slice &iov,
              ancillary_buffer &control,
-             sys::recv_flag flags = sys::recv_flag::none) noexcept -> Result<RecvMsg>;
+             utils::bitflags<sys::recv_flag> flags = sys::recv_flag::none) noexcept
+  -> Result<RecvMsg>;
 
 auto connect(utils::file_descriptor_ref fd, const endpoint &ep) noexcept -> Result<void>;
 
@@ -516,12 +526,12 @@ auto connect(utils::file_descriptor_ref fd, const endpoint &ep) noexcept -> Resu
 // add a wrapper class for protocol.
 auto socket(sys::address_family domain,
             sys::socket_type type,
-            sys::socket_flag flag = sys::socket_flag::none,
+            utils::bitflags<sys::socket_flag> flag = sys::socket_flag::none,
             int protocol = 0) noexcept -> Result<utils::file_descriptor>;
 
 auto socketpair(sys::address_family domain,
                 sys::socket_type type,
-                sys::socket_flag flag = sys::socket_flag::none,
+                utils::bitflags<sys::socket_flag> flag = sys::socket_flag::none,
                 int protocol = 0) noexcept
   -> Result<std::pair<utils::file_descriptor, utils::file_descriptor>>;
 
