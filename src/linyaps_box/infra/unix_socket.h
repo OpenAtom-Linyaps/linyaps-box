@@ -43,8 +43,9 @@ public:
 
     [[nodiscard]] auto send(utils::span<const std::byte> data) const -> os::Result<std::size_t>;
 
-    [[nodiscard]] auto recv(utils::span<std::byte> buf,
-                            os::sys::recv_flag flags = os::sys::recv_flag::none) const
+    [[nodiscard]] auto
+    recv(utils::span<std::byte> buf,
+         utils::bitflags<os::sys::recv_flag> flags = os::sys::recv_flag::none) const
       -> os::Result<std::size_t>;
 
     [[nodiscard]] auto send_fd(utils::file_descriptor_ref fd) const -> os::Result<void>;

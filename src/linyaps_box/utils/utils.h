@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <random>
 #include <string>
@@ -19,6 +20,21 @@
 #endif
 
 namespace linyaps_box::utils {
+
+namespace detail {
+template <typename T, std::size_t N, std::size_t... I>
+constexpr std::array<std::remove_cv_t<T>, N> to_array_impl(T (&arr)[N], std::index_sequence<I...>)
+{
+    return { { arr[I]... } };
+}
+
+template <typename T, std::size_t N, std::size_t... I>
+constexpr std::array<std::remove_cv_t<T>, N> to_array_impl(T (&&arr)[N], std::index_sequence<I...>)
+{
+    return { { std::move(arr[I])... } };
+}
+
+} // namespace detail
 
 template <typename... T>
 struct Overload : T...
@@ -94,5 +110,18 @@ struct uninit_allocator
 
 template <typename T>
 using uninit_vector = std::vector<T, uninit_allocator<T>>;
+
+// c++ 20 to_array
+template <typename T, std::size_t N>
+constexpr auto to_array(T (&arr)[N]) noexcept
+{
+    return detail::to_array_impl(arr, std::make_index_sequence<N>{ });
+}
+
+template <typename T, std::size_t N>
+constexpr auto to_array(T (&&arr)[N]) noexcept
+{
+    return detail::to_array_impl(std::move(arr), std::make_index_sequence<N>{ });
+}
 
 } // namespace linyaps_box::utils

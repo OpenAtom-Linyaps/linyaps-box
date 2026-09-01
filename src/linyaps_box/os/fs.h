@@ -44,38 +44,46 @@ enum class open_flag : uint64_t { // NOLINT
     no_follow = O_NOFOLLOW,
     async = O_ASYNC,
     dsync = O_DSYNC,
+#if O_LARGEFILE
     largefile = O_LARGEFILE,
+#endif
     no_atime = O_NOATIME,
     no_ctty = O_NOCTTY,
     tmpfile = O_TMPFILE,
-    LINYAPS_MARK_AS_BITMASK_ENUM(tmpfile),
 };
 // O_TMPFILE contains O_DIRECTORY, so it must be placed at first.
 // O_LARGEFILE is 0 on 64-bit platforms (kernel always supports large files),
-// so only register it in the name table when it's a real non-zero flag.
+// so both the enumerator and its name-table entry only exist when it's a real
+// non-zero flag. The table count below must match the entries actually present.
 #if O_LARGEFILE
 #  define LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY { open_flag::largefile, "O_LARGEFILE" },
+#  define LINYAPS_BOX_OPEN_FLAG_TABLE_COUNT 17
 #else
 #  define LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY
+#  define LINYAPS_BOX_OPEN_FLAG_TABLE_COUNT 16
 #endif
-LINYAPS_REGISTER_ENUM(open_flag,
-                      { open_flag::none, "NONE" },
-                      { open_flag::tmpfile, "O_TMPFILE" },
-                      { open_flag::sync, "O_SYNC" },
-                      { open_flag::create, "O_CREAT" },
-                      { open_flag::exclusive, "O_EXCL" },
-                      { open_flag::cloexec, "O_CLOEXEC" },
-                      { open_flag::truncate, "O_TRUNC" },
-                      { open_flag::append, "O_APPEND" },
-                      { open_flag::non_block, "O_NONBLOCK" },
-                      { open_flag::directory, "O_DIRECTORY" },
-                      { open_flag::no_follow, "O_NOFOLLOW" },
-                      { open_flag::async, "O_ASYNC" },
-                      { open_flag::direct, "O_DIRECT" },
-                      { open_flag::dsync, "O_DSYNC" },
-                      LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY{ open_flag::no_atime, "O_NOATIME" },
-                      { open_flag::no_ctty, "O_NOCTTY" })
+LINYAPS_ENABLE_BITMASK_ENUM(open_flag);
+LINYAPS_REGISTER_ENUM_TABLE(open_flag,
+                            LINYAPS_BOX_OPEN_FLAG_TABLE_COUNT,
+                            { open_flag::none, "NONE" },
+                            { open_flag::tmpfile, "O_TMPFILE" },
+                            { open_flag::sync, "O_SYNC" },
+                            { open_flag::create, "O_CREAT" },
+                            { open_flag::exclusive, "O_EXCL" },
+                            { open_flag::cloexec, "O_CLOEXEC" },
+                            { open_flag::truncate, "O_TRUNC" },
+                            { open_flag::append, "O_APPEND" },
+                            { open_flag::non_block, "O_NONBLOCK" },
+                            { open_flag::directory, "O_DIRECTORY" },
+                            { open_flag::no_follow, "O_NOFOLLOW" },
+                            { open_flag::async, "O_ASYNC" },
+                            { open_flag::direct, "O_DIRECT" },
+                            { open_flag::dsync, "O_DSYNC" },
+                            LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY{ open_flag::no_atime,
+                                                                   "O_NOATIME" },
+                            { open_flag::no_ctty, "O_NOCTTY" })
 #undef LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY
+#undef LINYAPS_BOX_OPEN_FLAG_TABLE_COUNT
 
 enum class access_mode : mode_t { // NOLINT
     unknown,
@@ -109,7 +117,7 @@ public:
 
     static auto from_raw(uint raw) noexcept -> Result<open_option>;
 
-    constexpr open_option(open_flag flags, access_mode acc_mode) noexcept
+    constexpr open_option(utils::bitflags<open_flag> flags, access_mode acc_mode) noexcept
         : flags_(flags)
         , access_mode_(acc_mode)
     {
@@ -145,7 +153,7 @@ public:
             mode |= 0U;
         }
 
-        return static_cast<uint>(flags_) | mode;
+        return flags_.to_raw() | mode;
     }
 
     [[nodiscard]] constexpr explicit operator int() const noexcept
@@ -159,42 +167,47 @@ public:
     }
 
 private:
-    open_flag flags_;
+    utils::bitflags<open_flag> flags_;
     access_mode access_mode_;
 };
 
 enum class fd_flag : uint8_t {
     none = 0,
     cloexec = FD_CLOEXEC,
-    LINYAPS_MARK_AS_BITMASK_ENUM(cloexec),
 };
-LINYAPS_REGISTER_ENUM(fd_flag, { fd_flag::none, "NONE" }, { fd_flag::cloexec, "FD_CLOEXEC" })
+LINYAPS_ENABLE_BITMASK_ENUM(fd_flag);
+LINYAPS_REGISTER_ENUM_TABLE(fd_flag,
+                            2,
+                            { fd_flag::none, "NONE" },
+                            { fd_flag::cloexec, "FD_CLOEXEC" })
 
 enum class at_flag : std::uint16_t {
     none = 0,
     empty_path = AT_EMPTY_PATH,
     symlink_nofollow = AT_SYMLINK_NOFOLLOW,
     remove_dir = AT_REMOVEDIR,
-    LINYAPS_MARK_AS_BITMASK_ENUM(empty_path),
 };
-LINYAPS_REGISTER_ENUM(at_flag,
-                      { at_flag::none, "NONE" },
-                      { at_flag::empty_path, "AT_EMPTY_PATH" },
-                      { at_flag::symlink_nofollow, "AT_SYMLINK_NOFOLLOW" },
-                      { at_flag::remove_dir, "AT_REMOVEDIR" })
+LINYAPS_ENABLE_BITMASK_ENUM(at_flag);
+LINYAPS_REGISTER_ENUM_TABLE(at_flag,
+                            4,
+                            { at_flag::none, "NONE" },
+                            { at_flag::empty_path, "AT_EMPTY_PATH" },
+                            { at_flag::symlink_nofollow, "AT_SYMLINK_NOFOLLOW" },
+                            { at_flag::remove_dir, "AT_REMOVEDIR" })
 
 enum class rename_flag : std::uint8_t {
     none = 0,
     exchange = RENAME_EXCHANGE,
     noreplace = RENAME_NOREPLACE,
     whiteout = RENAME_WHITEOUT,
-    LINYAPS_MARK_AS_BITMASK_ENUM(whiteout),
 };
-LINYAPS_REGISTER_ENUM(rename_flag,
-                      { rename_flag::none, "NONE" },
-                      { rename_flag::exchange, "RENAME_EXCHANGE" },
-                      { rename_flag::noreplace, "RENAME_NOREPLACE" },
-                      { rename_flag::whiteout, "RENAME_WHITEOUT" })
+LINYAPS_ENABLE_BITMASK_ENUM(rename_flag);
+LINYAPS_REGISTER_ENUM_TABLE(rename_flag,
+                            4,
+                            { rename_flag::none, "NONE" },
+                            { rename_flag::exchange, "RENAME_EXCHANGE" },
+                            { rename_flag::noreplace, "RENAME_NOREPLACE" },
+                            { rename_flag::whiteout, "RENAME_WHITEOUT" })
 
 enum class openat2_resolve : std::uint64_t { // NOLINT
     none = 0,
@@ -240,21 +253,21 @@ enum class openat2_resolve : std::uint64_t { // NOLINT
     ,
 
     // we couldn't stimulate RESOLVE_CACHED in userspace
-
-    LINYAPS_MARK_AS_BITMASK_ENUM(in_root),
 };
-LINYAPS_REGISTER_ENUM(openat2_resolve,
-                      { openat2_resolve::no_xdev, "RESOLVE_NO_XDEV" },
-                      { openat2_resolve::no_magic_links, "RESOLVE_NO_MAGICLINKS" },
-                      { openat2_resolve::no_symlinks, "RESOLVE_NO_SYMLINKS" },
-                      { openat2_resolve::beneath, "RESOLVE_BENEATH" },
-                      { openat2_resolve::in_root, "RESOLVE_IN_ROOT" })
+LINYAPS_ENABLE_BITMASK_ENUM(openat2_resolve);
+LINYAPS_REGISTER_ENUM_TABLE(openat2_resolve,
+                            5,
+                            { openat2_resolve::no_xdev, "RESOLVE_NO_XDEV" },
+                            { openat2_resolve::no_magic_links, "RESOLVE_NO_MAGICLINKS" },
+                            { openat2_resolve::no_symlinks, "RESOLVE_NO_SYMLINKS" },
+                            { openat2_resolve::beneath, "RESOLVE_BENEATH" },
+                            { openat2_resolve::in_root, "RESOLVE_IN_ROOT" })
 
 struct open_how
 {
     open_option opt;
     std::filesystem::perms perms;
-    openat2_resolve resolve;
+    utils::bitflags<openat2_resolve> resolve;
 };
 
 struct linux_dirent64
@@ -291,7 +304,8 @@ struct linux_dirent64
 
 [[nodiscard]] auto unlinkat(utils::file_descriptor_ref dirfd,
                             const std::filesystem::path &path,
-                            sys::at_flag flags = sys::at_flag::none) noexcept -> Result<void>;
+                            utils::bitflags<sys::at_flag> flags = sys::at_flag::none) noexcept
+  -> Result<void>;
 
 [[nodiscard]] auto mkdirat(utils::file_descriptor_ref dirfd,
                            const std::filesystem::path &path,
@@ -301,18 +315,19 @@ struct linux_dirent64
                              utils::file_descriptor_ref dirfd,
                              const std::filesystem::path &linkpath) noexcept -> Result<void>;
 
-[[nodiscard]] auto renameat2(utils::file_descriptor_ref olddirfd,
-                             const std::filesystem::path &oldpath,
-                             utils::file_descriptor_ref newdirfd,
-                             const std::filesystem::path &newpath,
-                             sys::rename_flag flags = sys::rename_flag::none) noexcept
-  -> Result<void>;
+[[nodiscard]] auto renameat2(
+  utils::file_descriptor_ref olddirfd,
+  const std::filesystem::path &oldpath,
+  utils::file_descriptor_ref newdirfd,
+  const std::filesystem::path &newpath,
+  utils::bitflags<sys::rename_flag> flags = sys::rename_flag::none) noexcept -> Result<void>;
 
 [[nodiscard]] auto fstat(utils::file_descriptor_ref fd) noexcept -> Result<struct stat>;
 
 [[nodiscard]] auto fstatat(utils::file_descriptor_ref dirfd,
                            const std::filesystem::path &path,
-                           sys::at_flag flags = sys::at_flag::none) noexcept -> Result<struct stat>;
+                           utils::bitflags<sys::at_flag> flags = sys::at_flag::none) noexcept
+  -> Result<struct stat>;
 
 [[nodiscard]] auto readlinkat(utils::file_descriptor_ref dirfd,
                               const std::filesystem::path &path,
@@ -328,7 +343,8 @@ struct linux_dirent64
                           const std::filesystem::path &oldpath,
                           utils::file_descriptor_ref newdirfd,
                           const std::filesystem::path &newpath,
-                          sys::at_flag flags = sys::at_flag::none) noexcept -> Result<void>;
+                          utils::bitflags<sys::at_flag> flags = sys::at_flag::none) noexcept
+  -> Result<void>;
 
 [[nodiscard]] auto fcntl_dupfd(utils::file_descriptor_ref fd, int newfd) noexcept
   -> Result<utils::file_descriptor>;
@@ -336,13 +352,13 @@ struct linux_dirent64
 [[nodiscard]] auto fcntl_dupfd_cloexec(utils::file_descriptor_ref fd, int newfd) noexcept
   -> Result<utils::file_descriptor>;
 
-[[nodiscard]] auto fcntl_setfl(utils::file_descriptor_ref fd, sys::open_flag flag) noexcept
-  -> Result<void>;
+[[nodiscard]] auto fcntl_setfl(utils::file_descriptor_ref fd,
+                               utils::bitflags<sys::open_flag> flag) noexcept -> Result<void>;
 
 [[nodiscard]] auto fcntl_getfl(utils::file_descriptor_ref fd) noexcept -> Result<sys::open_option>;
 
-[[nodiscard]] auto fcntl_setfd(utils::file_descriptor_ref fd, sys::fd_flag flag) noexcept
-  -> Result<void>;
+[[nodiscard]] auto fcntl_setfd(utils::file_descriptor_ref fd,
+                               utils::bitflags<sys::fd_flag> flag) noexcept -> Result<void>;
 
 [[nodiscard]] auto fcntl_getfd(utils::file_descriptor_ref fd) noexcept -> Result<sys::fd_flag>;
 
@@ -357,17 +373,18 @@ struct linux_dirent64
 [[nodiscard]] auto fchmodat(utils::file_descriptor_ref dirfd,
                             const std::filesystem::path &path,
                             std::filesystem::perms perm,
-                            sys::at_flag flags = sys::at_flag::none) noexcept -> Result<void>;
+                            utils::bitflags<sys::at_flag> flags = sys::at_flag::none) noexcept
+  -> Result<void>;
 
 [[nodiscard]] auto fchown(utils::file_descriptor_ref fd, uid_t owner, gid_t group) noexcept
   -> Result<void>;
 
-[[nodiscard]] auto fchownat(utils::file_descriptor_ref dirfd,
-                            const std::filesystem::path &path,
-                            uid_t owner,
-                            gid_t group,
-                            sys::at_flag flags = sys::at_flag::symlink_nofollow) noexcept
-  -> Result<void>;
+[[nodiscard]] auto fchownat(
+  utils::file_descriptor_ref dirfd,
+  const std::filesystem::path &path,
+  uid_t owner,
+  gid_t group,
+  utils::bitflags<sys::at_flag> flags = sys::at_flag::symlink_nofollow) noexcept -> Result<void>;
 
 auto to_fs_file_type(mode_t val) noexcept -> std::filesystem::file_type;
 
