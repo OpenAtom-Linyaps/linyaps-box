@@ -22,9 +22,9 @@ public:
 
     explicit semver(std::string_view str);
 
-    [[nodiscard]] unsigned int major() const noexcept;
-    [[nodiscard]] unsigned int minor() const noexcept;
-    [[nodiscard]] unsigned int patch() const noexcept;
+    [[nodiscard]] unsigned int major_version() const noexcept;
+    [[nodiscard]] unsigned int minor_version() const noexcept;
+    [[nodiscard]] unsigned int patch_version() const noexcept;
     [[nodiscard]] const std::string &prerelease() const noexcept;
     [[nodiscard]] const std::string &build() const noexcept;
 

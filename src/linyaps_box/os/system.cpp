@@ -6,6 +6,8 @@
 
 #include "linyaps_box/utils/utils.h"
 
+#include <unistd.h>
+
 namespace linyaps_box::os {
 
 auto sethostname(std::string_view name) noexcept -> os::Result<void>

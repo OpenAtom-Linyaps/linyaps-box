@@ -5,11 +5,8 @@
 #pragma once
 
 #include <array>
-#include <chrono>
-#include <random>
 #include <string>
-
-#include <unistd.h>
+#include <vector>
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define LIKELY(x) __builtin_expect((x), 1)
@@ -45,34 +42,7 @@ struct Overload : T...
 template <typename... T>
 Overload(T...) -> Overload<T...>;
 
-inline auto gen_random_string(std::size_t len) noexcept
-{
-    constexpr std::string_view charset = "0123456789"
-                                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                                         "abcdefghijklmnopqrstuvwxyz";
-
-    thread_local std::mt19937 gen = []() noexcept -> std::mt19937 {
-        try {
-            return std::mt19937{ std::random_device{ }() };
-        } catch (...) {
-            auto now = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-            constexpr auto golden = 0x9e3779b97f4a7c15ULL;
-            auto pid = static_cast<unsigned long>(getpid()) * golden;
-            auto fallback_seed = static_cast<unsigned int>(now ^ pid);
-            return std::mt19937{ fallback_seed };
-        }
-    }();
-    std::uniform_int_distribution<std::size_t> dist(0, charset.size() - 1);
-
-    std::string result;
-    result.reserve(len);
-
-    for (std::size_t i = 0; i < len; ++i) {
-        result += charset[dist(gen)];
-    }
-
-    return result;
-}
+auto gen_random_string(std::size_t len) noexcept -> std::string;
 
 template <typename T>
 struct uninit_allocator
