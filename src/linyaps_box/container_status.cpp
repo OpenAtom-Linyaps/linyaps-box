@@ -7,6 +7,7 @@
 #include "linyaps_box/infra/process_handle.h"
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/date.h"
+#include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
 #include <nlohmann/json.hpp>
@@ -18,21 +19,39 @@ auto to_json(nlohmann::json &j, const container_status &s) -> void
     std::array<char, utils::max_created_time_len> created_buf{ };
     auto len =
       linyaps_box::utils::to_created_time(linyaps_box::utils::span{ created_buf }, s.created);
-    j = nlohmann::json::object({ { "id", s.id },
-                                 { "pid", s.pid },
-                                 { "process-start-time", s.process_start_time },
-                                 { "bundle", s.bundle.string() },
-                                 { "created", std::string_view{ created_buf.data(), len } },
-                                 { "owner", s.owner },
-                                 { "annotations", s.annotations },
-                                 { "ociVersion", s.oci_version } });
+    auto obj = nlohmann::json::object({ { "id", s.id },
+                                        { "pid", s.pid },
+                                        { "bundle", s.bundle.string() },
+                                        { "created", std::string_view{ created_buf.data(), len } },
+                                        { "owner", s.owner },
+                                        { "annotations", s.annotations },
+                                        { "ociVersion", s.oci_version } });
+
+    if (s.process_start_time) {
+        obj["process-start-time"] = *s.process_start_time;
+    }
+
+    j = std::move(obj);
 }
 
 auto from_json(const nlohmann::json &j, container_status &s) -> void
 {
     j.at("id").get_to(s.id);
     j.at("pid").get_to(s.pid);
-    j.at("process-start-time").get_to(s.process_start_time);
+
+    const auto it = j.find("process-start-time");
+    if (UNLIKELY(it == j.cend())) {
+        s.process_start_time = std::nullopt;
+    } else {
+        if (UNLIKELY(it->is_null())) {
+            throw nlohmann::json::type_error::create(302,
+                                                     "Key 'process-start-time' exists but is null",
+                                                     &j);
+        }
+
+        s.process_start_time = it->get<std::uint64_t>();
+    }
+
     s.bundle = j.at("bundle").get<std::string>();
     s.created = utils::from_created_time(j.at("created").get_ref<const std::string &>());
     j.at("owner").get_to(s.owner);
@@ -87,7 +106,13 @@ auto derive_status(const container_status &s) -> runtime_status
         return runtime_status::STOPPED;
     }
 
-    if (stat->start_time != s.process_start_time) {
+    if (!s.process_start_time) {
+        // Legacy state files lack the process start time, so PID-reuse cannot
+        // be detected. Assume RUNNING (optimistic on uncertainty).
+        return runtime_status::RUNNING;
+    }
+
+    if (stat->start_time != *s.process_start_time) {
         // PID was recycled: the original container process is gone.
         return runtime_status::STOPPED;
     }

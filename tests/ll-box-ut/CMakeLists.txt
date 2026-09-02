@@ -8,7 +8,8 @@ set(linyaps-box_UNIT_TESTS_SOURCE
     ./src/log_test.cpp
     ./src/vfs_test.cpp
     ./src/parse_proc_stat_test.cpp
-    ./src/date_test.cpp)
+    ./src/date_test.cpp
+    ./src/container_status_test.cpp)
 set(linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
 set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")

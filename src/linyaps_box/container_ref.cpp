@@ -417,7 +417,15 @@ auto verify_container_process(const infra::process_handle &handle,
                                 fmt::format("container process {} is not running", st.pid));
     }
 
-    if (UNLIKELY(stat->start_time != st.process_start_time)) {
+    if (!st.process_start_time) {
+        LINYAPS_BOX_LOG_WARN("Legacy state files do not store the process {} startup time, so "
+                             "the process identity cannot be verified at this time. We assume that "
+                             "the current process is a container process.",
+                             st.pid);
+        return;
+    }
+
+    if (UNLIKELY(stat->start_time != *st.process_start_time)) {
         throw std::system_error(std::make_error_code(std::errc::no_such_process),
                                 fmt::format("container PID {} was reused by another process; "
                                             "refusing to {}",
