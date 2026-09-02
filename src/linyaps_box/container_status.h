@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -24,7 +25,7 @@ struct container_status
     std::string id;
     std::string oci_version;
     std::string owner; // extension field
-    std::uint64_t process_start_time;
+    std::optional<std::uint64_t> process_start_time;
     std::chrono::system_clock::time_point created; // extension field
     pid_t pid;
 };
