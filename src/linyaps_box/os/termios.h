@@ -4,6 +4,7 @@
 
 #include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/file_describer.h"
+#include "linyaps_box/utils/utils.h"
 
 #include <sys/ioctl.h>
 
@@ -14,7 +15,9 @@ auto isatty(utils::file_descriptor_ref fd) noexcept -> bool;
 
 auto tcgetattr(utils::file_descriptor_ref fd) noexcept -> Result<struct termios>;
 
-enum class optional_action : uint8_t {
+using optional_action_underlying_t = utils::shrink_macros_t<TCSANOW, TCSADRAIN, TCSAFLUSH>;
+
+enum class optional_action : optional_action_underlying_t {
     now = TCSANOW,
     drain = TCSADRAIN,
     flush = TCSAFLUSH,
