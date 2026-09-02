@@ -21,6 +21,8 @@
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/utils.h"
 
+#include <algorithm>
+
 #include <sys/resource.h>
 
 namespace linyaps_box {

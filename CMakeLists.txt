@@ -195,7 +195,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/session.cpp
     src/linyaps_box/utils/setns.cpp
     src/linyaps_box/utils/signal.cpp
-    src/linyaps_box/utils/time.cpp)
+    src/linyaps_box/utils/time.cpp
+    src/linyaps_box/utils/utils.cpp)
 
 if(NOT linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
   list(REMOVE_ITEM linyaps-box_LIBRARY_SOURCE
