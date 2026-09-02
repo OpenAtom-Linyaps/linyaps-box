@@ -186,6 +186,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/terminal.cpp
     src/linyaps_box/utils/cgroups.cpp
     src/linyaps_box/utils/close_range.cpp
+    src/linyaps_box/utils/date.cpp
     src/linyaps_box/utils/epoll.cpp
     src/linyaps_box/utils/file_describer.cpp
     src/linyaps_box/utils/mman.cpp
@@ -195,7 +196,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/session.cpp
     src/linyaps_box/utils/setns.cpp
     src/linyaps_box/utils/signal.cpp
-    src/linyaps_box/utils/time.cpp
     src/linyaps_box/utils/utils.cpp)
 
 if(NOT linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
