@@ -6,7 +6,7 @@
 
 #include "linyaps_box/log/utils.h"
 #include "linyaps_box/os/result.h"
-#include "linyaps_box/utils/time.h"
+#include "linyaps_box/utils/date.h"
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -65,7 +65,9 @@ auto from_json(const nlohmann::json &j, level &lvl) -> void
         return;
     }
 
-    throw std::invalid_argument(std::string{ "unknown log level: " }.append(s));
+    throw nlohmann::json::other_error::create(500,
+                                              std::string("unknown log level: ").append(s),
+                                              &j);
 }
 
 namespace detail {
