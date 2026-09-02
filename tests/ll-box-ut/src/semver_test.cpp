@@ -14,19 +14,19 @@ namespace semver = linyaps_box::utils;
 TEST(Semver, ConstructFromParts)
 {
     const semver::semver v0(1, 2, 3);
-    EXPECT_EQ(v0.major(), 1);
-    EXPECT_EQ(v0.minor(), 2);
-    EXPECT_EQ(v0.patch(), 3);
+    EXPECT_EQ(v0.major_version(), 1);
+    EXPECT_EQ(v0.minor_version(), 2);
+    EXPECT_EQ(v0.patch_version(), 3);
     EXPECT_TRUE(v0.prerelease().empty());
     EXPECT_TRUE(v0.build().empty());
 
     const semver::semver v1(1, 2, 3, "alpha");
-    EXPECT_EQ(v1.major(), 1);
+    EXPECT_EQ(v1.major_version(), 1);
     EXPECT_EQ(v1.prerelease(), "alpha");
     EXPECT_TRUE(v1.build().empty());
 
     const semver::semver v2(1, 2, 3, "", "build.123");
-    EXPECT_EQ(v2.minor(), 2);
+    EXPECT_EQ(v2.minor_version(), 2);
     EXPECT_TRUE(v2.prerelease().empty());
     EXPECT_EQ(v2.build(), "build.123");
 
@@ -38,11 +38,11 @@ TEST(Semver, ConstructFromParts)
 TEST(Semver, ConstructFromString)
 {
     const auto v1 = semver::semver("1.2.3");
-    EXPECT_EQ(v1.major(), 1);
+    EXPECT_EQ(v1.major_version(), 1);
     EXPECT_EQ(v1.prerelease().empty(), true);
 
     const auto v2 = semver::semver("0.0.0");
-    EXPECT_EQ(v2.major(), 0);
+    EXPECT_EQ(v2.major_version(), 0);
 
     const auto v3 = semver::semver("1.2.3-alpha");
     EXPECT_EQ(v3.prerelease(), "alpha");
@@ -261,7 +261,7 @@ TEST(Semver, Hash)
 TEST(Semver, LargeOrLongInputs)
 {
     const auto v1 = semver::semver("999999.999999.999999");
-    EXPECT_EQ(v1.major(), 999999);
+    EXPECT_EQ(v1.major_version(), 999999);
 
     const auto v2 = semver::semver("1.0.0-a.b.c.d.e.f");
     EXPECT_EQ(v2.prerelease(), "a.b.c.d.e.f");

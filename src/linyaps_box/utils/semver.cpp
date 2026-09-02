@@ -8,8 +8,7 @@
 
 #include <algorithm>
 #include <charconv>
-#include <ostream>
-#include <system_error>
+#include <stdexcept>
 
 namespace linyaps_box::utils {
 namespace {
@@ -139,17 +138,17 @@ semver::semver(unsigned int major,
 {
 }
 
-unsigned int semver::major() const noexcept
+unsigned int semver::major_version() const noexcept
 {
     return major_;
 }
 
-unsigned int semver::minor() const noexcept
+unsigned int semver::minor_version() const noexcept
 {
     return minor_;
 }
 
-unsigned int semver::patch() const noexcept
+unsigned int semver::patch_version() const noexcept
 {
     return patch_;
 }
@@ -311,9 +310,9 @@ namespace std {
 size_t
 hash<linyaps_box::utils::semver>::operator()(const linyaps_box::utils::semver &v) const noexcept
 {
-    auto h1 = hash<unsigned int>{ }(v.major());
-    auto h2 = hash<unsigned int>{ }(v.minor());
-    auto h3 = hash<unsigned int>{ }(v.patch());
+    auto h1 = hash<unsigned int>{ }(v.major_version());
+    auto h2 = hash<unsigned int>{ }(v.minor_version());
+    auto h3 = hash<unsigned int>{ }(v.patch_version());
     auto h4 = hash<string>{ }(v.prerelease());
     return h1 ^ (h2 << 1U) ^ (h3 << 2U) ^ (h4 << 3U);
 }
