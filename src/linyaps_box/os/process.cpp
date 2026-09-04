@@ -5,6 +5,7 @@
 #include "linyaps_box/os/process.h"
 
 #include "linyaps_box/os/details/ioctl_wrapper.h"
+#include "linyaps_box/os/syscall_nr.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <sys/prctl.h>
@@ -12,14 +13,6 @@
 
 #include <sys/stat.h>
 #include <sys/wait.h>
-
-#ifndef __NR_pidfd_open
-#  define __NR_pidfd_open 434
-#endif
-
-#ifndef __NR_pidfd_send_signal
-#  define __NR_pidfd_send_signal 424
-#endif
 
 namespace linyaps_box::os {
 
@@ -43,7 +36,7 @@ auto prctl(int option,
 
 auto pidfd_open(pid_t pid) noexcept -> Result<utils::file_descriptor>
 {
-    const auto fd = ::syscall(__NR_pidfd_open, pid, 0);
+    const auto fd = ::syscall(nr_pidfd_open, pid, 0);
     if (LIKELY(fd >= 0)) {
         return utils::file_descriptor{ static_cast<int>(fd) };
     }
@@ -53,7 +46,7 @@ auto pidfd_open(pid_t pid) noexcept -> Result<utils::file_descriptor>
 
 auto pidfd_send_signal(utils::file_descriptor_ref pidfd, int signal) noexcept -> Result<void>
 {
-    auto ret = ::syscall(__NR_pidfd_send_signal, pidfd.get(), signal, nullptr, 0U);
+    auto ret = ::syscall(nr_pidfd_send_signal, pidfd.get(), signal, nullptr, 0U);
     if (LIKELY(ret == 0)) {
         return { };
     }

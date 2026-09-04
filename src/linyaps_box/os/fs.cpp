@@ -4,16 +4,13 @@
 
 #include "linyaps_box/os/fs.h"
 
+#include "linyaps_box/os/syscall_nr.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <sys/stat.h>
 
 #ifdef LINYAPS_BOX_HAVE_OPENAT2_H
 #  include <linux/openat2.h>
-#endif
-
-#ifndef __NR_openat2
-#  define __NR_openat2 437
 #endif
 
 #include <sys/syscall.h>
@@ -105,7 +102,7 @@ auto openat2(utils::file_descriptor_ref dirfd,
 
     while (true) {
         const auto fd = static_cast<int>(
-          ::syscall(__NR_openat2, dirfd, path.c_str(), &linux_open_how, sizeof(linux_open_how)));
+          ::syscall(nr_openat2, dirfd, path.c_str(), &linux_open_how, sizeof(linux_open_how)));
         if (LIKELY(fd >= 0)) {
             return utils::file_descriptor{ fd };
         }
@@ -356,7 +353,7 @@ auto getdents64(utils::file_descriptor_ref fd, utils::span<std::byte> buf) noexc
 {
     // getdents64 was added after glibc 2.30 but we need support 2.28.
     // so use syscall directly
-    auto ret = syscall(SYS_getdents64, fd, buf.data(), buf.size());
+    auto ret = syscall(__NR_getdents64, fd, buf.data(), buf.size());
     if (UNLIKELY(ret < 0)) {
 
         return unexpected{ make_error_code(errno) };
