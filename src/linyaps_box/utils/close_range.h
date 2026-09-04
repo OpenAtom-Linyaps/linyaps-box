@@ -23,12 +23,6 @@
 #  define CLOSE_RANGE_CLOEXEC (1U << 2) // after linux 5.11
 #endif
 
-// use __NR_* instead of SYS_*
-// https://man7.org/linux/man-pages/man2/syscalls.2.html
-#ifndef __NR_close_range
-#  define __NR_close_range 436
-#endif
-
 namespace linyaps_box::utils {
 
 void close_range(uint first, uint last, int flags);
