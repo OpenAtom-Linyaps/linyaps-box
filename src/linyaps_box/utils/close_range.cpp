@@ -5,6 +5,7 @@
 #include "linyaps_box/utils/close_range.h"
 
 #include "linyaps_box/log/macro.h"
+#include "linyaps_box/os/syscall_nr.h"
 #include "linyaps_box/utils/defer.h"
 
 #include <cstring>
@@ -17,7 +18,7 @@
 namespace {
 void syscall_close_range(uint fd, uint max_fd, int flags)
 {
-    auto ret = syscall(__NR_close_range, fd, max_fd, flags);
+    auto ret = syscall(linyaps_box::os::nr_close_range, fd, max_fd, flags);
     if (ret < 0) {
         throw std::system_error(errno, std::system_category(), "close_range");
     }
