@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11.4) # for RHEL 8
 
 project(
   linyaps-box
-  VERSION 2.3.0
+  VERSION 2.3.2
   DESCRIPTION "A simple OCI runtime for desktop applications"
   HOMEPAGE_URL "https://github.com/OpenAtom-Linyaps/linyaps-box"
   LANGUAGES CXX)
