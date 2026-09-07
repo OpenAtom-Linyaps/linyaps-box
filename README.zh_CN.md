@@ -1,6 +1,8 @@
 # linyaps-box
 
-\[ [en](./README.md) | **zh_CN** \]
+[![CodeQL Security Scan](https://github.com/OpenAtom-Linyaps/linyaps-box/actions/workflows/codeql.yaml/badge.svg)](https://github.com/OpenAtom-Linyaps/linyaps-box/actions/workflows/codeql.yaml)
+
+[ [en](./README.md) | **zh_CN** ]
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/linyaps-box.svg)](https://repology.org/project/linyaps-box/versions)
 
