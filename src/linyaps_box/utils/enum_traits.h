@@ -477,3 +477,9 @@ constexpr E &operator^=(E &lhs, E rhs) noexcept
                       "enum_table entry count mismatch for " #E ": expected " #COUNT " entries"); \
         return table;                                                                             \
     }
+
+template <typename T>
+constexpr auto get_enum_table_from() noexcept
+{
+    return get_enum_table(static_cast<T *>(nullptr));
+}
