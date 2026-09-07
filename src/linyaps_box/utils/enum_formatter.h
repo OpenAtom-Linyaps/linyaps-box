@@ -23,6 +23,28 @@ struct enum_entry_view
     uint64_t value;
 };
 
+// Constexpr packing of an enum table for flag formatting.  N is deduced from
+// the table's type (not from a local variable) so the std::array size is a
+// type-level constant — referencing a local constexpr's size() as a template
+// argument breaks constant evaluation in templates under Clang.
+template <typename E, std::size_t N>
+constexpr auto make_enum_data(const enum_table<E, N> &table)
+{
+    struct packed_view
+    {
+        std::string_view type_name;
+        std::array<enum_entry_view, N> views;
+    };
+
+    packed_view result{ table.type_name(), { } };
+    for (std::size_t i = 0; i < N; ++i) {
+        result.views[i] = { table.entries()[i].name,
+                            static_cast<uint64_t>(table.entries()[i].value) };
+    }
+
+    return result;
+}
+
 template <typename T>
 struct enum_or_bitflags_traits
 {
@@ -148,24 +170,8 @@ struct fmt::formatter<T, std::enable_if_t<linyaps_box::utils::has_enum_table_v<T
         }
 
         if constexpr (linyaps_box::utils::is_bitmask_enum_v<E>) {
-            static constexpr auto enum_data = [] {
-                constexpr auto table = get_enum_table(static_cast<E *>(nullptr));
-
-                struct packed_view
-                {
-                    std::string_view type_name;
-                    std::array<linyaps_box::utils::detail::enum_entry_view, table.entries().size()>
-                      views;
-                };
-
-                packed_view result{ table.type_name(), { } };
-                for (std::size_t i = 0; i < table.entries().size(); ++i) {
-                    result.views[i] = { table.entries()[i].name,
-                                        static_cast<uint64_t>(table.entries()[i].value) };
-                }
-
-                return result;
-            }();
+            static constexpr auto enum_data =
+              linyaps_box::utils::detail::make_enum_data(get_enum_table(static_cast<E *>(nullptr)));
 
             return linyaps_box::utils::detail::format_flags_impl(ctx.out(),
                                                                  static_cast<uint64_t>(raw_val),
