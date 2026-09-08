@@ -2467,7 +2467,7 @@ int container::run(run_container_options_t options)
             }
         });
 
-        [&master, &monitor, &in, &out, &changed]() -> void {
+        [&master, &monitor, &in, &out, &changed, this]() -> void {
             if (!master) {
                 return;
             }
@@ -2478,7 +2478,10 @@ int container::run(run_container_options_t options)
             out.set_nonblock(true);
             changed = true;
 
-            monitor->enable_io_forwarding(std::move(*master), in, out);
+            monitor->enable_io_forwarding(std::move(*master),
+                                          in,
+                                          out,
+                                          !this->get_config().process_->console_size_.has_value());
         }();
 
         container_process_exit_code = monitor->wait_container_exit();
