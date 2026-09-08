@@ -996,7 +996,7 @@ TEST(VfsRoot, ReopenSucceeds)
     auto r = root->reopen();
     ASSERT_TRUE(r) << r.error().message();
     EXPECT_TRUE(root->valid());
-    EXPECT_EQ(root->ref().current_path(), d.path());
+    EXPECT_EQ(root->ref().current_path().string(), d.path().string());
 }
 
 TEST(VfsResolve, NonLexicalPartial)

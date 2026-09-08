@@ -1,0 +1,398 @@
+{
+  "ociVersion": "1.3.0",
+  "hostname": "test-host",
+  "domainname": "test-domain",
+  "process": {
+    "terminal": true,
+    "consoleSize": {
+      "height": 24,
+      "width": 80
+    },
+    "user": {
+      "uid": 1000,
+      "gid": 1000,
+      "umask": 63,
+      "additionalGids": [
+        10,
+        20
+      ]
+    },
+    "args": [
+      "/bin/echo",
+      "hello"
+    ],
+    "env": [
+      "PATH=/usr/bin",
+      "TERM=xterm"
+    ],
+    "cwd": "/work",
+    "capabilities": {
+      "bounding": [
+        "CAP_CHOWN"
+      ],
+      "effective": [
+        "CAP_CHOWN"
+      ],
+      "inheritable": [],
+      "permitted": [
+        "CAP_CHOWN"
+      ],
+      "ambient": []
+    },
+    "rlimits": [
+      {
+        "type": "RLIMIT_NOFILE",
+        "soft": 1024,
+        "hard": 2048
+      },
+      {
+        "type": "RLIMIT_CORE",
+        "soft": 0,
+        "hard": 0
+      }
+    ],
+    "noNewPrivileges": true,
+    "apparmorProfile": "unconfined",
+    "oomScoreAdj": 500,
+    "scheduler": {
+      "policy": "SCHED_DEADLINE",
+      "flags": [
+        "SCHED_FLAG_RESET_ON_FORK"
+      ],
+      "runtime": 100000,
+      "deadline": 500000,
+      "period": 1000000
+    },
+    "selinuxLabel": "system_u:system_r:container_t:s0",
+    "ioPriority": {
+      "class": "IOPRIO_CLASS_BE",
+      "priority": 4
+    },
+    "execCPUAffinity": {
+      "initial": "0-2",
+      "final": "1"
+    }
+  },
+  "root": {
+    "path": "/run/test/rootfs",
+    "readonly": false
+  },
+  "mounts": [
+    {
+      "destination": "/proc",
+      "type": "proc",
+      "source": "proc",
+      "options": [
+        "nosuid",
+        "noexec",
+        "nodev"
+      ]
+    },
+    {
+      "destination": "/data",
+      "type": "bind",
+      "source": "/tmp/data",
+      "options": [
+        "bind",
+        "ro"
+      ]
+    },
+    {
+      "destination": "/mnt",
+      "type": "tmpfs",
+      "source": "tmpfs",
+      "options": [
+        "nosuid",
+        "rw",
+        "noatime",
+        "size=65536k"
+      ]
+    },
+    {
+      "destination": "/mnt2",
+      "type": "bind",
+      "source": "/tmp/data2",
+      "options": [
+        "rbind",
+        "rprivate"
+      ],
+      "uidMappings": [
+        {
+          "containerID": 0,
+          "hostID": 1000,
+          "size": 1
+        }
+      ],
+      "gidMappings": [
+        {
+          "containerID": 0,
+          "hostID": 1000,
+          "size": 1
+        }
+      ]
+    }
+  ],
+  "linux": {
+    "namespaces": [
+      {
+        "type": "pid"
+      },
+      {
+        "type": "mount"
+      },
+      {
+        "type": "network"
+      },
+      {
+        "type": "user"
+      }
+    ],
+    "uidMappings": [
+      {
+        "containerID": 0,
+        "hostID": 1000,
+        "size": 1
+      }
+    ],
+    "gidMappings": [
+      {
+        "containerID": 0,
+        "hostID": 1000,
+        "size": 1
+      }
+    ],
+    "timeOffsets": {
+      "boottime": {
+        "secs": 100,
+        "nanosecs": 500
+      },
+      "monotonic": {
+        "secs": 200,
+        "nanosecs": 0
+      }
+    },
+    "devices": [
+      {
+        "type": "c",
+        "path": "/dev/null",
+        "fileMode": 438,
+        "major": 1,
+        "minor": 3,
+        "uid": 0,
+        "gid": 0
+      }
+    ],
+    "netDevices": {
+      "eth0": {
+        "name": "veth0"
+      }
+    },
+    "cgroupsPath": "/run/test/cgroups",
+    "resources": {
+      "devices": [
+        {
+          "allow": false,
+          "type": "c",
+          "major": 1,
+          "minor": 3,
+          "access": "rwm"
+        }
+      ],
+      "memory": {
+        "limit": 1048576,
+        "reservation": 524288,
+        "swap": 2097152,
+        "kernel": 1048576,
+        "kernelTCP": 1048576,
+        "swappiness": 60,
+        "disableOOMKiller": false,
+        "useHierarchy": true,
+        "checkBeforeUpdate": false
+      },
+      "cpu": {
+        "shares": 512,
+        "quota": 33000,
+        "burst": 1000,
+        "period": 100000,
+        "realtimeRuntime": 950000,
+        "realtimePeriod": 1000000,
+        "cpus": "0-3",
+        "mems": "0-1",
+        "idle": 1
+      },
+      "blockIO": {
+        "weight": 10,
+        "leafWeight": 20,
+        "weightDevice": [
+          {
+            "major": 8,
+            "minor": 0,
+            "weight": 100,
+            "leafWeight": 200
+          }
+        ],
+        "throttleReadBpsDevice": [
+          {
+            "major": 8,
+            "minor": 0,
+            "rate": 1024
+          }
+        ],
+        "throttleWriteBpsDevice": [
+          {
+            "major": 8,
+            "minor": 0,
+            "rate": 2048
+          }
+        ],
+        "throttleReadIOPSDevice": [
+          {
+            "major": 8,
+            "minor": 0,
+            "rate": 10
+          }
+        ],
+        "throttleWriteIOPSDevice": [
+          {
+            "major": 8,
+            "minor": 0,
+            "rate": 20
+          }
+        ]
+      },
+      "hugepageLimits": [
+        {
+          "pageSize": "2MB",
+          "limit": 1048576
+        }
+      ],
+      "network": {
+        "classID": 100,
+        "priorities": [
+          {
+            "name": "eth0",
+            "priority": 5
+          }
+        ]
+      },
+      "pids": {
+        "limit": 100
+      },
+      "rdma": {
+        "mlx5_0": {
+          "hcaHandles": 2,
+          "hcaObjects": 4
+        }
+      },
+      "unified": {
+        "memory.high": "1048576"
+      }
+    },
+    "intelRdt": {
+      "closID": "clos1",
+      "l3CacheSchema": "L3:0=ffff",
+      "memBwSchema": "MB:0=50",
+      "schemata": [
+        "L3:0=ffff",
+        "MB:0=50"
+      ],
+      "enableMonitoring": true
+    },
+    "memoryPolicy": {
+      "mode": "MPOL_INTERLEAVE",
+      "nodes": "0-1",
+      "flags": [
+        "MPOL_F_STATIC_NODES"
+      ]
+    },
+    "sysctl": {
+      "kernel.msgmax": "65536"
+    },
+    "seccomp": {
+      "defaultAction": "SCMP_ACT_ERRNO",
+      "defaultErrnoRet": 22,
+      "architectures": [
+        "SCMP_ARCH_X86_64",
+        "SCMP_ARCH_X86",
+        "SCMP_ARCH_AARCH64"
+      ],
+      "flags": [
+        "SECCOMP_FILTER_FLAG_TSYNC"
+      ],
+      "listenerPath": "/run/seccomp.sock",
+      "listenerMetadata": "metadata",
+      "syscalls": [
+        {
+          "names": [
+            "getcwd",
+            "chmod"
+          ],
+          "action": "SCMP_ACT_ALLOW",
+          "args": [
+            {
+              "index": 0,
+              "value": 1,
+              "valueTwo": 2,
+              "op": "SCMP_CMP_EQ"
+            }
+          ]
+        }
+      ]
+    },
+    "rootfsPropagation": "slave",
+    "maskedPaths": [
+      "/proc/kcore"
+    ],
+    "readonlyPaths": [
+      "/proc/sys"
+    ],
+    "mountLabel": "system_u:object_r:container_file_t:s0",
+    "personality": {
+      "domain": "LINUX",
+      "flags": []
+    }
+  },
+  "hooks": {
+    "prestart": [
+      {
+        "path": "/bin/prestart",
+        "args": [
+          "prestart",
+          "arg1"
+        ],
+        "env": [
+          "K=v"
+        ],
+        "timeout": 5
+      }
+    ],
+    "createRuntime": [
+      {
+        "path": "/bin/create-runtime"
+      }
+    ],
+    "createContainer": [
+      {
+        "path": "/bin/create-container"
+      }
+    ],
+    "startContainer": [
+      {
+        "path": "/bin/start-container"
+      }
+    ],
+    "poststart": [
+      {
+        "path": "/bin/poststart"
+      }
+    ],
+    "poststop": [
+      {
+        "path": "/bin/poststop"
+      }
+    ]
+  },
+  "annotations": {
+    "org.example.key": "value"
+  }
+}

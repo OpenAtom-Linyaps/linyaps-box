@@ -19,4 +19,6 @@ struct rdma
 
 void from_json(const nlohmann::json &j, rdma &v);
 
+void validate(const rdma &v);
+
 } // namespace linyaps_box::config

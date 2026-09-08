@@ -16,6 +16,24 @@
 
 namespace linyaps_box::config {
 
+enum class seccomp_flag : std::uint8_t {
+    none = 0U,
+    tsync = (1U << 0),
+    log = (1U << 1),
+    spec_allow = (1U << 2),
+    wait_killable_recv = (1U << 3),
+};
+
+LINYAPS_ENABLE_BITMASK_ENUM(seccomp_flag);
+
+LINYAPS_REGISTER_ENUM_TABLE(seccomp_flag,
+                            4,
+                            { seccomp_flag::tsync, "SECCOMP_FILTER_FLAG_TSYNC" },
+                            { seccomp_flag::log, "SECCOMP_FILTER_FLAG_LOG" },
+                            { seccomp_flag::spec_allow, "SECCOMP_FILTER_FLAG_SPEC_ALLOW" },
+                            { seccomp_flag::wait_killable_recv,
+                              "SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV" })
+
 struct seccomp
 {
     enum class action : std::uint8_t {
@@ -56,14 +74,6 @@ struct seccomp
         sheb,
     };
 
-    enum class flag : std::uint8_t {
-        none = 0U,
-        tsync = (1U << 0),
-        log = (1U << 1),
-        spec_allow = (1U << 2),
-        wait_killable_recv = (1U << 3),
-    };
-
     struct syscall
     {
         std::vector<std::string> names;
@@ -88,7 +98,7 @@ struct seccomp
     std::optional<std::filesystem::path> listener_path;
     std::optional<std::vector<syscall>> syscalls;
     std::optional<std::uint32_t> default_errno_ret;
-    std::optional<flag> flags;
+    utils::bitflags<seccomp_flag> flags;
     action default_action;
 };
 
@@ -129,16 +139,6 @@ LINYAPS_REGISTER_ENUM_TABLE(seccomp::arch,
                             { seccomp::arch::m68k, "SCMP_ARCH_M68K" },
                             { seccomp::arch::sh, "SCMP_ARCH_SH" },
                             { seccomp::arch::sheb, "SCMP_ARCH_SHEB" })
-
-LINYAPS_ENABLE_BITMASK_ENUM(seccomp::flag);
-
-LINYAPS_REGISTER_ENUM_TABLE(seccomp::flag,
-                            4,
-                            { seccomp::flag::tsync, "SECCOMP_FILTER_FLAG_TSYNC" },
-                            { seccomp::flag::log, "SECCOMP_FILTER_FLAG_LOG" },
-                            { seccomp::flag::spec_allow, "SECCOMP_FILTER_FLAG_SPEC_ALLOW" },
-                            { seccomp::flag::wait_killable_recv,
-                              "SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV" })
 
 LINYAPS_REGISTER_ENUM_TABLE(seccomp::syscall::arg::op,
                             7,

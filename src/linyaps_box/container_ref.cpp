@@ -16,7 +16,8 @@
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/defer.h"
-#include "linyaps_box/utils/platform.h"
+#include "linyaps_box/utils/environ.h"
+#include "linyaps_box/utils/rlimit.h"
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/utils.h"
@@ -29,13 +30,34 @@ namespace linyaps_box {
 
 namespace {
 
-auto resolve_final_process(linyaps_box::exec_container_option &option,
-                           const linyaps_box::oci_config &config)
-  -> linyaps_box::oci_config::process_t &
+auto dedup_env(std::vector<std::string> &env) -> void
 {
-    if (!option.proc) {
-        option.proc = config.process ? *config.process : linyaps_box::oci_config::process_t{ };
+    std::vector<std::string> result;
+    result.reserve(env.size());
+    std::unordered_map<std::string, std::size_t> index;
+    index.reserve(env.size());
+    for (auto &entry : env) {
+        const auto eq = entry.find('=');
+        auto [it, inserted] = index.try_emplace(entry.substr(0, eq), result.size());
+        if (inserted) {
+            result.push_back(std::move(entry));
+        } else {
+            result[it->second] = std::move(entry);
+        }
     }
+
+    env = std::move(result);
+}
+
+auto resolve_final_process(linyaps_box::exec_container_option &option,
+                           const linyaps_box::config::oci_config &config)
+  -> linyaps_box::config::process &
+{
+    if (option.proc) {
+        return *option.proc;
+    }
+
+    option.proc = config.process_ ? *config.process_ : linyaps_box::config::process{ };
 
     auto &proc = *option.proc;
 
@@ -65,35 +87,60 @@ auto resolve_final_process(linyaps_box::exec_container_option &option,
                          std::make_move_iterator(option.extra_envs.end()));
     }
 
+    if (proc.env) {
+        dedup_env(*proc.env);
+    }
+
     if (!option.command.empty()) {
         proc.args = std::move(option.command);
     }
 
     if (option.uid) {
-        proc.user.uid = *option.uid;
+        proc.user_.uid = *option.uid;
     }
 
     if (option.gid) {
-        proc.user.gid = *option.gid;
+        proc.user_.gid = *option.gid;
     }
 
 #ifdef LINYAPS_BOX_ENABLE_CAP
     if (option.caps) {
-        if (!proc.capabilities) {
-            proc.capabilities.emplace();
+        if (!proc.capabilities_) {
+            proc.capabilities_.emplace();
         }
 
-        proc.capabilities->effective = *option.caps;
-        proc.capabilities->ambient = *option.caps;
-        proc.capabilities->bounding = *option.caps;
-        proc.capabilities->permitted = *option.caps;
+        auto &caps = *proc.capabilities_;
+        for (auto *set : { &caps.bounding, &caps.effective, &caps.permitted }) {
+            if (!*set) {
+                set->emplace();
+            }
+
+            (*set)->insert((*set)->end(), option.caps->cbegin(), option.caps->cend());
+        }
+
+        if (caps.inheritable) {
+            if (!caps.ambient) {
+                caps.ambient.emplace();
+            }
+
+            // kernel constraint: ambient ⊆ inheritable, so only raise the
+            // requested caps that are already inheritable into the ambient set
+            const auto &inheritable = *caps.inheritable;
+            std::copy_if(option.caps->cbegin(),
+                         option.caps->cend(),
+                         std::back_inserter(*caps.ambient),
+                         [&](const std::string &cap) {
+                             return std::find(inheritable.cbegin(), inheritable.cend(), cap)
+                               != inheritable.cend();
+                         });
+        }
     }
 #endif
 
     return proc;
 }
 
-void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
+void child_setup_terminal(const linyaps_box::config::process &proc,
                           protocol::child_message_channel &sync)
 {
     if (!proc.terminal) {
@@ -103,8 +150,8 @@ void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
     auto [slave, path, master] = linyaps_box::create_pty_pair();
 
     slave.setup_stdio();
-    if (proc.console_size) {
-        slave.set_size({ proc.console_size->height, proc.console_size->width, 0, 0 });
+    if (proc.console_size_) {
+        slave.set_size({ proc.console_size_->height, proc.console_size_->width, 0, 0 });
     }
 
     auto console_fd = std::move(master).take();
@@ -112,13 +159,13 @@ void child_setup_terminal(const linyaps_box::oci_config::process_t &proc,
     sync.send_console_fd(ref);
 }
 
-void child_apply_environment(const linyaps_box::oci_config::process_t &proc,
-                             const linyaps_box::oci_config &config)
+void child_apply_environment(const linyaps_box::config::process &proc,
+                             const linyaps_box::config::oci_config &config)
 {
     ::clearenv();
 
-    if (config.process) {
-        for (const auto &env : *config.process->env) {
+    if (config.process_) {
+        for (const auto &env : *config.process_->env) {
             if (linyaps_box::utils::is_invalid_env(env)) {
                 continue;
             }
@@ -138,15 +185,15 @@ void child_apply_environment(const linyaps_box::oci_config::process_t &proc,
     }
 }
 
-void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
+void child_apply_rlimits(const linyaps_box::config::process &proc)
 {
     if (!proc.rlimits) {
         return;
     }
 
     for (const auto &rl : *proc.rlimits) {
-        auto resource = static_cast<int>(rl.type);
-        const struct rlimit limit{ rl.soft, rl.hard };
+        auto resource = utils::to_rlimit_resource(rl.type_);
+        const struct ::rlimit limit{ rl.soft, rl.hard };
         if (::setrlimit(resource, &limit) != 0) {
             _exit(EXIT_FAILURE);
         }
@@ -154,9 +201,9 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
 }
 
 [[noreturn]] auto exec_child_process(pid_t target_pid,
-                                     const linyaps_box::oci_config &config,
-                                     const linyaps_box::oci_config::process_t &proc,
-                                     int preserve_fds,
+                                     const linyaps_box::config::oci_config &config,
+                                     const linyaps_box::config::process &proc,
+                                     uint preserve_fds,
                                      protocol::child_message_channel child_chan) -> void
 {
     try {
@@ -165,13 +212,12 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
           std::make_unique<linyaps_box::protocol::sync_socket_forwarder>(child_chan));
 
         bool pid_ns{ false };
-        if (config.linux && config.linux->namespaces) {
-            linyaps_box::utils::join_container_namespaces(target_pid, *config.linux);
-            pid_ns = std::any_of(config.linux->namespaces->cbegin(),
-                                 config.linux->namespaces->cend(),
+        if (config.linux_ && config.linux_->namespaces) {
+            linyaps_box::utils::join_container_namespaces(target_pid, *config.linux_);
+            pid_ns = std::any_of(config.linux_->namespaces->cbegin(),
+                                 config.linux_->namespaces->cend(),
                                  [](const auto &ns) {
-                                     return ns.type_
-                                       == linyaps_box::oci_config::linux_t::namespace_t::type::PID;
+                                     return ns.type_ == linyaps_box::config::ns::type::pid;
                                  });
         }
 
@@ -205,19 +251,21 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
                                         std::numeric_limits<unsigned>::max(),
                                         CLOSE_RANGE_CLOEXEC);
 
-        if (proc.user.umask) {
-            auto val = proc.user.umask.value();
+        if (proc.user_.umask) {
+            auto val = proc.user_.umask.value();
             os::throw_if_error(os::umask(val), fmt::format("failed to set umask {}", val));
         }
 
-        security::privilege_context ctx{ proc.user };
+        security::privilege_context ctx{ proc.user_ };
 
-        auto effective_caps = [&]() -> std::optional<oci_config::process_t::capabilities_t> {
-            if (!proc.capabilities) {
-                return config.process->capabilities;
+        auto effective_caps = [&]() -> std::optional<config::capabilities> {
+            const auto &base_caps = config.process_ ? config.process_->capabilities_ : std::nullopt;
+
+            if (!proc.capabilities_) {
+                return base_caps;
             }
 
-            const auto &caps = *proc.capabilities;
+            const auto &caps = *proc.capabilities_;
             auto all_empty = (!caps.effective || caps.effective->empty())
               && (!caps.bounding || caps.bounding->empty())
               && (!caps.inheritable || caps.inheritable->empty())
@@ -225,10 +273,10 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
               && (!caps.ambient || caps.ambient->empty());
 
             if (all_empty) {
-                return config.process->capabilities;
+                return base_caps;
             }
 
-            return proc.capabilities;
+            return proc.capabilities_;
         }();
 
         ctx.set_capabilities(std::move(effective_caps))
@@ -236,7 +284,7 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
 
         // change before we drop caps
         for (auto fd : { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO }) {
-            if (::fchown(fd, proc.user.uid, proc.user.gid) != 0) {
+            if (::fchown(fd, proc.user_.uid, proc.user_.gid) != 0) {
                 if (errno != EINVAL && errno != ENOSYS) {
                     throw std::system_error(errno, std::system_category(), "fchown");
                 }
@@ -309,7 +357,13 @@ auto exec_parent_process(protocol::parent_message_channel sync,
                },
                inc.body);
 
-    linyaps_box::container_monitor monitor{ pid };
+    auto handle = infra::process_handle::open(pid);
+    if (UNLIKELY(!handle)) {
+        throw std::system_error(handle.error(),
+                                fmt::format("failed to open container process {}", pid));
+    }
+
+    linyaps_box::container_monitor monitor{ handle->pid() };
     monitor.enable_signal_forwarding();
 
     // Unblock the grandchild so it can proceed with terminal setup and exec.
@@ -469,8 +523,10 @@ auto container_ref::exec(exec_container_option option) const -> int
 
     os::throw_if_error(os::set_child_subreaper(true));
 
-    auto config = oci_config::parse(status_dir_.config());
+    auto config = config::oci_config::parse(status_dir_.config());
     auto &proc = resolve_final_process(option, config);
+
+    config::validate(proc);
 
     auto [parent_chan, child_chan] = protocol::create_message_socketpair();
 

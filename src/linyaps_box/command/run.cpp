@@ -23,11 +23,11 @@ auto linyaps_box::command::run(const struct run_options &options, const global_o
     run_options.preserve_fds = options.preserve_fds;
 
     const auto &cfg = container.get_config();
-    if (UNLIKELY(!cfg.process || !cfg.root)) {
-        throw std::runtime_error("'process' and 'root' are required for run a container");
+    if (UNLIKELY(!cfg.process_ || !cfg.root_)) {
+        throw std::runtime_error("'process' and 'root' are required for running a container");
     }
 
-    if (container.get_config().process->terminal && options.console_socket) {
+    if (container.get_config().process_->terminal && options.console_socket) {
         run_options.console_socket = infra::unix_socket::connect(*options.console_socket);
     }
 

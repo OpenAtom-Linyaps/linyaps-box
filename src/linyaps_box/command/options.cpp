@@ -4,9 +4,9 @@
 
 #include "linyaps_box/command/options.h"
 
-#include "linyaps_box/config.h"
+#include "linyaps_box/config/oci_config.h"
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/utils/platform.h"
+#include "linyaps_box/utils/environ.h"
 #include "linyaps_box/version.h"
 
 #include <CLI/CLI.hpp>
@@ -19,19 +19,62 @@
 
 namespace {
 
-auto socket_check(const std::string &str) noexcept -> std::string
+struct SignalItem
 {
-    try {
-        auto ret = std::filesystem::symlink_status(str);
-        if (!std::filesystem::is_socket(ret)) {
-            return "console-socket must be an existing socket file";
-        }
-    } catch (const std::system_error &e) {
-        return e.what();
+    std::string_view name;
+    int value;
+};
+
+auto str_to_signal(std::string_view str) noexcept -> int
+{
+    if (str.rfind("SIG", 0) != std::string_view::npos) {
+        str.remove_prefix(3);
     }
 
-    return "";
-};
+    static constexpr std::array sig_list{
+        SignalItem{ "ABRT", SIGABRT },     SignalItem{ "ALRM", SIGALRM },
+        SignalItem{ "BUS", SIGBUS },       SignalItem{ "CHLD", SIGCHLD },
+#ifdef SIGCLD
+        SignalItem{ "CLD", SIGCLD }, // alias for CHLD
+#endif
+        SignalItem{ "CONT", SIGCONT },     SignalItem{ "FPE", SIGFPE },
+        SignalItem{ "HUP", SIGHUP },       SignalItem{ "ILL", SIGILL },
+        SignalItem{ "INT", SIGINT },       SignalItem{ "IO", SIGIO },
+        SignalItem{ "IOT", SIGIOT },       SignalItem{ "KILL", SIGKILL },
+        SignalItem{ "PIPE", SIGPIPE },     SignalItem{ "POLL", SIGPOLL },
+        SignalItem{ "PROF", SIGPROF },     SignalItem{ "PWR", SIGPWR },
+        SignalItem{ "QUIT", SIGQUIT },     SignalItem{ "SEGV", SIGSEGV },
+        SignalItem{ "STOP", SIGSTOP },     SignalItem{ "SYS", SIGSYS },
+        SignalItem{ "TERM", SIGTERM },     SignalItem{ "TRAP", SIGTRAP },
+        SignalItem{ "TSTP", SIGTSTP },     SignalItem{ "TTIN", SIGTTIN },
+        SignalItem{ "TTOU", SIGTTOU },     SignalItem{ "URG", SIGURG },
+        SignalItem{ "USR1", SIGUSR1 },     SignalItem{ "USR2", SIGUSR2 },
+        SignalItem{ "VTALRM", SIGVTALRM }, SignalItem{ "WINCH", SIGWINCH },
+        SignalItem{ "XCPU", SIGXCPU },     SignalItem{ "XFSZ", SIGXFSZ }
+    };
+
+    constexpr auto sorted [[maybe_unused]] = []() noexcept {
+        for (size_t i = 1; i < sig_list.size(); ++i) {
+            if (sig_list[i - 1].name >= sig_list[i].name) {
+                return false;
+            }
+        }
+        return true;
+    }();
+    static_assert(sorted, "signal list must be sorted alphabetically");
+
+    const auto *it = std::lower_bound(sig_list.cbegin(),
+                                      sig_list.cend(),
+                                      str,
+                                      [](const SignalItem &item, std::string_view val) -> bool {
+                                          return item.name < val;
+                                      });
+    if (it == sig_list.cend() || it->name != str) {
+        return -1;
+    }
+
+    return it->value;
+}
 
 auto default_root_path() -> std::filesystem::path
 {
@@ -39,8 +82,10 @@ auto default_root_path() -> std::filesystem::path
         if (auto *env = ::getenv("XDG_RUNTIME_DIR"); env != nullptr) {
             return std::filesystem::path{ env } / "linglong" / "box";
         }
-        return std::filesystem::path("/run/user") / std::to_string(geteuid()) / "linglong" / "box";
+
+        return std::filesystem::path("/run/user") / fmt::format("{}/linglong/box", ::geteuid());
     }();
+
     return default_root;
 }
 
@@ -52,8 +97,7 @@ auto add_console_socket(CLI::App *cmd, T &opt) -> CLI::Option *
                    opt,
                    "Path to an unix socket that will receive the master end of the console's "
                    "pseudoterminal")
-      ->type_name("SOCKET")
-      ->check(socket_check, "must be an existing socket file");
+      ->type_name("SOCKET");
 }
 
 template <typename T>
@@ -247,7 +291,13 @@ auto register_exec(CLI::App &app, linyaps_box::command::exec_options &opts) -> C
     cmd->add_flag("--no-new-privs",
                   opts.no_new_privs,
                   "Set the no new privileges value for the process");
-    cmd->add_option("-p,--process", opts.process_file, "Path to the process.json file to use")
+    cmd
+      ->add_option("-p,--process",
+                   opts.process_file,
+                   "Path to the process.json file to use. "
+                   "When given, it is the complete process "
+                   "spec: --env/--cwd/-u/-t/--cap/COMMAND are "
+                   "ignored")
       ->type_name("FILE")
       ->check(CLI::ExistingFile);
     cmd->add_option("CONTAINER", opts.ID, "Container ID")->required();
@@ -255,6 +305,10 @@ auto register_exec(CLI::App &app, linyaps_box::command::exec_options &opts) -> C
     cmd->callback([&opts]() {
         if (opts.command.empty() && !opts.process_file) {
             throw CLI::ValidationError("At least one of COMMAND or --process must be provided");
+        }
+
+        if (!opts.command.empty() && opts.process_file) {
+            throw CLI::ValidationError("COMMAND and --process are mutually exclusive");
         }
     });
     return cmd;
@@ -277,11 +331,19 @@ auto register_kill(CLI::App &app, linyaps_box::command::kill_options &opts) -> C
               return str;
           }
 
-          try {
-              return std::to_string(linyaps_box::utils::str_to_signal(str));
-          } catch (const std::invalid_argument &) {
+          auto sig_num = str_to_signal(str);
+          if (UNLIKELY(sig_num < 0)) {
               throw CLI::ValidationError("SIGNAL", "invalid signal: " + str);
           }
+
+          std::array<char, std::numeric_limits<int>::max_digits10 + 1> buf; // NOLINT
+          auto [end, err] = std::to_chars(buf.data(), buf.data() + buf.size(), sig_num);
+          if (UNLIKELY(err != std::errc{ })) {
+              throw std::logic_error("signal mapping error");
+          }
+          *end = '\0';
+
+          return std::string{ buf.data() };
       })
       ->default_val(SIGTERM);
     return cmd;
@@ -312,10 +374,10 @@ struct cli_app_data
 
 void build_cli_app(cli_app_data &data)
 {
-    data.app.set_version_flag("-v,--version", [] {
-        return std::string("ll-box version ") + LINYAPS_BOX_VERSION + "\nspec "
-          + linyaps_box::oci_config::version + "\n";
-    });
+    data.app.set_version_flag("-v,--version",
+                              fmt::format("ll-box version {}\nspec {}",
+                                          LINYAPS_BOX_VERSION,
+                                          linyaps_box::config::oci_config::version));
     data.app.require_subcommand(1);
 
     register_global(data.app, data.global);
@@ -333,7 +395,7 @@ void run_parse(CLI::App &app, int argc, char **argv)
 
 auto convert_result(cli_app_data &data) -> linyaps_box::command::options
 {
-    linyaps_box::command::options opts{ std::move(data.global), std::monostate{ } };
+    linyaps_box::command::options opts{ std::monostate{ }, std::move(data.global) };
     if (data.cmd_list->parsed()) {
         opts.subcommand_opt = data.list_opts;
     } else if (data.cmd_run->parsed()) {
@@ -362,7 +424,7 @@ auto linyaps_box::command::parse(int argc, char **argv) noexcept -> std::optiona
         }
 
         // Help/version — return success with monostate subcommand
-        return linyaps_box::command::options{ data.global, std::monostate{ } };
+        return linyaps_box::command::options{ std::monostate{ }, data.global };
     }
 
     return convert_result(data);

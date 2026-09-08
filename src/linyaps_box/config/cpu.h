@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/utils/enum_traits.h"
+
 #include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
@@ -26,6 +28,8 @@ struct cpu
     std::optional<std::vector<unsigned int>> mems;
     std::optional<idle> idle_;
 };
+
+LINYAPS_REGISTER_ENUM_TABLE(cpu::idle, 2, { cpu::idle::none, "none" }, { cpu::idle::idle, "idle" })
 
 void from_json(const nlohmann::json &j, cpu &v);
 

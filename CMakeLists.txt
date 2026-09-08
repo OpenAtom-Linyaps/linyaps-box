@@ -147,8 +147,39 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/command/list.cpp
     src/linyaps_box/command/options.cpp
     src/linyaps_box/command/run.cpp
-    src/linyaps_box/config.cpp
-    src/linyaps_box/config/validate.cpp
+    src/linyaps_box/config/block_io.cpp
+    src/linyaps_box/config/capabilities.cpp
+    src/linyaps_box/config/console_size.cpp
+    src/linyaps_box/config/cpu.cpp
+    src/linyaps_box/config/device.cpp
+    src/linyaps_box/config/device_rule.cpp
+    src/linyaps_box/config/exec_cpu_affinity.cpp
+    src/linyaps_box/config/hook.cpp
+    src/linyaps_box/config/hooks.cpp
+    src/linyaps_box/config/hugepage.cpp
+    src/linyaps_box/config/id_mapping.cpp
+    src/linyaps_box/config/intel_rdt.cpp
+    src/linyaps_box/config/io_priority.cpp
+    src/linyaps_box/config/linux.cpp
+    src/linyaps_box/config/memory.cpp
+    src/linyaps_box/config/memory_policy.cpp
+    src/linyaps_box/config/mount.cpp
+    src/linyaps_box/config/network.cpp
+    src/linyaps_box/config/network_device.cpp
+    src/linyaps_box/config/ns.cpp
+    src/linyaps_box/config/oci_config.cpp
+    src/linyaps_box/config/personality.cpp
+    src/linyaps_box/config/pids.cpp
+    src/linyaps_box/config/process.cpp
+    src/linyaps_box/config/rdma.cpp
+    src/linyaps_box/config/resources.cpp
+    src/linyaps_box/config/rlimit.cpp
+    src/linyaps_box/config/root.cpp
+    src/linyaps_box/config/scheduler.cpp
+    src/linyaps_box/config/seccomp.cpp
+    src/linyaps_box/config/time_offset.cpp
+    src/linyaps_box/config/user.cpp
+    src/linyaps_box/config/utils.cpp
     src/linyaps_box/container.cpp
     src/linyaps_box/container_monitor.cpp
     src/linyaps_box/container_ref.cpp
@@ -187,10 +218,12 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/cgroups.cpp
     src/linyaps_box/utils/close_range.cpp
     src/linyaps_box/utils/date.cpp
+    src/linyaps_box/utils/environ.cpp
     src/linyaps_box/utils/epoll.cpp
     src/linyaps_box/utils/file_describer.cpp
     src/linyaps_box/utils/mman.cpp
-    src/linyaps_box/utils/platform.cpp
+    src/linyaps_box/utils/ns_flags.cpp
+    src/linyaps_box/utils/rlimit.cpp
     src/linyaps_box/utils/ringbuffer.cpp
     src/linyaps_box/utils/semver.cpp
     src/linyaps_box/utils/session.cpp

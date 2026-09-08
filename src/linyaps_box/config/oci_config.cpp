@@ -22,7 +22,7 @@ void from_json(const nlohmann::json &j, oci_config &v)
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };
         if (key_matches(k, "ociVersion")) {
-            auto semver = linyaps_box::utils::semver(val.get_ref<const std::string &>());
+            auto semver = linyaps_box::utils::semver(val.get<std::string_view>());
             if (UNLIKELY(
                   !linyaps_box::utils::semver(oci_config::version).is_compatible_with(semver))) {
                 throw std::runtime_error("unsupported OCI version: " + semver.to_string());

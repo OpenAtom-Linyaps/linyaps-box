@@ -43,10 +43,10 @@ void from_json(const nlohmann::json &j, device_rule &v)
             }
         } else if (key_matches(k, "access")) {
             if (!val.is_null()) {
-                auto access_str = val.get_ref<const std::string &>();
-                auto access_flags{ device_rule::access_flag::none };
+                auto access_str = val.get<std::string_view>();
+                utils::bitflags<device_rule_access_flag> access_flags;
                 for (const auto c : access_str) {
-                    auto flag_opt = get_enum_table_from<device_rule::access_flag>().from_name(
+                    auto flag_opt = get_enum_table_from<device_rule_access_flag>().from_name(
                       std::string_view(&c, 1));
                     if (UNLIKELY(!flag_opt)) {
                         throw std::runtime_error(

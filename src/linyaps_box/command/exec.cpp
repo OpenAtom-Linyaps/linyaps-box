@@ -11,8 +11,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <fstream>
-
 auto linyaps_box::command::exec(exec_options options, const global_options &global) noexcept -> int
 try {
     status_directory_manager mgr(global.root);
@@ -28,14 +26,7 @@ try {
     option.preserve_fds = options.preserve_fds;
 
     if (options.process_file) {
-        std::ifstream file(*options.process_file);
-        if (UNLIKELY(!file)) {
-            throw std::runtime_error("cannot open process file: " + options.process_file->string());
-        }
-
-        nlohmann::json j;
-        file >> j;
-        option.proc = j.get<oci_config::process_t>();
+        option.proc = config::process::parse(*options.process_file);
     }
 
     option.cwd = std::move(options.cwd);
@@ -54,7 +45,7 @@ try {
     }
     option.command = std::move(options.command);
 
-    auto needs_terminal = option.tty.value_or(false) || (option.proc && option.proc->terminal);
+    auto needs_terminal = option.proc ? option.proc->terminal.value_or(false) : option.tty;
     if (needs_terminal && options.console_socket) {
         option.console_socket = infra::unix_socket::connect(*options.console_socket);
     }

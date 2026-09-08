@@ -10,7 +10,6 @@
 #include <nlohmann/json.hpp>
 
 #include <stdexcept>
-#include <string>
 
 namespace linyaps_box::config {
 
@@ -28,10 +27,10 @@ void from_json(const nlohmann::json &j, memory_policy &v)
     }
 
     if (auto flags_it = j.find("flags"); flags_it != j.end() && !flags_it->is_null()) {
-        auto flags{ memory_policy::flag::none };
+        utils::bitflags<memory_policy_flag> flags;
         for (const auto &f : *flags_it) {
-            const auto &flag_str = f.get_ref<const std::string &>();
-            auto flag_opt = get_enum_table_from<memory_policy::flag>().from_name(flag_str);
+            const auto flag_str = f.get<std::string_view>();
+            auto flag_opt = get_enum_table_from<memory_policy_flag>().from_name(flag_str);
             if (UNLIKELY(!flag_opt)) {
                 throw std::runtime_error(fmt::format("unknown memory policy flag: {}", flag_str));
             }
@@ -40,6 +39,26 @@ void from_json(const nlohmann::json &j, memory_policy &v)
         }
 
         v.flags = flags;
+    }
+}
+
+void validate(const memory_policy &v)
+{
+    const auto has_nodes = v.nodes && !v.nodes->empty();
+
+    if (v.mode_ == memory_policy::mode::default_ || v.mode_ == memory_policy::mode::local) {
+        if (UNLIKELY(has_nodes)) {
+            throw std::runtime_error(
+              "memoryPolicy mode MPOL_DEFAULT/MPOL_LOCAL must not specify nodes");
+        }
+    } else if (v.mode_ == memory_policy::mode::bind || v.mode_ == memory_policy::mode::interleave
+               || v.mode_ == memory_policy::mode::preferred_many
+               || v.mode_ == memory_policy::mode::weighted_interleave) {
+        if (UNLIKELY(!has_nodes)) {
+            throw std::runtime_error(
+              "memoryPolicy mode MPOL_BIND/MPOL_INTERLEAVE/MPOL_PREFERRED_MANY/"
+              "MPOL_WEIGHTED_INTERLEAVE requires at least one node");
+        }
     }
 }
 

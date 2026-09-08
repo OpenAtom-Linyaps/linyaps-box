@@ -19,4 +19,6 @@ struct hugepage_limit
 
 void from_json(const nlohmann::json &j, hugepage_limit &v);
 
+void validate(const hugepage_limit &v);
+
 } // namespace linyaps_box::config
