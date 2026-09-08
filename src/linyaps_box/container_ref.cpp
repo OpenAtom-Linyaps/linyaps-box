@@ -292,8 +292,8 @@ void child_apply_rlimits(const linyaps_box::oci_config::process_t &proc)
 
 auto exec_parent_process(protocol::parent_message_channel sync,
                          bool expect_console_fd,
-                         std::optional<linyaps_box::infra::unix_socket> external_console_socket)
-  -> int
+                         std::optional<linyaps_box::infra::unix_socket> external_console_socket,
+                         bool mirror_host_size) -> int
 {
     assert(!external_console_socket || expect_console_fd);
 
@@ -358,7 +358,8 @@ auto exec_parent_process(protocol::parent_message_channel sync,
                                  monitor.enable_io_forwarding(
                                    linyaps_box::terminal_master{ std::move(master_fd) },
                                    in,
-                                   out);
+                                   out,
+                                   mirror_host_size);
                              }
                          },
                          [&](const auto &) {
@@ -489,7 +490,8 @@ auto container_ref::exec(exec_container_option option) const -> int
     child_chan.close();
     return exec_parent_process(std::move(parent_chan),
                                proc.terminal.value_or(false),
-                               std::move(option.console_socket));
+                               std::move(option.console_socket),
+                               !proc.console_size.has_value());
 }
 
 const status_directory &container_ref::status_dir() const

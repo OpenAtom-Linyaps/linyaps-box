@@ -26,7 +26,8 @@ public:
     auto enable_signal_forwarding() -> void;
     auto enable_io_forwarding(terminal_master pty,
                               const linyaps_box::utils::file_descriptor &in,
-                              const linyaps_box::utils::file_descriptor &out) -> void;
+                              const linyaps_box::utils::file_descriptor &out,
+                              bool mirror_host_size) -> void;
     [[nodiscard]] auto wait_container_exit() -> int;
 
     auto kill_child() noexcept -> int;
