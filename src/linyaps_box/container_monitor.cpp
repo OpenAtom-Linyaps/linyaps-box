@@ -173,7 +173,8 @@ auto container_monitor::kill_child() noexcept -> int
 
 auto container_monitor::enable_io_forwarding(terminal_master pty,
                                              const linyaps_box::utils::file_descriptor &in,
-                                             const linyaps_box::utils::file_descriptor &out) -> void
+                                             const linyaps_box::utils::file_descriptor &out,
+                                             bool mirror_host_size) -> void
 {
     host_tty = detect_host_tty();
     if (host_tty) {
@@ -182,10 +183,10 @@ auto container_monitor::enable_io_forwarding(terminal_master pty,
 
     master = std::move(pty);
 
-    // Immediately propagate the host terminal size to the PTY master,
-    // so the terminal inside the container starts with the right dimensions
-    // even when the OCI config does not specify consoleSize.
-    if (host_tty && master) {
+    // Mirror the host terminal size to the PTY master only when the OCI
+    // config does not specify consoleSize; otherwise the child already
+    // applied the configured size, and the host size must not override it.
+    if (host_tty && master && mirror_host_size) {
         master->resize(host_tty->get_size());
     }
 
