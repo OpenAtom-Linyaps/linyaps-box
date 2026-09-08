@@ -10,8 +10,13 @@ namespace linyaps_box::config {
 
 void from_json(const nlohmann::json &j, time_offset &v)
 {
-    j.at("secs").get_to(v.secs);
-    j.at("nanosecs").get_to(v.nanosecs);
+    if (auto it = j.find("secs"); it != j.end() && !it->is_null()) {
+        it->get_to(v.secs.emplace());
+    }
+
+    if (auto it = j.find("nanosecs"); it != j.end() && !it->is_null()) {
+        it->get_to(v.nanosecs.emplace());
+    }
 }
 
 } // namespace linyaps_box::config

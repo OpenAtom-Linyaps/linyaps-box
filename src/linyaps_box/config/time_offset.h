@@ -7,13 +7,14 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
+#include <optional>
 
 namespace linyaps_box::config {
 
 struct time_offset
 {
-    int64_t secs;
-    uint32_t nanosecs;
+    std::optional<int64_t> secs;
+    std::optional<uint32_t> nanosecs;
 };
 
 void from_json(const nlohmann::json &j, time_offset &v);

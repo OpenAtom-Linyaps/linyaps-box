@@ -13,31 +13,41 @@
 
 namespace linyaps_box::config {
 
+enum class scheduler_flag : std::uint8_t {
+    none = 0U,
+    reset_on_fork = (1U << 0),
+    reclaim = (1U << 1),
+    dl_overrun = (1U << 2),
+    keep_policy = (1U << 3),
+    keep_params = (1U << 4),
+    util_clamp_min = (1U << 5),
+    util_clamp_max = (1U << 6),
+};
+
+LINYAPS_ENABLE_BITMASK_ENUM(scheduler_flag);
+
+LINYAPS_REGISTER_ENUM_TABLE(scheduler_flag,
+                            7,
+                            { scheduler_flag::reset_on_fork, "SCHED_FLAG_RESET_ON_FORK" },
+                            { scheduler_flag::reclaim, "SCHED_FLAG_RECLAIM" },
+                            { scheduler_flag::dl_overrun, "SCHED_FLAG_DL_OVERRUN" },
+                            { scheduler_flag::keep_policy, "SCHED_FLAG_KEEP_POLICY" },
+                            { scheduler_flag::keep_params, "SCHED_FLAG_KEEP_PARAMS" },
+                            { scheduler_flag::util_clamp_min, "SCHED_FLAG_UTIL_CLAMP_MIN" },
+                            { scheduler_flag::util_clamp_max, "SCHED_FLAG_UTIL_CLAMP_MAX" })
+
 struct scheduler
 {
     enum class policy : uint8_t { other, fifo, rr, batch, iso, idle, deadline };
-
-    enum class flag : std::uint8_t {
-        none = 0U,
-        reset_on_fork = (1U << 0),
-        reclaim = (1U << 1),
-        dl_overrun = (1U << 2),
-        keep_policy = (1U << 3),
-        keep_params = (1U << 4),
-        util_clamp_min = (1U << 5),
-        util_clamp_max = (1U << 6),
-    };
 
     std::optional<uint64_t> runtime;
     std::optional<uint64_t> deadline;
     std::optional<uint64_t> period;
     std::optional<int32_t> nice;
     std::optional<int32_t> priority;
-    std::optional<flag> flags;
+    utils::bitflags<scheduler_flag> flags;
     policy policy_;
 };
-
-LINYAPS_ENABLE_BITMASK_ENUM(scheduler::flag);
 
 LINYAPS_REGISTER_ENUM_TABLE(scheduler::policy,
                             7,
@@ -48,16 +58,6 @@ LINYAPS_REGISTER_ENUM_TABLE(scheduler::policy,
                             { scheduler::policy::iso, "SCHED_ISO" },
                             { scheduler::policy::idle, "SCHED_IDLE" },
                             { scheduler::policy::deadline, "SCHED_DEADLINE" })
-
-LINYAPS_REGISTER_ENUM_TABLE(scheduler::flag,
-                            7,
-                            { scheduler::flag::reset_on_fork, "SCHED_FLAG_RESET_ON_FORK" },
-                            { scheduler::flag::reclaim, "SCHED_FLAG_RECLAIM" },
-                            { scheduler::flag::dl_overrun, "SCHED_FLAG_DL_OVERRUN" },
-                            { scheduler::flag::keep_policy, "SCHED_FLAG_KEEP_POLICY" },
-                            { scheduler::flag::keep_params, "SCHED_FLAG_KEEP_PARAMS" },
-                            { scheduler::flag::util_clamp_min, "SCHED_FLAG_UTIL_CLAMP_MIN" },
-                            { scheduler::flag::util_clamp_max, "SCHED_FLAG_UTIL_CLAMP_MAX" })
 
 void from_json(const nlohmann::json &j, scheduler &v);
 

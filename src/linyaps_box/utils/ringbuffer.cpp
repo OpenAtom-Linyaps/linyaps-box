@@ -7,7 +7,6 @@
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/mman.h"
-#include "linyaps_box/utils/platform.h"
 
 #include <cassert>
 #include <cstring>
@@ -16,6 +15,28 @@
 #include <unistd.h>
 
 namespace linyaps_box::utils {
+
+namespace {
+auto get_page_size() noexcept -> std::size_t
+{
+    static const auto page_size = []() noexcept -> std::size_t {
+        errno = 0;
+        const auto sz = ::sysconf(_SC_PAGESIZE);
+
+        if (sz == -1) {
+            if (errno != 0) {
+                LINYAPS_BOX_LOG_ERROR_ERRNO(errno, "Failed to get page size, defaulting to 4096");
+            }
+
+            return 4096;
+        }
+
+        return static_cast<std::size_t>(sz);
+    }();
+
+    return page_size;
+}
+} // namespace
 
 auto ring_buffer::deleter::operator()(ring_buffer *rb) const noexcept -> void
 {
@@ -35,7 +56,7 @@ auto ring_buffer::deleter::operator()(ring_buffer *rb) const noexcept -> void
 
 auto ring_buffer::create(std::size_t requested_capacity) -> ptr
 {
-    const auto page_size = utils::get_page_size();
+    const auto page_size = get_page_size();
     auto meta_size = (sizeof(ring_buffer) + page_size - 1) & ~(page_size - 1);
 
     auto cap = page_size;

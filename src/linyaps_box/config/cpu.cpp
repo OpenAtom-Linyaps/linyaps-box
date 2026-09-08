@@ -11,7 +11,6 @@
 #include <nlohmann/json.hpp>
 
 #include <stdexcept>
-#include <string>
 #include <string_view>
 
 namespace linyaps_box::config {
@@ -46,11 +45,11 @@ void from_json(const nlohmann::json &j, cpu &v)
             }
         } else if (key_matches(k, "cpus")) {
             if (!val.is_null()) {
-                v.cpus = parse_range_list(val.get_ref<const std::string &>());
+                v.cpus = parse_range_list(val.get<std::string_view>());
             }
         } else if (key_matches(k, "mems")) {
             if (!val.is_null()) {
-                v.mems = parse_range_list(val.get_ref<const std::string &>());
+                v.mems = parse_range_list(val.get<std::string_view>());
             }
         } else if (key_matches(k, "idle")) {
             if (!val.is_null()) {

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/config.h"
+#include "linyaps_box/config/process.h"
 #include "linyaps_box/container_status.h"
 #include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/status_directory.h"
@@ -17,10 +17,10 @@ namespace linyaps_box {
 
 struct exec_container_option
 {
-    int preserve_fds{ 0 };
-    std::optional<oci_config::process_t> proc;
+    uint preserve_fds{ 0 };
+    std::optional<config::process> proc;
 
-    // Per-field overrides applied on top of option.proc or config.json's process:
+    // Per-field overrides applied on top of option.proc or config.json's config::process:
     std::optional<uid_t> uid;
     std::optional<gid_t> gid;
     std::optional<std::filesystem::path> cwd;

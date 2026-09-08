@@ -28,6 +28,8 @@
 
 namespace linyaps_box::security {
 
+using namespace linyaps_box::config;
+
 unsigned long last_cap()
 {
     static const auto cached = []() -> unsigned long {
@@ -96,19 +98,18 @@ auto parse_names(const std::optional<std::vector<std::string>> &names)
 
     std::vector<int> vals;
     vals.reserve(names->size());
-    std::transform(names->cbegin(),
-                   names->cend(),
-                   std::back_inserter(vals),
-                   [](const std::string &name) {
-                       cap_value_t v{ };
-                       if (UNLIKELY(cap_from_name(name.c_str(), &v) < 0)) {
-                           throw std::system_error(errno,
-                                                   std::system_category(),
-                                                   fmt::format("unknown capability: {}", name));
-                       }
+    for (const auto &name : *names) {
+        cap_value_t v{ };
+        if (UNLIKELY(cap_from_name(name.c_str(), &v) < 0)) {
+            // config.md capabilities: a value which cannot be mapped to a
+            // relevant kernel interface MUST be logged as a warning, and the
+            // runtime SHOULD NOT fail the container because of it.
+            LINYAPS_BOX_LOG_WARN("unknown capability, ignoring: {}", name);
+            continue;
+        }
 
-                       return v;
-                   });
+        vals.push_back(v);
+    }
 
     return vals;
 }
@@ -219,13 +220,12 @@ auto apply_ambient(const std::optional<std::vector<int>> &) -> void { }
 
 } // anonymous namespace
 
-privilege_context::privilege_context(std::optional<oci_config::process_t::user_t> user)
+privilege_context::privilege_context(std::optional<user> user)
     : user_(std::move(user))
 {
 }
 
-auto privilege_context::set_capabilities(std::optional<oci_config::process_t::capabilities_t> caps)
-  -> privilege_context &
+auto privilege_context::set_capabilities(std::optional<capabilities> caps) -> privilege_context &
 {
     if (caps) {
         cap_sets s;

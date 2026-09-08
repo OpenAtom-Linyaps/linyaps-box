@@ -95,10 +95,10 @@ void from_json(const nlohmann::json &j, seccomp &v)
             }
         } else if (key_matches(k, "flags")) {
             if (!val.is_null()) {
-                auto flags{ seccomp::flag::none };
-                for (const auto &elem : val) {
-                    auto flag_str = elem.get<std::string_view>();
-                    auto flag_opt = get_enum_table_from<seccomp::flag>().from_name(flag_str);
+                utils::bitflags<seccomp_flag> flags;
+                for (const auto &f : val) {
+                    const auto flag_str = f.get<std::string_view>();
+                    auto flag_opt = get_enum_table_from<seccomp_flag>().from_name(flag_str);
                     if (UNLIKELY(!flag_opt)) {
                         throw std::runtime_error(fmt::format("unknown seccomp flag: {}", flag_str));
                     }

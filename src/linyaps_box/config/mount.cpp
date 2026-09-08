@@ -6,7 +6,6 @@
 
 #include "linyaps_box/config/utils.h"
 #include "linyaps_box/log/macro.h"
-#include "linyaps_box/os/kernel_constants.h"
 
 #include <fmt/std.h>
 #include <nlohmann/json.hpp>
@@ -23,110 +22,169 @@ namespace linyaps_box::config {
 
 namespace {
 
-constexpr auto extra_flags_table = get_enum_table_from<mount::extension>();
 constexpr auto idmap_options_table = get_enum_table_from<mount::idmap_type>();
 
-struct vfs_option_entry
+enum class option_kind : std::uint8_t { vfs, propagation, rec_attr_set, rec_attr_clr };
+
+struct mount_option
 {
     std::string_view name;
-    utils::bitflags<vfs_flag> flag;
+    uint32_t value;
+    option_kind kind;
     bool clear;
 };
 
-constexpr std::array<vfs_option_entry, 33> vfs_options{ {
-  { "bind", vfs_flag::bind, false },
-  { "dirsync", vfs_flag::dirsync, false },
-  { "defaults", vfs_flag::defaults, false },
-  { "iversion", vfs_flag::iversion, false },
-  { "lazytime", vfs_flag::lazytime, false },
-  { "mand", vfs_flag::mand, false },
-  { "noatime", vfs_flag::noatime, false },
-  { "nodev", vfs_flag::nodev, false },
-  { "nodiratime", vfs_flag::nodiratime, false },
-  { "noexec", vfs_flag::noexec, false },
-  { "nosuid", vfs_flag::nosuid, false },
-  { "nosymfollow", vfs_flag::nosymfollow, false },
-  { "rbind", vfs_flag::bind | vfs_flag::rec, false },
-  { "relatime", vfs_flag::relatime, false },
-  { "remount", vfs_flag::remount, false },
-  { "ro", vfs_flag::ro, false },
-  { "silent", vfs_flag::silent, false },
-  { "strictatime", vfs_flag::strictatime, false },
-  { "sync", vfs_flag::sync, false },
-  { "async", vfs_flag::sync, true },
-  { "atime", vfs_flag::noatime, true },
-  { "dev", vfs_flag::nodev, true },
-  { "diratime", vfs_flag::nodiratime, true },
-  { "exec", vfs_flag::noexec, true },
-  { "loud", vfs_flag::silent, true },
-  { "noiversion", vfs_flag::iversion, true },
-  { "nolazytime", vfs_flag::lazytime, true },
-  { "nomand", vfs_flag::mand, true },
-  { "norelatime", vfs_flag::relatime, true },
-  { "nostrictatime", vfs_flag::strictatime, true },
-  { "rw", vfs_flag::ro, true },
-  { "suid", vfs_flag::nosuid, true },
-  { "symfollow", vfs_flag::nosymfollow, true },
-} };
-
-struct propagation_option_entry
+struct parsed_mount_options
 {
-    std::string_view name;
-    utils::bitflags<propagation_flag> flag;
+    std::string data;
+    std::optional<std::vector<id_mapping>> gid_mappings;
+    std::optional<std::vector<id_mapping>> uid_mappings;
+    std::optional<mount::recursive_attr> rec_attr;
+    utils::bitflags<vfs_flag> vfs_flags;
+    std::optional<mount::idmap_type> idmap;
+    mount::extension extension_flags{ mount::extension::none };
+    utils::bitflags<propagation_flag> propagation_flags;
 };
 
-constexpr std::array<propagation_option_entry, 8> propagation_options{ {
-  { "private", propagation_flag::private_ },
-  { "rprivate", propagation_flag::private_ | propagation_flag::rec },
-  { "slave", propagation_flag::slave },
-  { "rslave", propagation_flag::slave | propagation_flag::rec },
-  { "shared", propagation_flag::shared },
-  { "rshared", propagation_flag::shared | propagation_flag::rec },
-  { "unbindable", propagation_flag::unbindable },
-  { "runbindable", propagation_flag::unbindable | propagation_flag::rec },
+// from https://github.com/opencontainers/runtime-spec/blob/main/config.md#linux-mount-options
+constexpr std::array<mount_option, 33 + 8 + 9 + 9> mount_options{ {
+  // vfs
+  { "bind", static_cast<uint32_t>(vfs_flag::bind), option_kind::vfs, false },
+  { "dirsync", static_cast<uint32_t>(vfs_flag::dirsync), option_kind::vfs, false },
+  { "defaults", static_cast<uint32_t>(vfs_flag::none), option_kind::vfs, false },
+  { "iversion", static_cast<uint32_t>(vfs_flag::iversion), option_kind::vfs, false },
+  { "lazytime", static_cast<uint32_t>(vfs_flag::lazytime), option_kind::vfs, false },
+  { "mand", static_cast<uint32_t>(vfs_flag::mand), option_kind::vfs, false },
+  { "noatime", static_cast<uint32_t>(vfs_flag::noatime), option_kind::vfs, false },
+  { "nodev", static_cast<uint32_t>(vfs_flag::nodev), option_kind::vfs, false },
+  { "nodiratime", static_cast<uint32_t>(vfs_flag::nodiratime), option_kind::vfs, false },
+  { "noexec", static_cast<uint32_t>(vfs_flag::noexec), option_kind::vfs, false },
+  { "nosuid", static_cast<uint32_t>(vfs_flag::nosuid), option_kind::vfs, false },
+  { "nosymfollow", static_cast<uint32_t>(vfs_flag::nosymfollow), option_kind::vfs, false },
+  { "rbind",
+    static_cast<uint32_t>((vfs_flag::bind | vfs_flag::rec).to_raw()),
+    option_kind::vfs,
+    false },
+  { "relatime", static_cast<uint32_t>(vfs_flag::relatime), option_kind::vfs, false },
+  { "remount", static_cast<uint32_t>(vfs_flag::remount), option_kind::vfs, false },
+  { "ro", static_cast<uint32_t>(vfs_flag::ro), option_kind::vfs, false },
+  { "silent", static_cast<uint32_t>(vfs_flag::silent), option_kind::vfs, false },
+  { "strictatime", static_cast<uint32_t>(vfs_flag::strictatime), option_kind::vfs, false },
+  { "sync", static_cast<uint32_t>(vfs_flag::sync), option_kind::vfs, false },
+  { "async", static_cast<uint32_t>(vfs_flag::sync), option_kind::vfs, true },
+  { "atime", static_cast<uint32_t>(vfs_flag::noatime), option_kind::vfs, true },
+  { "dev", static_cast<uint32_t>(vfs_flag::nodev), option_kind::vfs, true },
+  { "diratime", static_cast<uint32_t>(vfs_flag::nodiratime), option_kind::vfs, true },
+  { "exec", static_cast<uint32_t>(vfs_flag::noexec), option_kind::vfs, true },
+  { "loud", static_cast<uint32_t>(vfs_flag::silent), option_kind::vfs, true },
+  { "noiversion", static_cast<uint32_t>(vfs_flag::iversion), option_kind::vfs, true },
+  { "nolazytime", static_cast<uint32_t>(vfs_flag::lazytime), option_kind::vfs, true },
+  { "nomand", static_cast<uint32_t>(vfs_flag::mand), option_kind::vfs, true },
+  { "norelatime", static_cast<uint32_t>(vfs_flag::relatime), option_kind::vfs, true },
+  { "nostrictatime", static_cast<uint32_t>(vfs_flag::strictatime), option_kind::vfs, true },
+  { "rw", static_cast<uint32_t>(vfs_flag::ro), option_kind::vfs, true },
+  { "suid", static_cast<uint32_t>(vfs_flag::nosuid), option_kind::vfs, true },
+  { "symfollow", static_cast<uint32_t>(vfs_flag::nosymfollow), option_kind::vfs, true },
+  // propagation
+  { "private", static_cast<uint32_t>(propagation_flag::private_), option_kind::propagation, false },
+  { "rprivate",
+    static_cast<uint32_t>((propagation_flag::private_ | propagation_flag::rec).to_raw()),
+    option_kind::propagation,
+    false },
+  { "slave", static_cast<uint32_t>(propagation_flag::slave), option_kind::propagation, false },
+  { "rslave",
+    static_cast<uint32_t>((propagation_flag::slave | propagation_flag::rec).to_raw()),
+    option_kind::propagation,
+    false },
+  { "shared", static_cast<uint32_t>(propagation_flag::shared), option_kind::propagation, false },
+  { "rshared",
+    static_cast<uint32_t>((propagation_flag::shared | propagation_flag::rec).to_raw()),
+    option_kind::propagation,
+    false },
+  { "unbindable",
+    static_cast<uint32_t>(propagation_flag::unbindable),
+    option_kind::propagation,
+    false },
+  { "runbindable",
+    static_cast<uint32_t>((propagation_flag::unbindable | propagation_flag::rec).to_raw()),
+    option_kind::propagation,
+    false },
+  // recursive mount_setattr
+  { "rro", static_cast<uint32_t>(recursive_attr_flag::rdonly), option_kind::rec_attr_set, false },
+  { "rnosuid",
+    static_cast<uint32_t>(recursive_attr_flag::nosuid),
+    option_kind::rec_attr_set,
+    false },
+  { "rnodev", static_cast<uint32_t>(recursive_attr_flag::nodev), option_kind::rec_attr_set, false },
+  { "rnoexec",
+    static_cast<uint32_t>(recursive_attr_flag::noexec),
+    option_kind::rec_attr_set,
+    false },
+  { "rnodiratime",
+    static_cast<uint32_t>(recursive_attr_flag::nodiratime),
+    option_kind::rec_attr_set,
+    false },
+  { "rnoatime",
+    static_cast<uint32_t>(recursive_attr_flag::noatime),
+    option_kind::rec_attr_set,
+    false },
+  { "rstrictatime",
+    static_cast<uint32_t>(recursive_attr_flag::strictatime),
+    option_kind::rec_attr_set,
+    false },
+  { "rnosymfollow",
+    static_cast<uint32_t>(recursive_attr_flag::nosymfollow),
+    option_kind::rec_attr_set,
+    false },
+  { "rrelatime", 0U, option_kind::rec_attr_set, false },
+  { "rrw", static_cast<uint32_t>(recursive_attr_flag::rdonly), option_kind::rec_attr_clr, false },
+  { "rsuid", static_cast<uint32_t>(recursive_attr_flag::nosuid), option_kind::rec_attr_clr, false },
+  { "rdev", static_cast<uint32_t>(recursive_attr_flag::nodev), option_kind::rec_attr_clr, false },
+  { "rexec", static_cast<uint32_t>(recursive_attr_flag::noexec), option_kind::rec_attr_clr, false },
+  { "rdiratime",
+    static_cast<uint32_t>(recursive_attr_flag::nodiratime),
+    option_kind::rec_attr_clr,
+    false },
+  { "ratime",
+    static_cast<uint32_t>(recursive_attr_flag::noatime),
+    option_kind::rec_attr_clr,
+    false },
+  { "rnostrictatime",
+    static_cast<uint32_t>(recursive_attr_flag::strictatime),
+    option_kind::rec_attr_clr,
+    false },
+  { "rsymfollow",
+    static_cast<uint32_t>(recursive_attr_flag::nosymfollow),
+    option_kind::rec_attr_clr,
+    false },
+  { "rnorelatime", 0U, option_kind::rec_attr_clr, false },
 } };
 
-// Recursive mount_setattr options. these carry raw
-// MOUNT_ATTR_* UAPI values (mount::recursive_attr is a passthrough ABI bitmask;
-// mount_setattr(2) is not implemented yet).
-// TODO: Revisit when it lands.
-struct rec_attr_option_entry
+constexpr auto make_sorted_mount_options() noexcept
+  -> std::array<mount_option, mount_options.size()>
 {
-    std::string_view name;
-    uint64_t value;
-};
+    auto out = mount_options;
+    linyaps_box::utils::detail::shell_sort(
+      linyaps_box::utils::span(out),
+      [](const mount_option &a, const mount_option &b) noexcept {
+          return a.name < b.name;
+      });
 
-constexpr std::array<rec_attr_option_entry, 9> recursive_attr_set{ {
-  { "rro", os::sys::mount_attr_rdonly },
-  { "rnosuid", os::sys::mount_attr_nosuid },
-  { "rnodev", os::sys::mount_attr_nodev },
-  { "rnoexec", os::sys::mount_attr_noexec },
-  { "rnodiratime", os::sys::mount_attr_nodiratime },
-  { "rnoatime", os::sys::mount_attr_noatime },
-  { "rstrictatime", os::sys::mount_attr_strictatime },
-  { "rnosymfollow", os::sys::mount_attr_nosymfollow },
-  { "rrelatime", 0 },
-} };
+    return out;
+}
 
-constexpr std::array<rec_attr_option_entry, 9> recursive_attr_clr{ {
-  { "rrw", os::sys::mount_attr_rdonly },
-  { "rsuid", os::sys::mount_attr_nosuid },
-  { "rdev", os::sys::mount_attr_nodev },
-  { "rexec", os::sys::mount_attr_noexec },
-  { "rdiratime", os::sys::mount_attr_nodiratime },
-  { "ratime", os::sys::mount_attr_noatime },
-  { "rnostrictatime", os::sys::mount_attr_strictatime },
-  { "rsymfollow", os::sys::mount_attr_nosymfollow },
-  { "rnorelatime", 0 },
-} };
+constexpr auto sorted_mount_options = make_sorted_mount_options();
 
-template <typename Entry, std::size_t N>
-constexpr const Entry *find_option(const std::array<Entry, N> &table, std::string_view key) noexcept
+[[nodiscard]] auto find_mount_option(std::string_view name) noexcept -> const mount_option *
 {
-    for (const auto &entry : table) {
-        if (entry.name == key) {
-            return &entry;
-        }
+    const auto *const it = std::lower_bound(sorted_mount_options.cbegin(),
+                                            sorted_mount_options.cend(),
+                                            name,
+                                            [](const mount_option &entry, std::string_view n) {
+                                                return entry.name < n;
+                                            });
+    if (it != sorted_mount_options.cend() && it->name == name) {
+        return &*it;
     }
 
     return nullptr;
@@ -190,22 +248,16 @@ auto parse_mappings(std::string_view value) -> std::optional<std::vector<id_mapp
 
 struct inline_idmap_result
 {
-    mount::idmap_type type;
     std::optional<std::vector<id_mapping>> uid_mappings;
     std::optional<std::vector<id_mapping>> gid_mappings;
+    mount::idmap_type type;
 };
 
-auto parse_inline_idmap_option(std::string_view opt) -> inline_idmap_result
+auto parse_inline_idmap_option(std::string_view opt, mount::idmap_type type) -> inline_idmap_result
 {
     auto eq_pos = opt.find('=');
-    auto prefix = opt.substr(0, eq_pos);
-    auto iv = idmap_options_table.from_name(prefix);
-    if (UNLIKELY(!iv)) {
-        throw std::runtime_error(fmt::format("unknown idmap option: {}", opt));
-    }
-
     inline_idmap_result result;
-    result.type = *iv;
+    result.type = type;
     auto rest = opt.substr(eq_pos + 1);
 
     while (!rest.empty()) {
@@ -238,7 +290,7 @@ auto parse_inline_idmap_option(std::string_view opt) -> inline_idmap_result
     return result;
 }
 
-auto parse_mount_options(const std::vector<std::string> &options) -> parsed_mount_options
+auto parse_mount_options(const std::vector<std::string_view> &options) -> parsed_mount_options
 {
     parsed_mount_options result;
 
@@ -249,40 +301,43 @@ auto parse_mount_options(const std::vector<std::string> &options) -> parsed_moun
     };
 
     for (const auto &opt : options) {
-        if (const auto *entry = find_option(vfs_options, opt)) {
-            if (entry->clear) {
-                result.vfs_flags &= ~entry->flag;
-            } else {
-                result.vfs_flags |= entry->flag;
+        if (const auto *entry = find_mount_option(opt)) {
+            switch (entry->kind) {
+            case option_kind::vfs: {
+                const auto flag = utils::bitflags<vfs_flag>::from_raw_truncate(
+                  static_cast<std::uint32_t>(entry->value));
+                if (entry->clear) {
+                    result.vfs_flags &= ~flag;
+                } else {
+                    result.vfs_flags |= flag;
+                }
+            } break;
+            case option_kind::propagation: {
+                result.propagation_flags |= utils::bitflags<propagation_flag>::from_raw_truncate(
+                  static_cast<std::uint8_t>(entry->value));
+            } break;
+            case option_kind::rec_attr_set: {
+                if (!result.rec_attr) {
+                    result.rec_attr.emplace();
+                }
+
+                result.rec_attr->set |= utils::bitflags<recursive_attr_flag>::from_raw_truncate(
+                  static_cast<std::uint8_t>(entry->value));
+            } break;
+            case option_kind::rec_attr_clr: {
+                if (!result.rec_attr) {
+                    result.rec_attr.emplace();
+                }
+
+                result.rec_attr->clr |= utils::bitflags<recursive_attr_flag>::from_raw_truncate(
+                  static_cast<std::uint8_t>(entry->value));
+            } break;
             }
 
             continue;
         }
 
-        if (const auto *entry = find_option(propagation_options, opt)) {
-            result.propagation_flags |= entry->flag;
-            continue;
-        }
-
-        if (const auto *entry = find_option(recursive_attr_set, opt)) {
-            if (!result.rec_attr) {
-                result.rec_attr.emplace();
-            }
-
-            result.rec_attr->set |= entry->value;
-            continue;
-        }
-
-        if (const auto *entry = find_option(recursive_attr_clr, opt)) {
-            if (!result.rec_attr) {
-                result.rec_attr.emplace();
-            }
-
-            result.rec_attr->clr |= entry->value;
-            continue;
-        }
-
-        if (auto ev = extra_flags_table.from_name(opt)) {
+        if (auto ev = get_enum_table_from<mount::extension>().from_name(opt)) {
             result.extension_flags |= *ev;
             continue;
         }
@@ -296,12 +351,12 @@ auto parse_mount_options(const std::vector<std::string> &options) -> parsed_moun
         }
 
         // Handle inline mapping strings like "idmap=uids=0:1000:1,gids=0:1000:1"
-        if (auto eq_pos = opt.find('='); UNLIKELY(eq_pos != std::string_view::npos)) {
-            auto prefix = std::string_view{ opt }.substr(0, eq_pos);
+        if (auto eq_pos = opt.find('='); eq_pos != std::string_view::npos) {
+            auto prefix = opt.substr(0, eq_pos);
             if (auto iv = idmap_options_table.from_name(prefix)) {
                 ensure_idmap_compatible(*iv);
 
-                auto inline_result = parse_inline_idmap_option(opt);
+                auto inline_result = parse_inline_idmap_option(opt, *iv);
                 result.idmap.emplace(inline_result.type);
                 result.uid_mappings = std::move(inline_result.uid_mappings);
                 result.gid_mappings = std::move(inline_result.gid_mappings);
@@ -351,7 +406,15 @@ void from_json(const nlohmann::json &j, mount &v)
             }
         } else if (key_matches(k, "options")) {
             if (!val.is_null()) {
-                auto options = val.get<std::vector<std::string>>();
+                std::vector<std::string_view> options;
+                options.reserve(val.size());
+                std::transform(val.cbegin(),
+                               val.cend(),
+                               std::back_inserter(options),
+                               [](const auto &opt) {
+                                   return opt.template get<std::string_view>();
+                               });
+
                 auto parsed = parse_mount_options(options);
 
                 v.vfs_flags = parsed.vfs_flags;
@@ -395,7 +458,8 @@ void from_json(const nlohmann::json &j, mount &v)
 void validate(const mount &v)
 {
     if (UNLIKELY(!v.destination.is_absolute())) {
-        LINYAPS_BOX_LOG_WARN("mount destination is not an absolute path: {}", v.destination);
+        throw std::runtime_error(
+          fmt::format("mount destination must be an absolute path: {}", v.destination));
     }
 
     if (UNLIKELY(v.uid_mappings.has_value() != v.gid_mappings.has_value())) {

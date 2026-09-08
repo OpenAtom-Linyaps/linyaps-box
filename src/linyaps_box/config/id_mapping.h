@@ -8,14 +8,12 @@
 
 #include <cstdint>
 
-#include <sys/types.h>
-
 namespace linyaps_box::config {
 
 struct id_mapping
 {
-    uid_t host_id;
-    uid_t container_id;
+    uint32_t host_id;
+    uint32_t container_id;
     uint32_t size;
 };
 

@@ -39,10 +39,10 @@ void from_json(const nlohmann::json &j, scheduler &v)
             }
         } else if (key_matches(k, "flags")) {
             if (!val.is_null()) {
-                auto flags{ scheduler::flag::none };
+                utils::bitflags<scheduler_flag> flags;
                 for (const auto &f : val) {
-                    const auto &flag_str = f.get_ref<const std::string &>();
-                    auto flag_opt = get_enum_table_from<scheduler::flag>().from_name(flag_str);
+                    const auto flag_str = f.get<std::string_view>();
+                    auto flag_opt = get_enum_table_from<scheduler_flag>().from_name(flag_str);
                     if (UNLIKELY(!flag_opt)) {
                         throw std::runtime_error(
                           fmt::format("unknown scheduler flag: {}", flag_str));
@@ -78,6 +78,11 @@ void validate(const scheduler &v)
     using policy_t = scheduler::policy;
 
     if (v.nice) {
+        if (UNLIKELY(v.policy_ != policy_t::other && v.policy_ != policy_t::batch)) {
+            throw std::runtime_error(
+              "scheduler.nice can only be specified for SCHED_OTHER or SCHED_BATCH");
+        }
+
         if (UNLIKELY(*v.nice < -20 || *v.nice > 19)) {
             throw std::runtime_error(
               fmt::format("scheduler.nice must be in range [-20, 19]: got {}", *v.nice));

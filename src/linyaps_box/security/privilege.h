@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/config.h"
+#include "linyaps_box/config/oci_config.h"
 
 #include <optional>
 #include <vector>
@@ -18,10 +18,9 @@ namespace linyaps_box::security {
 class privilege_context
 {
 public:
-    explicit privilege_context(std::optional<oci_config::process_t::user_t> user);
+    explicit privilege_context(std::optional<config::user> user);
 
-    auto set_capabilities(std::optional<oci_config::process_t::capabilities_t> caps)
-      -> privilege_context &;
+    auto set_capabilities(std::optional<config::capabilities> caps) -> privilege_context &;
 
     auto set_no_new_privs(bool value) -> privilege_context &;
 
@@ -38,7 +37,7 @@ private:
     };
 
     std::optional<cap_sets> caps_;
-    std::optional<oci_config::process_t::user_t> user_;
+    std::optional<config::user> user_;
     bool no_new_privs_{ false };
 };
 

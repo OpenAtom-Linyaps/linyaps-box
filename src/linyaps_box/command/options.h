@@ -25,12 +25,12 @@ namespace linyaps_box::command {
 
 struct global_options
 {
-    cgroup_manager_t manager{ cgroup_manager_t::disabled };
     std::filesystem::path root;
     std::vector<std::string> log;
     log::level log_level;
     log::output_format log_format;
     bool cee_syslog{ false };
+    cgroup_manager_t manager{ cgroup_manager_t::disabled };
 };
 
 struct list_options
@@ -48,28 +48,28 @@ struct user_spec
 
 struct exec_options
 {
-    bool no_new_privs{ false };
-    bool tty{ false };
-    int preserve_fds{ 0 };
-    std::vector<std::string> command;
-    std::optional<user_spec> user;
+    std::optional<std::filesystem::path> console_socket;
+    std::optional<std::filesystem::path> process_file;
+    std::optional<std::filesystem::path> cwd;
 #ifdef LINYAPS_BOX_ENABLE_CAP
     std::optional<std::vector<std::string>> caps;
 #endif
     std::string ID;
-    std::optional<std::filesystem::path> cwd;
     std::vector<std::string> envs;
-    std::optional<std::filesystem::path> console_socket;
-    std::optional<std::filesystem::path> process_file;
+    std::vector<std::string> command;
+    std::optional<user_spec> user;
+    uint preserve_fds{ 0 };
+    bool no_new_privs{ false };
+    bool tty{ false };
 };
 
 struct run_options
 {
-    std::string ID;
+    std::optional<std::filesystem::path> console_socket;
     std::filesystem::path bundle;
     std::filesystem::path config;
-    std::optional<std::filesystem::path> console_socket;
-    int preserve_fds{ 0 };
+    std::string ID;
+    uint preserve_fds{ 0 };
 };
 
 struct kill_options
@@ -83,10 +83,10 @@ struct options
     using subcommand_opt_t =
       std::variant<std::monostate, list_options, exec_options, run_options, kill_options>;
 
-    global_options global;
     subcommand_opt_t subcommand_opt;
+    global_options global;
 };
 
-auto parse(int argc, char *argv[]) noexcept -> std::optional<options>;
+auto parse(int argc, char **argv) noexcept -> std::optional<options>;
 
 } // namespace linyaps_box::command

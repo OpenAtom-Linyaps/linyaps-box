@@ -53,7 +53,7 @@ auto from_json(const nlohmann::json &j, container_status &s) -> void
     }
 
     s.bundle = j.at("bundle").get<std::string>();
-    s.created = utils::from_created_time(j.at("created").get_ref<const std::string &>());
+    s.created = utils::from_created_time(j.at("created").get<std::string_view>());
     j.at("owner").get_to(s.owner);
     j.at("annotations").get_to(s.annotations);
     j.at("ociVersion").get_to(s.oci_version);

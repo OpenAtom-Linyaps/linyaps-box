@@ -5,7 +5,7 @@
 #pragma once
 
 #include "linyaps_box/cgroup_manager.h"
-#include "linyaps_box/config.h"
+#include "linyaps_box/config/oci_config.h"
 #include "linyaps_box/container_ref.h"
 #include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/status_directory.h"
@@ -23,8 +23,8 @@ struct create_container_options_t
 
 struct run_container_options_t
 {
-    int preserve_fds;
     std::optional<infra::unix_socket> console_socket;
+    uint preserve_fds;
 };
 
 class container final : public container_ref
@@ -37,7 +37,7 @@ public:
     container(container &&) = delete;
     auto operator=(container &&) -> container & = delete;
 
-    [[nodiscard]] auto get_config() const -> const linyaps_box::oci_config &;
+    [[nodiscard]] auto get_config() const -> const config::oci_config &;
     [[nodiscard]] auto get_bundle() const -> const std::filesystem::path &;
     [[nodiscard]] auto run(run_container_options_t options) -> int;
 
@@ -66,7 +66,7 @@ public:
 
 private:
     void cgroup_preenter(const cgroup_options &options, utils::file_descriptor &dirfd);
-    linyaps_box::oci_config config;
+    config::oci_config config;
     std::filesystem::path bundle;
     std::unique_ptr<cgroup_manager> manager;
     unsigned long rootfs_propagation_{ 0 };

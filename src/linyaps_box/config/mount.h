@@ -18,7 +18,7 @@
 namespace linyaps_box::config {
 
 enum class vfs_flag : uint32_t {
-    defaults = 0,
+    none = 0,
     bind = 1U << 0,
     rec = 1U << 1,
     ro = 1U << 2,
@@ -43,7 +43,7 @@ LINYAPS_ENABLE_BITMASK_ENUM(vfs_flag);
 
 LINYAPS_REGISTER_ENUM_TABLE(vfs_flag,
                             19,
-                            { vfs_flag::defaults, "defaults" },
+                            { vfs_flag::none, "defaults" },
                             { vfs_flag::bind, "bind" },
                             { vfs_flag::rec, "rec" },
                             { vfs_flag::ro, "ro" },
@@ -83,20 +83,46 @@ LINYAPS_REGISTER_ENUM_TABLE(propagation_flag,
                             { propagation_flag::unbindable, "unbindable" },
                             { propagation_flag::rec, "rec" })
 
+enum class recursive_attr_flag : std::uint8_t {
+    none = 0,
+    rdonly = 1U << 0,
+    nosuid = 1U << 1,
+    nodev = 1U << 2,
+    noexec = 1U << 3,
+    noatime = 1U << 4,
+    nodiratime = 1U << 5,
+    strictatime = 1U << 6,
+    nosymfollow = 1U << 7,
+};
+
+LINYAPS_ENABLE_BITMASK_ENUM(recursive_attr_flag);
+
+LINYAPS_REGISTER_ENUM_TABLE(recursive_attr_flag,
+                            9,
+                            { recursive_attr_flag::none, "none" },
+                            { recursive_attr_flag::rdonly, "rdonly" },
+                            { recursive_attr_flag::nosuid, "nosuid" },
+                            { recursive_attr_flag::nodev, "nodev" },
+                            { recursive_attr_flag::noexec, "noexec" },
+                            { recursive_attr_flag::noatime, "noatime" },
+                            { recursive_attr_flag::nodiratime, "nodiratime" },
+                            { recursive_attr_flag::strictatime, "strictatime" },
+                            { recursive_attr_flag::nosymfollow, "nosymfollow" })
+
 struct mount
 {
+    enum class idmap_type : std::uint8_t { idmap, ridmap };
+
     enum class extension : std::uint8_t {
         none = 0,
         copy_symlink = (1U << 0),
         tmpcopyup = (1U << 1),
     };
 
-    enum class idmap_type : std::uint8_t { idmap, ridmap };
-
     struct recursive_attr
     {
-        uint64_t set{ 0 };
-        uint64_t clr{ 0 };
+        utils::bitflags<recursive_attr_flag> set;
+        utils::bitflags<recursive_attr_flag> clr;
     };
 
     utils::bitflags<vfs_flag> vfs_flags;
@@ -126,18 +152,6 @@ LINYAPS_REGISTER_ENUM_TABLE(mount::idmap_type,
                             2,
                             { mount::idmap_type::idmap, "idmap" },
                             { mount::idmap_type::ridmap, "ridmap" })
-
-struct parsed_mount_options
-{
-    utils::bitflags<vfs_flag> vfs_flags{ vfs_flag::defaults };
-    utils::bitflags<propagation_flag> propagation_flags{ propagation_flag::none };
-    std::optional<mount::recursive_attr> rec_attr;
-    mount::extension extension_flags{ mount::extension::none };
-    std::optional<mount::idmap_type> idmap;
-    std::optional<std::vector<id_mapping>> uid_mappings;
-    std::optional<std::vector<id_mapping>> gid_mappings;
-    std::string data;
-};
 
 void from_json(const nlohmann::json &j, mount &v);
 

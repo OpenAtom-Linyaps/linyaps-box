@@ -5,8 +5,8 @@
 #include "linyaps_box/config/resources.h"
 
 #include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/utils.h"
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 #include <string_view>
@@ -75,15 +75,19 @@ void validate(const resources &v)
         validate(*v.network_);
     }
 
-    if (!v.hugepage_limits) {
-        return;
+    if (v.rdma_) {
+        std::for_each(v.rdma_->cbegin(), v.rdma_->cend(), [](const auto &entry) {
+            validate(entry.second);
+        });
     }
 
-    std::for_each(v.hugepage_limits->cbegin(), v.hugepage_limits->cend(), [](const auto &limit) {
-        if (UNLIKELY(limit.page_size.empty())) {
-            throw std::runtime_error("resources.hugepageLimits pageSize must not be empty");
-        }
-    });
+    if (v.hugepage_limits) {
+        std::for_each(v.hugepage_limits->cbegin(),
+                      v.hugepage_limits->cend(),
+                      [](const auto &limit) {
+                          validate(limit);
+                      });
+    }
 }
 
 } // namespace linyaps_box::config
