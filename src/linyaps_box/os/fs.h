@@ -15,6 +15,7 @@
 #include <filesystem>
 
 #include <fcntl.h>
+#include <sys/mman.h>
 
 namespace linyaps_box::os {
 
@@ -285,6 +286,18 @@ struct linux_dirent64
     }
 };
 
+enum class memfd_flag : std::uint8_t {
+    cloexec = MFD_CLOEXEC,
+    allow_sealing = MFD_ALLOW_SEALING,
+    hugetlb = MFD_HUGETLB
+};
+LINYAPS_ENABLE_BITMASK_ENUM(memfd_flag);
+LINYAPS_REGISTER_ENUM_TABLE(memfd_flag,
+                            3,
+                            { memfd_flag::cloexec, "MFD_CLOEXEC" },
+                            { memfd_flag::allow_sealing, "MFD_ALLOW_SEALING" },
+                            { memfd_flag::hugetlb, "MFD_HUGETLB" })
+
 } // namespace sys
 
 [[nodiscard]] auto open(const std::filesystem::path &path,
@@ -385,6 +398,12 @@ struct linux_dirent64
   uid_t owner,
   gid_t group,
   utils::bitflags<sys::at_flag> flags = sys::at_flag::symlink_nofollow) noexcept -> Result<void>;
+
+[[nodiscard]] auto ftruncate(utils::file_descriptor_ref fd, off_t length) noexcept -> Result<void>;
+
+[[nodiscard]] auto memfd_create(const std::string &name,
+                                utils::bitflags<sys::memfd_flag> flags) noexcept
+  -> Result<utils::file_descriptor>;
 
 auto to_fs_file_type(mode_t val) noexcept -> std::filesystem::file_type;
 

@@ -186,6 +186,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/container_status.cpp
     src/linyaps_box/impl/disabled_cgroup_manager.cpp
     src/linyaps_box/infra/process_handle.cpp
+    src/linyaps_box/infra/ringbuffer.cpp
     src/linyaps_box/infra/rootfs.cpp
     src/linyaps_box/infra/unix_socket.cpp
     src/linyaps_box/interface.cpp
@@ -201,6 +202,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/log/sinks/syslog_sink.cpp
     src/linyaps_box/log/utils.cpp
     src/linyaps_box/os/fs.cpp
+    src/linyaps_box/os/mm.cpp
     src/linyaps_box/os/io.cpp
     src/linyaps_box/os/net.cpp
     src/linyaps_box/os/process.cpp
@@ -221,10 +223,8 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/environ.cpp
     src/linyaps_box/utils/epoll.cpp
     src/linyaps_box/utils/file_describer.cpp
-    src/linyaps_box/utils/mman.cpp
     src/linyaps_box/utils/ns_flags.cpp
     src/linyaps_box/utils/rlimit.cpp
-    src/linyaps_box/utils/ringbuffer.cpp
     src/linyaps_box/utils/semver.cpp
     src/linyaps_box/utils/session.cpp
     src/linyaps_box/utils/setns.cpp

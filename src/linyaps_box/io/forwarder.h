@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include "linyaps_box/infra/ringbuffer.h"
 #include "linyaps_box/io/epoll.h"
 #include "linyaps_box/utils/file_describer.h"
-#include "linyaps_box/utils/ringbuffer.h"
 
 namespace linyaps_box::io {
 
@@ -53,7 +53,7 @@ private:
     [[nodiscard]] auto pull(std::size_t &bytes_quota) -> bool;
     [[nodiscard]] auto push(std::size_t &bytes_quota) -> bool;
 
-    utils::ring_buffer::ptr rb;
+    infra::ring_buffer::ptr rb;
     FdContext src_;
     FdContext dst_;
     std::reference_wrapper<Epoll> poller;
