@@ -44,16 +44,21 @@ set(COVERAGE_INFO "coverage.info")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set_tests_properties(
     ${linyaps-box_TESTS}
-    PROPERTIES ENVIRONMENT
-               "LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/default.profraw")
+    PROPERTIES
+      ENVIRONMENT
+      "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt;LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/llvm-%p.profraw"
+  )
 
   find_program(LLVM_PROFDATA llvm-profdata REQUIRED)
 
   add_custom_command(
     OUTPUT default.profdata
     DEPENDS "${linyaps-box_APP}" test
-    COMMAND "${LLVM_PROFDATA}" merge -sparse default.profraw -o
-            default.profdata)
+    COMMAND
+      "${CMAKE_COMMAND}" "-DPROFILE_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+      "-DPROF_OUT=${CMAKE_CURRENT_BINARY_DIR}/default.profdata"
+      "-DLLVM_PROFDATA=${LLVM_PROFDATA}" -P
+      "${CMAKE_CURRENT_SOURCE_DIR}/../merge-llvm-profiles.cmake")
 
   find_program(LLVM_COV llvm-cov REQUIRED)
 
@@ -61,29 +66,31 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     OUTPUT coverage.info
     DEPENDS default.profdata
     COMMAND "${LLVM_COV}" show -instr-profile=default.profdata
-            -object="$<TARGET_FILE_NAME:${linyaps-box_APP}>" > coverage.info)
+            -object="$<TARGET_FILE:${linyaps-box_APP}>" > coverage.info)
 
   add_custom_command(
     OUTPUT coverage.tar.gz
     DEPENDS default.profdata
     COMMAND rm -rf coverage
-    COMMAND
-      "${LLVM_COV}" show -instr-profile=default.profdata -format=html
-      -object="$<TARGET_FILE_NAME:${linyaps-box_APP}>" -output-dir=coverage
+    COMMAND "${LLVM_COV}" show -instr-profile=default.profdata -format=html
+            -object="$<TARGET_FILE:${linyaps-box_APP}>" -output-dir=coverage
     COMMAND tar -czf coverage-html.tar.gz coverage)
 
   add_custom_target(coverage DEPENDS coverage.info coverage.tar.gz)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  find_program(LCOV lcov REQUIRED)
-  find_program(SED sed REQUIRED)
+  find_program(GCOVR gcovr REQUIRED)
   add_custom_target(
     coverage
-    COMMAND "${LCOV}" --capture --directory . --output-file coverage.info
-            --branch-coverage --rc geninfo_unexecuted_blocks=1
-    COMMAND "${LCOV}" --remove coverage.info '/usr/*' --output-file
-            coverage.info
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    DEPENDS "${linyaps-box_APP}" test)
+    COMMAND bash -c "find '${CMAKE_BINARY_DIR}' -name '*.gcda' -delete"
+    COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_BINARY_DIR}"
+            "${CMAKE_CTEST_COMMAND}" --output-on-failure
+    COMMAND
+      "${GCOVR}" -r . --object-directory
+      "${CMAKE_BINARY_DIR}/CMakeFiles/linyaps-box.dir" --object-directory
+      "${CMAKE_BINARY_DIR}/CMakeFiles/${linyaps-box_APP}.dir" --filter
+      "src/linyaps_box" --txt --html --html-details -o coverage.html
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    DEPENDS "${linyaps-box_APP}")
 else()
   message(FATAL_ERROR "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}.")
 endif()

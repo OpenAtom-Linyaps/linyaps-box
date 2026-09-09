@@ -118,6 +118,12 @@ set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
 
 # ==============================================================================
 
+if(CMAKE_BUILD_TYPE STREQUAL ""
+   AND NOT CMAKE_CONFIGURATION_TYPES
+   AND NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/CMakeCache.txt")
+  message(WARNING "No build type is set.")
+endif()
+
 if(linyaps-box_MAKE_RELEASE AND linyaps-box_HARDENING)
   message(STATUS "applying harden settings")
   set(CMAKE_EXE_LINKER_FLAGS
@@ -413,16 +419,27 @@ if(linyaps-box_ENABLE_COVERAGE)
     message(
       FATAL_ERROR "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}.")
   endif()
+
+  # Line attribution is only faithful at -O0
+  if(NOT CMAKE_BUILD_TYPE STREQUAL "" AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(
+      WARNING
+        "linyaps-box_ENABLE_COVERAGE is enabled with build type "
+        "'${CMAKE_BUILD_TYPE}'; Debug (-O0) is recommended for accurate line "
+        "coverage.")
+  endif()
+
+  # PUBLIC so the flags also reach every consumer of the static library
   target_compile_options(
     "${linyaps-box_LIBRARY}"
-    PRIVATE "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fprofile-instr-generate>"
-            "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fcoverage-mapping>"
-            "$<$<CXX_COMPILER_ID:GNU>:--coverage>")
+    PUBLIC "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>"
+           "$<$<CXX_COMPILER_ID:Clang>:-fcoverage-mapping>"
+           "$<$<CXX_COMPILER_ID:GNU>:--coverage>")
   target_link_options(
     "${linyaps-box_LIBRARY}"
     PUBLIC
-    "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fprofile-instr-generate>"
-    "$<$<CXX_COMPILER_ID:Clang,AppleClang>:-fcoverage-mapping>"
+    "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>"
+    "$<$<CXX_COMPILER_ID:Clang>:-fcoverage-mapping>"
     "$<$<CXX_COMPILER_ID:GNU>:--coverage>")
 endif()
 

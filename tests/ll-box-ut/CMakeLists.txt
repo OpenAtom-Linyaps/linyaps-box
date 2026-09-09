@@ -1,4 +1,5 @@
 set(linyaps-box_UNIT_TESTS ll-box-ut)
+# find -regex '\./src/.*\.cpp' -type f -printf '%P\n' | sort
 set(linyaps-box_UNIT_TESTS_SOURCE
     src/config/cpu_test.cpp
     src/config/hook_test.cpp
@@ -25,6 +26,7 @@ set(linyaps-box_UNIT_TESTS_SOURCE
     src/semver_test.cpp
     src/span_test.cpp
     src/vfs_test.cpp)
+
 set(linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
 set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -45,18 +47,29 @@ check_cxx_source_compiles(
   }"
   GTEST_HAS_INSTANTIATE_TEST_SUITE_P)
 
-# gmock provides the matcher library (EXPECT_THAT/ASSERT_THAT), which has been
-# part of the googletest repo since 1.8.0 — so the 1.8.1 floor already has it.
-# The Config-mode GTest package exports GTest::gmock when gmock is installed;
-# fall back to a raw -lgmock lookup on older distros that split the package.
-check_cxx_source_compiles("#include <gmock/gmock.h>
-   int main() { return 0; }" GTEST_HAS_GMOCK_HEADER)
-
-if(TARGET GTest::gmock AND GTEST_HAS_GMOCK_HEADER)
+if(TARGET GTest::gmock)
   list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES GTest::gmock)
-elseif(GTEST_HAS_GMOCK_HEADER)
-  find_library(GMOCK_LIBRARY NAMES gmock gmockd REQUIRED)
-  list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES ${GMOCK_LIBRARY})
+else()
+  # fallback
+  find_path(GMOCK_INCLUDE_DIR gmock/gmock.h)
+  find_library(GMOCK_LIBRARY NAMES gmock gmockd)
+
+  if(GMOCK_INCLUDE_DIR AND GMOCK_LIBRARY)
+    add_library(GTest::gmock UNKNOWN IMPORTED)
+    set_target_properties(
+      GTest::gmock
+      PROPERTIES IMPORTED_LOCATION "${GMOCK_LIBRARY}"
+                 INTERFACE_INCLUDE_DIRECTORIES "${GMOCK_INCLUDE_DIR}")
+
+    if(TARGET GTest::gtest)
+      set_property(TARGET GTest::gmock PROPERTY INTERFACE_LINK_LIBRARIES
+                                                GTest::gtest)
+    endif()
+
+    list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES GTest::gmock)
+  else()
+    message(FATAL_ERROR "gmock not found but required by unit tests")
+  endif()
 endif()
 
 include(GoogleTest)
@@ -72,9 +85,14 @@ target_link_libraries("${linyaps-box_UNIT_TESTS}"
                       PRIVATE ${linyaps-box_UNIT_TESTS_LINK_LIBRARIES})
 
 # Test fixtures referenced by relative paths (e.g. "data/oci.json") resolve
-# against WORKING_DIRECTORY below; stage the data/ tree into the binary dir.
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/data"
-     DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+# against WORKING_DIRECTORY below; stage the data/ tree into the binary dir on
+# every build so edited fixtures are picked up without re-configuring.
+add_custom_command(
+  TARGET "${linyaps-box_UNIT_TESTS}"
+  POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E copy_directory
+          "${CMAKE_CURRENT_SOURCE_DIR}/data" "${CMAKE_CURRENT_BINARY_DIR}/data"
+  VERBATIM)
 
 target_compile_options("${linyaps-box_UNIT_TESTS}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
@@ -95,7 +113,51 @@ if(NOT GTEST_HAS_INSTANTIATE_TEST_SUITE_P)
     PRIVATE INSTANTIATE_TEST_SUITE_P=INSTANTIATE_TEST_CASE_P)
 endif()
 
+if(linyaps-box_ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  # gtest_discover_tests registers every test as its own ctest process
+  list(APPEND TEST_ENV_VARS
+       "LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/llvm-%p.profraw")
+endif()
+
 gtest_discover_tests(
   "${linyaps-box_UNIT_TESTS}"
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" DISCOVERY_MODE PRE_TEST
   PROPERTIES LABELS "unit" ENVIRONMENT "${TEST_ENV_VARS}")
+
+if(linyaps-box_ENABLE_COVERAGE)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    find_program(LLVM_PROFDATA llvm-profdata REQUIRED)
+    find_program(LLVM_COV llvm-cov REQUIRED)
+
+    add_custom_target(
+      coverage-ut
+      COMMAND "${CMAKE_CTEST_COMMAND}" -L unit --output-on-failure
+      COMMAND
+        "${CMAKE_COMMAND}" "-DPROFILE_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+        "-DPROF_OUT=${CMAKE_CURRENT_BINARY_DIR}/coverage-ut.profdata"
+        "-DLLVM_PROFDATA=${LLVM_PROFDATA}" -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/../merge-llvm-profiles.cmake"
+      COMMAND
+        "${LLVM_COV}" report "$<TARGET_FILE:${linyaps-box_UNIT_TESTS}>"
+        "-instr-profile=${CMAKE_CURRENT_BINARY_DIR}/coverage-ut.profdata"
+        "${PROJECT_SOURCE_DIR}/src/linyaps_box"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      DEPENDS "${linyaps-box_UNIT_TESTS}"
+      VERBATIM)
+  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    find_program(GCOVR gcovr REQUIRED)
+
+    add_custom_target(
+      coverage-ut
+      COMMAND bash -c "find '${CMAKE_BINARY_DIR}' -name '*.gcda' -delete"
+      COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_BINARY_DIR}"
+              "${CMAKE_CTEST_COMMAND}" -L unit --output-on-failure
+      COMMAND
+        "${GCOVR}" -r . --object-directory
+        "${CMAKE_BINARY_DIR}/CMakeFiles/linyaps-box.dir" --object-directory
+        "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${linyaps-box_UNIT_TESTS}.dir"
+        --filter "src/linyaps_box" --txt
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+      DEPENDS "${linyaps-box_UNIT_TESTS}")
+  endif()
+endif()
