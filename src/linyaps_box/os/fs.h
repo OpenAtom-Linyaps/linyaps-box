@@ -276,13 +276,6 @@ struct linux_dirent64
     int64_t d_off;
     unsigned short d_reclen;
     unsigned char d_type;
-
-    [[nodiscard]] std::string_view name() const noexcept // null-terminated
-    {
-        const char *name_ptr =
-          reinterpret_cast<const char *>(this) + offsetof(linux_dirent64, d_type) + 1;
-        return { name_ptr };
-    }
 };
 
 } // namespace sys

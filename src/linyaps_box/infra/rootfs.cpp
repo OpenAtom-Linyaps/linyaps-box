@@ -14,6 +14,7 @@
 #include <linux/magic.h>
 
 #include <algorithm>
+#include <cstring>
 #include <deque>
 
 namespace linyaps_box::infra {
@@ -554,7 +555,7 @@ auto remove_all_in_dir(utils::file_descriptor_ref dirfd, const std::filesystem::
 
     struct alignas(std::max_align_t) dirent_buf
     {
-        std::byte data[32768];
+        std::array<std::byte, 32768> data;
     };
 
     auto buf = std::make_unique<dirent_buf>();
@@ -610,14 +611,21 @@ auto remove_all_in_dir(utils::file_descriptor_ref dirfd, const std::filesystem::
                     return unexpected{ std::make_error_code(std::errc::io_error) };
                 }
 
-                const auto *d = reinterpret_cast<const os::sys::linux_dirent64 *>(buf->data + pos);
-                if (UNLIKELY(d->d_reclen < sizeof(os::sys::linux_dirent64)
-                             || pos + d->d_reclen > *n)) {
+                os::sys::linux_dirent64 d{ };
+                std::memcpy(&d, buf->data.data() + pos, sizeof(d));
+                if (UNLIKELY(d.d_reclen < sizeof(os::sys::linux_dirent64)
+                             || pos + d.d_reclen > *n)) {
                     return unexpected{ std::make_error_code(std::errc::io_error) };
                 }
 
-                pos += d->d_reclen;
-                auto child_name = d->name();
+                // The trailing name is not part of the copied header; read it
+                // straight from the kernel buffer (char reads are always valid).
+                const std::string_view child_name{
+                    reinterpret_cast<const char *>(buf->data.data() + pos)
+                    + offsetof(os::sys::linux_dirent64, d_type) + 1
+                };
+
+                pos += d.d_reclen;
                 if (child_name == "." || child_name == "..") {
                     continue;
                 }
