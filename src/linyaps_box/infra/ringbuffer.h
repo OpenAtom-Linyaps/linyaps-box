@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -18,8 +18,9 @@ constexpr std::size_t hardware_destructive_interference_size = 64;
 #endif
 } // namespace linyaps_box::compat
 
-namespace linyaps_box::utils {
+namespace linyaps_box::infra {
 
+// Single-threaded, single-owner only ring buffer
 class alignas(compat::hardware_constructive_interference_size) ring_buffer
 {
 public:
@@ -95,4 +96,4 @@ private:
     std::size_t mask_;
 };
 
-} // namespace linyaps_box::utils
+} // namespace linyaps_box::infra

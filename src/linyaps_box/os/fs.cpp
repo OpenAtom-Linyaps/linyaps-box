@@ -441,6 +441,33 @@ auto fchmodat(utils::file_descriptor_ref dirfd,
     }
 }
 
+auto ftruncate(utils::file_descriptor_ref fd, off_t length) noexcept -> Result<void>
+{
+    while (true) {
+        auto ret = ::ftruncate(fd, length);
+        if (LIKELY(ret == 0)) {
+            return { };
+        }
+
+        if (errno == EINTR) {
+            continue;
+        }
+
+        return unexpected{ make_error_code(errno) };
+    }
+}
+
+auto memfd_create(const std::string &name, utils::bitflags<sys::memfd_flag> flags) noexcept
+  -> Result<utils::file_descriptor>
+{
+    auto ret = ::memfd_create(name.c_str(), flags.to_raw());
+    if (UNLIKELY(ret == -1)) {
+        return unexpected{ make_error_code(errno) };
+    }
+
+    return utils::file_descriptor{ ret };
+}
+
 auto to_fs_file_type(mode_t val) noexcept -> std::filesystem::file_type
 {
     switch (val & S_IFMT) {
