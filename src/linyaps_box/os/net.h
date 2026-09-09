@@ -9,6 +9,8 @@
 #include "linyaps_box/utils/enum_traits.h"
 #include "linyaps_box/utils/file_describer.h"
 
+#include <memory>
+
 #include <sys/socket.h>
 
 namespace linyaps_box::os {
@@ -172,15 +174,15 @@ namespace detail {
 // aligned sub-span does not run past the end of the buffer.
 inline auto align_for_cmsghdr(utils::span<std::byte> buffer) noexcept -> utils::span<std::byte>
 {
-    const auto align = alignof(struct cmsghdr);
-    auto addr = reinterpret_cast<std::uintptr_t>(buffer.data());
-    const auto adjusted = (addr + (align - 1)) & ~static_cast<std::uintptr_t>(align - 1);
-    const auto skip = adjusted - addr;
-    if (skip > buffer.size()) {
+    void *ptr = buffer.data();
+    std::size_t space = buffer.size();
+    // size 1: only align the head; the caller checks remaining capacity.
+    const auto *aligned = std::align(alignof(struct cmsghdr), 1, ptr, space);
+    if (aligned == nullptr) {
         return { };
     }
 
-    return buffer.subspan(skip);
+    return buffer.subspan(static_cast<std::byte *>(ptr) - buffer.data());
 }
 
 } // namespace detail
