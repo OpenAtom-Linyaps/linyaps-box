@@ -13,8 +13,6 @@
 #  include <linux/openat2.h>
 #endif
 
-#include <sys/syscall.h>
-
 namespace linyaps_box::os {
 
 namespace sys {
@@ -186,6 +184,19 @@ auto fstatat(utils::file_descriptor_ref dirfd,
     }
 
     return st;
+}
+
+auto statx(utils::file_descriptor_ref fd,
+           const std::filesystem::path &path,
+           utils::bitflags<sys::at_flag> flags,
+           utils::bitflags<sys::statx_flag> mask) noexcept -> Result<struct statx>
+{
+    struct statx stx{ };
+    if (UNLIKELY(::statx(fd, path.c_str(), flags.to_raw(), mask.to_raw(), &stx) == -1)) {
+        return unexpected{ make_error_code(errno) };
+    }
+
+    return stx;
 }
 
 auto readlinkat(utils::file_descriptor_ref dirfd,

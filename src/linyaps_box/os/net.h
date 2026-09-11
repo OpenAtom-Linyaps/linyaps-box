@@ -528,12 +528,12 @@ auto connect(utils::file_descriptor_ref fd, const endpoint &ep) noexcept -> Resu
 // add a wrapper class for protocol.
 auto socket(sys::address_family domain,
             sys::socket_type type,
-            utils::bitflags<sys::socket_flag> flag = sys::socket_flag::none,
+            utils::bitflags<sys::socket_flag> flags = sys::socket_flag::none,
             int protocol = 0) noexcept -> Result<utils::file_descriptor>;
 
 auto socketpair(sys::address_family domain,
                 sys::socket_type type,
-                utils::bitflags<sys::socket_flag> flag = sys::socket_flag::none,
+                utils::bitflags<sys::socket_flag> flags = sys::socket_flag::none,
                 int protocol = 0) noexcept
   -> Result<std::pair<utils::file_descriptor, utils::file_descriptor>>;
 

@@ -25,7 +25,7 @@ auto tcgetattr(utils::file_descriptor_ref fd) noexcept -> Result<struct termios>
 }
 
 auto tcsetattr(utils::file_descriptor_ref fd,
-               optional_action action,
+               sys::optional_action action,
                const struct termios &termios) noexcept -> Result<void>
 {
     if (UNLIKELY(::tcsetattr(fd, static_cast<int>(action), &termios) == -1)) {

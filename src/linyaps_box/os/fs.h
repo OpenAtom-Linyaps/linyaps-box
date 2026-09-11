@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "linyaps_box/os/kernel_constants.h"
 #include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/enum_traits.h"
 #include "linyaps_box/utils/file_describer.h"
@@ -16,6 +17,7 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 namespace linyaps_box::os {
 
@@ -31,7 +33,23 @@ constexpr auto default_new_file_perm = std::filesystem::perms::owner_read
 
 namespace sys {
 
-enum class open_flag : uint64_t { // NOLINT
+using open_flag_underlying = utils::shrink_macros_t<O_CREAT,
+                                                    O_EXCL,
+                                                    O_TRUNC,
+                                                    O_APPEND,
+                                                    O_NONBLOCK,
+                                                    O_CLOEXEC,
+                                                    O_DIRECTORY,
+                                                    O_DIRECT,
+                                                    O_SYNC,
+                                                    O_NOFOLLOW,
+                                                    O_ASYNC,
+                                                    O_DSYNC,
+                                                    O_NOATIME,
+                                                    O_NOCTTY,
+                                                    O_TMPFILE>;
+
+enum class open_flag : open_flag_underlying {
     none = 0,
     create = O_CREAT,
     exclusive = O_EXCL,
@@ -45,27 +63,13 @@ enum class open_flag : uint64_t { // NOLINT
     no_follow = O_NOFOLLOW,
     async = O_ASYNC,
     dsync = O_DSYNC,
-#if O_LARGEFILE
-    largefile = O_LARGEFILE,
-#endif
     no_atime = O_NOATIME,
     no_ctty = O_NOCTTY,
     tmpfile = O_TMPFILE,
 };
-// O_TMPFILE contains O_DIRECTORY, so it must be placed at first.
-// O_LARGEFILE is 0 on 64-bit platforms (kernel always supports large files),
-// so both the enumerator and its name-table entry only exist when it's a real
-// non-zero flag. The table count below must match the entries actually present.
-#if O_LARGEFILE
-#  define LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY { open_flag::largefile, "O_LARGEFILE" },
-#  define LINYAPS_BOX_OPEN_FLAG_TABLE_COUNT 17
-#else
-#  define LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY
-#  define LINYAPS_BOX_OPEN_FLAG_TABLE_COUNT 16
-#endif
 LINYAPS_ENABLE_BITMASK_ENUM(open_flag);
 LINYAPS_REGISTER_ENUM_TABLE(open_flag,
-                            LINYAPS_BOX_OPEN_FLAG_TABLE_COUNT,
+                            16,
                             { open_flag::none, "NONE" },
                             { open_flag::tmpfile, "O_TMPFILE" },
                             { open_flag::sync, "O_SYNC" },
@@ -80,11 +84,8 @@ LINYAPS_REGISTER_ENUM_TABLE(open_flag,
                             { open_flag::async, "O_ASYNC" },
                             { open_flag::direct, "O_DIRECT" },
                             { open_flag::dsync, "O_DSYNC" },
-                            LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY{ open_flag::no_atime,
-                                                                   "O_NOATIME" },
+                            { open_flag::no_atime, "O_NOATIME" },
                             { open_flag::no_ctty, "O_NOCTTY" })
-#undef LINYAPS_BOX_OPEN_FLAG_LARGEFILE_ENTRY
-#undef LINYAPS_BOX_OPEN_FLAG_TABLE_COUNT
 
 enum class access_mode : mode_t { // NOLINT
     unknown,
@@ -124,11 +125,11 @@ public:
     {
     }
 
-    open_option(const open_option &) = default;
-    open_option(open_option &&) = default;
-    open_option &operator=(const open_option &) = default;
-    open_option &operator=(open_option &&) = default;
-    ~open_option() = default;
+    open_option(const open_option &) noexcept = default;
+    open_option(open_option &&) noexcept = default;
+    open_option &operator=(const open_option &) noexcept = default;
+    open_option &operator=(open_option &&) noexcept = default;
+    ~open_option() noexcept = default;
 
     [[nodiscard]] constexpr auto acc_mode() const noexcept { return access_mode_; }
 
@@ -291,6 +292,16 @@ LINYAPS_REGISTER_ENUM_TABLE(memfd_flag,
                             { memfd_flag::allow_sealing, "MFD_ALLOW_SEALING" },
                             { memfd_flag::hugetlb, "MFD_HUGETLB" })
 
+enum class statx_flag : std::uint32_t {
+    mnt_id = statx_mnt_id,
+    mnt_id_unique = statx_mnt_id_unique,
+};
+LINYAPS_ENABLE_BITMASK_ENUM(statx_flag);
+LINYAPS_REGISTER_ENUM_TABLE(statx_flag,
+                            2,
+                            { statx_flag::mnt_id, "STATX_MNT_ID" },
+                            { statx_flag::mnt_id_unique, "STATX_MNT_ID_UNIQUE" })
+
 } // namespace sys
 
 [[nodiscard]] auto open(const std::filesystem::path &path,
@@ -372,6 +383,11 @@ LINYAPS_REGISTER_ENUM_TABLE(memfd_flag,
   -> Result<std::size_t>;
 
 [[nodiscard]] auto fstatfs(utils::file_descriptor_ref fd) noexcept -> Result<struct statfs>;
+
+[[nodiscard]] auto statx(utils::file_descriptor_ref fd,
+                         const std::filesystem::path &path,
+                         utils::bitflags<sys::at_flag> flags,
+                         utils::bitflags<sys::statx_flag> mask) noexcept -> Result<struct statx>;
 
 [[nodiscard]] auto fchmod(utils::file_descriptor_ref fd, std::filesystem::perms perm) noexcept
   -> Result<void>;

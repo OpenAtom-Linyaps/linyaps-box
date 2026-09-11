@@ -98,7 +98,7 @@ auto terminal_slave::set_raw() -> void
     auto raw = orig_term;
     ::cfmakeraw(&raw);
 
-    os::throw_if_error(os::tcsetattr(slave_, os::optional_action::now, raw),
+    os::throw_if_error(os::tcsetattr(slave_, os::sys::optional_action::now, raw),
                        "failed to set raw mode to slave pty");
 
     termios = orig_term;
@@ -113,7 +113,7 @@ terminal_slave::~terminal_slave() noexcept
 
 try {
     if (termios && slave_.valid()) {
-        os::tcsetattr(slave_, os::optional_action::now, termios.value());
+        os::tcsetattr(slave_, os::sys::optional_action::now, termios.value());
     }
 } catch (std::exception &e) {
     LINYAPS_BOX_LOG_ERROR("Failed to restore terminal:{}", e.what());
