@@ -211,6 +211,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/os/mm.cpp
     src/linyaps_box/os/io.cpp
     src/linyaps_box/os/net.cpp
+    src/linyaps_box/os/pipe.cpp
     src/linyaps_box/os/process.cpp
     src/linyaps_box/os/pty.cpp
     src/linyaps_box/os/system.cpp

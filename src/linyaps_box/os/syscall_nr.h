@@ -111,7 +111,7 @@ inline constexpr int nr_pidfd_open =
   ;
 
 inline constexpr int nr_openat2 =
-#if defined(__NR_openat2)
+#ifdef __NR_openat2
   __NR_openat2
 #else
   syscall_nr<target_arch>::openat2
@@ -119,7 +119,7 @@ inline constexpr int nr_openat2 =
   ;
 
 inline constexpr int nr_close_range =
-#if defined(__NR_close_range)
+#ifdef __NR_close_range
   __NR_close_range
 #else
   syscall_nr<target_arch>::close_range

@@ -403,7 +403,7 @@ auto linyaps_box::utils::file_descriptor::write_vecs(span<const struct iovec> rs
 
                     auto *mutable_iov = const_cast<struct iovec *>(current_iov_ptr); // NOLINT
                     mutable_iov->iov_base =
-                      static_cast<char *>(mutable_iov->iov_base) + bytes_to_consume;
+                      static_cast<std::byte *>(mutable_iov->iov_base) + bytes_to_consume;
                     mutable_iov->iov_len -= bytes_to_consume;
                     bytes_to_consume = 0;
                 }
