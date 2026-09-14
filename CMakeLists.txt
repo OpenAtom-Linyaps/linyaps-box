@@ -149,9 +149,8 @@ if(linyaps-box_ENABLE_SANITIZER)
   endif()
 
   message(STATUS "enable address and undefined sanitizer")
-  add_compile_options(-fsanitize=address,undefined,leak -fno-omit-frame-pointer
-                      -g3)
-  add_link_options(-fsanitize=address,undefined,leak)
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g3)
+  add_link_options(-fsanitize=address,undefined)
 endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
