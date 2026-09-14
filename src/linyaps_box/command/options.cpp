@@ -336,7 +336,7 @@ auto register_kill(CLI::App &app, linyaps_box::command::kill_options &opts) -> C
               throw CLI::ValidationError("SIGNAL", "invalid signal: " + str);
           }
 
-          std::array<char, std::numeric_limits<int>::max_digits10 + 1> buf; // NOLINT
+          std::array<char, std::numeric_limits<int>::digits10 + 2> buf; // NOLINT
           auto [end, err] = std::to_chars(buf.data(), buf.data() + buf.size(), sig_num);
           if (UNLIKELY(err != std::errc{ })) {
               throw std::logic_error("signal mapping error");
