@@ -14,6 +14,7 @@ path = [
     "tests/**/.gitignore",
     ".clang-format",
     ".cmake-format.py",
+    "cmake/DetectArch.cmake",
     "cmake.external/CLI11/**",
     "cmake.external/nlohmann_json/**",
     "cmake.external/zeus_expected/**",
