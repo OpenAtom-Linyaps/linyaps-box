@@ -34,7 +34,7 @@ path = [
     ".obs/workflows.yml",
     "tests/ll-box-st/*.json",
     "tests/ll-box-st/*.txt",
-    "tests/ll-box-ut/data/**",
+    "tests/data/**",
 ]
 
 exclude = ["**/cmake_test_discovery_*.json"]
