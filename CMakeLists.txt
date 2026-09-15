@@ -49,6 +49,12 @@ option(
     OFF
 )
 
+option(
+    linyaps-box_ENABLE_WERROR
+    "Treat warnings in first-party targets as errors."
+    OFF
+)
+
 if(linyaps-box_ENABLE_SMOKE_TESTS OR linyaps-box_ENABLE_UNIT_TESTS)
     set(linyaps-box_ENABLE_TESTING ON)
 endif()
@@ -102,7 +108,15 @@ set(linyaps-box_OFFLINE_BUILD
     "when set, fall back to vendored sources instead of CPM fetch"
 )
 
-set(linyaps-box_HARDENING ON CACHE BOOL "enable hardening")
+set(linyaps-box_HARDENING
+    OFF
+    CACHE BOOL
+    "enable architecture-independent hardening"
+)
+
+include(CheckPIESupported)
+
+check_pie_supported()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -116,13 +130,12 @@ set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # ==============================================================================
+
 include(DetectArch)
 
 detect_architecture(TARGET_ARCH)
 
 message(STATUS "Detected architecture: ${TARGET_ARCH}")
-
-add_compile_definitions("LINYAPS_BOX_TARGET_ARCH_${TARGET_ARCH}")
 
 # ==============================================================================
 
@@ -134,13 +147,26 @@ if(
     message(WARNING "No build type is set.")
 endif()
 
-if(linyaps-box_MAKE_RELEASE AND linyaps-box_HARDENING)
+if(linyaps-box_HARDENING)
     message(STATUS "applying harden settings")
-    set(CMAKE_EXE_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -pie -Wl,-z,relro -Wl,-z,now"
+
+    # Architecture-independent hardening only.
+    add_library(linyaps-box_hardening INTERFACE)
+    target_compile_options(
+        linyaps-box_hardening
+        INTERFACE -fstack-protector-strong
     )
-    add_compile_options(-fstack-protector-strong)
-    add_compile_definitions("$<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=2>")
+
+    target_compile_definitions(
+        linyaps-box_hardening
+        INTERFACE
+            "$<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=2>"
+            "$<$<NOT:$<CONFIG:Debug>>:_GLIBCXX_ASSERTIONS>"
+    )
+    target_link_options(
+        linyaps-box_hardening
+        INTERFACE -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -Wl,--as-needed
+    )
 endif()
 
 if(linyaps-box_ENABLE_SANITIZER)
@@ -149,12 +175,35 @@ if(linyaps-box_ENABLE_SANITIZER)
     endif()
 
     message(STATUS "enable address and undefined sanitizer")
-    add_compile_options(
-        -fsanitize=address,undefined
-        -fno-omit-frame-pointer
-        -g3
+
+    add_library(linyaps-box_sanitizers INTERFACE)
+    target_compile_options(
+        linyaps-box_sanitizers
+        INTERFACE
+            -fsanitize=address,undefined
+            -fno-sanitize-recover=all
+            -fno-omit-frame-pointer
+            -g3
     )
-    add_link_options(-fsanitize=address,undefined)
+    target_link_options(
+        linyaps-box_sanitizers
+        INTERFACE -fsanitize=address,undefined
+    )
+endif()
+
+if(linyaps-box_STATIC)
+    add_library(linyaps-box_static_flags INTERFACE)
+    target_compile_options(
+        linyaps-box_static_flags
+        INTERFACE
+            -fno-asynchronous-unwind-tables
+            -fdata-sections
+            -ffunction-sections
+    )
+    target_link_options(
+        linyaps-box_static_flags
+        INTERFACE -Wl,--gc-sections,--strip-all,--exclude-libs,ALL
+    )
 endif()
 
 set(linyaps-box_LIBRARY linyaps-box)
@@ -428,6 +477,48 @@ target_link_libraries(
     "${linyaps-box_LIBRARY}"
     PRIVATE ${linyaps-box_LIBRARY_LINK_LIBRARIES}
 )
+
+add_library(linyaps-box_build_flags INTERFACE)
+
+# -ffile-prefix-map rewrites source paths to be relative to the project root so
+# the build does not leak absolute paths into debug info / __FILE__
+target_compile_options(
+    linyaps-box_build_flags
+    INTERFACE "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
+)
+
+target_compile_options(
+    linyaps-box_build_flags
+    INTERFACE -Wall -Wextra -Wpedantic
+)
+
+if(linyaps-box_ENABLE_WERROR)
+    target_compile_options(linyaps-box_build_flags INTERFACE -Werror)
+endif()
+
+if(linyaps-box_ENABLE_SANITIZER)
+    target_link_libraries(
+        linyaps-box_build_flags
+        INTERFACE linyaps-box_sanitizers
+    )
+endif()
+
+if(linyaps-box_STATIC)
+    target_link_libraries(
+        linyaps-box_build_flags
+        INTERFACE linyaps-box_static_flags
+    )
+endif()
+
+if(TARGET linyaps-box_hardening)
+    target_link_libraries(
+        linyaps-box_build_flags
+        INTERFACE linyaps-box_hardening
+    )
+endif()
+
+target_link_libraries("${linyaps-box_LIBRARY}" PRIVATE linyaps-box_build_flags)
+
 target_compile_features("${linyaps-box_LIBRARY}" PUBLIC cxx_std_17)
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_STANDARD 17)
 set_property(TARGET "${linyaps-box_LIBRARY}" PROPERTY CXX_EXTENSIONS OFF)
@@ -449,13 +540,11 @@ target_compile_definitions(
         "LINYAPS_BOX_CLONE_CHILD_STACK_SIZE=${linyaps-box_CLONE_CHILD_STACK_SIZE}"
         "LINYAPS_BOX_STACK_GROWTH_DOWN=${linyaps-box_STACK_GROWTH_DOWN}"
     PUBLIC
+        "LINYAPS_BOX_TARGET_ARCH_${TARGET_ARCH}"
         "LINYAPS_BOX_DEFAULT_LOG_LEVEL_NAME=${linyaps-box_DEFAULT_LOG_LEVEL}"
         "LINYAPS_BOX_ACTIVE_LOG_LEVEL_NAME=${linyaps-box_ACTIVE_LOG_LEVEL}"
 )
-target_compile_options(
-    "${linyaps-box_LIBRARY}"
-    PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
-)
+
 target_compile_definitions(
     "${linyaps-box_LIBRARY}"
     PUBLIC
@@ -468,6 +557,7 @@ if(linyaps-box_ENABLE_SECCOMP)
         "${linyaps-box_LIBRARY}"
         PUBLIC LINYAPS_BOX_ENABLE_SECCOMP
     )
+
     if(linyaps-box_HAVE_SECCOMP_ARCH_RESOLVE_NAME)
         target_compile_definitions(
             "${linyaps-box_LIBRARY}"
@@ -514,14 +604,20 @@ if(linyaps-box_ENABLE_COVERAGE)
         )
     endif()
 
-    # PUBLIC so the flags also reach every consumer of the static library
+    # PUBLIC so the flags also reach every consumer of the static library.
+    # -fprofile-abs-path keeps absolute source paths in .gcno despite
+    # -ffile-prefix-map, so gcovr/gcov can resolve them.
     target_compile_options(
         "${linyaps-box_LIBRARY}"
         PUBLIC
             "$<$<CXX_COMPILER_ID:Clang>:-fprofile-instr-generate>"
             "$<$<CXX_COMPILER_ID:Clang>:-fcoverage-mapping>"
+            "$<$<CXX_COMPILER_ID:Clang>:-fprofile-update=atomic>"
             "$<$<CXX_COMPILER_ID:GNU>:--coverage>"
+            "$<$<CXX_COMPILER_ID:GNU>:-fprofile-abs-path>"
+            "$<$<CXX_COMPILER_ID:GNU>:-fprofile-update=atomic>"
     )
+
     target_link_options(
         "${linyaps-box_LIBRARY}"
         PUBLIC
@@ -535,7 +631,11 @@ endif()
 
 set(linyaps-box_APP ll-box)
 set(linyaps-box_APP_SOURCE "./app/${linyaps-box_APP}/src/main.cpp")
-set(linyaps-box_APP_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
+set(linyaps-box_APP_LINK_LIBRARIES
+    PRIVATE
+    "${linyaps-box_LIBRARY}"
+    linyaps-box_build_flags
+)
 set(linyaps-box_APP_SOURCE_INCLUDE_DIRS
     PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/app/${linyaps-box_APP}/src"
@@ -546,6 +646,9 @@ target_include_directories(
     "${linyaps-box_APP}"
     ${linyaps-box_APP_SOURCE_INCLUDE_DIRS}
 )
+set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD 17)
+set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_EXTENSIONS OFF)
+set_property(TARGET "${linyaps-box_APP}" PROPERTY CXX_STANDARD_REQUIRED ON)
 target_link_libraries("${linyaps-box_APP}" ${linyaps-box_APP_LINK_LIBRARIES})
 target_link_options(
     "${linyaps-box_APP}"
@@ -553,10 +656,6 @@ target_link_options(
         "$<$<BOOL:${linyaps-box_STATIC}>:-static>"
         "$<$<BOOL:${linyaps-box_STATIC}>:-static-libgcc>"
         "$<$<BOOL:${linyaps-box_STATIC}>:-static-libstdc++>"
-)
-target_compile_options(
-    "${linyaps-box_APP}"
-    PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
 )
 
 # ==============================================================================
