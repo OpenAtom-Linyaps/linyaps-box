@@ -184,6 +184,10 @@ void validate(const linux &v)
     if (v.memory_policy_) {
         validate(*v.memory_policy_);
     }
+
+    if (v.intel_rdt_) {
+        validate(*v.intel_rdt_);
+    }
 }
 
 } // namespace linyaps_box::config

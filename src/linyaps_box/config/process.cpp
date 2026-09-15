@@ -160,6 +160,10 @@ void validate(const process &v)
     if (v.io_priority_) {
         validate(*v.io_priority_);
     }
+
+    if (v.exec_cpu_affinity_) {
+        validate(*v.exec_cpu_affinity_);
+    }
 }
 
 auto process::parse(std::string_view content) -> process
