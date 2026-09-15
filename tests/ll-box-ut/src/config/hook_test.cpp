@@ -16,7 +16,6 @@ namespace {
 using testing::ElementsAre;
 
 using linyaps_box::test::parse_config;
-using testing::Eq;
 
 TEST(HookParse, RelativePathRejected)
 {
@@ -49,6 +48,8 @@ TEST(HookParse, HappyPath)
     EXPECT_EQ(config.hooks_->prestart->at(0).path.string(), "/bin/prestart");
     ASSERT_TRUE(config.hooks_->prestart->at(0).args.has_value());
     EXPECT_THAT(*config.hooks_->prestart->at(0).args, ElementsAre("/bin/prestart", "arg"));
+    ASSERT_TRUE(config.hooks_->prestart->at(0).env.has_value());
+    EXPECT_THAT(*config.hooks_->prestart->at(0).env, ElementsAre("FOO=bar"));
     ASSERT_TRUE(config.hooks_->prestart->at(0).timeout.has_value());
     EXPECT_EQ(*config.hooks_->prestart->at(0).timeout, 10);
 }

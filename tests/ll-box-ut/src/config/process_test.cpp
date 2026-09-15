@@ -183,5 +183,61 @@ TEST(ProcessParse, ParseDirectoryThrows)
     EXPECT_THROW(process::parse(std::filesystem::path{ "data" }), std::runtime_error);
 }
 
+TEST(ProcessParse, ExecCpuAffinityInvalidRejected)
+{
+    EXPECT_THROW(
+      std::ignore = parse_config(
+        "",
+        R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "execCPUAffinity": {"initial": "0-3;4"}})"),
+      std::runtime_error);
+}
+
+TEST(ProcessParse, ExecCpuAffinityValidAccepted)
+{
+    const auto config = parse_config(
+      "",
+      R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "execCPUAffinity": {"initial": "0-3,7", "final": "1 2"}})");
+    ASSERT_TRUE(config.process_.has_value());
+    ASSERT_TRUE(config.process_->exec_cpu_affinity_.has_value());
+    EXPECT_THAT(config.process_->exec_cpu_affinity_->initial.value_or(""), Eq("0-3,7"));
+    EXPECT_THAT(config.process_->exec_cpu_affinity_->final.value_or(""), Eq("1 2"));
+}
+
+TEST(ProcessParse, ExecCpuAffinityInvalidFinalRejected)
+{
+    EXPECT_THROW(
+      std::ignore = parse_config(
+        "",
+        R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "execCPUAffinity": {"final": "1;2"}})"),
+      std::runtime_error);
+}
+
+TEST(ProcessParse, CapabilitiesSetsParsed)
+{
+    const auto config = parse_config(
+      "",
+      R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "capabilities": {"effective": ["CAP_NET_BIND_SERVICE"], "bounding": ["CAP_SYS_ADMIN"]}})");
+    ASSERT_TRUE(config.process_.has_value());
+    ASSERT_TRUE(config.process_->capabilities_.has_value());
+    const auto &caps = *config.process_->capabilities_;
+    ASSERT_TRUE(caps.effective.has_value());
+    EXPECT_THAT(*caps.effective, ElementsAre("CAP_NET_BIND_SERVICE"));
+    ASSERT_TRUE(caps.bounding.has_value());
+    EXPECT_THAT(*caps.bounding, ElementsAre("CAP_SYS_ADMIN"));
+    EXPECT_FALSE(caps.inheritable.has_value());
+}
+
+TEST(ProcessParse, SchedulerPolicyParsed)
+{
+    const auto config = parse_config(
+      "",
+      R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_RR", "priority": 3}})");
+    ASSERT_TRUE(config.process_.has_value());
+    ASSERT_TRUE(config.process_->scheduler_.has_value());
+    EXPECT_EQ(config.process_->scheduler_->policy_, scheduler::policy::rr);
+    EXPECT_EQ(config.process_->scheduler_->priority.value_or(0), 3);
+    EXPECT_FALSE(config.process_->scheduler_->nice.has_value());
+}
+
 } // namespace
 } // namespace linyaps_box

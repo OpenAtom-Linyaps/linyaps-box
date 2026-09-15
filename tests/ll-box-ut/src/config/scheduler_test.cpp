@@ -49,7 +49,7 @@ TEST(SchedulerParse, NiceWithRealTimePolicyRejected)
     EXPECT_THROW(
       std::ignore = parse_config(
         "",
-        R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_FIFO", "nice": 30}})"),
+        R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_FIFO", "nice": 5}})"),
       std::runtime_error);
 }
 
