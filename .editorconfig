@@ -13,9 +13,13 @@ trim_trailing_whitespace = true
 [*.{cpp,hpp,c,h,cc,cxx,hxx}]
 indent_style = space
 indent_size = 4
-max_line_length = 120
+max_line_length = 100
 
-[{CMakeLists.txt,*.cmake,*.json,*.yml,*.yaml,*.sh}]
+[{CMakeLists.txt,*.cmake}]
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,sh}]
 indent_style = space
 indent_size = 2
 
