@@ -5,7 +5,8 @@
 exclude: |
   (?x)^(
     external/|
-    cmake/|
+    cmake/CPM.cmake|
+    cmake.external/fmt/JoinPaths.cmake|
     LICENSES/|
     .obs/
   )
@@ -33,19 +34,33 @@ repos:
       - id: check-executables-have-shebangs
 
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v23.1.0
+    rev: v23.1.1
     hooks:
       - id: clang-format
         types_or: [c++, c]
 
-  - repo: https://github.com/cheshirekow/cmake-format-precommit
-    rev: v0.6.13
+  - repo: https://github.com/BlankSpruce/gersemi-pre-commit
+    rev: 0.29.1
     hooks:
-      - id: cmake-format
-        name: cmake-format
+      - id: gersemi
+        args: ['--warnings-as-errors']
 
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.13.1-1
+    rev: v3.14.1-1
     hooks:
       - id: shfmt
-        args: ['-i', '2', '-ci', '-sr']
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.49.1
+    hooks:
+      - id: markdownlint

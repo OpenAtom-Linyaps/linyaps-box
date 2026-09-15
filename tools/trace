@@ -40,8 +40,6 @@ Usage:
 Options:
   -h	Show this screen."
 
-CURRENT_SOURCE_FILE_DIR="$(dirname -- "$CURRENT_SOURCE_FILE_PATH")"
-
 # This function log messages to stderr works like printf
 # with a prefix of the current script name.
 # Arguments:
@@ -99,7 +97,8 @@ function main() {
 	read -r -p "Press enter to stop tracing"
 
 	echo 0 >/sys/kernel/debug/tracing/tracing_on
-	sudo -u "$(logname)" -- tee "$OUTPUT" </sys/kernel/debug/tracing/trace
+
+	sudo cat /sys/kernel/debug/tracing/trace | sudo -u "$(logname)" -- tee "$OUTPUT"
 	echo nop >/sys/kernel/debug/tracing/current_tracer
 }
 
