@@ -14,6 +14,7 @@ using namespace linyaps_box::config;
 namespace {
 
 using testing::Contains;
+using testing::Eq;
 using testing::SizeIs;
 
 using linyaps_box::test::load_fixture;
@@ -114,11 +115,15 @@ TEST(SeccompParse, ListenerMetadataRequiresListenerPath)
                  std::runtime_error);
 }
 
-TEST(SeccompParse, NotifyWithListenerPathParses)
+TEST(SeccompParse, NotifyWithListenerPathParsed)
 {
-    EXPECT_NO_THROW(
-      std::ignore = parse_config(
-        R"(  "linux": {"seccomp": {"defaultAction": "SCMP_ACT_NOTIFY", "listenerPath": "/run/sock"}})"));
+    const auto config = parse_config(
+      R"(  "linux": {"seccomp": {"defaultAction": "SCMP_ACT_NOTIFY", "listenerPath": "/run/sock"}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->seccomp_.has_value());
+    EXPECT_EQ(config.linux_->seccomp_->default_action, seccomp::action::notify);
+    ASSERT_TRUE(config.linux_->seccomp_->listener_path.has_value());
+    EXPECT_THAT(config.linux_->seccomp_->listener_path->string(), Eq("/run/sock"));
 }
 
 TEST(SeccompParse, DefaultActionRequiredRejected)

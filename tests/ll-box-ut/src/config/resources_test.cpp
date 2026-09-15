@@ -15,6 +15,7 @@ namespace {
 
 using testing::ElementsAre;
 using testing::Eq;
+using testing::SizeIs;
 
 using linyaps_box::test::load_fixture;
 using linyaps_box::test::parse_config;
@@ -83,14 +84,26 @@ TEST(ResourcesParse, DeviceRuleAllowRequiredRejected)
                  std::runtime_error);
 }
 
-TEST(ResourcesParse, EmptyBlockIOValidates)
+// An empty object yields a present-but-empty resource (distinct from the
+// "null" case, which leaves the optional unset).
+TEST(ResourcesParse, EmptyBlockIoParsedAsPresentButEmpty)
 {
-    EXPECT_NO_THROW(std::ignore = parse_config(R"(  "linux": {"resources": {"blockIO": {}}})"));
+    const auto config = parse_config(R"(  "linux": {"resources": {"blockIO": {}}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->resources_.has_value());
+    ASSERT_TRUE(config.linux_->resources_->block_io_.has_value());
+    EXPECT_FALSE(config.linux_->resources_->block_io_->weight.has_value());
+    EXPECT_FALSE(config.linux_->resources_->block_io_->weight_devices.has_value());
 }
 
-TEST(ResourcesParse, EmptyNetworkValidates)
+TEST(ResourcesParse, EmptyNetworkParsedAsPresentButEmpty)
 {
-    EXPECT_NO_THROW(std::ignore = parse_config(R"(  "linux": {"resources": {"network": {}}})"));
+    const auto config = parse_config(R"(  "linux": {"resources": {"network": {}}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->resources_.has_value());
+    ASSERT_TRUE(config.linux_->resources_->network_.has_value());
+    EXPECT_FALSE(config.linux_->resources_->network_->class_id.has_value());
+    EXPECT_FALSE(config.linux_->resources_->network_->priorities.has_value());
 }
 
 TEST(ResourcesParse, RdmaRequiresHandlesOrObjects)
@@ -130,6 +143,19 @@ TEST(ResourcesParse, HugepagePageSizeInvalidFormatRejected)
       std::ignore = parse_config(
         R"(  "linux": {"resources": {"hugepageLimits": [{"pageSize": "1048576", "limit": 1024}]}})"),
       std::runtime_error);
+    // OCI schema requires an uppercase K/M/G unit and no leading zero.
+    EXPECT_THROW(
+      std::ignore = parse_config(
+        R"(  "linux": {"resources": {"hugepageLimits": [{"pageSize": "64kB", "limit": 1024}]}})"),
+      std::runtime_error);
+    EXPECT_THROW(
+      std::ignore = parse_config(
+        R"(  "linux": {"resources": {"hugepageLimits": [{"pageSize": "0MB", "limit": 1024}]}})"),
+      std::runtime_error);
+    EXPECT_THROW(
+      std::ignore = parse_config(
+        R"(  "linux": {"resources": {"hugepageLimits": [{"pageSize": "1048576B", "limit": 1024}]}})"),
+      std::runtime_error);
 }
 
 TEST(ResourcesParse, HugepagePageSizeValidFormatsAccepted)
@@ -138,12 +164,18 @@ TEST(ResourcesParse, HugepagePageSizeValidFormatsAccepted)
       R"(  "linux": {"resources": {"hugepageLimits": [
              {"pageSize": "2MB", "limit": 209715200},
              {"pageSize": "64KB", "limit": 1024},
-             {"pageSize": "1048576B", "limit": 1024}
+             {"pageSize": "1GB", "limit": 1024}
            ]}})");
     ASSERT_TRUE(config.linux_.has_value());
     ASSERT_TRUE(config.linux_->resources_.has_value());
     ASSERT_TRUE(config.linux_->resources_->hugepage_limits.has_value());
-    EXPECT_THAT(config.linux_->resources_->hugepage_limits->size(), 3U);
+    const auto &limits = *config.linux_->resources_->hugepage_limits;
+    ASSERT_THAT(limits, SizeIs(3));
+    EXPECT_THAT(limits[0].page_size, Eq("2MB"));
+    EXPECT_EQ(limits[0].limit, 209715200U);
+    EXPECT_THAT(limits[1].page_size, Eq("64KB"));
+    EXPECT_EQ(limits[1].limit, 1024U);
+    EXPECT_THAT(limits[2].page_size, Eq("1GB"));
 }
 
 } // namespace

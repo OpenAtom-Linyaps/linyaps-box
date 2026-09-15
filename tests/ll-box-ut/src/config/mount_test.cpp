@@ -95,14 +95,28 @@ TEST(MountParse, RelativeDestinationRejected)
                  std::runtime_error);
 }
 
-TEST(MountParse, MalformedIdmapMappingRejected)
+class MountMalformedInlineIdmapTest : public testing::TestWithParam<const char *>
 {
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap=uids=1x2:0:100"]}
-  ])"),
-                 std::runtime_error);
+};
+
+TEST_P(MountMalformedInlineIdmapTest, Rejected)
+{
+    const auto content = fmt::format(
+      R"(  "mounts": [{{"destination": "/mnt", "source": "/tmp", "type": "none", "options": ["idmap={}"]}}])",
+      GetParam());
+    EXPECT_THROW(std::ignore = parse_config(content), std::runtime_error)
+      << "idmap option not rejected: " << GetParam();
 }
+
+INSTANTIATE_TEST_SUITE_P(MountParse,
+                         MountMalformedInlineIdmapTest,
+                         testing::Values("uids=1x2:0:100",
+                                         "uids=0:1000",
+                                         "uids=0:1x:2",
+                                         "uids=0:1000:x",
+                                         "uids=01000",
+                                         "uids",
+                                         "foo=1"));
 
 TEST(MountParse, SpecUidMappingsTakePrecedenceOverInlineIdmap)
 {
@@ -139,24 +153,6 @@ TEST(MountParse, IdmapAndRidmapMutuallyExclusive)
                  std::runtime_error);
 }
 
-TEST(MountParse, InlineIdmapUnknownKeyRejected)
-{
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap=foo=1"]}
-  ])"),
-                 std::runtime_error);
-}
-
-TEST(MountParse, InlineIdmapMissingEqualsRejected)
-{
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap=uids"]}
-  ])"),
-                 std::runtime_error);
-}
-
 TEST(MountParse, UidMappingsWithoutGidMappingsRejected)
 {
     EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
@@ -174,8 +170,9 @@ TEST(MountParse, RecAttrOptionsParsed)
   ])");
     ASSERT_TRUE(config.mounts[0].rec_attr.has_value());
     const auto &attr = *config.mounts[0].rec_attr;
-    EXPECT_FALSE(attr.set.empty());
-    EXPECT_FALSE(attr.clr.empty());
+    EXPECT_TRUE(attr.set.contains(recursive_attr_flag::rdonly));
+    EXPECT_TRUE(attr.set.contains(recursive_attr_flag::nosuid));
+    EXPECT_TRUE(attr.clr.contains(recursive_attr_flag::rdonly));
 }
 
 TEST(MountParse, RecAttrClrOnlyParsed)
@@ -186,7 +183,7 @@ TEST(MountParse, RecAttrClrOnlyParsed)
   ])");
     ASSERT_TRUE(config.mounts[0].rec_attr.has_value());
     EXPECT_TRUE(config.mounts[0].rec_attr->set.empty());
-    EXPECT_FALSE(config.mounts[0].rec_attr->clr.empty());
+    EXPECT_TRUE(config.mounts[0].rec_attr->clr.contains(recursive_attr_flag::rdonly));
 }
 
 TEST(MountParse, ExtensionOptionsParsed)
@@ -198,42 +195,6 @@ TEST(MountParse, ExtensionOptionsParsed)
     const auto flags = config.mounts[0].extension_flags;
     EXPECT_NE(flags & mount::extension::copy_symlink, mount::extension::none);
     EXPECT_NE(flags & mount::extension::tmpcopyup, mount::extension::none);
-}
-
-TEST(MountParse, IdmapMissingColonRejected)
-{
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap=uids=0:1000"]}
-  ])"),
-                 std::runtime_error);
-}
-
-TEST(MountParse, IdmapInvalidHostRejected)
-{
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap=uids=0:1x:2"]}
-  ])"),
-                 std::runtime_error);
-}
-
-TEST(MountParse, IdmapInvalidSizeRejected)
-{
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap=uids=0:1000:x"]}
-  ])"),
-                 std::runtime_error);
-}
-
-TEST(MountParse, IdmapNoColonRejected)
-{
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap=uids=01000"]}
-  ])"),
-                 std::runtime_error);
 }
 
 TEST(MountParse, InlineIdmapMutuallyExclusiveRejected)

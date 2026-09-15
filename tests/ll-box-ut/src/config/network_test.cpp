@@ -13,8 +13,6 @@ using namespace linyaps_box::config;
 
 namespace {
 
-using testing::Eq;
-
 using linyaps_box::test::parse_config;
 
 TEST(NetworkParse, EmptyPriorityNameRejected)
@@ -35,6 +33,7 @@ TEST(NetworkParse, HappyPath)
     EXPECT_EQ(config.linux_->resources_->network_->class_id, 1048577U);
     ASSERT_TRUE(config.linux_->resources_->network_->priorities.has_value());
     EXPECT_EQ(config.linux_->resources_->network_->priorities->at(0).name, "eth0");
+    EXPECT_EQ(config.linux_->resources_->network_->priorities->at(0).priority, 5U);
 }
 
 TEST(NetworkParse, NullFieldsAccepted)
