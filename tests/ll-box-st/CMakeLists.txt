@@ -1,5 +1,5 @@
 if(NOT linyaps-box_ENABLE_SMOKE_TESTS)
-  return()
+    return()
 endif()
 
 set(linyaps-box_SMOKE_TESTS
@@ -16,81 +16,94 @@ set(linyaps-box_SMOKE_TESTS
     ./11-output-to-null.json
     ./12-bind-host-dev.json
     ./13-pid-extension.json
-    ./14-console-size.json)
+    ./14-console-size.json
+)
 
 foreach(test ${linyaps-box_SMOKE_TESTS})
-  add_test(
-    NAME "${test}"
-    COMMAND
-      "${CMAKE_CURRENT_SOURCE_DIR}/ll-box-st"
-      "${CMAKE_BINARY_DIR}/${linyaps-box_APP}"
-      "${CMAKE_CURRENT_BINARY_DIR}/st-data"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${test}")
-  list(APPEND linyaps-box_TESTS "${test}")
+    add_test(
+        NAME "${test}"
+        COMMAND
+            "${CMAKE_CURRENT_SOURCE_DIR}/ll-box-st"
+            "${CMAKE_BINARY_DIR}/${linyaps-box_APP}"
+            "${CMAKE_CURRENT_BINARY_DIR}/st-data"
+            "${CMAKE_CURRENT_SOURCE_DIR}/${test}"
+    )
+    list(APPEND linyaps-box_TESTS "${test}")
 
-  set_tests_properties(
-    "${test}"
-    PROPERTIES
-      ENVIRONMENT
-      "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt")
+    set_tests_properties(
+        "${test}"
+        PROPERTIES
+            ENVIRONMENT
+                "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt"
+    )
 endforeach()
 
 if(NOT linyaps-box_ENABLE_COVERAGE)
-  return()
+    return()
 endif()
 
 set(COVERAGE_INFO "coverage.info")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set_tests_properties(
-    ${linyaps-box_TESTS}
-    PROPERTIES
-      ENVIRONMENT
-      "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt;LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/llvm-%p.profraw"
-  )
+    set_tests_properties(
+        ${linyaps-box_TESTS}
+        PROPERTIES
+            ENVIRONMENT
+                "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt;LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/llvm-%p.profraw"
+    )
 
-  find_program(LLVM_PROFDATA llvm-profdata REQUIRED)
+    find_program(LLVM_PROFDATA llvm-profdata REQUIRED)
 
-  add_custom_command(
-    OUTPUT default.profdata
-    DEPENDS "${linyaps-box_APP}" test
-    COMMAND
-      "${CMAKE_COMMAND}" "-DPROFILE_DIR=${CMAKE_CURRENT_BINARY_DIR}"
-      "-DPROF_OUT=${CMAKE_CURRENT_BINARY_DIR}/default.profdata"
-      "-DLLVM_PROFDATA=${LLVM_PROFDATA}" -P
-      "${CMAKE_CURRENT_SOURCE_DIR}/../merge-llvm-profiles.cmake")
+    add_custom_command(
+        OUTPUT default.profdata
+        DEPENDS "${linyaps-box_APP}" test
+        COMMAND
+            "${CMAKE_COMMAND}" "-DPROFILE_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+            "-DPROF_OUT=${CMAKE_CURRENT_BINARY_DIR}/default.profdata"
+            "-DLLVM_PROFDATA=${LLVM_PROFDATA}" -P
+            "${CMAKE_CURRENT_SOURCE_DIR}/../merge-llvm-profiles.cmake"
+    )
 
-  find_program(LLVM_COV llvm-cov REQUIRED)
+    find_program(LLVM_COV llvm-cov REQUIRED)
 
-  add_custom_command(
-    OUTPUT coverage.info
-    DEPENDS default.profdata
-    COMMAND "${LLVM_COV}" show -instr-profile=default.profdata
-            -object="$<TARGET_FILE:${linyaps-box_APP}>" > coverage.info)
+    add_custom_command(
+        OUTPUT coverage.info
+        DEPENDS default.profdata
+        COMMAND
+            "${LLVM_COV}" show -instr-profile=default.profdata
+            -object="$<TARGET_FILE:${linyaps-box_APP}>" > coverage.info
+    )
 
-  add_custom_command(
-    OUTPUT coverage.tar.gz
-    DEPENDS default.profdata
-    COMMAND rm -rf coverage
-    COMMAND "${LLVM_COV}" show -instr-profile=default.profdata -format=html
+    add_custom_command(
+        OUTPUT coverage.tar.gz
+        DEPENDS default.profdata
+        COMMAND rm -rf coverage
+        COMMAND
+            "${LLVM_COV}" show -instr-profile=default.profdata -format=html
             -object="$<TARGET_FILE:${linyaps-box_APP}>" -output-dir=coverage
-    COMMAND tar -czf coverage-html.tar.gz coverage)
+        COMMAND tar -czf coverage-html.tar.gz coverage
+    )
 
-  add_custom_target(coverage DEPENDS coverage.info coverage.tar.gz)
+    add_custom_target(coverage DEPENDS coverage.info coverage.tar.gz)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  find_program(GCOVR gcovr REQUIRED)
-  add_custom_target(
-    coverage
-    COMMAND bash -c "find '${CMAKE_BINARY_DIR}' -name '*.gcda' -delete"
-    COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_BINARY_DIR}"
+    find_program(GCOVR gcovr REQUIRED)
+    add_custom_target(
+        coverage
+        COMMAND bash -c "find '${CMAKE_BINARY_DIR}' -name '*.gcda' -delete"
+        COMMAND
+            "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_BINARY_DIR}"
             "${CMAKE_CTEST_COMMAND}" --output-on-failure
-    COMMAND
-      "${GCOVR}" -r . --object-directory
-      "${CMAKE_BINARY_DIR}/CMakeFiles/linyaps-box.dir" --object-directory
-      "${CMAKE_BINARY_DIR}/CMakeFiles/${linyaps-box_APP}.dir" --filter
-      "src/linyaps_box" --txt --html --html-details -o coverage.html
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    DEPENDS "${linyaps-box_APP}")
+        COMMAND
+            "${GCOVR}" -r . --object-directory
+            "${CMAKE_BINARY_DIR}/CMakeFiles/linyaps-box.dir" --object-directory
+            "${CMAKE_BINARY_DIR}/CMakeFiles/${linyaps-box_APP}.dir" --filter
+            "src/linyaps_box" --txt --html --html-details -o coverage.html
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+        DEPENDS "${linyaps-box_APP}"
+    )
 else()
-  message(FATAL_ERROR "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}.")
+    message(
+        FATAL_ERROR
+        "Coverage is not supported for ${CMAKE_CXX_COMPILER_ID}."
+    )
 endif()
