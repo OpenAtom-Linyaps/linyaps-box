@@ -690,9 +690,27 @@ if(linyaps-box_ENABLE_CPACK)
     set(CPACK_PACKAGING_INSTALL_PREFIX
         "${linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX}"
     )
-    set(CPACK_PACKAGE_CONTACT "heyuming@uniontech.com")
+
+    set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+    set(CPACK_PACKAGE_VENDOR "UnionTech Software Technology Co., Ltd.")
+    set(CPACK_PACKAGE_CONTACT
+        "UnionTech Software Technology Co., Ltd. <heyuming@uniontech.com>"
+    )
+    set(CPACK_PACKAGE_HOMEPAGE_URL "${PROJECT_HOMEPAGE_URL}")
+
+    # Debian
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+    set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${PROJECT_HOMEPAGE_URL}")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+
+    # RPM
+    set(CPACK_RPM_PACKAGE_LICENSE "LGPL-3.0-or-later")
+    set(CPACK_RPM_PACKAGE_GROUP "Applications/System")
+    set(CPACK_RPM_PACKAGE_URL "${PROJECT_HOMEPAGE_URL}")
     set(CPACK_RPM_PACKAGE_AUTOREQ ON)
+
     include(CPack)
 endif()
 
