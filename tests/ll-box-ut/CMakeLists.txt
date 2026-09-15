@@ -29,6 +29,7 @@ set(linyaps-box_UNIT_TESTS_SOURCE
 )
 
 set(linyaps-box_UNIT_TESTS_LINK_LIBRARIES PRIVATE "${linyaps-box_LIBRARY}")
+list(APPEND linyaps-box_UNIT_TESTS_LINK_LIBRARIES linyaps-box_build_flags)
 set(linyaps-box_UNIT_TESTS_SOURCE_INCLUDE_DIRS
     PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -96,19 +97,15 @@ target_link_libraries(
     PRIVATE ${linyaps-box_UNIT_TESTS_LINK_LIBRARIES}
 )
 
-# Test fixtures referenced by relative paths (e.g. "data/oci.json") resolve
-# against WORKING_DIRECTORY below; stage the data/ tree into the binary dir on
-# every build so edited fixtures are picked up without re-configuring.
+# Fixtures referenced by relative paths (e.g. "data/oci.json") resolve against
+# WORKING_DIRECTORY below (this binary dir). Link the shared tests/data tree
+# instead of copying it: edits and deletions are reflected without stale files
+# and without a copy on every build.
 file(
     CREATE_LINK
         "${PROJECT_SOURCE_DIR}/tests/data"
         "${CMAKE_CURRENT_BINARY_DIR}/data"
     SYMBOLIC
-)
-
-target_compile_options(
-    "${linyaps-box_UNIT_TESTS}"
-    PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
 )
 
 set_property(TARGET "${linyaps-box_UNIT_TESTS}" PROPERTY CXX_STANDARD 17)
