@@ -87,12 +87,8 @@ target_link_libraries("${linyaps-box_UNIT_TESTS}"
 # Test fixtures referenced by relative paths (e.g. "data/oci.json") resolve
 # against WORKING_DIRECTORY below; stage the data/ tree into the binary dir on
 # every build so edited fixtures are picked up without re-configuring.
-add_custom_command(
-  TARGET "${linyaps-box_UNIT_TESTS}"
-  POST_BUILD
-  COMMAND "${CMAKE_COMMAND}" -E copy_directory
-          "${CMAKE_CURRENT_SOURCE_DIR}/data" "${CMAKE_CURRENT_BINARY_DIR}/data"
-  VERBATIM)
+file(CREATE_LINK "${PROJECT_SOURCE_DIR}/tests/data"
+     "${CMAKE_CURRENT_BINARY_DIR}/data" SYMBOLIC)
 
 target_compile_options("${linyaps-box_UNIT_TESTS}"
                        PRIVATE -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
