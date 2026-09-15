@@ -370,7 +370,16 @@ if(linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
     )
 endif()
 
-function(linyaps_box_dependency name min_version repo tag)
+# version is passed explicitly because CPM cannot derive it from a commit SHA
+# (it reports 0 otherwise).
+function(
+    linyaps_box_dependency
+    name
+    min_version
+    repo
+    version
+    commit
+)
     cmake_parse_arguments(ARG "" "" "OPTIONS" ${ARGN})
 
     find_package(${name} ${min_version} QUIET)
@@ -384,7 +393,7 @@ function(linyaps_box_dependency name min_version repo tag)
             APPEND CMAKE_MODULE_PATH
             "${CMAKE_CURRENT_SOURCE_DIR}/cmake.external/${name}"
         )
-        add_subdirectory(external/${name})
+        add_subdirectory(external/${name} EXCLUDE_FROM_ALL)
         find_package(${name} ${min_version} REQUIRED)
         message(STATUS "use vendor ${name} ${${name}_VERSION}")
     else()
@@ -392,7 +401,8 @@ function(linyaps_box_dependency name min_version repo tag)
             CPMAddPackage(
                 NAME ${name}
                 GITHUB_REPOSITORY ${repo}
-                GIT_TAG ${tag}
+                VERSION ${version}
+                GIT_TAG ${commit}
                 EXCLUDE_FROM_ALL ON
                 OPTIONS ${ARG_OPTIONS}
             )
@@ -400,7 +410,8 @@ function(linyaps_box_dependency name min_version repo tag)
             CPMAddPackage(
                 NAME ${name}
                 GITHUB_REPOSITORY ${repo}
-                GIT_TAG ${tag}
+                VERSION ${version}
+                GIT_TAG ${commit}
                 EXCLUDE_FROM_ALL ON
             )
         endif()
@@ -419,10 +430,10 @@ linyaps_box_dependency(
     nlohmann_json
     3.11.3
     nlohmann/json
-    v3.12.0
+    3.12.0
+    55f93686c01528224f448c19128836e7df245f72
     OPTIONS "JSON_BuildTests OFF"
 )
-
 list(
     APPEND linyaps-box_LIBRARY_LINK_LIBRARIES
     PUBLIC
@@ -435,7 +446,8 @@ linyaps_box_dependency(
     CLI11
     2.6.0
     CLIUtils/CLI11
-    v2.7.2
+    2.7.2
+    cbd58a3696887b34c70949aef21a71735a0c2ad5
     OPTIONS "CLI11_BUILD_TESTS OFF"
 )
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES CLI11::CLI11)
@@ -453,7 +465,13 @@ endif()
 
 # fmt 10.1.1 announced its version number as 10.1.0
 # https://github.com/fmtlib/fmt/blob/f5e54359df4c26b6230fc61d38aa294581393084/include/fmt/core.h#L21
-linyaps_box_dependency(fmt 10.1.0 fmtlib/fmt 12.2.0)
+linyaps_box_dependency(
+    fmt
+    10.1.0
+    fmtlib/fmt
+    12.2.0
+    1be298e1bd68957e4cd352e1f676f00e07dcfb57
+)
 if(linyaps-box_OFFLINE_BUILD)
     set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
 endif()
@@ -463,7 +481,8 @@ linyaps_box_dependency(
     zeus_expected
     1.4.0
     zeus-cpp/expected
-    v1.4.0
+    1.4.0
+    f9dde3b062f1b3a5d1a9f2888e4b6f6d2303557b
     OPTIONS "BUILD_TESTING OFF"
 )
 list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES zeus::expected)
