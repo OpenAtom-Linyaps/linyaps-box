@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11.4) # for RHEL 8
+cmake_minimum_required(VERSION 3.22)
 
 project(
     linyaps-box
@@ -8,18 +8,13 @@ project(
     LANGUAGES CXX
 )
 
-# ==============================================================================
-# Utilities
-# ==============================================================================
-
-# NOTE: Modified from https://www.scivision.dev/cmake-project-is-top-level/
-if(CMAKE_VERSION VERSION_LESS 3.21)
-    get_property(not_top DIRECTORY PROPERTY PARENT_DIRECTORY)
-    if(NOT not_top)
-        set(linyaps-box_IS_TOP_LEVEL true)
-    else()
-        set(linyaps-box_IS_TOP_LEVEL false)
-    endif()
+if(PROJECT_IS_TOP_LEVEL AND CMAKE_EXPORT_COMPILE_COMMANDS STREQUAL "")
+    set(CMAKE_EXPORT_COMPILE_COMMANDS
+        ON
+        CACHE BOOL
+        "Export compile commands for tooling"
+        FORCE
+    )
 endif()
 
 # ==============================================================================
@@ -41,7 +36,7 @@ option(
 option(
     linyaps-box_ENABLE_UNIT_TESTS
     "Enable unit tests."
-    ${linyaps-box_IS_TOP_LEVEL}
+    ${PROJECT_IS_TOP_LEVEL}
 )
 
 option(linyaps-box_ENABLE_SMOKE_TESTS "Enable smoke tests." OFF)
@@ -110,14 +105,6 @@ set(linyaps-box_OFFLINE_BUILD
 set(linyaps-box_HARDENING ON CACHE BOOL "enable hardening")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-if(CMAKE_VERSION VERSION_LESS "3.14" AND NOT linyaps-box_OFFLINE_BUILD)
-    set(linyaps-box_OFFLINE_BUILD ON)
-    message(
-        STATUS
-        "cmake version ${CMAKE_VERSION} not compatible with CPM.cmake; forcing offline mode."
-    )
-endif()
 
 # if just want to try local packages at first set CPM_USE_LOCAL_PACKAGES ON
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
@@ -571,15 +558,10 @@ target_compile_options(
 
 include(GNUInstallDirs)
 
-# parameter TYPE was added in CMake 3.14
-if(CMAKE_VERSION VERSION_LESS "3.14")
-    install(
-        PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}"
-        DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    )
-else()
-    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${linyaps-box_APP}" TYPE BIN)
-endif()
+install(
+    TARGETS "${linyaps-box_APP}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
 
 if(linyaps-box_ENABLE_CPACK)
     set(CPACK_PACKAGING_INSTALL_PREFIX
