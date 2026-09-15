@@ -19,9 +19,15 @@ max_line_length = 100
 indent_style = space
 indent_size = 4
 
-[*.{json,yml,yaml,sh}]
+[*.{json,yml,yaml}]
 indent_style = space
 indent_size = 2
+
+[{*.sh,ll-box-st}]
+indent_style = space
+indent_size = 2
+switch_case_indent = true
+space_redirects = true
 
 [*.md]
 trim_trailing_whitespace = false
