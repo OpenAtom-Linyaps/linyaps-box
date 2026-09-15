@@ -25,13 +25,13 @@ void from_json(const nlohmann::json &j, device_rule &v)
         } else if (key_matches(k, "type")) {
             if (!val.is_null()) {
                 auto type_name = val.get<std::string_view>();
-                auto type_opt = get_enum_table_from<device_rule::type>().from_name(type_name);
+                auto type_opt = utils::enum_table_v<device_rule::type>.from_name(type_name);
                 if (UNLIKELY(!type_opt)) {
                     throw std::runtime_error(
                       fmt::format("device_rule.type must be one of a/c/b: {}", type_name));
                 }
 
-                v.type_ = *type_opt;
+                v.type_.emplace(*type_opt);
             }
         } else if (key_matches(k, "major")) {
             if (!val.is_null()) {
@@ -46,7 +46,7 @@ void from_json(const nlohmann::json &j, device_rule &v)
                 auto access_str = val.get<std::string_view>();
                 utils::bitflags<device_rule_access_flag> access_flags;
                 for (const auto c : access_str) {
-                    auto flag_opt = get_enum_table_from<device_rule_access_flag>().from_name(
+                    auto flag_opt = utils::enum_table_v<device_rule_access_flag>.from_name(
                       std::string_view(&c, 1));
                     if (UNLIKELY(!flag_opt)) {
                         throw std::runtime_error(

@@ -22,8 +22,6 @@ namespace linyaps_box::config {
 
 namespace {
 
-constexpr auto idmap_options_table = get_enum_table_from<mount::idmap_type>();
-
 enum class option_kind : std::uint8_t { vfs, propagation, rec_attr_set, rec_attr_clr };
 
 struct mount_option
@@ -165,7 +163,7 @@ constexpr auto make_sorted_mount_options() noexcept
 {
     auto out = mount_options;
     linyaps_box::utils::detail::shell_sort(
-      linyaps_box::utils::span(out),
+      out,
       [](const mount_option &a, const mount_option &b) noexcept {
           return a.name < b.name;
       });
@@ -337,13 +335,13 @@ auto parse_mount_options(const std::vector<std::string_view> &options) -> parsed
             continue;
         }
 
-        if (auto ev = get_enum_table_from<mount::extension>().from_name(opt)) {
+        if (auto ev = utils::enum_table_v<mount::extension>.from_name(opt)) {
             result.extension_flags |= *ev;
             continue;
         }
 
         // Handle simple "idmap" or "ridmap" flags
-        if (auto iv = idmap_options_table.from_name(opt)) {
+        if (auto iv = utils::enum_table_v<mount::idmap_type>.from_name(opt)) {
             ensure_idmap_compatible(*iv);
 
             result.idmap.emplace(std::move(iv).value());
@@ -353,7 +351,7 @@ auto parse_mount_options(const std::vector<std::string_view> &options) -> parsed
         // Handle inline mapping strings like "idmap=uids=0:1000:1,gids=0:1000:1"
         if (auto eq_pos = opt.find('='); eq_pos != std::string_view::npos) {
             auto prefix = opt.substr(0, eq_pos);
-            if (auto iv = idmap_options_table.from_name(prefix)) {
+            if (auto iv = utils::enum_table_v<mount::idmap_type>.from_name(prefix)) {
                 ensure_idmap_compatible(*iv);
 
                 auto inline_result = parse_inline_idmap_option(opt, *iv);

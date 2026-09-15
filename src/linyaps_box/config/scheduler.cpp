@@ -10,7 +10,6 @@
 #include <nlohmann/json.hpp>
 
 #include <stdexcept>
-#include <string>
 #include <string_view>
 
 namespace linyaps_box::config {
@@ -21,8 +20,8 @@ void from_json(const nlohmann::json &j, scheduler &v)
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };
         if (key_matches(k, "policy")) {
-            auto policy_name = val.get<std::string_view>();
-            auto policy_opt = get_enum_table_from<scheduler::policy>().from_name(policy_name);
+            const auto policy_name = val.get<std::string_view>();
+            const auto policy_opt = utils::enum_table_v<scheduler::policy>.from_name(policy_name);
             if (UNLIKELY(!policy_opt)) {
                 throw std::runtime_error(fmt::format("unknown scheduler policy: {}", policy_name));
             }
@@ -42,7 +41,7 @@ void from_json(const nlohmann::json &j, scheduler &v)
                 utils::bitflags<scheduler_flag> flags;
                 for (const auto &f : val) {
                     const auto flag_str = f.get<std::string_view>();
-                    auto flag_opt = get_enum_table_from<scheduler_flag>().from_name(flag_str);
+                    const auto flag_opt = utils::enum_table_v<scheduler_flag>.from_name(flag_str);
                     if (UNLIKELY(!flag_opt)) {
                         throw std::runtime_error(
                           fmt::format("unknown scheduler flag: {}", flag_str));

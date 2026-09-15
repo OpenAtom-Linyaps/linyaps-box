@@ -32,7 +32,7 @@ template <typename To, typename From>
 using is_array_convertible = std::is_convertible<From (*)[], To (*)[]>;
 
 template <typename To, typename From>
-inline constexpr bool is_array_convertible_v = is_array_convertible<To, From>::value;
+constexpr bool is_array_convertible_v = is_array_convertible<To, From>::value;
 
 template <typename T>
 constexpr T *to_address(T *p) noexcept
@@ -63,26 +63,6 @@ constexpr auto to_address(const Ptr &p) noexcept
     }
 }
 
-template <typename It, typename T, typename = void>
-struct is_span_compatible_iter : std::false_type
-{
-};
-
-template <typename It, typename T>
-struct is_span_compatible_iter<It,
-                               T,
-                               std::void_t<decltype(*std::declval<It &>()),
-                                           decltype(std::declval<It &>() - std::declval<It &>()),
-                                           decltype(detail::to_address(std::declval<It &>()))>>
-    : std::conjunction<
-        is_array_convertible<T, std::remove_reference_t<decltype(*std::declval<It &>())>>,
-        std::is_convertible<decltype(detail::to_address(std::declval<It &>())), T *>>
-{
-};
-
-template <typename It, typename T>
-inline constexpr bool is_span_compatible_iter_v = is_span_compatible_iter<It, T>::value;
-
 template <typename It, typename = void>
 struct is_contiguous_iterator : std::false_type
 {
@@ -98,7 +78,7 @@ struct is_contiguous_iterator<It,
 };
 
 template <typename It>
-inline constexpr bool is_contiguous_iterator_v = is_contiguous_iterator<It>::value;
+constexpr bool is_contiguous_iterator_v = is_contiguous_iterator<It>::value;
 
 template <typename It, typename = void>
 struct has_data_and_size : std::false_type
@@ -114,7 +94,7 @@ struct has_data_and_size<
 };
 
 template <typename It>
-inline constexpr bool has_data_and_size_v = has_data_and_size<It>::value;
+constexpr bool has_data_and_size_v = has_data_and_size<It>::value;
 
 template <typename It>
 constexpr auto span_to_address(It &&it) noexcept
@@ -144,25 +124,10 @@ struct is_view<T, std::enable_if_t<enable_view<T>::value>> : std::true_type
 };
 
 template <typename T>
-inline constexpr bool is_view_v = is_view<T>::value;
+constexpr bool is_view_v = is_view<T>::value;
 
 template <typename CharT, typename Traits>
 struct enable_view<std::basic_string_view<CharT, Traits>> : std::true_type
-{
-};
-
-template <typename Container, typename T, typename = void>
-struct is_compatible_container : std::false_type
-{
-};
-
-template <typename Container, typename T>
-struct is_compatible_container<Container,
-                               T,
-                               std::void_t<decltype(std::data(std::declval<Container &>())),
-                                           decltype(std::size(std::declval<Container &>()))>>
-    : is_array_convertible<T,
-                           std::remove_pointer_t<decltype(std::data(std::declval<Container &>()))>>
 {
 };
 
@@ -176,8 +141,6 @@ class span;
 template <typename T, std::size_t Extent>
 struct span_storage
 {
-    T *data_;
-
     constexpr span_storage() noexcept
         : data_(nullptr)
     {
@@ -191,14 +154,14 @@ struct span_storage
     [[nodiscard]] constexpr T *data() const noexcept { return data_; }
 
     [[nodiscard]] constexpr std::size_t size() const noexcept { return Extent; }
+
+private:
+    T *data_;
 };
 
 template <typename T>
 struct span_storage<T, dynamic_extent>
 {
-    T *data_;
-    std::size_t size_;
-
     constexpr span_storage() noexcept
         : data_(nullptr)
         , size_(0)
@@ -214,6 +177,10 @@ struct span_storage<T, dynamic_extent>
     [[nodiscard]] constexpr T *data() const noexcept { return data_; }
 
     [[nodiscard]] constexpr std::size_t size() const noexcept { return size_; }
+
+private:
+    T *data_;
+    std::size_t size_;
 };
 
 template <typename T, std::size_t Extent>
@@ -646,6 +613,6 @@ struct is_span<span<T, Extent>> : std::true_type
 };
 
 template <typename T>
-inline constexpr bool is_span_v = is_span<std::decay_t<T>>::value;
+constexpr bool is_span_v = is_span<std::decay_t<T>>::value;
 
 } // namespace linyaps_box::utils

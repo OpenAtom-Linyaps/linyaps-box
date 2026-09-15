@@ -15,7 +15,6 @@
 #include <vector>
 
 namespace linyaps_box::config {
-constexpr auto seccomp_action_table = get_enum_table_from<seccomp::action>();
 
 void from_json(const nlohmann::json &j, seccomp::syscall::arg &v)
 {
@@ -27,8 +26,8 @@ void from_json(const nlohmann::json &j, seccomp::syscall::arg &v)
         value_two_it->get_to(v.value_two.emplace());
     }
 
-    auto op_name = j.at("op").get<std::string_view>();
-    auto op_opt = get_enum_table_from<seccomp::syscall::arg::op>().from_name(op_name);
+    const auto op_name = j.at("op").get<std::string_view>();
+    const auto op_opt = utils::enum_table_v<seccomp::syscall::arg::op>.from_name(op_name);
     if (UNLIKELY(!op_opt)) {
         throw std::runtime_error(fmt::format("unknown seccomp arg op: {}", op_name));
     }
@@ -40,8 +39,8 @@ void from_json(const nlohmann::json &j, seccomp::syscall &v)
 {
     j.at("names").get_to(v.names);
 
-    auto action_name = j.at("action").get<std::string_view>();
-    auto action_opt = seccomp_action_table.from_name(action_name);
+    const auto action_name = j.at("action").get<std::string_view>();
+    const auto action_opt = utils::enum_table_v<seccomp::action>.from_name(action_name);
     if (UNLIKELY(!action_opt)) {
         throw std::runtime_error(fmt::format("unknown seccomp action: {}", action_name));
     }
@@ -62,8 +61,8 @@ void from_json(const nlohmann::json &j, seccomp &v)
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };
         if (key_matches(k, "defaultAction")) {
-            auto action_name = val.get<std::string_view>();
-            auto action_opt = seccomp_action_table.from_name(action_name);
+            const auto action_name = val.get<std::string_view>();
+            const auto action_opt = utils::enum_table_v<seccomp::action>.from_name(action_name);
             if (UNLIKELY(!action_opt)) {
                 throw std::runtime_error(fmt::format("unknown seccomp action: {}", action_name));
             }
@@ -80,8 +79,8 @@ void from_json(const nlohmann::json &j, seccomp &v)
                 archs.reserve(val.size());
 
                 for (const auto &elem : val) {
-                    auto arch_str = elem.get<std::string_view>();
-                    auto arch_opt = get_enum_table_from<seccomp::arch>().from_name(arch_str);
+                    const auto arch_str = elem.get<std::string_view>();
+                    const auto arch_opt = utils::enum_table_v<seccomp::arch>.from_name(arch_str);
 
                     if (UNLIKELY(!arch_opt)) {
                         throw std::runtime_error(
@@ -98,7 +97,7 @@ void from_json(const nlohmann::json &j, seccomp &v)
                 utils::bitflags<seccomp_flag> flags;
                 for (const auto &f : val) {
                     const auto flag_str = f.get<std::string_view>();
-                    auto flag_opt = get_enum_table_from<seccomp_flag>().from_name(flag_str);
+                    const auto flag_opt = utils::enum_table_v<seccomp_flag>.from_name(flag_str);
                     if (UNLIKELY(!flag_opt)) {
                         throw std::runtime_error(fmt::format("unknown seccomp flag: {}", flag_str));
                     }

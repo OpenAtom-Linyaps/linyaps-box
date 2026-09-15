@@ -33,6 +33,10 @@ struct defer
     {
     }
 
+    // The move constructor is noexcept, so Fn must not throw while being moved.
+    static_assert(std::is_nothrow_move_constructible_v<Fn>,
+                  "defer's callable must be nothrow move constructible");
+
     defer(const defer &) = delete;
     auto operator=(const defer &) -> defer & = delete;
 
@@ -44,20 +48,9 @@ struct defer
         other.cancelled = true;
     }
 
-    defer &operator=(defer &&other) noexcept
-    {
-        if (this != &other) {
-            defer temp{ std::move(*this) };
-
-            fn_ = std::move(other.fn_);
-            uncaught_count = other.uncaught_count;
-            cancelled = other.cancelled;
-
-            other.cancelled = true;
-        }
-
-        return *this;
-    }
+    // A scope guard cannot be move-assigned without ambiguity about whether the
+    // target's pending cleanup should run or be cancelled, so it is deleted.
+    defer &operator=(defer &&) = delete;
 
     ~defer() noexcept
     {
@@ -89,7 +82,7 @@ private:
 
 // Helper functions to create defer objects
 template <typename Fn>
-auto make_defer(Fn &&fn) noexcept
+[[nodiscard]] auto make_defer(Fn &&fn) noexcept
 {
     return defer<std::decay_t<Fn>>(std::forward<Fn>(fn));
 }
@@ -98,7 +91,7 @@ auto make_defer(Fn &&fn) noexcept
 // a defer object that executes the cleanup function only when an exception is active during
 // destruction
 template <typename Fn>
-auto make_errdefer(Fn &&fn) noexcept
+[[nodiscard]] auto make_errdefer(Fn &&fn) noexcept
 {
     return defer<std::decay_t<Fn>, defer_policy::on_error>(std::forward<Fn>(fn));
 }

@@ -171,7 +171,7 @@ struct fmt::formatter<T, std::enable_if_t<linyaps_box::utils::has_enum_table_v<T
 
         if constexpr (linyaps_box::utils::is_bitmask_enum_v<E>) {
             static constexpr auto enum_data =
-              linyaps_box::utils::detail::make_enum_data(get_enum_table(static_cast<E *>(nullptr)));
+              linyaps_box::utils::detail::make_enum_data(linyaps_box::utils::enum_table_v<E>);
 
             return linyaps_box::utils::detail::format_flags_impl(ctx.out(),
                                                                  static_cast<uint64_t>(raw_val),
@@ -179,8 +179,7 @@ struct fmt::formatter<T, std::enable_if_t<linyaps_box::utils::has_enum_table_v<T
                                                                  enum_data.views.data(),
                                                                  enum_data.views.size());
         } else {
-            constexpr auto table = get_enum_table(static_cast<E *>(nullptr));
-            if (auto name = table.to_name(static_cast<E>(raw_val))) {
+            if (auto name = linyaps_box::utils::enum_table_v<E>.to_name(static_cast<E>(raw_val))) {
                 return std::copy(name->cbegin(), name->cend(), ctx.out());
             }
 

@@ -11,18 +11,16 @@
 
 namespace linyaps_box::config {
 
-constexpr auto personality_domain_table = get_enum_table_from<personality::domain>();
-
 void from_json(const nlohmann::json &j, personality &v)
 {
-    auto domain_name = j.at("domain").get<std::string_view>();
-    auto domain_opt = personality_domain_table.from_name(domain_name);
+    const auto domain_name = j.at("domain").get<std::string_view>();
+    const auto domain_opt = utils::enum_table_v<personality::domain>.from_name(domain_name);
     if (UNLIKELY(!domain_opt)) {
         throw std::runtime_error(fmt::format("unknown personality domain: {}", domain_name));
     }
     v.domain_ = *domain_opt;
 
-    if (auto flags_it = j.find("flags"); flags_it != j.end() && !flags_it->is_null()) {
+    if (const auto flags_it = j.find("flags"); flags_it != j.cend() && !flags_it->is_null()) {
         flags_it->get_to(v.flags.emplace());
     }
 }
