@@ -43,7 +43,7 @@ repos:
     rev: 0.29.1
     hooks:
       - id: gersemi
-        args: ['--warnings-as-errors']
+        args: ['-i', '--warnings-as-errors']
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.14.1-1

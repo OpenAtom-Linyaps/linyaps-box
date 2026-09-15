@@ -11,12 +11,14 @@ file(GLOB _profraw_files "${PROFILE_DIR}/llvm-*.profraw")
 list(SORT _profraw_files)
 
 if(NOT _profraw_files)
-  message(FATAL_ERROR "No llvm-*.profraw files found in ${PROFILE_DIR}")
+    message(FATAL_ERROR "No llvm-*.profraw files found in ${PROFILE_DIR}")
 endif()
 
 execute_process(
-  COMMAND "${LLVM_PROFDATA}" merge -sparse ${_profraw_files} -o "${PROF_OUT}"
-  RESULT_VARIABLE _merge_result COMMAND_ERROR_IS_FATAL ANY)
+    COMMAND "${LLVM_PROFDATA}" merge -sparse ${_profraw_files} -o "${PROF_OUT}"
+    RESULT_VARIABLE _merge_result
+    COMMAND_ERROR_IS_FATAL ANY
+)
 
 file(REMOVE ${_profraw_files})
 
