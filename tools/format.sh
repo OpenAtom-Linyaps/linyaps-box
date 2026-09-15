@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# SPDX-FileCopyrightText: 2022-2025 UnionTech Software Technology Co., Ltd.
+# SPDX-FileCopyrightText: 2022 - 2026 UnionTech Software Technology Co., Ltd.
 #
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -20,9 +20,9 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLANG_FORMAT="${1:-clang-format}"
 
 # Check clang-format availability
-if ! command -v "${CLANG_FORMAT}" >/dev/null 2>&1; then
-    echo "Error: ${CLANG_FORMAT} not found. Please install clang-format." >&2
-    exit 1
+if ! command -v "${CLANG_FORMAT}" > /dev/null 2>&1; then
+  echo "Error: ${CLANG_FORMAT} not found. Please install clang-format." >&2
+  exit 1
 fi
 
 # --- Project root validation ---
@@ -33,25 +33,25 @@ fi
 
 VALID_ROOT=false
 if [[ -f "${ROOT_DIR}/CMakeLists.txt" ]]; then
-    VALID_ROOT=true
+  VALID_ROOT=true
 elif [[ -f "${ROOT_DIR}/.clang-format" ]]; then
-    VALID_ROOT=true
+  VALID_ROOT=true
 else
-    for d in app src tests; do
-        if [ -d "${ROOT_DIR}/${d}" ]; then
-            VALID_ROOT=true
-            break
-        fi
-    done
+  for d in app src tests; do
+    if [ -d "${ROOT_DIR}/${d}" ]; then
+      VALID_ROOT=true
+      break
+    fi
+  done
 fi
 
 if [[ ${VALID_ROOT} != true ]]; then
-    echo "Error: This script must be run inside a valid C++ project root."
-    echo "Expected to find one of the following in ${ROOT_DIR}:"
-    echo "  - CMakeLists.txt"
-    echo "  - .clang-format or _clang-format"
-    echo "  - app/, src/, or tests/ directories"
-    exit 1
+  echo "Error: This script must be run inside a valid C++ project root."
+  echo "Expected to find one of the following in ${ROOT_DIR}:"
+  echo "  - CMakeLists.txt"
+  echo "  - .clang-format or _clang-format"
+  echo "  - app/, src/, or tests/ directories"
+  exit 1
 fi
 # --- End project root validation ---
 
@@ -62,22 +62,22 @@ echo "Project root: ${ROOT_DIR}"
 # Only search for .cpp and .h files under app, src, and tests directories
 dirs=()
 for d in app src tests; do
-    if [[ -d "${ROOT_DIR}/${d}" ]]; then
-        dirs+=("${ROOT_DIR}/${d}")
-    fi
+  if [[ -d "${ROOT_DIR}/${d}" ]]; then
+    dirs+=("${ROOT_DIR}/${d}")
+  fi
 done
 
 if [[ ${#dirs[@]} -eq 0 ]]; then
-    echo "Warning: No app/, src/, or tests/ directories found under ${ROOT_DIR}."
-    exit 0
+  echo "Warning: No app/, src/, or tests/ directories found under ${ROOT_DIR}."
+  exit 0
 fi
 
 find "${dirs[@]}" \
-    \( -name "*.cpp" -o -name "*.h" \) \
-    -type f -print |
-    while read -r file; do
-        echo "Formatting: ${file}"
-        "${CLANG_FORMAT}" -i "${file}"
-    done
+  \( -name "*.cpp" -o -name "*.h" \) \
+  -type f -print |
+  while read -r file; do
+    echo "Formatting: ${file}"
+    "${CLANG_FORMAT}" -i "${file}"
+  done
 
 echo "Formatting completed."
