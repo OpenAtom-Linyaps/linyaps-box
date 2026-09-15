@@ -1,139 +1,261 @@
 {
-	"version": 6,
+	"$schema": "https://raw.githubusercontent.com/Kitware/CMake/v3.28.0/Help/manual/presets/schema.json",
+	"version": 8,
 	"cmakeMinimumRequired": {
 		"major": 3,
-		"minor": 25,
+		"minor": 28,
 		"patch": 0
 	},
 	"configurePresets": [
 		{
-			"name": "dev",
-			"displayName": "The developer profile",
-			"description": "The default configuration for developers",
-			"binaryDir": "${sourceDir}/build-dev",
+			"name": "base",
+			"hidden": true,
+			"displayName": "Base configuration",
+			"description": "Shared configure settings inherited by every profile",
 			"generator": "Ninja",
 			"cacheVariables": {
+				"CMAKE_COLOR_DIAGNOSTICS": "ON"
+			}
+		},
+		{
+			"name": "dev",
+			"inherits": "base",
+			"displayName": "The developer profile",
+			"description": "Debug build with address/undefined sanitizers and smoke tests",
+			"binaryDir": "${sourceDir}/build-dev",
+			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_COLOR_DIAGNOSTICS": true,
-				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror $env{CXXFLAGS}",
-				"CMAKE_EXPORT_COMPILE_COMMANDS": true,
-				"linyaps-box_ENABLE_SANITIZER": true,
-				"linyaps-box_ENABLE_COVERAGE": true,
-				"linyaps-box_ENABLE_CPACK": true,
-				"linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX": "",
-				"linyaps-box_ENABLE_SMOKE_TESTS": true,
+				"linyaps-box_ENABLE_SANITIZER": "ON",
+				"linyaps-box_ENABLE_SMOKE_TESTS": "ON",
+				"linyaps-box_DEFAULT_LOG_LEVEL": "debug",
+				"linyaps-box_ACTIVE_LOG_LEVEL": "debug"
+			}
+		},
+		{
+			"name": "coverage",
+			"inherits": "base",
+			"displayName": "The coverage profile",
+			"description": "Clang Debug build with coverage instrumentation (llvm-cov), no sanitizers",
+			"binaryDir": "${sourceDir}/build-coverage",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_CXX_COMPILER": "clang++",
+				"linyaps-box_ENABLE_COVERAGE": "ON",
+				"linyaps-box_ENABLE_SMOKE_TESTS": "ON",
 				"linyaps-box_DEFAULT_LOG_LEVEL": "debug",
 				"linyaps-box_ACTIVE_LOG_LEVEL": "debug"
 			}
 		},
 		{
 			"name": "release",
+			"inherits": "base",
 			"displayName": "The release profile",
-			"description": "The default configuration for release",
+			"description": "Release build with hardening and packaging",
 			"binaryDir": "${sourceDir}/build-release",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release",
-				"CMAKE_COLOR_DIAGNOSTICS": true,
-				"CMAKE_EXPORT_COMPILE_COMMANDS": true,
+				"CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
 				"linyaps-box_ENABLE_CPACK": "ON",
+				"linyaps-box_HARDENING": "ON",
 				"linyaps-box_MAKE_RELEASE": "ON"
 			}
 		},
 		{
 			"name": "static",
+			"inherits": "base",
 			"displayName": "The static build profile",
-			"description": "The default configuration for produce static binary",
+			"description": "MinSizeRel statically linked binary with LTO and hardening",
 			"binaryDir": "${sourceDir}/build-static",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "MinSizeRel",
-				"CMAKE_COLOR_DIAGNOSTICS": true,
-				"CMAKE_CXX_FLAGS": "-fno-asynchronous-unwind-tables -fdata-sections -ffunction-sections -flto=auto $env{CXXFLAGS}",
-				"CMAKE_EXE_LINKER_FLAGS_INIT": "-Wl,--gc-sections,--strip-all,--exclude-libs,ALL -flto=auto",
-				"linyaps-box_STATIC": true,
-				"linyaps-box_ENABLE_CPACK": "ON",
+				"CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+				"linyaps-box_STATIC": "ON",
 				"linyaps-box_MAKE_RELEASE": "ON"
 			}
 		},
 		{
 			"name": "ci",
+			"inherits": "base",
 			"displayName": "The CI profile",
-			"description": "The default configuration for CI",
+			"description": "RelWithDebInfo -O1 build with sanitizers and vendored dependencies",
 			"binaryDir": "${sourceDir}/build-ci",
-			"generator": "Ninja",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
-				"CMAKE_COLOR_DIAGNOSTICS": true,
-				"CMAKE_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror -static-libasan $env{CXXFLAGS}",
-				"linyaps-box_ENABLE_SANITIZER": true,
-				"linyaps-box_ENABLE_SMOKE_TESTS": false,
+				"CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O1 -g -DNDEBUG",
+				"linyaps-box_ENABLE_WERROR": "ON",
+				"linyaps-box_ENABLE_UNIT_TESTS": "ON",
+				"linyaps-box_ENABLE_SANITIZER": "ON",
+				"linyaps-box_ENABLE_SMOKE_TESTS": "OFF",
 				"linyaps-box_DEFAULT_LOG_LEVEL": "debug",
 				"linyaps-box_ACTIVE_LOG_LEVEL": "debug",
-				"linyaps-box_OFFLINE_BUILD": true
+				"linyaps-box_OFFLINE_BUILD": "ON"
+			}
+		},
+		{
+			"name": "codeql",
+			"inherits": "base",
+			"displayName": "The CodeQL profile",
+			"description": "Lean RelWithDebInfo build for CodeQL analysis: matches release defines, no sanitizers, no -Werror, no tests",
+			"binaryDir": "${sourceDir}/build-codeql",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
+				"linyaps-box_ENABLE_UNIT_TESTS": "OFF",
+				"linyaps-box_ENABLE_SMOKE_TESTS": "OFF",
+				"linyaps-box_OFFLINE_BUILD": "ON"
+			}
+		},
+		{
+			"name": "analyzer",
+			"inherits": "base",
+			"displayName": "The static analysis profile",
+			"description": "Clang build for scan-build; debug logging so all code paths compile",
+			"binaryDir": "${sourceDir}/build-analyzer",
+			"cacheVariables": {
+				"CMAKE_CXX_COMPILER": "clang++",
+				"CMAKE_BUILD_TYPE": "Debug",
+				"linyaps-box_ENABLE_UNIT_TESTS": "OFF",
+				"linyaps-box_ENABLE_SMOKE_TESTS": "OFF",
+				"linyaps-box_ACTIVE_LOG_LEVEL": "debug",
+				"linyaps-box_DEFAULT_LOG_LEVEL": "debug",
+				"linyaps-box_OFFLINE_BUILD": "ON"
 			}
 		}
 	],
 	"buildPresets": [
 		{
+			"name": "build-base",
+			"hidden": true,
+			"description": "Shared build settings"
+		},
+		{
 			"name": "dev",
-			"configurePreset": "dev"
+			"inherits": "build-base",
+			"configurePreset": "dev",
+			"displayName": "Build the dev profile"
+		},
+		{
+			"name": "coverage",
+			"inherits": "build-base",
+			"configurePreset": "coverage",
+			"displayName": "Build the coverage profile"
+		},
+		{
+			"name": "coverage-report",
+			"inherits": "build-base",
+			"configurePreset": "coverage",
+			"displayName": "Run unit tests and print the coverage report",
+			"targets": ["coverage-ut"]
 		},
 		{
 			"name": "release",
-			"configurePreset": "release"
+			"inherits": "build-base",
+			"configurePreset": "release",
+			"displayName": "Build the release profile"
 		},
 		{
 			"name": "ci",
-			"configurePreset": "ci"
+			"inherits": "build-base",
+			"configurePreset": "ci",
+			"displayName": "Build the CI profile"
+		},
+		{
+			"name": "codeql",
+			"inherits": "build-base",
+			"configurePreset": "codeql",
+			"displayName": "Build the CodeQL profile"
+		},
+		{
+			"name": "analyzer",
+			"inherits": "build-base",
+			"configurePreset": "analyzer",
+			"displayName": "Build the static analyzer profile"
 		},
 		{
 			"name": "static",
-			"configurePreset": "static"
+			"inherits": "build-base",
+			"configurePreset": "static",
+			"displayName": "Build the static profile"
 		}
 	],
 	"testPresets": [
 		{
-			"name": "dev",
-			"configurePreset": "dev",
+			"name": "test-base",
+			"hidden": true,
+			"description": "Shared test settings",
 			"output": {
-				"outputOnFailure": true
+				"outputOnFailure": true,
+				"outputJUnitFile": "test-results.xml"
 			},
 			"execution": {
-				"noTestsAction": "default",
+				"jobs": 0
+			}
+		},
+		{
+			"name": "dev",
+			"inherits": "test-base",
+			"configurePreset": "dev",
+			"displayName": "Test the dev profile",
+			"execution": {
+				"stopOnFailure": true
+			}
+		},
+		{
+			"name": "coverage",
+			"inherits": "test-base",
+			"configurePreset": "coverage",
+			"displayName": "Test the coverage profile",
+			"execution": {
 				"stopOnFailure": true
 			}
 		},
 		{
 			"name": "release",
+			"inherits": "test-base",
 			"configurePreset": "release",
-			"output": {
-				"outputOnFailure": true
-			},
+			"displayName": "Test the release profile",
 			"execution": {
-				"noTestsAction": "default",
 				"stopOnFailure": true
 			}
 		},
 		{
 			"name": "ci",
+			"inherits": "test-base",
 			"configurePreset": "ci",
-			"output": {
-				"verbosity": "verbose"
+			"displayName": "Test the CI profile",
+			"environment": {
+				"ASAN_OPTIONS": "abort_on_error=1:detect_leaks=1:strict_string_checks=1",
+				"UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
 			},
 			"execution": {
-				"noTestsAction": "default",
 				"stopOnFailure": false
 			}
 		},
 		{
 			"name": "static",
+			"inherits": "test-base",
 			"configurePreset": "static",
-			"output": {
-				"verbosity": "verbose"
-			},
+			"displayName": "Test the static profile",
 			"execution": {
-				"noTestsAction": "default",
 				"stopOnFailure": true
 			}
+		}
+	],
+	"packagePresets": [
+		{
+			"name": "release",
+			"configurePreset": "release",
+			"displayName": "Package the release profile",
+			"description": "Generate TGZ, DEB and RPM packages (Linux only; DEB needs dpkg-dev, RPM needs rpm)",
+			"condition": {
+				"type": "equals",
+				"lhs": "${hostSystemName}",
+				"rhs": "Linux"
+			},
+			"generators": [
+				"TGZ",
+				"DEB",
+				"RPM"
+			]
 		}
 	],
 	"workflowPresets": [
@@ -157,9 +279,28 @@
 			]
 		},
 		{
+			"name": "coverage",
+			"displayName": "The workflow for coverage",
+			"description": "Configure, build, run unit tests and print the coverage report",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "coverage"
+				},
+				{
+					"type": "build",
+					"name": "coverage"
+				},
+				{
+					"type": "build",
+					"name": "coverage-report"
+				}
+			]
+		},
+		{
 			"name": "release",
 			"displayName": "The default workflow for release",
-			"description": "Configure, build then test with release profile",
+			"description": "Configure, build, test then package with release profile",
 			"steps": [
 				{
 					"type": "configure",
@@ -171,6 +312,10 @@
 				},
 				{
 					"type": "test",
+					"name": "release"
+				},
+				{
+					"type": "package",
 					"name": "release"
 				}
 			]
@@ -191,6 +336,21 @@
 				{
 					"type": "test",
 					"name": "ci"
+				}
+			]
+		},
+		{
+			"name": "codeql",
+			"displayName": "The workflow for CodeQL",
+			"description": "Configure and build with the lean CodeQL profile, without running tests.",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "codeql"
+				},
+				{
+					"type": "build",
+					"name": "codeql"
 				}
 			]
 		},
