@@ -19,4 +19,6 @@ struct exec_cpu_affinity
 
 void from_json(const nlohmann::json &j, exec_cpu_affinity &v);
 
+void validate(const exec_cpu_affinity &v);
+
 } // namespace linyaps_box::config

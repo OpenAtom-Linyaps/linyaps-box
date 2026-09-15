@@ -23,4 +23,6 @@ struct intel_rdt
 
 void from_json(const nlohmann::json &j, intel_rdt &v);
 
+void validate(const intel_rdt &v);
+
 } // namespace linyaps_box::config

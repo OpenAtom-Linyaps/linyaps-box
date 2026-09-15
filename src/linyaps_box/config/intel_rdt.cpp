@@ -5,9 +5,12 @@
 #include "linyaps_box/config/intel_rdt.h"
 
 #include "linyaps_box/config/utils.h"
+#include "linyaps_box/utils/utils.h"
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
+#include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::config {
@@ -37,6 +40,25 @@ void from_json(const nlohmann::json &j, intel_rdt &v)
                 val.get_to(v.enable_monitoring.emplace());
             }
         }
+    }
+}
+
+void validate(const intel_rdt &v)
+{
+    if (v.memory_bandwidth_schema) {
+        const auto &s = *v.memory_bandwidth_schema;
+        if (UNLIKELY(s.rfind("MB:", 0) != 0 || s.find('\n') != std::string::npos)) {
+            throw std::runtime_error(
+              fmt::format("intelRdt.memBwSchema must match ^MB:[^\\n]*$: {}", s));
+        }
+    }
+
+    if (v.schemata) {
+        std::for_each(v.schemata->cbegin(), v.schemata->cend(), [](std::string_view line) {
+            if (UNLIKELY(line.find('\n') != std::string_view::npos)) {
+                throw std::runtime_error("intelRdt.schemata entries must not contain newlines");
+            }
+        });
     }
 }
 

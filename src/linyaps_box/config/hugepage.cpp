@@ -21,30 +21,26 @@ void from_json(const nlohmann::json &j, hugepage_limit &v)
 
 void validate(const hugepage_limit &v)
 {
-    if (UNLIKELY(v.page_size.empty())) {
-        throw std::runtime_error("resources.hugepageLimits pageSize must not be empty");
-    }
-
     const std::string_view s = v.page_size;
     const auto *it = s.cbegin();
     const auto *const end = s.cend();
+
+    if (UNLIKELY(it == end || *it < '1' || *it > '9')) {
+        throw std::runtime_error(
+          fmt::format("resources.hugepageLimits pageSize must start with a non-zero digit: {}", s));
+    }
 
     while (it != end && *it >= '0' && *it <= '9') {
         ++it;
     }
 
-    if (UNLIKELY(it == s.cbegin())) {
+    if (UNLIKELY(it == end || (*it != 'K' && *it != 'M' && *it != 'G'))) {
         throw std::runtime_error(
-          fmt::format("resources.hugepageLimits pageSize must start with a number: {}", s));
+          fmt::format("resources.hugepageLimits pageSize must use an uppercase K/M/G unit: {}", s));
     }
+    ++it;
 
-    if (it != end
-        && (*it == 'K' || *it == 'k' || *it == 'M' || *it == 'm' || *it == 'G' || *it == 'g'
-            || *it == 'T' || *it == 't')) {
-        ++it;
-    }
-
-    if (UNLIKELY(it == end || (*it != 'B' && *it != 'b'))) {
+    if (UNLIKELY(it == end || *it != 'B')) {
         throw std::runtime_error(
           fmt::format("resources.hugepageLimits pageSize must end with 'B': {}", s));
     }
