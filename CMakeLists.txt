@@ -265,13 +265,18 @@ set(LINYAPS_BOX_VERSION ${PROJECT_VERSION})
 
 if(NOT linyaps-box_MAKE_RELEASE)
     execute_process(
-        COMMAND git rev-parse --short=7 HEAD
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE GIT_COMMIT_HASH
+        COMMAND git describe --always --dirty --exclude=*
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_DESCRIBE
         OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE GIT_RESULT
     )
 
-    set(LINYAPS_BOX_VERSION "${LINYAPS_BOX_VERSION}-dev-${GIT_COMMIT_HASH}")
+    if(NOT GIT_RESULT STREQUAL "0" OR NOT GIT_DESCRIBE)
+        set(GIT_DESCRIBE "unknown-dirty")
+    endif()
+
+    set(LINYAPS_BOX_VERSION "${LINYAPS_BOX_VERSION}-${GIT_DESCRIBE}")
     message(STATUS "make dev build: ${LINYAPS_BOX_VERSION}")
 endif()
 
