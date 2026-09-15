@@ -18,7 +18,7 @@ namespace linyaps_box::config {
 void from_json(const nlohmann::json &j, ns &v)
 {
     auto type_str = j.at("type").get<std::string_view>();
-    auto opt = get_enum_table_from<ns::type>().from_name(type_str);
+    const auto opt = utils::enum_table_v<ns::type>.from_name(type_str);
     if (UNLIKELY(!opt)) {
         throw std::runtime_error(fmt::format("unknown namespace type: {}", type_str));
     }

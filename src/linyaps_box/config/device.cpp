@@ -17,14 +17,13 @@ namespace linyaps_box::config {
 
 void from_json(const nlohmann::json &j, device &v)
 {
-    constexpr auto device_type_table = get_enum_table_from<device::type>();
     bool have_type{ false };
     bool have_path{ false };
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };
         if (key_matches(k, "type")) {
             auto type_str = val.get<std::string_view>();
-            auto type_opt = device_type_table.from_name(type_str);
+            auto type_opt = utils::enum_table_v<device::type>.from_name(type_str);
             if (UNLIKELY(!type_opt)) {
                 throw std::runtime_error(
                   fmt::format("device.type must be one of c/b/u/p: {}", type_str));

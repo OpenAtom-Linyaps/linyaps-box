@@ -59,7 +59,7 @@ void from_json(const nlohmann::json &j, linux &v)
         } else if (key_matches(k, "rootfsPropagation")) {
             if (!val.is_null()) {
                 auto prop_name = val.get<std::string_view>();
-                auto prop_opt = get_enum_table_from<rootfs_propagation>().from_name(prop_name);
+                auto prop_opt = utils::enum_table_v<rootfs_propagation>.from_name(prop_name);
                 if (UNLIKELY(!prop_opt)) {
                     throw std::runtime_error(
                       fmt::format("unknown rootfsPropagation value: {}", prop_name));

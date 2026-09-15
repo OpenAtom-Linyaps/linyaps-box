@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "linyaps_box/utils/span.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <array>
@@ -12,15 +11,16 @@
 #include <optional>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 namespace linyaps_box::utils {
 
 namespace detail {
 
 template <typename T, std::size_t N, typename Compare>
-constexpr void shell_sort(span<T, N> entries, Compare comp) noexcept
+constexpr void shell_sort(std::array<T, N> &entries, Compare comp) noexcept
 {
-    for (const std::size_t gap : { 123, 54, 23, 10, 4, 1 }) {
+    for (const std::size_t gap : std::array<std::size_t, 6>{ 123, 54, 23, 10, 4, 1 }) {
         if (gap >= N) {
             continue;
         }
@@ -92,7 +92,7 @@ constexpr auto check_is_bitmask_enum() noexcept
 } // namespace detail
 
 template <typename E>
-inline constexpr bool is_bitmask_enum_v = detail::check_is_bitmask_enum<E>();
+constexpr bool is_bitmask_enum_v = detail::check_is_bitmask_enum<E>();
 
 template <typename E>
 struct enum_entry
@@ -100,7 +100,9 @@ struct enum_entry
     // GCC 8's constexpr evaluator requires the defaulted default constructor
     // to initialize every member; without `= {}` the implicit default ctor
     // leaves `value` uninitialized and is not usable in constant expressions.
-    E value{ };
+    // Only ever brace-initialized from a real enumerator, so the zero default
+    // is never observed.
+    E value{ }; // NOLINT(bugprone-invalid-enum-default-initialization)
     std::string_view name;
 };
 
@@ -111,19 +113,19 @@ template <typename E, std::size_t N>
 class enum_table;
 
 template <typename E, std::size_t N>
-constexpr auto make_enum_table(std::string_view type_name, const enum_entry<E> (&arr)[N]) noexcept
-  -> enum_table<E, N>;
+constexpr auto make_enum_table(std::string_view type_name,
+                               const enum_entry<E> (&entries)[N]) noexcept -> enum_table<E, N>;
 
 template <typename E, std::size_t N>
-constexpr auto verify_enum_table(const enum_table<E, N> &entries) noexcept -> bool;
+constexpr auto verify_enum_table(const enum_table<E, N> &table) noexcept -> bool;
 
 template <typename E, std::size_t N>
 class enum_table
 {
 public:
-    constexpr enum_table(std::string_view name, const enum_entry<E> (&arr)[N]) noexcept
+    constexpr enum_table(std::string_view name, std::array<enum_entry<E>, N> arr) noexcept
         : type_name_(name)
-        , entries_(utils::to_array(arr))
+        , entries_(std::move(arr))
     {
     }
 
@@ -149,11 +151,6 @@ public:
         return std::nullopt;
     }
 
-    friend constexpr auto make_enum_table<>(std::string_view, const enum_entry<E> (&)[N]) noexcept
-      -> enum_table<E, N>;
-
-    friend constexpr auto verify_enum_table<>(const enum_table<E, N> &) noexcept -> bool;
-
     [[nodiscard]] constexpr auto type_name() const noexcept -> std::string_view
     {
         return type_name_;
@@ -170,11 +167,37 @@ private:
 };
 
 template <typename E, typename = void>
-inline constexpr bool has_enum_table_v = false;
+constexpr bool has_enum_table_v = false;
 
 template <typename E>
-inline constexpr bool
+constexpr bool
   has_enum_table_v<E, std::void_t<decltype(get_enum_table(static_cast<E *>(nullptr)))>> = true;
+
+// The registered table for an enum, exposed as a namespace-scope variable
+// template so that it has static storage: every specialization is an
+// implicitly inline (COMDAT), constant-initialized object with no runtime
+// guard. Callers read it by reference, so the table is never copied.
+//
+// Why a variable template instead of a constexpr accessor?
+//   A `static` local variable inside a `constexpr` function is a C++23
+//   extension (P2647R1); it is ill-formed in C++17 (and still in C++20). This
+//   project targets C++17, so a variable template is the way to obtain static
+//   storage for the table.
+//
+// What this replaced, and why it matters:
+//   Access used to go through `get_enum_table_from<T>()`, which returned
+//   `enum_table` by value. Without static storage the caller ended up with a
+//   copy of the whole table, and GCC materialized it on the stack on every
+//   call (stack protector included) before scanning it linearly, while Clang
+//   folded it away. Codegen was therefore compiler-dependent and pessimized on
+//   GCC. With the variable template both compilers emit equivalent code, and
+//   small tables are even constant-folded into direct comparisons.
+//
+// TODO(C++23): when the project adopts C++23, reconsider replacing this with a
+// `get_enum_table` accessor that returns a reference to a `static constexpr`
+// local.
+template <typename E>
+constexpr auto enum_table_v = get_enum_table(static_cast<E *>(nullptr));
 
 namespace detail {
 
@@ -185,9 +208,8 @@ constexpr auto known_mask() noexcept -> enum_underlying_t<E>
     using U = enum_underlying_t<E>;
 
     if constexpr (has_enum_table_v<E>) {
-        constexpr auto table = get_enum_table(static_cast<E *>(nullptr));
         U mask{ 0 };
-        for (const auto &entry : table.entries()) {
+        for (const auto &entry : enum_table_v<E>.entries()) {
             mask |= static_cast<U>(entry.value);
         }
 
@@ -204,55 +226,51 @@ constexpr auto known_mask() noexcept -> enum_underlying_t<E>
 } // namespace detail
 
 template <typename E, std::size_t N>
-constexpr auto make_enum_table(std::string_view type_name,
-                               const enum_entry<E> (&entries)[N]) noexcept -> enum_table<E, N>
+constexpr auto make_enum_table(
+  std::string_view type_name,
+  const enum_entry<E> (&entries)[N]) noexcept // NOLINT(cppcoreguidelines-avoid-c-arrays)
+  -> enum_table<E, N>
 {
-    enum_table table(type_name, entries);
+    auto arr = utils::to_array(entries);
 
     // generate an ordered table at compile time
     if constexpr (is_bitmask_enum_v<E>) {
         using U = std::make_unsigned_t<detail::enum_underlying_t<E>>;
 
-        detail::shell_sort(span(table.entries_),
-                           [](const enum_entry<E> &a, const enum_entry<E> &b) {
-                               const auto a_u = static_cast<U>(a.value);
-                               const auto b_u = static_cast<U>(b.value);
-                               const auto a_pop = detail::popcount(a_u);
-                               const auto b_pop = detail::popcount(b_u);
-                               return a_pop > b_pop || (a_pop == b_pop && a_u < b_u);
-                           });
+        detail::shell_sort(arr, [](const enum_entry<E> &a, const enum_entry<E> &b) {
+            const auto a_u = static_cast<U>(a.value);
+            const auto b_u = static_cast<U>(b.value);
+            const auto a_pop = detail::popcount(a_u);
+            const auto b_pop = detail::popcount(b_u);
+            return a_pop > b_pop || (a_pop == b_pop && a_u < b_u);
+        });
     }
 
-    return table;
+    return enum_table<E, N>(type_name, std::move(arr));
 }
 
 template <typename E, std::size_t N>
 constexpr auto verify_enum_table(const enum_table<E, N> &table) noexcept -> bool
 {
-    // value duplicates: leverage existing sort order for bitmask enums
-    if constexpr (is_bitmask_enum_v<E>) {
-        for (std::size_t i = 1; i < N; ++i) {
-            if (table.entries_[i].value == table.entries_[i - 1].value) {
-                return false;
-            }
-        }
-    } else {
-        for (std::size_t i = 0; i < N; ++i) {
-            for (std::size_t j = i + 1; j < N; ++j) {
-                if (table.entries_[i].value == table.entries_[j].value) {
-                    return false;
-                }
-            }
+    // TODO(C++20): once the project adopts C++20 the <algorithm> facilities
+    // become constexpr (P0202R3), and this could use std::sort +
+    // std::adjacent_find instead of the hand-rolled shell_sort + adjacent scans.
+    std::array<enum_entry<E>, N> sorted = table.entries();
+
+    // value duplicates: sort by value, then check adjacent
+    detail::shell_sort(sorted, [](const enum_entry<E> &a, const enum_entry<E> &b) {
+        using U = detail::enum_underlying_t<E>;
+        return static_cast<U>(a.value) < static_cast<U>(b.value);
+    });
+
+    for (std::size_t i = 1; i < N; ++i) {
+        if (sorted[i].value == sorted[i - 1].value) {
+            return false;
         }
     }
 
-    // name duplicates: shell sort by name then check adjacent
-    std::array<enum_entry<E>, N> sorted;
-    for (std::size_t i = 0; i < N; ++i) {
-        sorted[i] = table.entries_[i];
-    }
-
-    detail::shell_sort(span(sorted), [](const enum_entry<E> &a, const enum_entry<E> &b) {
+    // name duplicates: sort by name, then check adjacent
+    detail::shell_sort(sorted, [](const enum_entry<E> &a, const enum_entry<E> &b) {
         return a.name < b.name;
     });
 
@@ -405,6 +423,8 @@ private:
     underlying_type bits_{ 0 };
 };
 
+// NOTE: DO NOT use this function directly!
+// use enum_table_v instead.
 template <typename E, std::enable_if_t<is_bitmask_enum_v<E>, int> = 0>
 constexpr auto get_enum_table([[maybe_unused]] bitflags<E> *ptr) noexcept
 {
@@ -466,7 +486,8 @@ constexpr E &operator^=(E &lhs, E rhs) noexcept
     }
 
 #define LINYAPS_REGISTER_ENUM_TABLE(E, COUNT, ...)                                                \
-    constexpr auto get_enum_table([[maybe_unused]] E *ptr) noexcept                               \
+    constexpr auto get_enum_table(/*NOLINT(bugprone-macro-parentheses)*/                          \
+                                  [[maybe_unused]] E *ptr) noexcept                               \
     {                                                                                             \
         constexpr auto table = ::linyaps_box::utils::make_enum_table<E>(#E, { __VA_ARGS__ });     \
         constexpr auto valid = ::linyaps_box::utils::verify_enum_table(table);                    \
@@ -477,9 +498,3 @@ constexpr E &operator^=(E &lhs, E rhs) noexcept
                       "enum_table entry count mismatch for " #E ": expected " #COUNT " entries"); \
         return table;                                                                             \
     }
-
-template <typename T>
-constexpr auto get_enum_table_from() noexcept
-{
-    return get_enum_table(static_cast<T *>(nullptr));
-}

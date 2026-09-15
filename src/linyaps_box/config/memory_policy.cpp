@@ -16,7 +16,7 @@ namespace linyaps_box::config {
 void from_json(const nlohmann::json &j, memory_policy &v)
 {
     auto mode_name = j.at("mode").get<std::string_view>();
-    auto mode_opt = get_enum_table_from<memory_policy::mode>().from_name(mode_name);
+    auto mode_opt = utils::enum_table_v<memory_policy::mode>.from_name(mode_name);
     if (UNLIKELY(!mode_opt)) {
         throw std::runtime_error(fmt::format("unknown memory policy mode: {}", mode_name));
     }
@@ -30,7 +30,7 @@ void from_json(const nlohmann::json &j, memory_policy &v)
         utils::bitflags<memory_policy_flag> flags;
         for (const auto &f : *flags_it) {
             const auto flag_str = f.get<std::string_view>();
-            auto flag_opt = get_enum_table_from<memory_policy_flag>().from_name(flag_str);
+            auto flag_opt = utils::enum_table_v<memory_policy_flag>.from_name(flag_str);
             if (UNLIKELY(!flag_opt)) {
                 throw std::runtime_error(fmt::format("unknown memory policy flag: {}", flag_str));
             }

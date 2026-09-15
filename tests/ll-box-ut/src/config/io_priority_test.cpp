@@ -13,8 +13,6 @@ using namespace linyaps_box::config;
 
 namespace {
 
-using testing::Eq;
-
 using linyaps_box::test::parse_config;
 
 TEST(IoPriorityParse, UnknownClassRejected)

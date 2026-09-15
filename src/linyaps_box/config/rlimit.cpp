@@ -15,7 +15,7 @@ namespace linyaps_box::config {
 void from_json(const nlohmann::json &j, rlimit &v)
 {
     auto name = j.at("type").get<std::string_view>();
-    auto opt = get_enum_table_from<rlimit::type>().from_name(name);
+    auto opt = utils::enum_table_v<rlimit::type>.from_name(name);
     if (UNLIKELY(!opt)) {
         throw std::runtime_error(fmt::format("unknown rlimit type: {}", name));
     }
