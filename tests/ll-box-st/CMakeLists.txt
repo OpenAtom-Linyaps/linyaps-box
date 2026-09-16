@@ -33,6 +33,7 @@ foreach(test ${linyaps-box_SMOKE_TESTS})
     set_tests_properties(
         "${test}"
         PROPERTIES
+            RESOURCE_LOCK st-data
             ENVIRONMENT
                 "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt"
     )
@@ -45,9 +46,23 @@ endif()
 set(COVERAGE_INFO "coverage.info")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Drop stale profiles before the tests run
+    add_test(
+        NAME coverage-clean-profraw
+        COMMAND
+            bash -c
+            "find '${CMAKE_CURRENT_BINARY_DIR}' -name 'llvm-*.profraw' -delete"
+    )
+
+    set_tests_properties(
+        coverage-clean-profraw
+        PROPERTIES FIXTURES_SETUP coverage-profraw-clean
+    )
+
     set_tests_properties(
         ${linyaps-box_TESTS}
         PROPERTIES
+            FIXTURES_REQUIRED coverage-profraw-clean
             ENVIRONMENT
                 "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt;LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/llvm-%p.profraw"
     )
@@ -66,22 +81,32 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
     find_program(LLVM_COV llvm-cov REQUIRED)
 
+    # Sources are recorded project-relative, so llvm-cov must run from
+    # the project root output paths therefore have to be absolute.
     add_custom_command(
         OUTPUT coverage.info
         DEPENDS default.profdata
         COMMAND
-            "${LLVM_COV}" show -instr-profile=default.profdata
-            -object="$<TARGET_FILE:${linyaps-box_APP}>" > coverage.info
+            "${LLVM_COV}" show
+            "-instr-profile=${CMAKE_CURRENT_BINARY_DIR}/default.profdata"
+            -object="$<TARGET_FILE:${linyaps-box_APP}>" >
+            "${CMAKE_CURRENT_BINARY_DIR}/coverage.info"
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
 
     add_custom_command(
         OUTPUT coverage.tar.gz
         DEPENDS default.profdata
-        COMMAND rm -rf coverage
+        COMMAND rm -rf "${CMAKE_CURRENT_BINARY_DIR}/coverage"
         COMMAND
-            "${LLVM_COV}" show -instr-profile=default.profdata -format=html
-            -object="$<TARGET_FILE:${linyaps-box_APP}>" -output-dir=coverage
-        COMMAND tar -czf coverage-html.tar.gz coverage
+            "${LLVM_COV}" show
+            "-instr-profile=${CMAKE_CURRENT_BINARY_DIR}/default.profdata"
+            -format=html -object="$<TARGET_FILE:${linyaps-box_APP}>"
+            "-output-dir=${CMAKE_CURRENT_BINARY_DIR}/coverage"
+        COMMAND
+            tar -czf "${CMAKE_CURRENT_BINARY_DIR}/coverage.tar.gz" -C
+            "${CMAKE_CURRENT_BINARY_DIR}" coverage
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
 
     add_custom_target(coverage DEPENDS coverage.info coverage.tar.gz)
