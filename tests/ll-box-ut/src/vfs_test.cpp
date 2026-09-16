@@ -27,6 +27,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// GTEST_SKIP was added after 1.10
+// So we've defined this compatibility macro
+#ifndef GTEST_SKIP
+#  define GTEST_SKIP()                                                 \
+      return GTEST_MESSAGE_("Skipped test due to runtime conditions.", \
+                            ::testing::TestPartResult::kSuccess)
+#endif
+
 namespace os = linyaps_box::os;
 namespace infra = linyaps_box::infra;
 namespace utils = linyaps_box::utils;
@@ -734,7 +742,15 @@ TEST(VfsCreate, CreateFileTmpfile)
                                os::sys::open_flag::tmpfile | os::sys::open_flag::cloexec
                                  | os::sys::open_flag::exclusive,
                                tmpfile_perm);
-    ASSERT_TRUE(fd) << fd.error().message();
+    if (!fd) {
+        auto err = fd.error();
+        if (err == std::errc::operation_not_supported) {
+            GTEST_SKIP() << "Filesystem does not support O_TMPFILE: " << err.message();
+        }
+
+        FAIL() << "Failed to create tmpfile due to unexpected error: " << err.message();
+    }
+
     auto st = os::fstat(fd->ref());
     ASSERT_TRUE(st);
     EXPECT_TRUE(S_ISREG(st->st_mode));
