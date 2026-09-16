@@ -6,8 +6,7 @@ include(CheckCXXSourceCompiles)
 function(detect_architecture out_var)
     set(CMAKE_REQUIRED_QUIET ON)
 
-    # sw64
-    # Private ISA
+    # sw64 is private ISA
     check_cxx_source_compiles(
         "
 #if !defined(__sw_64__) && !defined(__sw_64)
@@ -22,9 +21,7 @@ int main() { return 0; }"
         return()
     endif()
 
-    # x86_64
-    # __x86_64__ / __x86_64 / __amd64__
-    # GCC/Clang predefine all three on x86-64
+    # x86_64: GCC/Clang predefine __x86_64__ / __x86_64 / __amd64__
     check_cxx_source_compiles(
         "
   #if !defined(__x86_64__) && !defined(__x86_64) && !defined(__amd64__)
@@ -39,9 +36,7 @@ int main() { return 0; }"
         return()
     endif()
 
-    # aarch64
-    # __aarch64__ / __arm64__
-    # GCC/Clang predefine __aarch64__; __arm64__ covers Apple/Solaris-style
+    # aarch64 use __aarch64__, GCC/Clang predefine __aarch64__
     check_cxx_source_compiles(
         "
 #if !defined(__aarch64__)
@@ -91,8 +86,7 @@ int main() { return 0; }"
         return()
     endif()
 
-    # loong64
-    # from gcc:
+    # loong64 from gcc:
     # https://github.com/gcc-mirror/gcc/blob/b76fde4b175ff5f8e8ed8affede662bacb5775a4/gcc/config/loongarch/loongarch-c.cc
     # and also llvm:
     # https://github.com/llvm/llvm-project/blob/a92db5feb9eb78ae7bf37d969391d9f94f181afb/clang/lib/Basic/Targets/LoongArch.cpp

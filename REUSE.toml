@@ -13,7 +13,6 @@ path = [
     ".gitignore",
     "tests/**/.gitignore",
     ".clang-format",
-    ".clang-tidy",
     ".gersemirc",
     "cmake/DetectArch.cmake",
     "cmake.external/CLI11/**",
