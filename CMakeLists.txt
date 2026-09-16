@@ -711,6 +711,16 @@ if(linyaps-box_ENABLE_CPACK)
     set(CPACK_RPM_PACKAGE_URL "${PROJECT_HOMEPAGE_URL}")
     set(CPACK_RPM_PACKAGE_AUTOREQ ON)
 
+    # rpm records the build timestamp, host name and file mtimes in the
+    # package, which breaks reproducibility.  Pin the host, make rpm use
+    # SOURCE_DATE_EPOCH (set by the release pipeline) as the build time, and
+    # clamp packaged file mtimes to it.
+    set(CPACK_RPM_SPEC_MORE_DEFINE
+        "%define _buildhost reproducible"
+        "%define use_source_date_epoch_as_buildtime 1"
+        "%define clamp_mtime_to_source_date_epoch 1"
+    )
+
     include(CPack)
 endif()
 

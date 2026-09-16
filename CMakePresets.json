@@ -321,6 +321,25 @@
 			]
 		},
 		{
+			"name": "release-test",
+			"displayName": "Release workflow without packaging",
+			"description": "Configure, build and test the release profile; used by CI on release branches and pull requests",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "release"
+				},
+				{
+					"type": "build",
+					"name": "release"
+				},
+				{
+					"type": "test",
+					"name": "release"
+				}
+			]
+		},
+		{
 			"name": "ci",
 			"displayName": "The default workflow for CI",
 			"description": "Configure, build then test with CI profile",
