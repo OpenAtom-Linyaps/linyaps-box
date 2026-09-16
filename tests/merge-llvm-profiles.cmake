@@ -17,9 +17,15 @@ endif()
 execute_process(
     COMMAND "${LLVM_PROFDATA}" merge -sparse ${_profraw_files} -o "${PROF_OUT}"
     RESULT_VARIABLE _merge_result
-    COMMAND_ERROR_IS_FATAL ANY
+    OUTPUT_VARIABLE _merge_stdout
+    ERROR_VARIABLE _merge_stderr
 )
 
-file(REMOVE ${_profraw_files})
+if(NOT _merge_result EQUAL 0)
+    message(
+        FATAL_ERROR
+        "llvm-profdata merge failed (${_merge_result}):\n${_merge_stderr}"
+    )
+endif()
 
-message(STATUS "Merged ${_profraw_files} into ${PROF_OUT}")
+file(REMOVE ${_profraw_files})
