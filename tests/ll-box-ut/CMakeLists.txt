@@ -150,39 +150,108 @@ if(linyaps-box_ENABLE_COVERAGE)
         find_program(LLVM_PROFDATA llvm-profdata REQUIRED)
         find_program(LLVM_COV llvm-cov REQUIRED)
 
+        set(_coverage_ignore_regex "(^|/)(tests|_deps|external)/")
+
         add_custom_target(
-            coverage-ut
+            coverage-ut-run
+            # Drop stale profiles first
+            COMMAND
+                bash -c
+                "find '${CMAKE_CURRENT_BINARY_DIR}' -name 'llvm-*.profraw' -delete"
             COMMAND "${CMAKE_CTEST_COMMAND}" -L unit --output-on-failure
             COMMAND
                 "${CMAKE_COMMAND}" "-DPROFILE_DIR=${CMAKE_CURRENT_BINARY_DIR}"
                 "-DPROF_OUT=${CMAKE_CURRENT_BINARY_DIR}/coverage-ut.profdata"
                 "-DLLVM_PROFDATA=${LLVM_PROFDATA}" -P
                 "${CMAKE_CURRENT_SOURCE_DIR}/../merge-llvm-profiles.cmake"
-            COMMAND
-                "${LLVM_COV}" report "$<TARGET_FILE:${linyaps-box_UNIT_TESTS}>"
-                "-instr-profile=${CMAKE_CURRENT_BINARY_DIR}/coverage-ut.profdata"
-                "${PROJECT_SOURCE_DIR}/src/linyaps_box"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
             DEPENDS "${linyaps-box_UNIT_TESTS}"
+            VERBATIM
+        )
+
+        add_custom_target(
+            coverage-ut
+            COMMAND
+                "${CMAKE_COMMAND}" -E chdir "${PROJECT_SOURCE_DIR}"
+                "${LLVM_COV}" report "$<TARGET_FILE:${linyaps-box_UNIT_TESTS}>"
+                "-instr-profile=${CMAKE_CURRENT_BINARY_DIR}/coverage-ut.profdata"
+                "-ignore-filename-regex=${_coverage_ignore_regex}"
+            DEPENDS coverage-ut-run
+            VERBATIM
+        )
+
+        add_custom_target(
+            coverage-lcov
+            COMMAND
+                "${LLVM_COV}" export -format=lcov
+                "$<TARGET_FILE:${linyaps-box_UNIT_TESTS}>"
+                "-instr-profile=${CMAKE_CURRENT_BINARY_DIR}/coverage-ut.profdata"
+                "-ignore-filename-regex=${_coverage_ignore_regex}" >
+                "${CMAKE_CURRENT_BINARY_DIR}/coverage.info"
+            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            DEPENDS coverage-ut-run
+            VERBATIM
+        )
+
+        add_custom_target(
+            coverage-html
+            COMMAND
+                "${CMAKE_COMMAND}" -E rm -rf
+                "${CMAKE_CURRENT_BINARY_DIR}/coverage-html"
+            COMMAND
+                "${CMAKE_COMMAND}" -E chdir "${PROJECT_SOURCE_DIR}"
+                "${LLVM_COV}" show "$<TARGET_FILE:${linyaps-box_UNIT_TESTS}>"
+                "-instr-profile=${CMAKE_CURRENT_BINARY_DIR}/coverage-ut.profdata"
+                "-ignore-filename-regex=${_coverage_ignore_regex}" -format=html
+                "-output-dir=${CMAKE_CURRENT_BINARY_DIR}/coverage-html"
+            DEPENDS coverage-ut-run
             VERBATIM
         )
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         find_program(GCOVR gcovr REQUIRED)
 
+        set(_gcovr_args
+            -r
+            .
+            --object-directory
+            "${CMAKE_BINARY_DIR}/CMakeFiles/linyaps-box.dir"
+            --object-directory
+            "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${linyaps-box_UNIT_TESTS}.dir"
+            --filter
+            "src/linyaps_box"
+        )
+
         add_custom_target(
-            coverage-ut
+            coverage-ut-run
             COMMAND bash -c "find '${CMAKE_BINARY_DIR}' -name '*.gcda' -delete"
+            COMMAND
+                bash -c
+                "find '${CMAKE_BINARY_DIR}' -name '*.gcov.json.gz' -delete"
             COMMAND
                 "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_BINARY_DIR}"
                 "${CMAKE_CTEST_COMMAND}" -L unit --output-on-failure
-            COMMAND
-                "${GCOVR}" -r . --object-directory
-                "${CMAKE_BINARY_DIR}/CMakeFiles/linyaps-box.dir"
-                --object-directory
-                "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${linyaps-box_UNIT_TESTS}.dir"
-                --filter "src/linyaps_box" --txt
             WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
             DEPENDS "${linyaps-box_UNIT_TESTS}"
         )
+
+        add_custom_target(
+            coverage-gcovr
+            COMMAND
+                "${CMAKE_COMMAND}" -E rm -rf
+                "${CMAKE_CURRENT_BINARY_DIR}/coverage-html"
+            COMMAND
+                "${CMAKE_COMMAND}" -E make_directory
+                "${CMAKE_CURRENT_BINARY_DIR}/coverage-html"
+            COMMAND
+                "${GCOVR}" ${_gcovr_args} --txt --lcov
+                "${CMAKE_CURRENT_BINARY_DIR}/coverage.info" --html-details
+                "${CMAKE_CURRENT_BINARY_DIR}/coverage-html/index.html"
+            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            DEPENDS coverage-ut-run
+        )
+
+        add_custom_target(coverage-ut DEPENDS coverage-gcovr)
+        add_custom_target(coverage-lcov DEPENDS coverage-gcovr)
+        add_custom_target(coverage-html DEPENDS coverage-gcovr)
     endif()
 endif()

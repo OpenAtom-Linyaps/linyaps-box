@@ -147,6 +147,20 @@
 			"targets": ["coverage-ut"]
 		},
 		{
+			"name": "coverage-lcov",
+			"inherits": "build-base",
+			"configurePreset": "coverage",
+			"displayName": "Export unit-test coverage as LCOV (for CI upload)",
+			"targets": ["coverage-lcov"]
+		},
+		{
+			"name": "coverage-html",
+			"inherits": "build-base",
+			"configurePreset": "coverage",
+			"displayName": "Generate the browsable HTML coverage report",
+			"targets": ["coverage-html"]
+		},
+		{
 			"name": "release",
 			"inherits": "build-base",
 			"configurePreset": "release",
