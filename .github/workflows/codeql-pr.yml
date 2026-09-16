@@ -1,0 +1,90 @@
+name: 'CodeQL (PR)'
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect source changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      source: ${{ steps.filter.outputs.source }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            source:
+              - 'src/**'
+              - 'app/**'
+              - 'tests/**'
+              - 'cmake/**'
+              - 'cmake.external/**'
+              - 'external/**'
+              - 'CMakeLists.txt'
+              - 'CMakePresets.json'
+              - '.github/actions/**'
+              - '.github/codeql/**'
+              - '.github/workflows/codeql-pr.yml'
+
+  codeql-pr:
+    name: CodeQL (PR)
+    needs: changes
+    # Fork PRs only get a read-only token, so the SARIF upload cannot succeed;
+    # skip them here. workflow_dispatch and same-repo PRs still run.
+    if: >-
+      !cancelled()
+      && (needs.changes.outputs.source == 'true' || github.event_name == 'workflow_dispatch')
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['cpp']
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: manual
+          queries: security-extended
+          config-file: .github/codeql/codeql-config.yaml
+
+      - name: Install Build Dependencies
+        uses: ./.github/actions/setup-deps
+
+      - name: Configure and Build
+        run: cmake --workflow --preset=codeql
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          category: /language:${{ matrix.language }}

@@ -1,0 +1,78 @@
+name: 'Static Analysis'
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan-build:
+    name: scan-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Build Dependencies
+        uses: ./.github/actions/setup-deps
+
+      - name: Install Clang analysis tools
+        run: sudo apt-get install -y clang clang-tools
+
+      - name: Clang Static Analyzer
+        run: ./tools/analyzer.sh
+
+      - name: Upload scan-build report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scan-build-report
+          path: build-analyzer/scan-build-report
+          if-no-files-found: ignore
+
+  codeql-full:
+    name: CodeQL (full)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['cpp']
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: manual
+          queries: security-and-quality
+          config-file: .github/codeql/codeql-config.yaml
+
+      - name: Install Build Dependencies
+        uses: ./.github/actions/setup-deps
+
+      - name: Configure and Build
+        run: cmake --workflow --preset=codeql
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          category: /language:${{ matrix.language }}
