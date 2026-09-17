@@ -292,7 +292,7 @@ LINYAPS_REGISTER_ENUM_TABLE(memfd_flag,
                             { memfd_flag::allow_sealing, "MFD_ALLOW_SEALING" },
                             { memfd_flag::hugetlb, "MFD_HUGETLB" })
 
-enum class statx_flag : std::uint32_t {
+enum class statx_flag : std::uint16_t {
     mnt_id = statx_mnt_id,
     mnt_id_unique = statx_mnt_id_unique,
 };
