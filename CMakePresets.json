@@ -92,6 +92,16 @@
 			}
 		},
 		{
+			"name": "ci-nosan",
+			"inherits": "ci",
+			"displayName": "The CI profile without sanitizers",
+			"description": "Same as ci but with the address/undefined sanitizers disabled, for targets whose toolchain has no libsanitizer (e.g. loong64)",
+			"binaryDir": "${sourceDir}/build-ci-nosan",
+			"cacheVariables": {
+				"linyaps-box_ENABLE_SANITIZER": "OFF"
+			}
+		},
+		{
 			"name": "codeql",
 			"inherits": "base",
 			"displayName": "The CodeQL profile",
@@ -173,6 +183,12 @@
 			"displayName": "Build the CI profile"
 		},
 		{
+			"name": "ci-nosan",
+			"inherits": "build-base",
+			"configurePreset": "ci-nosan",
+			"displayName": "Build the CI profile without sanitizers"
+		},
+		{
 			"name": "codeql",
 			"inherits": "build-base",
 			"configurePreset": "codeql",
@@ -243,6 +259,12 @@
 			"execution": {
 				"stopOnFailure": false
 			}
+		},
+		{
+			"name": "ci-nosan",
+			"inherits": "ci",
+			"configurePreset": "ci-nosan",
+			"displayName": "Test the CI profile without sanitizers"
 		},
 		{
 			"name": "static",
@@ -369,6 +391,25 @@
 				{
 					"type": "test",
 					"name": "ci"
+				}
+			]
+		},
+		{
+			"name": "ci-nosan",
+			"displayName": "The CI workflow without sanitizers",
+			"description": "Configure, build then test with the ci-nosan profile",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "ci-nosan"
+				},
+				{
+					"type": "build",
+					"name": "ci-nosan"
+				},
+				{
+					"type": "test",
+					"name": "ci-nosan"
 				}
 			]
 		},
