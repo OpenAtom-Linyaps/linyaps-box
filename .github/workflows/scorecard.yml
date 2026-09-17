@@ -1,11 +1,6 @@
 name: 'OpenSSF Scorecard'
 
 on:
-  branch_protection_rule:
-  schedule:
-    - cron: '0 5 * * 1'
-  push:
-    branches: ['master']
   workflow_dispatch:
 
 permissions: read-all
@@ -20,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      security-events: write
-      id-token: write
       contents: read
       actions: read
 
@@ -36,7 +29,7 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
-          publish_results: true
+          publish_results: false
 
       - name: Upload SARIF artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -44,8 +37,3 @@ jobs:
           name: scorecard-results
           path: results.sarif
           retention-days: 5
-
-      - name: Upload to code-scanning
-        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
-        with:
-          sarif_file: results.sarif
