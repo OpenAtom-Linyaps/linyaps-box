@@ -1,6 +1,8 @@
 # linyaps-box
 
-[![CodeQL Security Scan](https://github.com/OpenAtom-Linyaps/linyaps-box/actions/workflows/codeql.yaml/badge.svg)](https://github.com/OpenAtom-Linyaps/linyaps-box/actions/workflows/codeql.yaml)
+[![CodeQL](https://github.com/OpenAtom-Linyaps/linyaps-box/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/OpenAtom-Linyaps/linyaps-box/actions/workflows/codeql.yml)
+[![CI](https://github.com/OpenAtom-Linyaps/linyaps-box/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/OpenAtom-Linyaps/linyaps-box/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/OpenAtom-Linyaps/linyaps-box)](LICENSE)
 
 [ [en](./README.md) | **zh_CN** ]
 
