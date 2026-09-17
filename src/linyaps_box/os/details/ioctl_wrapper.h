@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+#pragma once
+
 #include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/utils.h"
 
