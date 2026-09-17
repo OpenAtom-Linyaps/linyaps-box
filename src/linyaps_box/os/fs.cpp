@@ -18,7 +18,7 @@ namespace linyaps_box::os {
 namespace sys {
 auto open_option::from_raw(uint raw) noexcept -> Result<open_option>
 {
-    auto mode{ access_mode::unknown };
+    auto mode{ access_mode::read_only };
     if ((raw & O_PATH) != 0) {
         mode = access_mode::path;
     } else {

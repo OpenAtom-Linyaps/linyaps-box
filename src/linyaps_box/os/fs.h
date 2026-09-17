@@ -87,29 +87,18 @@ LINYAPS_REGISTER_ENUM_TABLE(open_flag,
                             { open_flag::no_atime, "O_NOATIME" },
                             { open_flag::no_ctty, "O_NOCTTY" })
 
-enum class access_mode : mode_t { // NOLINT
-    unknown,
-    read_only,
-    write_only,
-    read_write,
-    path
+enum class access_mode : uint32_t {
+    read_only = O_RDONLY,
+    write_only = O_WRONLY,
+    read_write = O_RDWR,
+    path = O_PATH
 };
-
-constexpr auto format_as(access_mode mode) noexcept -> std::string_view
-{
-    switch (mode) {
-    case access_mode::unknown:
-        return "Unknown";
-    case access_mode::read_only:
-        return "O_RDONLY";
-    case access_mode::write_only:
-        return "O_WRONLY";
-    case access_mode::read_write:
-        return "O_RDWR";
-    case access_mode::path:
-        return "O_PATH";
-    }
-}
+LINYAPS_REGISTER_ENUM_TABLE(access_mode,
+                            4,
+                            { access_mode::read_only, "O_RDONLY" },
+                            { access_mode::write_only, "O_WRONLY" },
+                            { access_mode::read_write, "O_RDWR" },
+                            { access_mode::path, "O_PATH" })
 
 class open_option
 {
