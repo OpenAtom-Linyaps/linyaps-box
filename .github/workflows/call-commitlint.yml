@@ -2,10 +2,13 @@ name: Call commitlint
 on:
   pull_request_target:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-pull/${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:
   check_job:
-    uses: linuxdeepin/.github/.github/workflows/commitlint.yml@master
+    uses: linuxdeepin/.github/.github/workflows/commitlint.yml@c40b0e5a4dbcaf03a9bd3bf05e1abb4933b13fda
