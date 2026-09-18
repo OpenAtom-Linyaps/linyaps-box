@@ -10,22 +10,21 @@
 
 #include <cstdint>
 #include <optional>
-#include <vector>
+#include <string>
 
 namespace linyaps_box::config {
 
 struct cpu
 {
     enum class idle : uint8_t { none, idle };
-
+    std::optional<std::string> cpus;
+    std::optional<std::string> mems;
     std::optional<uint64_t> shares;
     std::optional<int64_t> quota;
     std::optional<uint64_t> burst;
     std::optional<uint64_t> period;
     std::optional<int64_t> realtime_runtime;
     std::optional<uint64_t> realtime_period;
-    std::optional<std::vector<unsigned int>> cpus;
-    std::optional<std::vector<unsigned int>> mems;
     std::optional<idle> idle_;
 };
 

@@ -45,11 +45,11 @@ void from_json(const nlohmann::json &j, cpu &v)
             }
         } else if (key_matches(k, "cpus")) {
             if (!val.is_null()) {
-                v.cpus = parse_range_list(val.get<std::string_view>());
+                val.get_to(v.cpus.emplace());
             }
         } else if (key_matches(k, "mems")) {
             if (!val.is_null()) {
-                v.mems = parse_range_list(val.get<std::string_view>());
+                val.get_to(v.mems.emplace());
             }
         } else if (key_matches(k, "idle")) {
             if (!val.is_null()) {

@@ -10,7 +10,7 @@
 
 #include <cstdint>
 #include <optional>
-#include <vector>
+#include <string>
 
 namespace linyaps_box::config {
 
@@ -41,7 +41,7 @@ struct memory_policy
         local,
     };
 
-    std::optional<std::vector<unsigned int>> nodes;
+    std::optional<std::string> nodes;
     utils::bitflags<memory_policy_flag> flags;
     mode mode_;
 };

@@ -20,6 +20,4 @@ namespace linyaps_box::config {
 [[nodiscard]] auto read_json_to(const std::filesystem::path &path,
                                 utils::uninit_vector<std::byte> &buffer) -> std::size_t;
 
-[[nodiscard]] auto parse_range_list(std::string_view s) -> std::vector<unsigned int>;
-
 } // namespace linyaps_box::config

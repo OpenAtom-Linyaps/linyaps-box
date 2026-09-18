@@ -32,7 +32,7 @@ TEST(ResourcesParse, FixtureResources)
     ASSERT_TRUE(resources.cpu_.has_value());
     EXPECT_THAT(resources.cpu_->shares, Eq(512));
     ASSERT_TRUE(resources.cpu_->cpus.has_value());
-    EXPECT_THAT(*resources.cpu_->cpus, ElementsAre(0, 1, 2, 3));
+    EXPECT_EQ(*resources.cpu_->cpus, "0-3");
     EXPECT_EQ(resources.cpu_->idle_, cpu::idle::idle);
     ASSERT_TRUE(resources.memory_.has_value());
     EXPECT_THAT(resources.memory_->limit, Eq(1048576));
