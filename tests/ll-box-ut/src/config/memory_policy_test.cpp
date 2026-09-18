@@ -8,14 +8,32 @@
 #include "fixture.h"
 #include "linyaps_box/config/oci_config.h"
 
+#include <fmt/format.h>
+
+#include <tuple>
+
 namespace linyaps_box {
 using namespace linyaps_box::config;
 
 namespace {
 
-using testing::ElementsAre;
-
 using linyaps_box::test::parse_config;
+
+[[nodiscard]] auto policy_json(const char *mode, const char *nodes, const char *flags)
+  -> std::string
+{
+    auto policy = fmt::format(R"({{"mode": "{}")", mode);
+    if (nodes != nullptr) {
+        policy += fmt::format(R"(, "nodes": "{}")", nodes);
+    }
+
+    if (flags != nullptr) {
+        policy += fmt::format(R"(, "flags": {})", flags);
+    }
+
+    policy += "}";
+    return fmt::format(R"(  "linux": {{"memoryPolicy": {}}})", policy);
+}
 
 TEST(MemoryPolicyParse, UnknownModeRejected)
 {
@@ -40,7 +58,7 @@ TEST(MemoryPolicyParse, HappyPath)
     ASSERT_TRUE(config.linux_->memory_policy_.has_value());
     EXPECT_EQ(config.linux_->memory_policy_->mode_, memory_policy::mode::bind);
     ASSERT_TRUE(config.linux_->memory_policy_->nodes.has_value());
-    EXPECT_THAT(*config.linux_->memory_policy_->nodes, ElementsAre(0, 2));
+    EXPECT_EQ(*config.linux_->memory_policy_->nodes, "0,2");
     EXPECT_TRUE(config.linux_->memory_policy_->flags.contains(memory_policy_flag::static_nodes));
 }
 
@@ -51,70 +69,91 @@ TEST(MemoryPolicyParse, NullPolicyAccepted)
     EXPECT_FALSE(config.linux_->memory_policy_.has_value());
 }
 
-TEST(MemoryPolicyParse, DefaultModeWithNodesRejected)
+TEST(MemoryPolicyParse, NodesKeptVerbatim)
 {
-    EXPECT_THROW(std::ignore = parse_config(
-                   R"(  "linux": {"memoryPolicy": {"mode": "MPOL_DEFAULT", "nodes": "0,2"}})"),
-                 std::runtime_error);
+    for (const auto *const nodes : { "", "   ", ", ,", "0-3,7", "all", "1-123456789123456789" }) {
+        const auto config = parse_config(policy_json("MPOL_PREFERRED", nodes, nullptr));
+        ASSERT_TRUE(config.linux_.has_value()) << nodes;
+        ASSERT_TRUE(config.linux_->memory_policy_.has_value()) << nodes;
+        ASSERT_TRUE(config.linux_->memory_policy_->nodes.has_value()) << nodes;
+        EXPECT_EQ(*config.linux_->memory_policy_->nodes, nodes) << nodes;
+    }
 }
 
-TEST(MemoryPolicyParse, LocalModeWithNodesRejected)
+class MemoryPolicyModeNodesTest
+    : public testing::TestWithParam<std::tuple<const char *, const char *, bool>>
 {
-    EXPECT_THROW(std::ignore = parse_config(
-                   R"(  "linux": {"memoryPolicy": {"mode": "MPOL_LOCAL", "nodes": "0,2"}})"),
-                 std::runtime_error);
+};
+
+TEST_P(MemoryPolicyModeNodesTest, ModeNodesConsistency)
+{
+    const auto &[mode, nodes, rejected] = GetParam();
+    const auto content = policy_json(mode, nodes, nullptr);
+
+    if (rejected) {
+        EXPECT_THROW(std::ignore = parse_config(content), std::runtime_error) << content;
+    } else {
+        EXPECT_NO_THROW(std::ignore = parse_config(content)) << content;
+    }
 }
 
-TEST(MemoryPolicyParse, BindModeRequiresNodes)
+INSTANTIATE_TEST_SUITE_P(MemoryPolicyParse,
+                         MemoryPolicyModeNodesTest,
+                         testing::Values(std::tuple{ "MPOL_DEFAULT", nullptr, false },
+                                         std::tuple{ "MPOL_DEFAULT", "", false },
+                                         std::tuple{ "MPOL_DEFAULT", "   ", false },
+                                         std::tuple{ "MPOL_DEFAULT", ", ,", false },
+                                         std::tuple{ "MPOL_DEFAULT", "0,2", true },
+                                         std::tuple{ "MPOL_LOCAL", "0", true },
+                                         std::tuple{ "MPOL_LOCAL", "   ", false },
+                                         std::tuple{ "MPOL_BIND", nullptr, true },
+                                         std::tuple{ "MPOL_BIND", "", true },
+                                         std::tuple{ "MPOL_BIND", "   ", true },
+                                         std::tuple{ "MPOL_BIND", ", ,", true },
+                                         std::tuple{ "MPOL_BIND", "0,2", false },
+                                         std::tuple{ "MPOL_BIND", "all", false },
+                                         std::tuple{ "MPOL_INTERLEAVE", nullptr, true },
+                                         std::tuple{ "MPOL_PREFERRED_MANY", nullptr, true },
+                                         std::tuple{ "MPOL_WEIGHTED_INTERLEAVE", nullptr, true },
+                                         std::tuple{ "MPOL_PREFERRED", nullptr, false },
+                                         std::tuple{ "MPOL_PREFERRED", "", false },
+                                         std::tuple{ "MPOL_PREFERRED", "0,2", false }));
+
+class MemoryPolicyFlagsTest
+    : public testing::TestWithParam<std::tuple<const char *, const char *, const char *, bool>>
 {
-    EXPECT_THROW(std::ignore =
-                   parse_config(R"(  "linux": {"memoryPolicy": {"mode": "MPOL_BIND"}})"),
-                 std::runtime_error);
+};
+
+TEST_P(MemoryPolicyFlagsTest, FlagConsistency)
+{
+    const auto &[mode, nodes, flags, rejected] = GetParam();
+    const auto content = policy_json(mode, nodes, flags);
+
+    if (rejected) {
+        EXPECT_THROW(std::ignore = parse_config(content), std::runtime_error) << content;
+    } else {
+        EXPECT_NO_THROW(std::ignore = parse_config(content)) << content;
+    }
 }
 
-TEST(MemoryPolicyParse, InterleaveModeRequiresNodes)
-{
-    EXPECT_THROW(std::ignore =
-                   parse_config(R"(  "linux": {"memoryPolicy": {"mode": "MPOL_INTERLEAVE"}})"),
-                 std::runtime_error);
-}
-
-TEST(MemoryPolicyParse, PreferredManyModeRequiresNodes)
-{
-    EXPECT_THROW(std::ignore =
-                   parse_config(R"(  "linux": {"memoryPolicy": {"mode": "MPOL_PREFERRED_MANY"}})"),
-                 std::runtime_error);
-}
-
-TEST(MemoryPolicyParse, WeightedInterleaveModeRequiresNodes)
-{
-    EXPECT_THROW(std::ignore = parse_config(
-                   R"(  "linux": {"memoryPolicy": {"mode": "MPOL_WEIGHTED_INTERLEAVE"}})"),
-                 std::runtime_error);
-}
-
-TEST(MemoryPolicyParse, PreferredModeAllowsAnyNodes)
-{
-    const auto no_nodes =
-      parse_config(R"(  "linux": {"memoryPolicy": {"mode": "MPOL_PREFERRED"}})");
-    ASSERT_TRUE(no_nodes.linux_.has_value());
-    ASSERT_TRUE(no_nodes.linux_->memory_policy_.has_value());
-    EXPECT_FALSE(no_nodes.linux_->memory_policy_->nodes.has_value());
-
-    const auto with_nodes =
-      parse_config(R"(  "linux": {"memoryPolicy": {"mode": "MPOL_PREFERRED", "nodes": "2"}})");
-    ASSERT_TRUE(with_nodes.linux_.has_value());
-    ASSERT_TRUE(with_nodes.linux_->memory_policy_.has_value());
-    ASSERT_TRUE(with_nodes.linux_->memory_policy_->nodes.has_value());
-}
-
-TEST(MemoryPolicyParse, DefaultModeWithoutNodesAccepted)
-{
-    const auto config = parse_config(R"(  "linux": {"memoryPolicy": {"mode": "MPOL_DEFAULT"}})");
-    ASSERT_TRUE(config.linux_.has_value());
-    ASSERT_TRUE(config.linux_->memory_policy_.has_value());
-    EXPECT_FALSE(config.linux_->memory_policy_->nodes.has_value());
-}
+INSTANTIATE_TEST_SUITE_P(
+  MemoryPolicyParse,
+  MemoryPolicyFlagsTest,
+  testing::Values(
+    // MPOL_F_STATIC_NODES and MPOL_F_RELATIVE_NODES are mutually exclusive.
+    std::tuple{ "MPOL_BIND", "0", R"(["MPOL_F_STATIC_NODES", "MPOL_F_RELATIVE_NODES"])", true },
+    std::tuple{ "MPOL_BIND", "0", R"(["MPOL_F_STATIC_NODES"])", false },
+    // MPOL_F_NUMA_BALANCING is valid with MPOL_BIND and MPOL_PREFERRED_MANY only.
+    std::tuple{ "MPOL_BIND", "0", R"(["MPOL_F_NUMA_BALANCING"])", false },
+    std::tuple{ "MPOL_PREFERRED_MANY", "0", R"(["MPOL_F_NUMA_BALANCING"])", false },
+    std::tuple{ "MPOL_INTERLEAVE", "0", R"(["MPOL_F_NUMA_BALANCING"])", true },
+    std::tuple{ "MPOL_PREFERRED", "0", R"(["MPOL_F_NUMA_BALANCING"])", true },
+    // The kernel ignores flags for MPOL_DEFAULT, but rejects them for MPOL_LOCAL.
+    std::tuple{ "MPOL_DEFAULT", nullptr, R"(["MPOL_F_STATIC_NODES"])", false },
+    std::tuple{ "MPOL_LOCAL", nullptr, R"(["MPOL_F_STATIC_NODES"])", true },
+    // MPOL_PREFERRED with empty nodes rejects static/relative flags.
+    std::tuple{ "MPOL_PREFERRED", nullptr, R"(["MPOL_F_STATIC_NODES"])", true },
+    std::tuple{ "MPOL_PREFERRED", "0", R"(["MPOL_F_STATIC_NODES"])", false }));
 
 } // namespace
 } // namespace linyaps_box
