@@ -19,4 +19,6 @@ struct time_offset
 
 void from_json(const nlohmann::json &j, time_offset &v);
 
+void validate(const time_offset &v);
+
 } // namespace linyaps_box::config

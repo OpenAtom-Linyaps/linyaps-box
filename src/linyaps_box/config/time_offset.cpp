@@ -4,7 +4,12 @@
 
 #include "linyaps_box/config/time_offset.h"
 
+#include "linyaps_box/utils/utils.h"
+
 #include <nlohmann/json.hpp>
+
+#include <stdexcept>
+#include <string>
 
 namespace linyaps_box::config {
 
@@ -16,6 +21,15 @@ void from_json(const nlohmann::json &j, time_offset &v)
 
     if (auto it = j.find("nanosecs"); it != j.end() && !it->is_null()) {
         it->get_to(v.nanosecs.emplace());
+    }
+}
+
+void validate(const time_offset &v)
+{
+    const uint32_t max_nanosecs{ 1'000'000'000 };
+    if (UNLIKELY(v.nanosecs && *v.nanosecs >= max_nanosecs)) {
+        throw std::runtime_error("timeOffsets nanosecs must be smaller than "
+                                 + std::to_string(max_nanosecs));
     }
 }
 
