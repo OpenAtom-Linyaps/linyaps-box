@@ -6,10 +6,22 @@
 
 #include <cstddef>
 #include <iosfwd>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
 namespace linyaps_box::utils {
+
+class invalid_semver : public std::invalid_argument
+{
+public:
+    explicit invalid_semver(const std::string &message);
+    invalid_semver(const invalid_semver &) = default;
+    invalid_semver(invalid_semver &&) noexcept = default;
+    auto operator=(const invalid_semver &) -> invalid_semver & = default;
+    auto operator=(invalid_semver &&) noexcept -> invalid_semver & = default;
+    ~invalid_semver() noexcept override = default;
+};
 
 class semver
 {
@@ -18,7 +30,7 @@ public:
            unsigned int minor,
            unsigned int patch,
            std::string prerelease = "",
-           std::string build = "") noexcept;
+           std::string build = "");
 
     explicit semver(std::string_view str);
 
@@ -42,8 +54,6 @@ public:
     friend std::ostream &operator<<(std::ostream &os, const semver &v);
 
 private:
-    static int compare_prerelease(const std::string &a, const std::string &b) noexcept;
-
     unsigned int major_;
     unsigned int minor_;
     unsigned int patch_;
