@@ -188,6 +188,12 @@ void validate(const linux &v)
     if (v.intel_rdt_) {
         validate(*v.intel_rdt_);
     }
+
+    if (v.time_offsets) {
+        std::for_each(v.time_offsets->cbegin(), v.time_offsets->cend(), [](const auto &entry) {
+            validate(entry.second);
+        });
+    }
 }
 
 } // namespace linyaps_box::config
