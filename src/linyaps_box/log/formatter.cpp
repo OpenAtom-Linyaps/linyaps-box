@@ -11,7 +11,6 @@
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
-#include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::log {
@@ -35,39 +34,6 @@ auto to_json(nlohmann::json &j, level lvl) -> void
         j = "DEBUG";
         break;
     }
-}
-
-auto from_json(const nlohmann::json &j, level &lvl) -> void
-{
-    auto s = j.get<std::string_view>();
-    if (s == "FATAL") {
-        lvl = level::fatal;
-        return;
-    }
-
-    if (s == "ERROR") {
-        lvl = level::error;
-        return;
-    }
-
-    if (s == "WARN") {
-        lvl = level::warn;
-        return;
-    }
-
-    if (s == "INFO") {
-        lvl = level::info;
-        return;
-    }
-
-    if (s == "DEBUG") {
-        lvl = level::debug;
-        return;
-    }
-
-    throw nlohmann::json::other_error::create(500,
-                                              std::string("unknown log level: ").append(s),
-                                              &j);
 }
 
 namespace detail {

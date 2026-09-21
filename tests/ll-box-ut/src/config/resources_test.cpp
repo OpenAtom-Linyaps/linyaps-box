@@ -178,5 +178,32 @@ TEST(ResourcesParse, HugepagePageSizeValidFormatsAccepted)
     EXPECT_THAT(limits[2].page_size, Eq("1GB"));
 }
 
+TEST(ResourcesParse, PidsLimitParsed)
+{
+    const auto with_limit = parse_config(R"(  "linux": {"resources": {"pids": {"limit": 42}}})");
+    ASSERT_TRUE(with_limit.linux_->resources_->pids_.has_value());
+    EXPECT_EQ(with_limit.linux_->resources_->pids_->limit.value_or(-1), 42);
+
+    const auto without = parse_config(R"(  "linux": {"resources": {"pids": {}}})");
+    EXPECT_FALSE(without.linux_->resources_->pids_->limit.has_value());
+}
+
+TEST(ResourcesParse, CpuMemoryBlockIoFieldsParsed)
+{
+    const auto config = parse_config(
+      R"(  "linux": {"resources": {"cpu": {"quota": 1000, "period": 100}, "memory": {"swap": 2097152}, "blockIO": {"weight": 500, "leafWeight": 300}}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->resources_.has_value());
+    const auto &res = *config.linux_->resources_;
+    ASSERT_TRUE(res.cpu_.has_value());
+    EXPECT_EQ(res.cpu_->quota.value_or(0), 1000);
+    EXPECT_EQ(res.cpu_->period.value_or(0), 100U);
+    ASSERT_TRUE(res.memory_.has_value());
+    EXPECT_EQ(res.memory_->swap.value_or(0), 2097152);
+    ASSERT_TRUE(res.block_io_.has_value());
+    EXPECT_EQ(res.block_io_->weight.value_or(0), 500U);
+    EXPECT_EQ(res.block_io_->leaf_weight.value_or(0), 300U);
+}
+
 } // namespace
 } // namespace linyaps_box

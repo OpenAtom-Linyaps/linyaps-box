@@ -5,16 +5,16 @@
 #include "linyaps_box/config/capabilities.h"
 
 #include "linyaps_box/config/utils.h"
-
-#include <nlohmann/json.hpp>
+#include "linyaps_box/utils/strict_json.h"
 
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, capabilities &v)
+void from_json(const utils::strict_json &j, capabilities &v)
 {
-    auto parse_set = [](const nlohmann::json &j, std::vector<std::string> &set) {
+    utils::require_object(j);
+    auto parse_set = [](const utils::strict_json &j, std::vector<std::string> &set) {
         set.reserve(j.size());
         for (const auto &elem : j) {
             set.push_back(elem.get<std::string>());

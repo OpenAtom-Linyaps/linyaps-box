@@ -4,12 +4,13 @@
 
 #include "linyaps_box/config/pids.h"
 
-#include <nlohmann/json.hpp>
+#include "linyaps_box/utils/strict_json.h"
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, pids &v)
+void from_json(const utils::strict_json &j, pids &v)
 {
+    utils::require_object(j);
     if (auto it = j.find("limit"); it != j.end() && !it->is_null()) {
         it->get_to(v.limit.emplace());
     }

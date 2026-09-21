@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <string>
@@ -17,7 +17,7 @@ struct hugepage_limit
     uint64_t limit;
 };
 
-void from_json(const nlohmann::json &j, hugepage_limit &v);
+void from_json(const utils::strict_json &j, hugepage_limit &v);
 
 void validate(const hugepage_limit &v);
 

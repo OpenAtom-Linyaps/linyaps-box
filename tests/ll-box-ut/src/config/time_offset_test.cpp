@@ -38,5 +38,24 @@ TEST(TimeOffsetParse, NegativeSecsAccepted)
     EXPECT_EQ(*config.linux_->time_offsets->at("boottime").secs, -5);
 }
 
+TEST(TimeOffsetParse, SecsOnlyAccepted)
+{
+    const auto config =
+      parse_config(R"(  "linux": {"timeOffsets": {"monotonic": {"secs": 172800}}})");
+    ASSERT_TRUE(config.linux_->time_offsets.has_value());
+    const auto &offset = config.linux_->time_offsets->at("monotonic");
+    EXPECT_EQ(offset.secs, 172800);
+    EXPECT_FALSE(offset.nanosecs.has_value());
+}
+
+TEST(TimeOffsetParse, EmptyAccepted)
+{
+    const auto config = parse_config(R"(  "linux": {"timeOffsets": {"monotonic": {}}})");
+    ASSERT_TRUE(config.linux_->time_offsets.has_value());
+    const auto &offset = config.linux_->time_offsets->at("monotonic");
+    EXPECT_FALSE(offset.secs.has_value());
+    EXPECT_FALSE(offset.nanosecs.has_value());
+}
+
 } // namespace
 } // namespace linyaps_box

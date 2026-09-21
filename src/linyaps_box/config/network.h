@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -25,9 +25,9 @@ struct network
     std::optional<std::vector<priority>> priorities;
 };
 
-void from_json(const nlohmann::json &j, network::priority &v);
+void from_json(const utils::strict_json &j, network::priority &v);
 
-void from_json(const nlohmann::json &j, network &v);
+void from_json(const utils::strict_json &j, network &v);
 
 void validate(const network &v);
 

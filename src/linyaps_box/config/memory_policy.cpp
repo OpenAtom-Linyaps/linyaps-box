@@ -4,10 +4,9 @@
 
 #include "linyaps_box/config/memory_policy.h"
 
-#include "linyaps_box/config/utils.h"
+#include "linyaps_box/utils/strict_json.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 #include <string_view>
@@ -23,8 +22,9 @@ namespace {
 
 } // namespace
 
-void from_json(const nlohmann::json &j, memory_policy &v)
+void from_json(const utils::strict_json &j, memory_policy &v)
 {
+    utils::require_object(j);
     auto mode_name = j.at("mode").get<std::string_view>();
     auto mode_opt = utils::enum_table_v<memory_policy::mode>.from_name(mode_name);
     if (UNLIKELY(!mode_opt)) {

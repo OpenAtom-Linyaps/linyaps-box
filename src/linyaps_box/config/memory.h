@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -24,7 +24,7 @@ struct memory
     std::optional<bool> check_before_update;
 };
 
-void from_json(const nlohmann::json &j, memory &v);
+void from_json(const utils::strict_json &j, memory &v);
 
 void validate(const memory &v);
 

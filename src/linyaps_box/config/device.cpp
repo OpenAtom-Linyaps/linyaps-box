@@ -5,18 +5,19 @@
 #include "linyaps_box/config/device.h"
 
 #include "linyaps_box/config/utils.h"
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, device &v)
+void from_json(const utils::strict_json &j, device &v)
 {
+    utils::require_object(j);
     bool have_type{ false };
     bool have_path{ false };
     for (const auto &[key, val] : j.items()) {

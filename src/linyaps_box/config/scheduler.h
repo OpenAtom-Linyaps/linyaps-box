@@ -5,8 +5,7 @@
 #pragma once
 
 #include "linyaps_box/utils/enum_traits.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -59,7 +58,7 @@ LINYAPS_REGISTER_ENUM_TABLE(scheduler::policy,
                             { scheduler::policy::idle, "SCHED_IDLE" },
                             { scheduler::policy::deadline, "SCHED_DEADLINE" })
 
-void from_json(const nlohmann::json &j, scheduler &v);
+void from_json(const utils::strict_json &j, scheduler &v);
 
 void validate(const scheduler &v);
 

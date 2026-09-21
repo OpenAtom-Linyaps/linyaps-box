@@ -4,17 +4,18 @@
 
 #include "linyaps_box/config/hugepage.h"
 
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, hugepage_limit &v)
+void from_json(const utils::strict_json &j, hugepage_limit &v)
 {
+    utils::require_object(j);
     j.at("pageSize").get_to(v.page_size);
     j.at("limit").get_to(v.limit);
 }

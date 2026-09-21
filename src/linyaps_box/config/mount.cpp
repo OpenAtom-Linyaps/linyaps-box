@@ -6,9 +6,9 @@
 
 #include "linyaps_box/config/utils.h"
 #include "linyaps_box/log/macro.h"
+#include "linyaps_box/utils/strict_json.h"
 
 #include <fmt/std.h>
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -375,8 +375,9 @@ auto parse_mount_options(const std::vector<std::string_view> &options) -> parsed
 
 } // namespace
 
-void from_json(const nlohmann::json &j, mount &v)
+void from_json(const utils::strict_json &j, mount &v)
 {
+    utils::require_object(j);
     std::optional<std::vector<id_mapping>> inline_uid_mappings;
     std::optional<std::vector<id_mapping>> inline_gid_mappings;
     bool have_destination{ false };

@@ -4,16 +4,18 @@
 
 #include "linyaps_box/config/io_priority.h"
 
+#include "linyaps_box/utils/strict_json.h"
+
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, io_priority &v)
+void from_json(const utils::strict_json &j, io_priority &v)
 {
+    utils::require_object(j);
     auto name = j.at("class").get<std::string_view>();
     const auto opt = utils::enum_table_v<io_priority::class_t>.from_name(name);
     if (UNLIKELY(!opt)) {

@@ -9,10 +9,10 @@
 #include "linyaps_box/os/fs.h"
 #include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/file_describer.h"
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
-#include <nlohmann/json.hpp>
 
 namespace {
 
@@ -84,9 +84,14 @@ auto read_status(const std::filesystem::path &path) -> linyaps_box::container_st
       open(path, sys::open_option{ sys::open_flag::cloexec, sys::access_mode::read_only }));
 
     linyaps_box::utils::uninit_vector<std::byte> buf;
-    std::ignore = throw_if_error(linyaps_box::io::read_to_end(fd, buf));
+    const auto len = throw_if_error(linyaps_box::io::read_to_end(fd, buf));
 
-    const auto j = nlohmann::json::parse(buf.cbegin(), buf.cend());
+    if (UNLIKELY(len == 0)) {
+        throw std::runtime_error(fmt::format("status file is empty: {}", path));
+    }
+
+    const auto j = linyaps_box::utils::strict_parse(
+      std::string_view{ reinterpret_cast<const char *>(buf.data()), len });
     return j.get<linyaps_box::container_status>();
 }
 
@@ -104,7 +109,7 @@ linyaps_box::status_directory::status_directory(std::filesystem::path path)
 
 void linyaps_box::status_directory::write(const container_status &status) const
 {
-    auto j = nlohmann::json(status);
+    auto j = utils::strict_json(status);
     ::atomic_write(path_ / "status.json", j.dump());
 }
 

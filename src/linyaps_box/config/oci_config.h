@@ -9,8 +9,7 @@
 #include "linyaps_box/config/mount.h"
 #include "linyaps_box/config/process.h"
 #include "linyaps_box/config/root.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <filesystem>
 #include <optional>
@@ -40,7 +39,7 @@ struct oci_config
     std::optional<std::unordered_map<std::string, std::string>> annotations;
 };
 
-void from_json(const nlohmann::json &j, oci_config &v);
+void from_json(const utils::strict_json &j, oci_config &v);
 
 void validate(const oci_config &v);
 

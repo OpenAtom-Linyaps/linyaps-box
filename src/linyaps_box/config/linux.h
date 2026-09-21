@@ -53,7 +53,7 @@ struct linux
     std::optional<rootfs_propagation> rootfs_propagation_;
 };
 
-void from_json(const nlohmann::json &j, linux &v);
+void from_json(const utils::strict_json &j, linux &v);
 
 void validate(const linux &v);
 

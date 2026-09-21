@@ -5,8 +5,7 @@
 #pragma once
 
 #include "linyaps_box/utils/enum_traits.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -150,11 +149,11 @@ LINYAPS_REGISTER_ENUM_TABLE(seccomp::syscall::arg::op,
                             { seccomp::syscall::arg::op::ge, "SCMP_CMP_GE" },
                             { seccomp::syscall::arg::op::masked_eq, "SCMP_CMP_MASKED_EQ" })
 
-void from_json(const nlohmann::json &j, seccomp::syscall::arg &v);
+void from_json(const utils::strict_json &j, seccomp::syscall::arg &v);
 
-void from_json(const nlohmann::json &j, seccomp::syscall &v);
+void from_json(const utils::strict_json &j, seccomp::syscall &v);
 
-void from_json(const nlohmann::json &j, seccomp &v);
+void from_json(const utils::strict_json &j, seccomp &v);
 
 void validate(const seccomp::syscall &v);
 

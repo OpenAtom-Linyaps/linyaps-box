@@ -5,9 +5,9 @@
 #include "linyaps_box/config/ns.h"
 
 #include "linyaps_box/utils/enum_formatter.h" // IWYU pragma: keep
+#include "linyaps_box/utils/strict_json.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <array>
 #include <filesystem>
@@ -15,8 +15,9 @@
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, ns &v)
+void from_json(const utils::strict_json &j, ns &v)
 {
+    utils::require_object(j);
     auto type_str = j.at("type").get<std::string_view>();
     const auto opt = utils::enum_table_v<ns::type>.from_name(type_str);
     if (UNLIKELY(!opt)) {

@@ -5,12 +5,13 @@
 #include <gtest/gtest.h>
 
 #include "linyaps_box/container_status.h"
-
-#include <nlohmann/json.hpp>
+#include "linyaps_box/utils/strict_json.h" // IWYU pragma: keep
 
 #include <chrono>
 #include <cstdint>
 #include <string>
+
+using json = linyaps_box::utils::strict_json;
 
 namespace {
 
@@ -28,6 +29,7 @@ auto make_status(bool with_start_time) -> linyaps_box::container_status
     if (with_start_time) {
         s.process_start_time = std::uint64_t{ 123456789 };
     }
+
     return s;
 }
 
@@ -36,11 +38,8 @@ auto make_status(bool with_start_time) -> linyaps_box::container_status
 TEST(ContainerStatusJson, RoundTripWithStartTime)
 {
     auto s = make_status(true);
-    nlohmann::json j;
-    linyaps_box::to_json(j, s);
-
-    linyaps_box::container_status parsed;
-    linyaps_box::from_json(j, parsed);
+    auto ret = json(s).dump();
+    auto parsed = linyaps_box::utils::strict_parse(ret).get<linyaps_box::container_status>();
 
     EXPECT_EQ(parsed.id, s.id);
     EXPECT_EQ(parsed.oci_version, s.oci_version);
@@ -56,8 +55,7 @@ TEST(ContainerStatusJson, RoundTripWithStartTime)
 TEST(ContainerStatusJson, OmitKeyWhenNullopt)
 {
     auto s = make_status(false);
-    nlohmann::json j;
-    linyaps_box::to_json(j, s);
+    auto j = json(s);
 
     EXPECT_FALSE(j.contains("process-start-time"));
 }
@@ -65,8 +63,7 @@ TEST(ContainerStatusJson, OmitKeyWhenNullopt)
 TEST(ContainerStatusJson, IncludeKeyWhenSet)
 {
     auto s = make_status(true);
-    nlohmann::json j;
-    linyaps_box::to_json(j, s);
+    auto j = json(s);
 
     EXPECT_TRUE(j.contains("process-start-time"));
     EXPECT_EQ(j.at("process-start-time").get<std::uint64_t>(), std::uint64_t{ 123456789 });
@@ -74,13 +71,13 @@ TEST(ContainerStatusJson, IncludeKeyWhenSet)
 
 TEST(ContainerStatusJson, MissingKeyYieldsNullopt)
 {
-    auto j = nlohmann::json::object({ { "id", "c1" },
-                                      { "pid", 100 },
-                                      { "bundle", "/b" },
-                                      { "created", "2023-11-14T22:13:20.123456Z" },
-                                      { "owner", "o" },
-                                      { "annotations", nlohmann::json::object() },
-                                      { "ociVersion", "1.0.2" } });
+    auto j = linyaps_box::utils::strict_json::object({ { "id", "c1" },
+                                                       { "pid", 100 },
+                                                       { "bundle", "/b" },
+                                                       { "created", "2023-11-14T22:13:20.123456Z" },
+                                                       { "owner", "o" },
+                                                       { "annotations", json::object() },
+                                                       { "ociVersion", "1.0.2" } });
 
     linyaps_box::container_status parsed;
     linyaps_box::from_json(j, parsed);
@@ -90,15 +87,15 @@ TEST(ContainerStatusJson, MissingKeyYieldsNullopt)
 
 TEST(ContainerStatusJson, ExplicitNullThrows)
 {
-    auto j = nlohmann::json::object({ { "id", "c1" },
-                                      { "pid", 100 },
-                                      { "process-start-time", nullptr },
-                                      { "bundle", "/b" },
-                                      { "created", "2023-11-14T22:13:20.123456Z" },
-                                      { "owner", "o" },
-                                      { "annotations", nlohmann::json::object() },
-                                      { "ociVersion", "1.0.2" } });
+    auto j = json::object({ { "id", "c1" },
+                            { "pid", 100 },
+                            { "process-start-time", nullptr },
+                            { "bundle", "/b" },
+                            { "created", "2023-11-14T22:13:20.123456Z" },
+                            { "owner", "o" },
+                            { "annotations", json::object() },
+                            { "ociVersion", "1.0.2" } });
 
     linyaps_box::container_status parsed;
-    EXPECT_THROW(linyaps_box::from_json(j, parsed), nlohmann::json::type_error);
+    EXPECT_THROW(linyaps_box::from_json(j, parsed), json::type_error);
 }

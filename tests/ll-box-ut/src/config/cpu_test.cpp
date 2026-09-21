@@ -7,6 +7,7 @@
 
 #include "fixture.h"
 #include "linyaps_box/config/oci_config.h"
+#include "linyaps_box/utils/strict_json.h"
 
 #include <fmt/format.h>
 
@@ -37,7 +38,7 @@ TEST(CpuParse, IdleValuesParsed)
 TEST(CpuParse, CpusWrongTypeRejected)
 {
     EXPECT_THROW(std::ignore = parse_config(R"(  "linux": {"resources": {"cpu": {"cpus": 42}}})"),
-                 std::exception);
+                 utils::strict_json::type_error);
 }
 
 TEST(CpuParse, CpusKeptVerbatim)

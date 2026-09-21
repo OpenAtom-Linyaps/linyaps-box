@@ -30,11 +30,11 @@
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/signal.h"
+#include "linyaps_box/utils/strict_json.h"
 #include "utils/defer.h"
 
 #include <linux/magic.h>
 #include <linux/sched.h>
-#include <nlohmann/json.hpp>
 #include <sys/mount.h>
 #include <sys/signalfd.h>
 #include <sys/statfs.h>
@@ -247,7 +247,7 @@ void execute_hook(const hook &hook, const container_status &state)
     }
     parent.close();
 
-    auto state_json = nlohmann::json(state).dump();
+    auto state_json = utils::strict_json(state).dump();
     const auto *data = reinterpret_cast<const std::byte *>(state_json.data());
     auto remaining = state_json.size();
 

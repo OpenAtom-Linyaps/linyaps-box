@@ -7,10 +7,10 @@
 #include "linyaps_box/config/utils.h"
 #include "linyaps_box/utils/enum_formatter.h" // IWYU pragma: keep
 #include "linyaps_box/utils/environ.h"
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <bitset>
@@ -20,8 +20,9 @@
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, process &v)
+void from_json(const utils::strict_json &j, process &v)
 {
+    utils::require_object(j);
     bool have_cwd{ false };
     bool have_args{ false };
     for (const auto &[key, val] : j.items()) {
@@ -168,7 +169,7 @@ void validate(const process &v)
 
 auto process::parse(std::string_view content) -> process
 {
-    auto process_config = nlohmann::json::parse(content).get<process>();
+    auto process_config = utils::strict_parse(content).get<process>();
     validate(process_config);
     return process_config;
 }

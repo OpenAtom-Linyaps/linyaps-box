@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <filesystem>
 #include <optional>
@@ -22,7 +22,7 @@ struct user
     std::optional<std::vector<gid_t>> additional_gids;
 };
 
-void from_json(const nlohmann::json &j, user &v);
+void from_json(const utils::strict_json &j, user &v);
 
 void validate(const user &v);
 

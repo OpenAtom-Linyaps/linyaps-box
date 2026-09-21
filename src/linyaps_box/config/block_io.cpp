@@ -5,16 +5,16 @@
 #include "linyaps_box/config/block_io.h"
 
 #include "linyaps_box/config/utils.h"
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
-
-#include <nlohmann/json.hpp>
 
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, block_io::weight_device &v)
+void from_json(const utils::strict_json &j, block_io::weight_device &v)
 {
+    utils::require_object(j);
     j.at("major").get_to(v.major);
     j.at("minor").get_to(v.minor);
 
@@ -27,15 +27,17 @@ void from_json(const nlohmann::json &j, block_io::weight_device &v)
     }
 }
 
-void from_json(const nlohmann::json &j, block_io::throttle_device &v)
+void from_json(const utils::strict_json &j, block_io::throttle_device &v)
 {
+    utils::require_object(j);
     j.at("major").get_to(v.major);
     j.at("minor").get_to(v.minor);
     j.at("rate").get_to(v.rate);
 }
 
-void from_json(const nlohmann::json &j, block_io &v)
+void from_json(const utils::strict_json &j, block_io &v)
 {
+    utils::require_object(j);
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };
         if (key_matches(k, "weight")) {

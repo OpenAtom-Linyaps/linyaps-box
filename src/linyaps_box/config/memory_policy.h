@@ -5,8 +5,7 @@
 #pragma once
 
 #include "linyaps_box/utils/enum_traits.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -57,7 +56,7 @@ LINYAPS_REGISTER_ENUM_TABLE(memory_policy::mode,
                             { memory_policy::mode::preferred_many, "MPOL_PREFERRED_MANY" },
                             { memory_policy::mode::local, "MPOL_LOCAL" })
 
-void from_json(const nlohmann::json &j, memory_policy &v);
+void from_json(const utils::strict_json &j, memory_policy &v);
 
 void validate(const memory_policy &v);
 

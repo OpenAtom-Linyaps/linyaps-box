@@ -5,17 +5,18 @@
 #include "linyaps_box/config/device_rule.h"
 
 #include "linyaps_box/config/utils.h"
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, device_rule &v)
+void from_json(const utils::strict_json &j, device_rule &v)
 {
+    utils::require_object(j);
     bool have_allow{ false };
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };

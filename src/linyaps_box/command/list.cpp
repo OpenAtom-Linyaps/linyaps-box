@@ -8,9 +8,9 @@
 #include "linyaps_box/runtime.h"
 #include "linyaps_box/status_directory_manager.h"
 #include "linyaps_box/utils/date.h"
+#include "linyaps_box/utils/strict_json.h"
 
 #include <fmt/std.h>
-#include <nlohmann/json.hpp>
 
 namespace linyaps_box::command {
 
@@ -28,8 +28,8 @@ auto list(const list_options &options, const global_options &global) -> int
     }
 
     if (options.output_format == list_options::output_format_t::json) {
-        auto j = nlohmann::json::array();
-        auto *ptr = j.get_ptr<nlohmann::json::array_t *>();
+        auto j = utils::strict_json::array();
+        auto *ptr = j.get_ptr<utils::strict_json::array_t *>();
         ptr->reserve(statuses.size());
 
         for (auto &s : statuses) {
