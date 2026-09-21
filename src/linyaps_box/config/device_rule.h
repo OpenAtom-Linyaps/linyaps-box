@@ -5,8 +5,7 @@
 #pragma once
 
 #include "linyaps_box/utils/enum_traits.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -45,6 +44,6 @@ LINYAPS_REGISTER_ENUM_TABLE(device_rule::type,
                             { device_rule::type::character, "c" },
                             { device_rule::type::block, "b" })
 
-void from_json(const nlohmann::json &j, device_rule &v);
+void from_json(const utils::strict_json &j, device_rule &v);
 
 } // namespace linyaps_box::config

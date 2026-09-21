@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <optional>
 #include <string>
@@ -17,7 +17,7 @@ struct exec_cpu_affinity
     std::optional<std::string> final;
 };
 
-void from_json(const nlohmann::json &j, exec_cpu_affinity &v);
+void from_json(const utils::strict_json &j, exec_cpu_affinity &v);
 
 void validate(const exec_cpu_affinity &v);
 

@@ -6,9 +6,8 @@
 
 #include "linyaps_box/config/utils.h"
 #include "linyaps_box/utils/semver.h"
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
-
-#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <stdexcept>
@@ -16,8 +15,9 @@
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, oci_config &v)
+void from_json(const utils::strict_json &j, oci_config &v)
 {
+    utils::require_object(j);
     bool have_oci_version{ false };
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };
@@ -104,7 +104,7 @@ void validate(const oci_config &v)
 
 auto oci_config::parse(std::string_view content) -> oci_config
 {
-    auto config = nlohmann::json::parse(content).get<oci_config>();
+    auto config = utils::strict_parse(content).get<oci_config>();
     validate(config);
     return config;
 }

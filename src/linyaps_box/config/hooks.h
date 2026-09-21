@@ -5,8 +5,7 @@
 #pragma once
 
 #include "linyaps_box/config/hook.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <optional>
 #include <vector>
@@ -23,7 +22,7 @@ struct hooks
     std::optional<std::vector<hook>> poststop;
 };
 
-void from_json(const nlohmann::json &j, hooks &v);
+void from_json(const utils::strict_json &j, hooks &v);
 
 void validate(const hooks &v);
 

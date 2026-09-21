@@ -5,9 +5,9 @@
 #include "linyaps_box/config/linux.h"
 
 #include "linyaps_box/config/utils.h"
+#include "linyaps_box/utils/strict_json.h"
 
 #include <fmt/std.h>
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <stdexcept>
@@ -16,8 +16,9 @@
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, linux &v)
+void from_json(const utils::strict_json &j, linux &v)
 {
+    utils::require_object(j);
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };
         if (key_matches(k, "uidMappings")) {

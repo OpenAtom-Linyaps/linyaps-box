@@ -5,15 +5,15 @@
 #include "linyaps_box/config/hooks.h"
 
 #include "linyaps_box/config/utils.h"
-
-#include <nlohmann/json.hpp>
+#include "linyaps_box/utils/strict_json.h"
 
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, hooks &v)
+void from_json(const utils::strict_json &j, hooks &v)
 {
+    utils::require_object(j);
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };
         if (key_matches(k, "prestart")) {

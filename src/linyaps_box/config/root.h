@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <filesystem>
 
@@ -16,7 +16,7 @@ struct root
     bool readonly{ false };
 };
 
-void from_json(const nlohmann::json &j, root &v);
+void from_json(const utils::strict_json &j, root &v);
 
 void validate(const root &v);
 

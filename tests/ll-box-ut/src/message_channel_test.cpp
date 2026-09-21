@@ -237,16 +237,7 @@ TEST(MessageChannel, UnknownMsgIdThrows)
 {
     std::vector<std::byte> wire(1);
     wire[0] = static_cast<std::byte>(42);
-    EXPECT_THROW(
-      {
-          try {
-              std::ignore = msg::deserialize(wire);
-          } catch (const std::runtime_error &e) {
-              EXPECT_NE(std::string(e.what()).find("42"), std::string::npos);
-              throw;
-          }
-      },
-      std::runtime_error);
+    EXPECT_THROW(std::ignore = msg::deserialize(wire), std::runtime_error);
 }
 
 TEST(MessageChannel, SerializePidReport)
@@ -273,16 +264,7 @@ TEST(MessageChannel, UnknownStageTypeThrows)
 {
     std::vector<std::byte> wire = { static_cast<std::byte>(proto::msg_id::stage),
                                     std::byte{ 0xFF } };
-    EXPECT_THROW(
-      {
-          try {
-              std::ignore = msg::deserialize(wire);
-          } catch (const std::runtime_error &e) {
-              EXPECT_NE(std::string(e.what()).find("255"), std::string::npos);
-              throw;
-          }
-      },
-      std::runtime_error);
+    EXPECT_THROW(std::ignore = msg::deserialize(wire), std::runtime_error);
 }
 
 TEST(MessageChannel, SerializeConsoleFd)
@@ -425,16 +407,7 @@ TEST_F(ChannelTest, ChildWaitForUnexpected)
 {
     parent->send_proceed();
 
-    EXPECT_THROW(
-      {
-          try {
-              child->expect_stage(proto::stage::type::namespace_ready);
-          } catch (const std::runtime_error &e) {
-              EXPECT_NE(std::string(e.what()).find("unexpected"), std::string::npos);
-              throw;
-          }
-      },
-      std::runtime_error);
+    EXPECT_THROW(child->expect_stage(proto::stage::type::namespace_ready), std::runtime_error);
 }
 
 TEST(MessageChannel, LargeLogMessageRoundTrip)

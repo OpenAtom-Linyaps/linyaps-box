@@ -4,14 +4,14 @@
 
 #include "linyaps_box/config/rdma.h"
 
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
-
-#include <nlohmann/json.hpp>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, rdma &v)
+void from_json(const utils::strict_json &j, rdma &v)
 {
+    utils::require_object(j);
     if (auto it = j.find("hcaHandles"); it != j.end() && !it->is_null()) {
         it->get_to(v.hca_handles.emplace());
     }

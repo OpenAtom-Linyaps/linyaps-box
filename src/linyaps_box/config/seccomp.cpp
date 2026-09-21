@@ -5,9 +5,9 @@
 #include "linyaps_box/config/seccomp.h"
 
 #include "linyaps_box/config/utils.h"
+#include "linyaps_box/utils/strict_json.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 #include <string_view>
@@ -16,8 +16,9 @@
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, seccomp::syscall::arg &v)
+void from_json(const utils::strict_json &j, seccomp::syscall::arg &v)
 {
+    utils::require_object(j);
     j.at("index").get_to(v.index);
     j.at("value").get_to(v.value);
 
@@ -35,8 +36,9 @@ void from_json(const nlohmann::json &j, seccomp::syscall::arg &v)
     v.op_ = *op_opt;
 }
 
-void from_json(const nlohmann::json &j, seccomp::syscall &v)
+void from_json(const utils::strict_json &j, seccomp::syscall &v)
 {
+    utils::require_object(j);
     j.at("names").get_to(v.names);
 
     const auto action_name = j.at("action").get<std::string_view>();
@@ -55,8 +57,9 @@ void from_json(const nlohmann::json &j, seccomp::syscall &v)
     }
 }
 
-void from_json(const nlohmann::json &j, seccomp &v)
+void from_json(const utils::strict_json &j, seccomp &v)
 {
+    utils::require_object(j);
     bool have_default_action{ false };
     for (const auto &[key, val] : j.items()) {
         const auto k = std::string_view{ key };

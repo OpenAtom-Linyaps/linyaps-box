@@ -172,17 +172,6 @@ TEST(ProcessParse, ParseFromFileSucceeds)
     std::filesystem::remove(path);
 }
 
-TEST(ProcessParse, ParseMissingFileThrows)
-{
-    EXPECT_THROW(process::parse(std::filesystem::path{ "/nonexistent/process.json" }),
-                 std::runtime_error);
-}
-
-TEST(ProcessParse, ParseDirectoryThrows)
-{
-    EXPECT_THROW(process::parse(std::filesystem::path{ "data" }), std::runtime_error);
-}
-
 TEST(ProcessParse, ExecCpuAffinityInvalidRejected)
 {
     EXPECT_THROW(

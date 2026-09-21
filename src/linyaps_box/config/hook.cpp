@@ -5,18 +5,19 @@
 #include "linyaps_box/config/hook.h"
 
 #include "linyaps_box/utils/environ.h"
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <stdexcept>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, hook &v)
+void from_json(const utils::strict_json &j, hook &v)
 {
+    utils::require_object(j);
     j.at("path").get_to(v.path);
 
     if (auto it = j.find("args"); it != j.end() && !it->is_null()) {

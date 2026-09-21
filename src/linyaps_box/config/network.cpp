@@ -4,20 +4,21 @@
 
 #include "linyaps_box/config/network.h"
 
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
-
-#include <nlohmann/json.hpp>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, network::priority &v)
+void from_json(const utils::strict_json &j, network::priority &v)
 {
+    utils::require_object(j);
     j.at("name").get_to(v.name);
     j.at("priority").get_to(v.priority);
 }
 
-void from_json(const nlohmann::json &j, network &v)
+void from_json(const utils::strict_json &j, network &v)
 {
+    utils::require_object(j);
     if (auto it = j.find("classID"); it != j.end() && !it->is_null()) {
         it->get_to(v.class_id.emplace());
     }

@@ -5,9 +5,9 @@
 #pragma once
 
 #include "linyaps_box/utils/date.h"
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -30,15 +30,15 @@ struct container_status
     pid_t pid;
 };
 
-auto from_json(const nlohmann::json &j, container_status &s) -> void;
-auto to_json(nlohmann::json &j, const container_status &s) -> void;
+auto from_json(const utils::strict_json &j, container_status &s) -> void;
+auto to_json(utils::strict_json &j, const container_status &s) -> void;
 
 enum class runtime_status : std::uint8_t { CREATING, CREATED, RUNNING, STOPPED };
 
 auto to_string_view(runtime_status s) -> std::string_view;
 auto derive_status(const container_status &s) -> runtime_status;
 
-auto to_oci_json(container_status s, runtime_status rs) -> nlohmann::json;
+auto to_oci_json(container_status s, runtime_status rs) -> utils::strict_json;
 
 namespace detail {
 auto format_container_status_json(const container_status &status, bool pretty) -> std::string;

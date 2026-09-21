@@ -4,10 +4,10 @@
 
 #include "linyaps_box/config/exec_cpu_affinity.h"
 
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <stdexcept>
@@ -43,8 +43,9 @@ void validate(const exec_cpu_affinity &v)
     }
 }
 
-void from_json(const nlohmann::json &j, exec_cpu_affinity &v)
+void from_json(const utils::strict_json &j, exec_cpu_affinity &v)
 {
+    utils::require_object(j);
     if (auto it = j.find("initial"); it != j.end() && !it->is_null()) {
         it->get_to(v.initial.emplace());
     }

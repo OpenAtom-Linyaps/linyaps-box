@@ -4,15 +4,17 @@
 
 #include "linyaps_box/config/personality.h"
 
+#include "linyaps_box/utils/strict_json.h"
+
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, personality &v)
+void from_json(const utils::strict_json &j, personality &v)
 {
+    utils::require_object(j);
     const auto domain_name = j.at("domain").get<std::string_view>();
     const auto domain_opt = utils::enum_table_v<personality::domain>.from_name(domain_name);
     if (UNLIKELY(!domain_opt)) {

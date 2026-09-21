@@ -5,8 +5,7 @@
 #pragma once
 
 #include "linyaps_box/utils/enum_traits.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -30,7 +29,7 @@ struct cpu
 
 LINYAPS_REGISTER_ENUM_TABLE(cpu::idle, 2, { cpu::idle::none, "none" }, { cpu::idle::idle, "idle" })
 
-void from_json(const nlohmann::json &j, cpu &v);
+void from_json(const utils::strict_json &j, cpu &v);
 
 void validate(const cpu &v);
 

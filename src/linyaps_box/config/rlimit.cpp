@@ -4,16 +4,18 @@
 
 #include "linyaps_box/config/rlimit.h"
 
+#include "linyaps_box/utils/strict_json.h"
+
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, rlimit &v)
+void from_json(const utils::strict_json &j, rlimit &v)
 {
+    utils::require_object(j);
     auto name = j.at("type").get<std::string_view>();
     auto opt = utils::enum_table_v<rlimit::type>.from_name(name);
     if (UNLIKELY(!opt)) {

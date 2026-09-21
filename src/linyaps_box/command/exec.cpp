@@ -9,8 +9,6 @@
 #include "linyaps_box/status_directory_manager.h"
 #include "linyaps_box/utils/utils.h"
 
-#include <nlohmann/json.hpp>
-
 auto linyaps_box::command::exec(exec_options options, const global_options &global) noexcept -> int
 try {
     status_directory_manager mgr(global.root);

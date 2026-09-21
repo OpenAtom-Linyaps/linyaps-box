@@ -5,8 +5,7 @@
 #pragma once
 
 #include "linyaps_box/utils/enum_traits.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <string_view>
@@ -58,6 +57,6 @@ LINYAPS_REGISTER_ENUM_TABLE(rlimit::type,
                             { rlimit::type::sigpending, "RLIMIT_SIGPENDING" },
                             { rlimit::type::stack, "RLIMIT_STACK" })
 
-void from_json(const nlohmann::json &j, rlimit &v);
+void from_json(const utils::strict_json &j, rlimit &v);
 
 } // namespace linyaps_box::config

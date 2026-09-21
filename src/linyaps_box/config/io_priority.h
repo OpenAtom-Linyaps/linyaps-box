@@ -5,8 +5,7 @@
 #pragma once
 
 #include "linyaps_box/utils/enum_traits.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 
@@ -26,7 +25,7 @@ LINYAPS_REGISTER_ENUM_TABLE(io_priority::class_t,
                             { io_priority::class_t::best_effort, "IOPRIO_CLASS_BE" },
                             { io_priority::class_t::idle, "IOPRIO_CLASS_IDLE" })
 
-void from_json(const nlohmann::json &j, io_priority &v);
+void from_json(const utils::strict_json &j, io_priority &v);
 
 void validate(const io_priority &v);
 

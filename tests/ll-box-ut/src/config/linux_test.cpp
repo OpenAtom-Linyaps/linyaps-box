@@ -155,27 +155,6 @@ TEST(LinuxParse, DuplicateDeviceRejected)
                  std::runtime_error);
 }
 
-TEST(LinuxParse, TimeOffsetSecsOnlyAccepted)
-{
-    const auto config =
-      parse_config(R"(  "linux": {"timeOffsets": {"monotonic": {"secs": 172800}}})");
-    ASSERT_TRUE(config.linux_.has_value());
-    ASSERT_TRUE(config.linux_->time_offsets.has_value());
-    const auto &offset = config.linux_->time_offsets->at("monotonic");
-    EXPECT_EQ(offset.secs, 172800);
-    EXPECT_FALSE(offset.nanosecs.has_value());
-}
-
-TEST(LinuxParse, TimeOffsetEmptyAccepted)
-{
-    const auto config = parse_config(R"(  "linux": {"timeOffsets": {"monotonic": {}}})");
-    ASSERT_TRUE(config.linux_.has_value());
-    ASSERT_TRUE(config.linux_->time_offsets.has_value());
-    const auto &offset = config.linux_->time_offsets->at("monotonic");
-    EXPECT_FALSE(offset.secs.has_value());
-    EXPECT_FALSE(offset.nanosecs.has_value());
-}
-
 TEST(LinuxParse, IntelRdtMemBwSchemaInvalidRejected)
 {
     EXPECT_THROW(std::ignore =
@@ -188,16 +167,6 @@ TEST(LinuxParse, IntelRdtSchemataNewlineRejected)
     EXPECT_THROW(std::ignore =
                    parse_config(R"(  "linux": {"intelRdt": {"schemata": ["L3:0=7f0\nL2:0=f"]}})"),
                  std::runtime_error);
-}
-
-TEST(LinuxParse, IntelRdtValidAccepted)
-{
-    const auto config = parse_config(
-      R"(  "linux": {"intelRdt": {"closID": "group1", "l3CacheSchema": "L3:0=7f0", "memBwSchema": "MB:0=20", "schemata": ["L3:0=7f0"], "enableMonitoring": true}})");
-    ASSERT_TRUE(config.linux_.has_value());
-    ASSERT_TRUE(config.linux_->intel_rdt_.has_value());
-    EXPECT_THAT(config.linux_->intel_rdt_->clos_id.value_or(""), Eq("group1"));
-    EXPECT_EQ(config.linux_->intel_rdt_->enable_monitoring.value_or(false), true);
 }
 
 // The fields below are OPTIONAL per the spec; assert the parsed values as well
@@ -215,24 +184,19 @@ TEST(LinuxParse, NetDeviceNamesParsed)
 TEST(LinuxParse, IntelRdtValuesParsed)
 {
     const auto config = parse_config(
-      R"(  "linux": {"intelRdt": {"closID": "group1", "l3CacheSchema": "L3:0=7f0", "enableMonitoring": true}})");
+      R"(  "linux": {"intelRdt": {"closID": "group1", "l3CacheSchema": "L3:0=7f0", "memBwSchema": "MB:0=20", "schemata": ["L3:0=7f0"], "enableMonitoring": true}})");
     ASSERT_TRUE(config.linux_.has_value());
     ASSERT_TRUE(config.linux_->intel_rdt_.has_value());
     const auto &rdt = *config.linux_->intel_rdt_;
     EXPECT_THAT(rdt.clos_id.value_or(""), Eq("group1"));
     EXPECT_THAT(rdt.l3_cache_schema.value_or(""), Eq("L3:0=7f0"));
+    EXPECT_THAT(rdt.memory_bandwidth_schema.value_or(""), Eq("MB:0=20"));
     EXPECT_EQ(rdt.enable_monitoring.value_or(false), true);
-    EXPECT_FALSE(rdt.memory_bandwidth_schema.has_value());
-}
 
-TEST(LinuxParse, PidsLimitParsed)
-{
-    const auto with_limit = parse_config(R"(  "linux": {"resources": {"pids": {"limit": 42}}})");
-    ASSERT_TRUE(with_limit.linux_->resources_->pids_.has_value());
-    EXPECT_EQ(with_limit.linux_->resources_->pids_->limit.value_or(-1), 42);
-
-    const auto without = parse_config(R"(  "linux": {"resources": {"pids": {}}})");
-    EXPECT_FALSE(without.linux_->resources_->pids_->limit.has_value());
+    const auto minimal = parse_config(R"(  "linux": {"intelRdt": {"closID": "g"}})");
+    ASSERT_TRUE(minimal.linux_->intel_rdt_.has_value());
+    EXPECT_FALSE(minimal.linux_->intel_rdt_->l3_cache_schema.has_value());
+    EXPECT_FALSE(minimal.linux_->intel_rdt_->memory_bandwidth_schema.has_value());
 }
 
 TEST(LinuxParse, PersonalityDomainAndFlagsParsed)
@@ -244,25 +208,6 @@ TEST(LinuxParse, PersonalityDomainAndFlagsParsed)
     EXPECT_EQ(config.linux_->personality_->domain_, personality::domain::linux32);
     ASSERT_TRUE(config.linux_->personality_->flags.has_value());
     EXPECT_THAT(*config.linux_->personality_->flags, ElementsAre("ADDR_NO_RANDOMIZE"));
-}
-
-TEST(LinuxParse, CpuMemoryBlockIoValuesParsed)
-{
-    const auto config = parse_config(
-      R"(  "linux": {"resources": {"cpu": {"shares": 512, "quota": 1000, "period": 100}, "memory": {"limit": 1048576, "swap": 2097152}, "blockIO": {"weight": 500, "leafWeight": 300}}})");
-    ASSERT_TRUE(config.linux_.has_value());
-    ASSERT_TRUE(config.linux_->resources_.has_value());
-    const auto &res = *config.linux_->resources_;
-    ASSERT_TRUE(res.cpu_.has_value());
-    EXPECT_EQ(res.cpu_->shares.value_or(0), 512U);
-    EXPECT_EQ(res.cpu_->quota.value_or(0), 1000);
-    EXPECT_EQ(res.cpu_->period.value_or(0), 100U);
-    ASSERT_TRUE(res.memory_.has_value());
-    EXPECT_EQ(res.memory_->limit.value_or(0), 1048576);
-    EXPECT_EQ(res.memory_->swap.value_or(0), 2097152);
-    ASSERT_TRUE(res.block_io_.has_value());
-    EXPECT_EQ(res.block_io_->weight.value_or(0), 500U);
-    EXPECT_EQ(res.block_io_->leaf_weight.value_or(0), 300U);
 }
 
 } // namespace

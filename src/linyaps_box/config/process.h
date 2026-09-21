@@ -11,8 +11,7 @@
 #include "linyaps_box/config/rlimit.h"
 #include "linyaps_box/config/scheduler.h"
 #include "linyaps_box/config/user.h"
-
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <filesystem>
 #include <optional>
@@ -45,7 +44,7 @@ struct process
     std::optional<bool> no_new_privileges;
 };
 
-void from_json(const nlohmann::json &j, process &v);
+void from_json(const utils::strict_json &j, process &v);
 
 void validate(const process &v);
 

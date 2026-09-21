@@ -4,16 +4,16 @@
 
 #include "linyaps_box/config/root.h"
 
+#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
-
-#include <nlohmann/json.hpp>
 
 #include <stdexcept>
 
 namespace linyaps_box::config {
 
-void from_json(const nlohmann::json &j, root &v)
+void from_json(const utils::strict_json &j, root &v)
 {
+    utils::require_object(j);
     j.at("path").get_to(v.path);
     v.readonly = j.value("readonly", false);
 }

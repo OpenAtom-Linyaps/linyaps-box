@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <nlohmann/json_fwd.hpp>
+#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -17,7 +17,7 @@ struct rdma
     std::optional<uint32_t> hca_objects;
 };
 
-void from_json(const nlohmann::json &j, rdma &v);
+void from_json(const utils::strict_json &j, rdma &v);
 
 void validate(const rdma &v);
 
