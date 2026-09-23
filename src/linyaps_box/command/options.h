@@ -58,7 +58,7 @@ struct exec_options
     std::vector<std::string> envs;
     std::vector<std::string> command;
     std::optional<user_spec> user;
-    uint preserve_fds{ 0 };
+    unsigned int preserve_fds{ 0 };
     bool no_new_privs{ false };
     bool tty{ false };
 };
@@ -69,7 +69,7 @@ struct run_options
     std::filesystem::path bundle;
     std::filesystem::path config;
     std::string ID;
-    uint preserve_fds{ 0 };
+    unsigned int preserve_fds{ 0 };
 };
 
 struct kill_options

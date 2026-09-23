@@ -16,7 +16,7 @@
 #include <fcntl.h>
 
 namespace {
-void syscall_close_range(uint fd, uint max_fd, int flags)
+void syscall_close_range(unsigned int fd, unsigned int max_fd, int flags)
 {
     auto ret = syscall(linyaps_box::os::nr_close_range, fd, max_fd, flags);
     if (ret < 0) {
@@ -24,9 +24,9 @@ void syscall_close_range(uint fd, uint max_fd, int flags)
     }
 }
 
-void close_range_fallback(uint first, uint last, int flags)
+void close_range_fallback(unsigned int first, unsigned int last, int flags)
 {
-    if ((static_cast<uint>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
+    if ((static_cast<unsigned int>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
         // not support CLOSE_RANGE_UNSHARE
         // it request to create a new file descriptor table
         // we can't do that in user space
@@ -66,11 +66,11 @@ void close_range_fallback(uint first, uint last, int flags)
             continue;
         }
 
-        if (static_cast<uint>(fd) < first || static_cast<uint>(fd) > last) {
+        if (static_cast<unsigned int>(fd) < first || static_cast<unsigned int>(fd) > last) {
             continue;
         }
 
-        if ((static_cast<uint>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
+        if ((static_cast<unsigned int>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
             if (::fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
                 throw std::system_error(errno,
                                         std::system_category(),
@@ -85,7 +85,7 @@ void close_range_fallback(uint first, uint last, int flags)
 }
 } // namespace
 
-void linyaps_box::utils::close_range(uint first, uint last, int flags)
+void linyaps_box::utils::close_range(unsigned int first, unsigned int last, int flags)
 {
     LINYAPS_BOX_LOG_DEBUG("close_range ({}, {}) with flags {}",
                           first,
@@ -93,10 +93,10 @@ void linyaps_box::utils::close_range(uint first, uint last, int flags)
                           [flags]() -> std::string {
                               std::stringstream ss;
                               ss << '[';
-                              if ((static_cast<uint>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
+                              if ((static_cast<unsigned int>(flags) & CLOSE_RANGE_CLOEXEC) != 0) {
                                   ss << " CLOSE_RANGE_CLOEXEC";
                               }
-                              if ((static_cast<uint>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
+                              if ((static_cast<unsigned int>(flags) & CLOSE_RANGE_UNSHARE) != 0) {
                                   ss << " CLOSE_RANGE_UNSHARE ";
                               }
                               ss << ']';

@@ -16,7 +16,7 @@
 namespace linyaps_box::os {
 
 namespace sys {
-auto open_option::from_raw(uint raw) noexcept -> Result<open_option>
+auto open_option::from_raw(unsigned int raw) noexcept -> Result<open_option>
 {
     auto mode{ access_mode::read_only };
     if ((raw & O_PATH) != 0) {
@@ -38,7 +38,7 @@ auto open_option::from_raw(uint raw) noexcept -> Result<open_option>
         }
     }
 
-    auto flag = open_flag((mode == access_mode::path) ? (raw & ~static_cast<uint>(O_PATH))
+    auto flag = open_flag((mode == access_mode::path) ? (raw & ~static_cast<unsigned int>(O_PATH))
                                                       : (raw & ~acc_mask));
     return open_option(flag, mode);
 }

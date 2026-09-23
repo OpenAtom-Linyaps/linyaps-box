@@ -25,6 +25,6 @@
 
 namespace linyaps_box::utils {
 
-void close_range(uint first, uint last, int flags);
+void close_range(unsigned int first, unsigned int last, int flags);
 
 } // namespace linyaps_box::utils
