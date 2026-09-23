@@ -21,7 +21,7 @@ auto epoll_create1(int flags) -> file_descriptor;
 [[nodiscard]] auto epoll_wait(const file_descriptor &efd,
                               struct epoll_event *events,
                               std::size_t maxevents,
-                              int timeout) -> uint;
+                              int timeout) -> unsigned int;
 
 auto epoll_ctl(const file_descriptor &efd,
                epoll_operation op,

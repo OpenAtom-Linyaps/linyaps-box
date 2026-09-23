@@ -24,7 +24,7 @@ struct create_container_options_t
 struct run_container_options_t
 {
     std::optional<infra::unix_socket> console_socket;
-    uint preserve_fds;
+    unsigned int preserve_fds;
 };
 
 class container final : public container_ref

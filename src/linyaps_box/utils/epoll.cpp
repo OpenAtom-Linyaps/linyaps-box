@@ -19,7 +19,7 @@ auto epoll_create1(int flags) -> file_descriptor
 auto epoll_wait(const file_descriptor &efd,
                 struct epoll_event *events,
                 std::size_t maxevents,
-                int timeout) -> uint
+                int timeout) -> unsigned int
 {
     while (true) {
         auto ret = ::epoll_wait(efd.get(), events, static_cast<int>(maxevents), timeout);

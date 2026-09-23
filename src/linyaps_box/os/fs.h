@@ -103,10 +103,10 @@ LINYAPS_REGISTER_ENUM_TABLE(access_mode,
 class open_option
 {
 public:
-    constexpr static uint acc_mask = O_ACCMODE;
+    constexpr static unsigned int acc_mask = O_ACCMODE;
     open_option() = delete;
 
-    static auto from_raw(uint raw) noexcept -> Result<open_option>;
+    static auto from_raw(unsigned int raw) noexcept -> Result<open_option>;
 
     constexpr open_option(utils::bitflags<open_flag> flags, access_mode acc_mode) noexcept
         : flags_(flags)
@@ -126,7 +126,7 @@ public:
 
     [[nodiscard]] constexpr auto to_native() const noexcept
     {
-        uint mode{ 0 };
+        unsigned int mode{ 0 };
         switch (access_mode_) {
         case access_mode::read_only: {
             mode |= O_RDONLY;

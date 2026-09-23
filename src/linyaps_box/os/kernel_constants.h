@@ -36,6 +36,7 @@
 
 #pragma once
 
+#include <linux/types.h>
 #include <linux/version.h>
 #include <sys/mount.h>
 

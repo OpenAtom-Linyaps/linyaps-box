@@ -17,7 +17,7 @@ namespace linyaps_box {
 
 struct exec_container_option
 {
-    uint preserve_fds{ 0 };
+    unsigned int preserve_fds{ 0 };
     std::optional<config::process> proc;
 
     // Per-field overrides applied on top of option.proc or config.json's config::process:

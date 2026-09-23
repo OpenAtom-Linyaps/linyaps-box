@@ -203,7 +203,7 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
 [[noreturn]] auto exec_child_process(pid_t target_pid,
                                      const linyaps_box::config::oci_config &config,
                                      const linyaps_box::config::process &proc,
-                                     uint preserve_fds,
+                                     unsigned int preserve_fds,
                                      protocol::child_message_channel child_chan) -> void
 {
     try {

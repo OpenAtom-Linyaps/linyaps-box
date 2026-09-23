@@ -30,7 +30,7 @@
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/signal.h"
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/utils/strict_json.h" // IWYU pragma: keep
 #include "utils/defer.h"
 
 #include <linux/magic.h>
@@ -331,7 +331,7 @@ void execute_hook(const hook &hook, const container_status &state)
 
 struct clone_fn_args
 {
-    uint preserve_fds;
+    unsigned int preserve_fds;
     linyaps_box::container *container{ nullptr };
     child_message_channel sync;
 };
