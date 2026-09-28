@@ -73,12 +73,14 @@ TEST(Semver, ConstructFromString)
 
 TEST(Semver, ToStringRoundTrip)
 {
-    for (const auto *input : { "1.0.0",
-                               "1.2.3-alpha",
-                               "1.2.3+build",
-                               "1.2.3-rc.1+build.42",
-                               "0.0.0",
-                               "10.20.30-alpha.beta.99+sha.abc.123" }) {
+    for (const auto *input : {
+           "1.0.0",
+           "1.2.3-alpha",
+           "1.2.3+build",
+           "1.2.3-rc.1+build.42",
+           "0.0.0",
+           "10.20.30-alpha.beta.99+sha.abc.123",
+         }) {
         EXPECT_EQ(semver::semver(input).to_string(), input);
     }
 }
@@ -299,10 +301,10 @@ TEST_P(SemverSpecInvalidVersionsTest, Rejected)
     EXPECT_THROW(std::ignore = semver::semver(version), semver::invalid_semver) << version;
 }
 
-INSTANTIATE_TEST_SUITE_P(
-  Semver,
-  SemverSpecInvalidVersionsTest,
-  testing::Values(
+// gtest 1.8.1 caps Values() at 50 arguments;
+// use the list as a container through ValuesIn()
+// so the suite stays portable across gtest versions.
+constexpr std::array<const char *, 55> InvalidSemverVersions{
     // SemVer 2.0.0 rule-derived and reference implementation cases
     "",
     "  ",
@@ -340,8 +342,7 @@ INSTANTIATE_TEST_SUITE_P(
     "+justmeta",
     "9.8.7+meta+meta",
     "9.8.7-whatever+meta+meta",
-    "99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1-----------"
-    "---------------------..12",
+    R"(99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1--------------------------------..12)",
     // additional rule-derived cases
     "1.-2.3",
     "1.2.-3",
@@ -361,4 +362,9 @@ INSTANTIATE_TEST_SUITE_P(
     "10.66.6600-0.-0.",
     "1.2.3-rc.",
     "1.2.3+build.",
-    "1.2.3-rc.1+build."));
+    "1.2.3-rc.1+build.",
+};
+
+INSTANTIATE_TEST_SUITE_P(Semver,
+                         SemverSpecInvalidVersionsTest,
+                         testing::ValuesIn(InvalidSemverVersions));
