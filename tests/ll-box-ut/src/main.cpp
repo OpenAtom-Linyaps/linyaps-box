@@ -47,7 +47,5 @@ int main(int argc, char **argv)
     // prevent death test generates coredump
     prctl(PR_SET_DUMPABLE, 0);
 
-    auto result = RUN_ALL_TESTS();
-
-    return result;
+    return RUN_ALL_TESTS();
 }
