@@ -54,7 +54,6 @@
 			"binaryDir": "${sourceDir}/build-release",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release",
-				"CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
 				"linyaps-box_ENABLE_CPACK": "ON",
 				"linyaps-box_HARDENING": "ON",
 				"linyaps-box_MAKE_RELEASE": "ON"
@@ -68,7 +67,6 @@
 			"binaryDir": "${sourceDir}/build-static",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "MinSizeRel",
-				"CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
 				"linyaps-box_STATIC": "ON",
 				"linyaps-box_MAKE_RELEASE": "ON"
 			}
@@ -82,6 +80,7 @@
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
 				"CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O1 -g -DNDEBUG",
+				"linyaps-box_ENABLE_LTO": "OFF",
 				"linyaps-box_ENABLE_WERROR": "ON",
 				"linyaps-box_ENABLE_UNIT_TESTS": "ON",
 				"linyaps-box_ENABLE_SANITIZER": "ON",
@@ -109,6 +108,7 @@
 			"binaryDir": "${sourceDir}/build-codeql",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
+				"linyaps-box_ENABLE_LTO": "OFF",
 				"linyaps-box_ENABLE_UNIT_TESTS": "OFF",
 				"linyaps-box_ENABLE_SMOKE_TESTS": "OFF",
 				"linyaps-box_OFFLINE_BUILD": "ON"

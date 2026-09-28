@@ -70,6 +70,40 @@ endif()
 
 option(linyaps-box_ENABLE_CPACK "Enable CPack." OFF)
 
+set(linyaps-box_ENABLE_LTO_DEFAULT OFF)
+if(CMAKE_CONFIGURATION_TYPES)
+    if(NOT "Debug" IN_LIST CMAKE_CONFIGURATION_TYPES)
+        set(linyaps-box_ENABLE_LTO_DEFAULT ON)
+    endif()
+elseif(CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(linyaps-box_ENABLE_LTO_DEFAULT ON)
+endif()
+
+option(
+    linyaps-box_ENABLE_LTO
+    "Enable link-time optimization (LTO/IPO)."
+    ${linyaps-box_ENABLE_LTO_DEFAULT}
+)
+
+if(linyaps-box_ENABLE_LTO)
+    include(CheckIPOSupported)
+    check_ipo_supported(
+        RESULT linyaps-box_IPO_SUPPORTED
+        OUTPUT linyaps-box_IPO_ERROR
+        LANGUAGES CXX
+    )
+
+    if(NOT linyaps-box_IPO_SUPPORTED)
+        message(
+            FATAL_ERROR
+            "linyaps-box_ENABLE_LTO is ON, but LTO is not supported by this toolchain: ${linyaps-box_IPO_ERROR}"
+        )
+    endif()
+
+    message(STATUS "enabling link-time optimization (LTO)")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+endif()
+
 if(linyaps-box_ENABLE_CPACK)
     set(linyaps-box_CPACK_PACKAGING_INSTALL_PREFIX
         "/opt/org.openatom.linyaps-box"
@@ -117,8 +151,10 @@ set(linyaps-box_HARDENING
 include(CheckPIESupported)
 
 check_pie_supported()
-
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+if(CMAKE_CXX_LINK_PIE_SUPPORTED)
+    message(STATUS "enable position independent code")
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # if just want to try local packages at first set CPM_USE_LOCAL_PACKAGES ON
 set(linyaps-box_CPM_LOCAL_PACKAGES_ONLY
@@ -163,6 +199,7 @@ if(linyaps-box_HARDENING)
             "$<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=2>"
             "$<$<NOT:$<CONFIG:Debug>>:_GLIBCXX_ASSERTIONS>"
     )
+
     target_link_options(
         linyaps-box_hardening
         INTERFACE -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -Wl,--as-needed
@@ -185,6 +222,7 @@ if(linyaps-box_ENABLE_SANITIZER)
             -fno-omit-frame-pointer
             -g3
     )
+
     target_link_options(
         linyaps-box_sanitizers
         INTERFACE -fsanitize=address,undefined
