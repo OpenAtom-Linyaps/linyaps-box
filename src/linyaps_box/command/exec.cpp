@@ -15,7 +15,7 @@ try {
     runtime_t runtime(std::move(mgr));
 
     const auto &container_refs = runtime.containers();
-    auto container = container_refs.find(options.ID);
+    const auto container = container_refs.find(options.ID);
     if (UNLIKELY(container == container_refs.cend())) {
         throw std::runtime_error("container not found");
     }
@@ -43,7 +43,7 @@ try {
     }
     option.command = std::move(options.command);
 
-    auto needs_terminal = option.proc ? option.proc->terminal.value_or(false) : option.tty;
+    const auto needs_terminal = option.proc ? option.proc->terminal.value_or(false) : option.tty;
     if (needs_terminal && options.console_socket) {
         option.console_socket = infra::unix_socket::connect(*options.console_socket);
     }

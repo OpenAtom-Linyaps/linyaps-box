@@ -120,13 +120,13 @@ void drop_bounding(const std::optional<std::vector<int>> &keep)
         return;
     }
 
-    auto last = last_cap();
+    const auto last = last_cap();
     if (UNLIKELY(last == 0)) {
         throw std::runtime_error("kernel does not support capabilities");
     }
 
     std::vector<bool> keep_mask(last + 1, false);
-    for (auto c : *keep) {
+    for (const auto c : *keep) {
         keep_mask[c] = true;
     }
 
@@ -152,11 +152,12 @@ void apply_caps(const std::optional<std::vector<int>> &effective,
     if (UNLIKELY(raw == nullptr)) {
         throw std::system_error(errno, std::system_category(), "failed to init cap");
     }
-    auto release_cap = utils::make_defer([raw]() noexcept {
+
+    const auto release_cap = utils::make_defer([raw]() noexcept {
         cap_free(raw);
     });
 
-    auto set_flag =
+    const auto set_flag =
       [&raw](cap_flag_t flag, const std::optional<std::vector<int>> &vals, std::string_view label) {
           if (!vals || vals->empty()) {
               return;

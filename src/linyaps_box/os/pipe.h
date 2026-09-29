@@ -20,7 +20,7 @@ enum class pipe_flags : uint32_t {
     nonblock = O_NONBLOCK,
     direct = O_DIRECT,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(pipe_flags);
+LINYAPS_ENABLE_BITMASK_ENUM(pipe_flags)
 LINYAPS_REGISTER_ENUM_TABLE(pipe_flags,
                             4,
                             { pipe_flags::none, "NONE" },

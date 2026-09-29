@@ -57,15 +57,15 @@ auto append_string(std::vector<std::byte> &buf, std::string_view s) -> void
         throw std::logic_error("string too large for wire format");
     }
 
-    auto len = static_cast<uint32_t>(s.size());
+    const auto len = static_cast<uint32_t>(s.size());
     append_pod(buf, len);
-    auto view = utils::as_bytes(utils::span{ s });
+    const auto view = utils::as_bytes(utils::span{ s });
     buf.insert(buf.end(), view.cbegin(), view.cend());
 }
 
 auto read_string(utils::span<const std::byte> data, std::size_t &offset) -> std::string
 {
-    auto len = read_pod<uint32_t>(data, offset);
+    const auto len = read_pod<uint32_t>(data, offset);
     if (UNLIKELY(offset > data.size() || len > data.size() - offset)) {
         throw std::runtime_error("payload too short for string read");
     }
@@ -143,27 +143,29 @@ auto deserialize(utils::span<const std::byte> wire) -> message
             throw std::runtime_error(fmt::format("invalid log level: {}", lvl_raw));
         }
 
-        auto lvl = static_cast<linyaps_box::log::level>(lvl_raw);
+        const auto lvl = static_cast<linyaps_box::log::level>(lvl_raw);
         auto message = read_string(payload, offset);
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
         auto file = read_string(payload, offset);
-        auto line = read_pod<int>(payload, offset);
+        const auto line = read_pod<int>(payload, offset);
         auto function = read_string(payload, offset);
 #endif
-        auto errno_val = read_pod<int>(payload, offset);
-        auto pid = read_pod<pid_t>(payload, offset);
-        auto time_count = read_pod<std::int64_t>(payload, offset);
+        const auto errno_val = read_pod<int>(payload, offset);
+        const auto pid = read_pod<pid_t>(payload, offset);
+        const auto time_count = read_pod<std::int64_t>(payload, offset);
 
-        return log{ std::move(message),
+        return log{
+            std::move(message),
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-                    std::move(file),
-                    std::move(function),
-                    line,
+            std::move(file),
+            std::move(function),
+            line,
 #endif
-                    errno_val,
-                    std::chrono::nanoseconds{ time_count },
-                    pid,
-                    lvl };
+            errno_val,
+            std::chrono::nanoseconds{ time_count },
+            pid,
+            lvl,
+        };
     }
     case msg_id::stage: {
         auto value = read_pod<protocol::stage::type>(payload, offset);

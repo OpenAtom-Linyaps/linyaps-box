@@ -21,7 +21,8 @@ auto gen_random_string(std::size_t len) noexcept -> std::string
         try {
             return std::mt19937{ std::random_device{ }() };
         } catch (...) {
-            auto now = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+            auto now = static_cast<std::size_t>(
+              std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
             const auto pid = static_cast<std::uint64_t>(::getpid());
             const auto tid = std::hash<std::thread::id>{ }(std::this_thread::get_id());
@@ -29,10 +30,10 @@ auto gen_random_string(std::size_t len) noexcept -> std::string
             const auto addr = reinterpret_cast<std::uintptr_t>(&now);
 
             std::seed_seq seq{
-                static_cast<std::uint32_t>(now),       static_cast<std::uint32_t>(now >> 32),
-                static_cast<std::uint32_t>(pid),       static_cast<std::uint32_t>(tid),
-                static_cast<std::uint32_t>(tid >> 32), static_cast<std::uint32_t>(addr),
-                static_cast<std::uint32_t>(addr >> 32)
+                static_cast<std::uint32_t>(now),         static_cast<std::uint32_t>(now >> 32U),
+                static_cast<std::uint32_t>(pid),         static_cast<std::uint32_t>(tid),
+                static_cast<std::uint32_t>(tid >> 32U),  static_cast<std::uint32_t>(addr),
+                static_cast<std::uint32_t>(addr >> 32U),
             };
 
             return std::mt19937{ seq };

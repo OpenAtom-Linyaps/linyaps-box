@@ -12,7 +12,7 @@ linyaps_box::runtime_t::runtime_t(status_directory_manager status_dir_mgr)
 auto linyaps_box::runtime_t::containers()
   -> std::unordered_map<std::string, linyaps_box::container_ref>
 {
-    auto container_ids = status_dir_mgr_.list();
+    const auto container_ids = status_dir_mgr_.list();
 
     std::unordered_map<std::string, container_ref> containers;
     for (const auto &container_id : container_ids) {

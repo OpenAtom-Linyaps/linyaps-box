@@ -21,7 +21,7 @@ void atomic_write(const std::filesystem::path &path, std::string_view content)
     using namespace linyaps_box::os;
     using namespace linyaps_box::utils;
 
-    auto dir = path.parent_path();
+    const auto dir = path.parent_path();
     auto dirfd =
       throw_if_error(open(dir,
                           sys::open_option{ sys::open_flag::directory | sys::open_flag::cloexec,
@@ -33,7 +33,7 @@ void atomic_write(const std::filesystem::path &path, std::string_view content)
     file_descriptor fd;
     for (; max_retries >= 0; --max_retries) {
         temp_name.replace(5, 6, gen_random_string(6));
-        auto temp_path = dir / temp_name;
+        const auto temp_path = dir / temp_name;
         auto temp = open(temp_path,
                          sys::open_option{ sys::open_flag::create | sys::open_flag::exclusive
                                              | sys::open_flag::cloexec | sys::open_flag::no_follow,
@@ -56,7 +56,7 @@ void atomic_write(const std::filesystem::path &path, std::string_view content)
         throw std::runtime_error("maximum number of attempts to create a temporary file reached");
     }
 
-    auto cleanup = make_errdefer([&dirfd, &temp_name]() noexcept {
+    const auto cleanup = make_errdefer([&dirfd, &temp_name]() noexcept {
         std::ignore = unlinkat(dirfd, temp_name);
     });
 
@@ -67,7 +67,7 @@ void atomic_write(const std::filesystem::path &path, std::string_view content)
                              std::generic_category().message(errno));
     }
 
-    auto ref = dirfd.ref();
+    const auto ref = dirfd.ref();
     throw_if_error(renameat2(ref, temp_name, ref, path.filename(), sys::rename_flag::none));
 
     if (::fsync(ref) != 0) {
@@ -80,7 +80,7 @@ auto read_status(const std::filesystem::path &path) -> linyaps_box::container_st
 {
     using namespace linyaps_box::os;
 
-    auto fd = throw_if_error(
+    const auto fd = throw_if_error(
       open(path, sys::open_option{ sys::open_flag::cloexec, sys::access_mode::read_only }));
 
     linyaps_box::utils::uninit_vector<std::byte> buf;
@@ -109,7 +109,7 @@ linyaps_box::status_directory::status_directory(std::filesystem::path path)
 
 void linyaps_box::status_directory::write(const container_status &status) const
 {
-    auto j = utils::strict_json(status);
+    const auto j = utils::strict_json(status);
     ::atomic_write(path_ / "status.json", j.dump());
 }
 

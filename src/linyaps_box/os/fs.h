@@ -67,7 +67,7 @@ enum class open_flag : open_flag_underlying {
     no_ctty = O_NOCTTY,
     tmpfile = O_TMPFILE,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(open_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(open_flag)
 LINYAPS_REGISTER_ENUM_TABLE(open_flag,
                             16,
                             { open_flag::none, "NONE" },
@@ -91,7 +91,7 @@ enum class access_mode : uint32_t {
     read_only = O_RDONLY,
     write_only = O_WRONLY,
     read_write = O_RDWR,
-    path = O_PATH
+    path = O_PATH,
 };
 LINYAPS_REGISTER_ENUM_TABLE(access_mode,
                             4,
@@ -166,7 +166,7 @@ enum class fd_flag : uint8_t {
     none = 0,
     cloexec = FD_CLOEXEC,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(fd_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(fd_flag)
 LINYAPS_REGISTER_ENUM_TABLE(fd_flag,
                             2,
                             { fd_flag::none, "NONE" },
@@ -178,7 +178,7 @@ enum class at_flag : std::uint16_t {
     symlink_nofollow = AT_SYMLINK_NOFOLLOW,
     remove_dir = AT_REMOVEDIR,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(at_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(at_flag)
 LINYAPS_REGISTER_ENUM_TABLE(at_flag,
                             4,
                             { at_flag::none, "NONE" },
@@ -192,7 +192,7 @@ enum class rename_flag : std::uint8_t {
     noreplace = RENAME_NOREPLACE,
     whiteout = RENAME_WHITEOUT,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(rename_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(rename_flag)
 LINYAPS_REGISTER_ENUM_TABLE(rename_flag,
                             4,
                             { rename_flag::none, "NONE" },
@@ -245,7 +245,7 @@ enum class openat2_resolve : std::uint64_t { // NOLINT
 
     // we couldn't stimulate RESOLVE_CACHED in userspace
 };
-LINYAPS_ENABLE_BITMASK_ENUM(openat2_resolve);
+LINYAPS_ENABLE_BITMASK_ENUM(openat2_resolve)
 LINYAPS_REGISTER_ENUM_TABLE(openat2_resolve,
                             5,
                             { openat2_resolve::no_xdev, "RESOLVE_NO_XDEV" },
@@ -272,9 +272,9 @@ struct linux_dirent64
 enum class memfd_flag : std::uint8_t {
     cloexec = MFD_CLOEXEC,
     allow_sealing = MFD_ALLOW_SEALING,
-    hugetlb = MFD_HUGETLB
+    hugetlb = MFD_HUGETLB,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(memfd_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(memfd_flag)
 LINYAPS_REGISTER_ENUM_TABLE(memfd_flag,
                             3,
                             { memfd_flag::cloexec, "MFD_CLOEXEC" },
@@ -285,7 +285,7 @@ enum class statx_flag : std::uint16_t {
     mnt_id = statx_mnt_id,
     mnt_id_unique = statx_mnt_id_unique,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(statx_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(statx_flag)
 LINYAPS_REGISTER_ENUM_TABLE(statx_flag,
                             2,
                             { statx_flag::mnt_id, "STATX_MNT_ID" },
@@ -443,7 +443,7 @@ struct fmt::formatter<std::filesystem::perms>
     template <typename FormatContext>
     auto format(std::filesystem::perms p, FormatContext &ctx) const
     {
-        using perms = std::filesystem::perms;
+        using std::filesystem::perms;
 
         auto raw = fmt::underlying(p);
         if ((p & ~perms::mask) != perms::none) {
@@ -488,7 +488,7 @@ struct fmt::formatter<std::filesystem::perms>
                 // Others
                 has(perms::others_read) ? 'r' : '-',
                 has(perms::others_write) ? 'w' : '-',
-                get_exec_char(has(perms::others_exec), has(perms::sticky_bit), 'T')
+                get_exec_char(has(perms::others_exec), has(perms::sticky_bit), 'T'),
             };
 
             return std::copy(str.cbegin(), str.cend(), ctx.out());

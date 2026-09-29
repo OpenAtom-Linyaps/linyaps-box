@@ -154,8 +154,8 @@ void child_setup_terminal(const linyaps_box::config::process &proc,
         slave.set_size({ proc.console_size_->height, proc.console_size_->width, 0, 0 });
     }
 
-    auto console_fd = std::move(master).take();
-    auto ref = console_fd.ref();
+    const auto console_fd = std::move(master).take();
+    const auto ref = console_fd.ref();
     sync.send_console_fd(ref);
 }
 
@@ -169,7 +169,8 @@ void child_apply_environment(const linyaps_box::config::process &proc,
             if (linyaps_box::utils::is_invalid_env(env)) {
                 continue;
             }
-            auto eq = env.find('=');
+
+            const auto eq = env.find('=');
             ::setenv(env.substr(0, eq).c_str(), env.substr(eq + 1).c_str(), 1);
         }
     }
@@ -179,7 +180,8 @@ void child_apply_environment(const linyaps_box::config::process &proc,
             if (linyaps_box::utils::is_invalid_env(env)) {
                 continue;
             }
-            auto eq = env.find('=');
+
+            const auto eq = env.find('=');
             ::setenv(env.substr(0, eq).c_str(), env.substr(eq + 1).c_str(), 1);
         }
     }
@@ -192,7 +194,7 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
     }
 
     for (const auto &rl : *proc.rlimits) {
-        auto resource = utils::to_rlimit_resource(rl.type_);
+        const auto resource = utils::to_rlimit_resource(rl.type_);
         const struct ::rlimit limit{ rl.soft, rl.hard };
         if (::setrlimit(resource, &limit) != 0) {
             _exit(EXIT_FAILURE);
@@ -222,7 +224,7 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
         }
 
         if (pid_ns) {
-            auto grandchild = ::fork();
+            const auto grandchild = ::fork();
             if (UNLIKELY(grandchild < 0)) {
                 throw std::system_error(errno, std::system_category(), "fork grandchild failed");
             }
@@ -247,7 +249,7 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
 
         child_apply_rlimits(proc);
 
-        linyaps_box::utils::close_range(3U + static_cast<unsigned>(preserve_fds),
+        linyaps_box::utils::close_range(3 + preserve_fds,
                                         std::numeric_limits<unsigned>::max(),
                                         CLOSE_RANGE_CLOEXEC);
 
@@ -266,7 +268,7 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
             }
 
             const auto &caps = *proc.capabilities_;
-            auto all_empty = (!caps.effective || caps.effective->empty())
+            const auto all_empty = (!caps.effective || caps.effective->empty())
               && (!caps.bounding || caps.bounding->empty())
               && (!caps.inheritable || caps.inheritable->empty())
               && (!caps.permitted || caps.permitted->empty())
@@ -283,7 +285,7 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
           .set_no_new_privs(proc.no_new_privileges.value_or(false));
 
         // change before we drop caps
-        for (auto fd : { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO }) {
+        for (const auto fd : { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO }) {
             if (::fchown(fd, proc.user_.uid, proc.user_.gid) != 0) {
                 if (errno != EINVAL && errno != ENOSYS) {
                     throw std::system_error(errno, std::system_category(), "fchown");
@@ -309,7 +311,7 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
         }
         c_env.push_back(nullptr);
 
-        auto ret = ::chdir(proc.cwd.c_str());
+        const auto ret = ::chdir(proc.cwd.c_str());
         if (UNLIKELY(ret != 0)) {
             throw std::system_error(errno, std::system_category(), "chdir");
         }
@@ -378,7 +380,7 @@ auto exec_parent_process(protocol::parent_message_channel sync,
     auto in_flags = in.flags();
     auto out_flags = out.flags();
 
-    auto restore_if_changed = linyaps_box::utils::make_defer([&]() noexcept {
+    const auto restore_if_changed = linyaps_box::utils::make_defer([&]() noexcept {
         if (!changed) {
             return;
         }
@@ -520,18 +522,18 @@ auto container_ref::exec(exec_container_option option) const -> int
 
     verify_container_process(*handle, st, "exec process");
 
-    auto target_pid = handle->pid();
+    const auto target_pid = handle->pid();
 
     os::throw_if_error(os::set_child_subreaper(true));
 
-    auto config = config::oci_config::parse(status_dir_.config());
-    auto &proc = resolve_final_process(option, config);
+    const auto config = config::oci_config::parse(status_dir_.config());
+    const auto &proc = resolve_final_process(option, config);
 
     config::validate(proc);
 
     auto [parent_chan, child_chan] = protocol::create_message_socketpair();
 
-    auto child = ::fork();
+    const auto child = ::fork();
     if (UNLIKELY(child < 0)) {
         throw std::system_error(errno, std::system_category(), "fork");
     }

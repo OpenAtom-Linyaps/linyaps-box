@@ -23,8 +23,9 @@ public:
     template <typename T>
     constexpr explicit io_slice(utils::span<T> s) noexcept
     {
-        auto bytes = utils::as_bytes(s);
-        iov_.iov_base = const_cast<void *>(static_cast<const void *>(bytes.data()));
+        static_assert(std::is_const_v<T>, "io_slice only could be construct from a immutable span");
+        const auto bytes = utils::as_bytes(s);
+        iov_.iov_base = static_cast<void *>(const_cast<std::byte *>(bytes.data()));
         iov_.iov_len = bytes.size();
     }
 
@@ -62,7 +63,7 @@ public:
         iov_.iov_len = bytes.size();
     }
 
-    constexpr operator io_slice() const noexcept
+    constexpr explicit operator io_slice() const noexcept
     {
         return io_slice{ utils::span<const std::byte>{
           static_cast<const std::byte *>(iov_.iov_base),

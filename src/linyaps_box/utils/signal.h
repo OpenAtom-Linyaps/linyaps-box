@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 UnionTech Software Technology Co., Ltd.
+// SPDX-FileCopyrightText: 2025 - 2026 UnionTech Software Technology Co., Ltd.
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
@@ -20,6 +20,6 @@ auto sigaction(int sig, const struct sigaction &new_act, struct sigaction *old_a
 
 auto reset_signals(const sigset_t &set) -> void;
 
-auto create_signalfd(sigset_t &set, bool nonblock = true) -> file_descriptor;
+auto create_signalfd(const sigset_t &set, bool nonblock = true) -> file_descriptor;
 
 } // namespace linyaps_box::utils

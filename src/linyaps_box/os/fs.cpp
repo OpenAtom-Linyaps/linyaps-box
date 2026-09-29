@@ -22,7 +22,7 @@ auto open_option::from_raw(unsigned int raw) noexcept -> Result<open_option>
     if ((raw & O_PATH) != 0) {
         mode = access_mode::path;
     } else {
-        auto val{ raw & acc_mask };
+        const auto val{ raw & acc_mask };
         switch (val) {
         case O_RDONLY: {
             mode = access_mode::read_only;
@@ -38,8 +38,8 @@ auto open_option::from_raw(unsigned int raw) noexcept -> Result<open_option>
         }
     }
 
-    auto flag = open_flag((mode == access_mode::path) ? (raw & ~static_cast<unsigned int>(O_PATH))
-                                                      : (raw & ~acc_mask));
+    const auto flag = open_flag(
+      (mode == access_mode::path) ? (raw & ~static_cast<unsigned int>(O_PATH)) : (raw & ~acc_mask));
     return open_option(flag, mode);
 }
 } // namespace sys
@@ -94,9 +94,11 @@ auto openat2(utils::file_descriptor_ref dirfd,
         uint64_t flags;
         uint64_t mode;
         uint64_t resolve;
-    } linux_open_how{ static_cast<uint64_t>(how.opt),
-                      static_cast<uint64_t>(how.perms),
-                      how.resolve.to_raw() };
+    } linux_open_how{
+        static_cast<uint64_t>(how.opt),
+        static_cast<uint64_t>(how.perms),
+        how.resolve.to_raw(),
+    };
 
     while (true) {
         const auto fd = static_cast<int>(
@@ -298,7 +300,7 @@ auto linkat(utils::file_descriptor_ref olddirfd,
 auto fcntl_dupfd(utils::file_descriptor_ref fd, int newfd) noexcept
   -> Result<utils::file_descriptor>
 {
-    auto ret = ::fcntl(fd, F_DUPFD, newfd);
+    const auto ret = ::fcntl(fd, F_DUPFD, newfd);
     if (UNLIKELY(ret < 0)) {
         return unexpected(make_error_code(errno));
     }
@@ -309,7 +311,7 @@ auto fcntl_dupfd(utils::file_descriptor_ref fd, int newfd) noexcept
 auto fcntl_dupfd_cloexec(utils::file_descriptor_ref fd, int newfd) noexcept
   -> Result<utils::file_descriptor>
 {
-    auto ret = ::fcntl(fd, F_DUPFD_CLOEXEC, newfd);
+    const auto ret = ::fcntl(fd, F_DUPFD_CLOEXEC, newfd);
     if (UNLIKELY(ret < 0)) {
         return unexpected(make_error_code(errno));
     }
@@ -330,7 +332,7 @@ auto fcntl_setfl(utils::file_descriptor_ref fd, utils::bitflags<sys::open_flag> 
 
 auto fcntl_getfl(utils::file_descriptor_ref fd) noexcept -> Result<sys::open_option>
 {
-    auto ret = ::fcntl(fd, F_GETFL);
+    const auto ret = ::fcntl(fd, F_GETFL);
     if (UNLIKELY(ret < 0)) {
         return unexpected(make_error_code(errno));
     }
@@ -455,7 +457,7 @@ auto fchmodat(utils::file_descriptor_ref dirfd,
 auto ftruncate(utils::file_descriptor_ref fd, off_t length) noexcept -> Result<void>
 {
     while (true) {
-        auto ret = ::ftruncate(fd, length);
+        const auto ret = ::ftruncate(fd, length);
         if (LIKELY(ret == 0)) {
             return { };
         }
@@ -471,7 +473,7 @@ auto ftruncate(utils::file_descriptor_ref fd, off_t length) noexcept -> Result<v
 auto memfd_create(const std::string &name, utils::bitflags<sys::memfd_flag> flags) noexcept
   -> Result<utils::file_descriptor>
 {
-    auto ret = ::memfd_create(name.c_str(), flags.to_raw());
+    const auto ret = ::memfd_create(name.c_str(), flags.to_raw());
     if (UNLIKELY(ret == -1)) {
         return unexpected{ make_error_code(errno) };
     }

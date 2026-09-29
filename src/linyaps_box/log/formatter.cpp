@@ -47,7 +47,7 @@ struct oci_log_message
 auto to_json(nlohmann::json &j, const log_context &ctx) noexcept -> void
 {
     std::array<char, 30> time_buf{ };
-    auto len =
+    const auto len =
       linyaps_box::utils::to_created_time(linyaps_box::utils::span{ time_buf },
                                           std::chrono::system_clock::time_point{ ctx.time },
                                           linyaps_box::utils::subsecond_precision::nanoseconds);
@@ -74,7 +74,7 @@ auto format_text(fmt::memory_buffer &buf, const log_context &ctx, fmt::text_styl
 {
     // Format time into a local buffer first to avoid writing raw bytes to output
     thread_local std::array<char, 30> time_buf{ };
-    auto len =
+    const auto len =
       linyaps_box::utils::to_created_time(linyaps_box::utils::span{ time_buf },
                                           std::chrono::system_clock::time_point{ ctx.time },
                                           linyaps_box::utils::subsecond_precision::nanoseconds);
@@ -151,7 +151,7 @@ struct fmt::formatter<linyaps_box::log::detail::oci_log_message>
 
         std::string_view::size_type start = 0;
         while (true) {
-            auto pos = text.find('\n', start);
+            const auto pos = text.find('\n', start);
             if (pos == std::string_view::npos) {
                 out = fmt::format_to(out, "{}", text.substr(start));
                 break;

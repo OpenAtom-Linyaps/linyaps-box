@@ -20,7 +20,7 @@ enum class prot_flag : std::uint8_t {
     write = PROT_WRITE,
     exec = PROT_EXEC,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(prot_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(prot_flag)
 LINYAPS_REGISTER_ENUM_TABLE(prot_flag,
                             4,
                             { prot_flag::none, "PROT_NONE" },
@@ -43,6 +43,7 @@ enum class map_flag : std::uint32_t {
 #ifdef MAP_SYNC
     sync = MAP_SYNC // unavailble on mips
 #endif
+    ,
 };
 
 #ifdef MAP_SYNC
@@ -53,7 +54,7 @@ constexpr auto map_flag_table_count = 12;
 constexpr auto map_flag_table_count = 11;
 #endif
 
-LINYAPS_ENABLE_BITMASK_ENUM(map_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(map_flag)
 LINYAPS_REGISTER_ENUM_TABLE(map_flag,
                             map_flag_table_count,
                             { map_flag::shared, "MAP_SHARED" },

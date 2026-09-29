@@ -27,7 +27,7 @@ try {
     log::format_log(fallback_buf, ctx, log::output_format::text, { });
 
     const utils::file_descriptor stderr_fd{ STDERR_FILENO, false };
-    auto bytes = utils::as_bytes(utils::span(fallback_buf.data(), fallback_buf.size()));
+    const auto bytes = utils::as_bytes(utils::span(fallback_buf.data(), fallback_buf.size()));
     std::ignore = stderr_fd.write_span(bytes);
 }
 

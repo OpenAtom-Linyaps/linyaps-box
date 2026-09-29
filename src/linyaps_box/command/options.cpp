@@ -50,7 +50,7 @@ auto str_to_signal(std::string_view str) noexcept -> int
         SignalItem{ "TTOU", SIGTTOU },     SignalItem{ "URG", SIGURG },
         SignalItem{ "USR1", SIGUSR1 },     SignalItem{ "USR2", SIGUSR2 },
         SignalItem{ "VTALRM", SIGVTALRM }, SignalItem{ "WINCH", SIGWINCH },
-        SignalItem{ "XCPU", SIGXCPU },     SignalItem{ "XFSZ", SIGXFSZ }
+        SignalItem{ "XCPU", SIGXCPU },     SignalItem{ "XFSZ", SIGXFSZ },
     };
 
     constexpr auto sorted [[maybe_unused]] = []() noexcept {
@@ -153,7 +153,7 @@ auto register_global(CLI::App &app, linyaps_box::command::global_options &opts) 
 #ifdef LINYAPS_BOX_ENABLE_SYSTEMD_INTEGRATION
     help += ", journald:ID";
 #endif
-    help += ")";
+    help += ')';
 
     app.add_option("--log", opts.log, std::move(help))
       ->type_name("SINK")
@@ -168,13 +168,13 @@ auto register_global(CLI::App &app, linyaps_box::command::global_options &opts) 
           }
 
           const std::string_view sv{ s };
-          auto idx = sv.find(':');
+          const auto idx = sv.find(':');
           if (idx == std::string_view::npos) {
               return "";
           }
 
           auto scheme = sv.substr(0, idx);
-          auto content = sv.substr(idx + 1);
+          const auto content = sv.substr(idx + 1);
           if (content.empty()) {
               return fmt::format("empty {} destination", scheme);
           }
@@ -233,8 +233,8 @@ auto register_exec(CLI::App &app, linyaps_box::command::exec_options &opts) -> C
         "-u,--user",
         [&opts](const std::string &value) {
             linyaps_box::command::user_spec spec{ };
-            auto colon = value.find(':');
-            auto uid_len = colon == std::string::npos ? value.size() : colon;
+            const auto colon = value.find(':');
+            const auto uid_len = colon == std::string::npos ? value.size() : colon;
 
             auto [uid_ptr, uid_ec] =
               std::from_chars(value.data(), value.data() + uid_len, spec.uid);
@@ -302,7 +302,7 @@ auto register_exec(CLI::App &app, linyaps_box::command::exec_options &opts) -> C
       ->check(CLI::ExistingFile);
     cmd->add_option("CONTAINER", opts.ID, "Container ID")->required();
     cmd->add_option("COMMAND", opts.command, "Command to execute");
-    cmd->callback([&opts]() {
+    cmd->callback([&opts] {
         if (opts.command.empty() && !opts.process_file) {
             throw CLI::ValidationError("At least one of COMMAND or --process must be provided");
         }
@@ -331,7 +331,7 @@ auto register_kill(CLI::App &app, linyaps_box::command::kill_options &opts) -> C
               return str;
           }
 
-          auto sig_num = str_to_signal(str);
+          const auto sig_num = str_to_signal(str);
           if (UNLIKELY(sig_num < 0)) {
               throw CLI::ValidationError("SIGNAL", "invalid signal: " + str);
           }
@@ -418,7 +418,7 @@ auto linyaps_box::command::parse(int argc, char **argv) noexcept -> std::optiona
     try {
         run_parse(data.app, argc, argv);
     } catch (const CLI::ParseError &e) {
-        auto code = data.app.exit(e);
+        const auto code = data.app.exit(e);
         if (code != 0) {
             return std::nullopt;
         }

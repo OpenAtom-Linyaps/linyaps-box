@@ -26,7 +26,7 @@ try {
     auto &logger = log::global_logger::instance();
     logger.set_level(opts.log_level);
 
-    auto fmt = opts.log_format;
+    const auto fmt = opts.log_format;
 
     if (opts.log.empty()) {
         std::vector<std::unique_ptr<log::sink>> sinks;
@@ -75,22 +75,24 @@ auto main(int argc, char **argv) noexcept -> int
     }
 
     try {
-        return std::visit(utils::Overload{ [&opts](const command::list_options &list) -> int {
-                                              return command::list(list, opts.global);
-                                          },
-                                           [&opts](command::exec_options &exec) -> int {
-                                               return command::exec(std::move(exec), opts.global);
-                                           },
-                                           [&opts](const command::kill_options &kill) -> int {
-                                               return command::kill(kill, opts.global);
-                                           },
-                                           [&opts](const command::run_options &run) -> int {
-                                               return command::run(run, opts.global);
-                                           },
-                                           [](const std::monostate &) -> int {
-                                               // just for exhausting variant
-                                               return EXIT_SUCCESS;
-                                           } },
+        return std::visit(utils::Overload{
+                            [&opts](const command::list_options &list) -> int {
+                                return command::list(list, opts.global);
+                            },
+                            [&opts](command::exec_options &exec) -> int {
+                                return command::exec(std::move(exec), opts.global);
+                            },
+                            [&opts](const command::kill_options &kill) -> int {
+                                return command::kill(kill, opts.global);
+                            },
+                            [&opts](const command::run_options &run) -> int {
+                                return command::run(run, opts.global);
+                            },
+                            [](const std::monostate &) -> int {
+                                // just for exhausting variant
+                                return EXIT_SUCCESS;
+                            },
+                          },
                           opts.subcommand_opt);
     } catch (const std::exception &e) {
         LINYAPS_BOX_LOG_ERROR("Error: {}", e.what());

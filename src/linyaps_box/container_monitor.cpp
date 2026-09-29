@@ -25,9 +25,9 @@ auto detect_host_tty() -> std::optional<terminal_slave>
 {
     LINYAPS_BOX_LOG_DEBUG("detect host available tty");
 
-    for (auto io : { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO }) {
+    for (const auto io : { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO }) {
         utils::file_descriptor fd{ io, false };
-        auto ret = os::isatty(fd);
+        const auto ret = os::isatty(fd);
         if (UNLIKELY(!ret)) {
             continue;
         }
@@ -58,7 +58,7 @@ void handle_fd_error(const struct epoll_event &ev,
         return;
     }
 
-    auto mark = [fd = ev.data.fd](io::Forwarder &fwd) {
+    const auto mark = [fd = ev.data.fd](io::Forwarder &fwd) {
         if (fwd.src().get() == fd) {
             fwd.mark_src_eof();
         }
@@ -101,7 +101,7 @@ auto container_monitor::enable_signal_forwarding() -> void
         }
     }
 
-    auto signalfd_pollable = epoll.add(signal_fd, EPOLLIN);
+    const auto signalfd_pollable = epoll.add(signal_fd, EPOLLIN);
     if (!UNLIKELY(signalfd_pollable)) {
         throw std::runtime_error("failed to add signalfd to epoll");
     }
@@ -150,7 +150,7 @@ auto container_monitor::handle_signals() -> void
 
 auto container_monitor::kill_child() noexcept -> int
 {
-    auto ret = ::kill(pid, SIGKILL);
+    const auto ret = ::kill(pid, SIGKILL);
     if (ret < 0) {
         if (LIKELY(errno == ESRCH)) {
             return 0;
@@ -211,7 +211,7 @@ auto container_monitor::enable_io_forwarding(terminal_master pty,
     out_fwd->set_dst(out);
 
     // Prime the IO loop — drain any data already buffered.
-    auto drive_and_cleanup = [](std::optional<io::Forwarder> &fwd) {
+    const auto drive_and_cleanup = [](std::optional<io::Forwarder> &fwd) {
         if (!fwd) {
             return;
         }

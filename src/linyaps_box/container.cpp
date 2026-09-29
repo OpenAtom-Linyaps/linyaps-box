@@ -71,7 +71,7 @@ namespace stage = protocol::stage;
   -> unsigned long
 {
     unsigned long out{ 0 };
-    auto add = [&](vfs_flag f, unsigned long ms) {
+    const auto add = [&](vfs_flag f, unsigned long ms) {
         if (flags.contains(f)) {
             out |= ms;
         }
@@ -101,7 +101,7 @@ namespace stage = protocol::stage;
 to_os_propagation_flags(utils::bitflags<propagation_flag> flags) noexcept -> unsigned long
 {
     unsigned long out{ 0 };
-    auto add = [&](propagation_flag f, unsigned long ms) {
+    const auto add = [&](propagation_flag f, unsigned long ms) {
         if (flags.contains(f)) {
             out |= ms;
         }
@@ -135,7 +135,7 @@ to_os_propagation_flags(utils::bitflags<propagation_flag> flags) noexcept -> uns
   -> utils::bitflags<vfs_flag>
 {
     utils::bitflags<vfs_flag> out{ };
-    auto add = [&](vfs_flag f, unsigned long bit) {
+    const auto add = [&](vfs_flag f, unsigned long bit) {
         if ((ms & bit) != 0) {
             out |= f;
         }
@@ -163,7 +163,7 @@ to_os_propagation_flags(utils::bitflags<propagation_flag> flags) noexcept -> uns
 
 [[maybe_unused]] auto get_pid_namespace() -> std::string
 {
-    auto result =
+    const auto result =
       os::throw_if_error(os::readlinkat(utils::file_descriptor_ref::cwd(), "/proc/self/ns/pid"));
     const std::string_view pid_ns = result;
 
@@ -198,7 +198,7 @@ void execute_hook(const hook &hook, const container_status &state)
     auto [parent, child] = infra::unix_socket::create_pair(os::sys::socket_type::seqpacket,
                                                            os::sys::socket_flag::cloexec);
 
-    auto pid = fork();
+    const auto pid = fork();
     if (pid < 0) {
         throw std::system_error(errno, std::system_category(), "fork");
     }
@@ -249,7 +249,7 @@ void execute_hook(const hook &hook, const container_status &state)
 
     auto state_json = utils::strict_json(state).dump();
     const auto *data = reinterpret_cast<const std::byte *>(state_json.data());
-    auto remaining = state_json.size();
+    const auto remaining = state_json.size();
 
     if (auto r = child.send(utils::span(data, remaining)); !r) {
         LINYAPS_BOX_LOG_WARN("failed to write state to hook stdin: {}", r.error().message());
@@ -284,13 +284,13 @@ void execute_hook(const hook &hook, const container_status &state)
 
         siginfo_t info;
         while (true) {
-            auto sig = sigtimedwait(&mask, &info, &ts);
+            const auto sig = sigtimedwait(&mask, &info, &ts);
             if (sig >= 0) {
                 if (info.si_pid != pid) {
                     continue;
                 }
 
-                auto ret = waitpid(pid, &status, 0);
+                const auto ret = waitpid(pid, &status, 0);
                 if (ret < 0) {
                     throw std::system_error(errno,
                                             std::system_category(),
@@ -433,7 +433,7 @@ void syscall_mount(const char *_special_file,
                           _dir ? _dir : "(null)",
                           _fstype ? _fstype : "(null)",
                           _rwflag);
-    auto ret = ::mount(_special_file, _dir, _fstype, _rwflag, _data);
+    const auto ret = ::mount(_special_file, _dir, _fstype, _rwflag, _data);
     if (ret < 0) {
         LINYAPS_BOX_LOG_DEBUG("mount failed: {} (errno={})", std::strerror(errno), errno);
         throw std::system_error(errno, std::system_category(), "mount");
@@ -476,7 +476,7 @@ auto do_remount(const remount_t &mount) -> void
                               e.what());
     }
 
-    auto state = os::throw_if_error(os::fstatfs(mount.destination_fd.ref()));
+    const auto state = os::throw_if_error(os::fstatfs(mount.destination_fd.ref()));
     const auto dest_flag = static_cast<unsigned long>(state.f_flags);
 
     auto remount_flags = dest_flag & (MS_NOSUID | MS_NODEV | MS_NOEXEC);
@@ -539,7 +539,7 @@ auto do_remount(const remount_t &mount) -> void
         }
 
         if (path.has_parent_path()) {
-            auto parent = os::throw_if_error(root.create_directories(path.parent_path()));
+            const auto parent = os::throw_if_error(root.create_directories(path.parent_path()));
             return os::throw_if_error(
               os::openat(parent.ref(),
                          path.filename(),
@@ -573,7 +573,7 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
         throw std::invalid_argument("invalid destination file descriptor for propagation mount");
     }
 
-    auto dest_path = destination.ref().current_path();
+    const auto dest_path = destination.ref().current_path();
     if (dest_path.empty()) {
         return;
     }
@@ -588,17 +588,17 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
         throw std::invalid_argument("bind mount requires source");
     }
 
-    auto source_fd = os::throw_if_error(
+    const auto source_fd = os::throw_if_error(
       os::open(mount.source.value(), { os::sys::open_flag::cloexec, os::sys::access_mode::path }));
-    auto source_ref = source_fd.ref();
-    auto source_stat =
+    const auto source_ref = source_fd.ref();
+    const auto source_stat =
       os::throw_if_error(os::fstatat(source_ref, "", os::sys::at_flag::empty_path));
 
     // TODO: if we do a bind mount after pivot_root and this container doesn't mount a procfs,
     // we need try a mount directly.
-    auto sourceIsDir = S_ISDIR(source_stat.st_mode);
-    auto destination_fd = ensure_mount_destination(root, mount, sourceIsDir);
-    auto dest_stat =
+    const auto sourceIsDir = S_ISDIR(source_stat.st_mode);
+    const auto destination_fd = ensure_mount_destination(root, mount, sourceIsDir);
+    const auto dest_stat =
       os::throw_if_error(os::fstatat(destination_fd.ref(), "", os::sys::at_flag::empty_path));
     if (sourceIsDir != S_ISDIR(dest_stat.st_mode)) {
         throw std::invalid_argument(
@@ -611,7 +611,7 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
 
     // remove MS_RDONLY for creating destination
     // we will remount it on later
-    auto bind_flags = to_os_vfs_flags(mount.vfs_flags) & ~MS_RDONLY;
+    const auto bind_flags = to_os_vfs_flags(mount.vfs_flags) & ~MS_RDONLY;
     try {
         // bind mount will ignore fstype and data
         syscall_mount(source_ref.proc_path().c_str(),
@@ -700,7 +700,7 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
                                 { os::sys::open_flag::cloexec, os::sys::access_mode::path }));
 
                     // mask /sys/fs/cgroup to prevent host cgroup leakage unless explicitly mounted
-                    auto has_cgroup_mount =
+                    const auto has_cgroup_mount =
                       std::any_of(container.get_config().mounts.cbegin(),
                                   container.get_config().mounts.cend(),
                                   [](const auto &m) {
@@ -732,7 +732,7 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
         }
     }
 
-    if (auto prop_flags = to_os_propagation_flags(mount.propagation_flags); prop_flags != 0) {
+    if (const auto prop_flags = to_os_propagation_flags(mount.propagation_flags); prop_flags != 0) {
         do_propagation_mount(destination_fd, prop_flags);
     }
 
@@ -753,7 +753,7 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
 
     // if the mount destination is root, we need to reopen it after mount
     // to refresh the file descriptor, otherwise it may cause some unexpected behavior
-    auto maybe_refresh_root = [&root, &mount] {
+    const auto maybe_refresh_root = [&root, &mount] {
         if (mount.destination == "/") {
             os::throw_if_error(root.reopen());
         }
@@ -830,7 +830,7 @@ public:
     {
         const auto &oci_config = container.get().get_config();
 
-        auto has_mount_ns = oci_config.linux_ && oci_config.linux_->namespaces
+        const auto has_mount_ns = oci_config.linux_ && oci_config.linux_->namespaces
           && std::any_of(oci_config.linux_->namespaces->begin(),
                          oci_config.linux_->namespaces->end(),
                          [](const auto &ns) {
@@ -915,7 +915,7 @@ public:
                 throw std::invalid_argument("copy-symlink mount requires a source");
             }
 
-            auto target = os::throw_if_error(
+            const auto target = os::throw_if_error(
               os::readlinkat(utils::file_descriptor_ref::cwd(), mount.source.value()));
             if (mount.destination.has_parent_path()) {
                 os::throw_if_error(root.create_directories(mount.destination.parent_path()));
@@ -932,11 +932,11 @@ public:
             }
 
             // EEXIST: tolerate an existing symlink with the same target.
-            auto handle = os::throw_if_error(
+            const auto handle = os::throw_if_error(
               root.open(mount.destination,
                         { os::sys::open_flag::no_follow | os::sys::open_flag::cloexec,
                           os::sys::access_mode::path }));
-            auto existing = os::throw_if_error(os::readlinkat(handle.ref(), ""));
+            const auto existing = os::throw_if_error(os::readlinkat(handle.ref(), ""));
             if (existing != target) {
                 throw std::system_error(EEXIST,
                                         std::system_category(),
@@ -977,16 +977,17 @@ public:
                 throw std::system_error(err, fmt::format("failed to open {} under rootfs", path));
             }
 
-            auto dst = std::move(dst_res).value();
-            auto dst_ref = dst.ref();
-            auto prop_flag = utils::bitflags<propagation_flag>{ propagation_flag::private_
-                                                                | propagation_flag::rec };
+            const auto dst = std::move(dst_res).value();
+            const auto dst_ref = dst.ref();
+            const auto prop_flag = utils::bitflags<propagation_flag>{ propagation_flag::private_
+                                                                      | propagation_flag::rec };
 
             // readonly path is an absolute path within the container,
             // the path is already exists in the container when making it readonly
             // so we should inherit the mount flags to keep it as same as the original
-            auto ret = os::throw_if_error(os::fstatfs(dst_ref));
-            auto vfs_flags = (MS_BIND | MS_RDONLY | MS_REC) | ret.f_flags;
+            const auto ret = os::throw_if_error(os::fstatfs(dst_ref));
+            auto vfs_flags =
+              (MS_BIND | MS_RDONLY | MS_REC) | static_cast<unsigned long>(ret.f_flags);
 
             // parent mount flags may contain MS_REMOUNT, we should remove it due to the
             // readonly path is not mounted yet
@@ -1028,7 +1029,7 @@ public:
             // so O_PATH is sufficient.
             auto dst = root.open(path, { os::sys::open_flag::cloexec, os::sys::access_mode::path });
             if (UNLIKELY(!dst)) {
-                auto err = std::move(dst).error();
+                const auto err = std::move(dst).error();
                 if (err == std::errc::no_such_file_or_directory
                     || err == std::errc::permission_denied) {
                     continue;
@@ -1037,7 +1038,7 @@ public:
                 throw std::system_error(err, fmt::format("failed to open {} under rootfs", path));
             }
 
-            auto ret =
+            const auto ret =
               os::throw_if_error(os::fstatat(dst->ref(), "", os::sys::at_flag::empty_path));
 
             config::mount mount{ };
@@ -1109,18 +1110,20 @@ private:
             dev_t dev;
         };
 
-        static const std::array<device_spec, 6> devices{ {
-          { "null", std::filesystem::file_type::character, makedev(1, 3) },
-          { "zero", std::filesystem::file_type::character, makedev(1, 5) },
-          { "full", std::filesystem::file_type::character, makedev(1, 7) },
-          { "random", std::filesystem::file_type::character, makedev(1, 8) },
-          { "urandom", std::filesystem::file_type::character, makedev(1, 9) },
-          { "tty", std::filesystem::file_type::character, makedev(5, 0) },
-        } };
+        static const std::array<device_spec, 6> devices{
+            {
+              { "null", std::filesystem::file_type::character, makedev(1, 3) },
+              { "zero", std::filesystem::file_type::character, makedev(1, 5) },
+              { "full", std::filesystem::file_type::character, makedev(1, 7) },
+              { "random", std::filesystem::file_type::character, makedev(1, 8) },
+              { "urandom", std::filesystem::file_type::character, makedev(1, 9) },
+              { "tty", std::filesystem::file_type::character, makedev(5, 0) },
+            },
+        };
 
-        auto dev_fd = os::throw_if_error(
+        const auto dev_fd = os::throw_if_error(
           root.open("dev", { os::sys::open_flag::cloexec, os::sys::access_mode::path }));
-        auto ref = dev_fd.ref();
+        const auto ref = dev_fd.ref();
 
         for (const auto &d : devices) {
             LINYAPS_BOX_LOG_DEBUG("Creating device /dev/{} (type={}, dev={})",
@@ -1177,7 +1180,7 @@ private:
               root.create("dev/ptmx", linyaps_box::infra::symlink_spec{ "pts/ptmx" }));
             return;
         }
-        auto ptmx = std::move(*ptmx_res);
+        const auto ptmx = std::move(*ptmx_res);
 
         auto stat_res = os::fstat(ptmx.ref());
         if (UNLIKELY(!stat_res)) {
@@ -1201,7 +1204,7 @@ private:
         } break;
         case std::filesystem::file_type::symlink: {
             // /dev/ptmx is a symlink: check if it points to pts/ptmx
-            auto link_target = os::throw_if_error(os::readlinkat(ptmx.ref(), ""));
+            const auto link_target = os::throw_if_error(os::readlinkat(ptmx.ref(), ""));
             if (link_target != "pts/ptmx" && link_target != "/dev/pts/ptmx") {
                 // Atomically replace the symlink using a temp + rename
                 os::throw_if_error(root.create("dev/.ptmx.tmp", infra::symlink_spec{ "pts/ptmx" }));
@@ -1229,13 +1232,15 @@ private:
     {
         LINYAPS_BOX_LOG_DEBUG("Configure dev symlinks");
         constexpr static std::array<std::pair<std::string_view, std::string_view>, 4> symlinks{
-            { { "/proc/self/fd", "fd" },
+            {
+              { "/proc/self/fd", "fd" },
               { "/proc/self/fd/0", "stdin" },
               { "/proc/self/fd/1", "stdout" },
-              { "/proc/self/fd/2", "stderr" } }
+              { "/proc/self/fd/2", "stderr" },
+            },
         };
 
-        auto dev_fd = os::throw_if_error(
+        const auto dev_fd = os::throw_if_error(
           root.open("dev", { os::sys::open_flag::cloexec, os::sys::access_mode::path }));
 
         for (const auto &[src, dst] : symlinks) {
@@ -1302,7 +1307,7 @@ void configure_mounts(container &container, const std::filesystem::path &rootfs)
     }
     c_env.push_back(nullptr);
 
-    auto ret = ::chdir(process.cwd.c_str());
+    const auto ret = ::chdir(process.cwd.c_str());
     if (ret != 0) {
         throw std::system_error(errno, std::system_category(), "chdir");
     }
@@ -1385,28 +1390,28 @@ void do_pivot_root(const container &container,
     if (!has_mount_ns) {
         LINYAPS_BOX_LOG_DEBUG("no mount namespace, fallback to chroot");
         auto ret = chdir(rootfs.c_str());
-        if (ret < 0) {
+        if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno, std::system_category(), "chdir to rootfs");
         }
 
         ret = chroot(".");
-        if (ret < 0) {
+        if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno, std::system_category(), "chroot");
         }
 
         ret = chdir("/");
-        if (ret < 0) {
+        if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno, std::system_category(), "chdir to /");
         }
 
         return;
     }
 
-    auto old_root = os::throw_if_error(os::open(
+    const auto old_root = os::throw_if_error(os::open(
       "/",
       { os::sys::open_flag::directory | os::sys::open_flag::cloexec, os::sys::access_mode::path },
       std::filesystem::perms::none));
-    auto new_root = os::throw_if_error(os::open(
+    const auto new_root = os::throw_if_error(os::open(
       rootfs,
       { os::sys::open_flag::directory | os::sys::open_flag::cloexec, os::sys::access_mode::path },
       std::filesystem::perms::none));
@@ -1417,27 +1422,27 @@ void do_pivot_root(const container &container,
     auto new_root_stat = os::throw_if_error(os::fstatfs(new_root.ref()));
     LINYAPS_BOX_LOG_DEBUG("Pivot root new root: {}", new_root_stat.f_flags);
 
-    auto ret = fchdir(new_root.get());
-    if (ret < 0) {
+    long ret = fchdir(new_root.get());
+    if (UNLIKELY(ret < 0)) {
         throw std::system_error(errno, std::system_category(), "fchdir");
     }
 
     ret = syscall(__NR_pivot_root, ".", ".");
-    if (ret < 0) {
+    if (UNLIKELY(ret < 0)) {
         LINYAPS_BOX_LOG_DEBUG("pivot_root failed ({}), fallback to move_root + chroot", errno);
         // fallback: MS_MOVE + chroot
         ret = ::mount(rootfs.c_str(), "/", "", MS_MOVE, nullptr);
-        if (ret < 0) {
+        if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno, std::system_category(), "mount MS_MOVE");
         }
 
         ret = chroot(".");
-        if (ret < 0) {
+        if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno, std::system_category(), "chroot after MS_MOVE");
         }
 
         ret = chdir("/");
-        if (ret < 0) {
+        if (UNLIKELY(ret < 0)) {
             throw std::system_error(errno, std::system_category(), "chdir to /");
         }
 
@@ -1445,7 +1450,7 @@ void do_pivot_root(const container &container,
     }
 
     ret = fchdir(old_root.get());
-    if (ret < 0) {
+    if (UNLIKELY(ret < 0)) {
         throw std::system_error(errno, std::system_category(), "fchdir");
     }
 
@@ -1458,22 +1463,23 @@ void do_pivot_root(const container &container,
 
     // umount old root
     ret = umount2(".", MNT_DETACH);
-    if (ret < 0) {
+    if (UNLIKELY(ret < 0)) {
         throw std::system_error(errno, std::system_category(), "umount2");
     }
 
-    do {
-        ret = umount2(".", MNT_DETACH);
-        if (ret < 0 && errno == EINVAL) {
-            break;
+    [] {
+        const auto u_ret = umount2(".", MNT_DETACH);
+        if (u_ret < 0 && errno == EINVAL) {
+            return;
         }
-        if (ret < 0) {
+
+        if (UNLIKELY(u_ret < 0)) {
             throw std::system_error(errno, std::system_category(), "umount2");
         }
-    } while (ret == 0);
+    }();
 
     ret = chdir("/");
-    if (ret < 0) {
+    if (UNLIKELY(ret < 0)) {
         throw std::system_error(errno, std::system_category(), "chdir");
     }
 
@@ -1518,7 +1524,7 @@ void processing_extensions(const oci_config &oci_config)
     // we use this feature for avoiding two process has the same pid.
     // e.g some application will register a tray through dbus and use the pid as the part of
     // dbus object path, if two process has the same pid, the dbus object path will conflict
-    auto it = oci_config.annotations->find("cn.org.linyaps.runtime.ns_last_pid");
+    const auto it = oci_config.annotations->find("cn.org.linyaps.runtime.ns_last_pid");
     while (it != oci_config.annotations->end()) {
         LINYAPS_BOX_LOG_DEBUG("Processing ns_last_pid extension: {}", it->second);
 
@@ -1538,7 +1544,7 @@ void processing_extensions(const oci_config &oci_config)
         }
 
         // ignore ns_last_pid if the file does not exist
-        auto ns_last_pid = std::filesystem::path{ "/proc/sys/kernel/ns_last_pid" };
+        const auto ns_last_pid = std::filesystem::path{ "/proc/sys/kernel/ns_last_pid" };
         if (!std::filesystem::exists(ns_last_pid)) {
             break;
         }
@@ -1573,7 +1579,7 @@ void configure_terminal(const container &container, protocol::child_message_chan
 
     slave.setup_stdio();
 
-    auto ret = fchown(slave.fd().get(), process.user_.uid, process.user_.gid);
+    const auto ret = fchown(slave.fd().get(), process.user_.uid, process.user_.gid);
     if (ret != 0) {
         throw std::system_error(errno, std::system_category(), "fchown");
     }
@@ -1582,7 +1588,7 @@ void configure_terminal(const container &container, protocol::child_message_chan
         slave.set_size({ process.console_size_->height, process.console_size_->width, 0, 0 });
     }
 
-    auto root = os::throw_if_error(infra::Root::open("/"));
+    const auto root = os::throw_if_error(infra::Root::open("/"));
 
     // /dev/console must be a regular file (for bind-mount) or absent.
     // If it is a symlink, remove it
@@ -1594,7 +1600,7 @@ void configure_terminal(const container &container, protocol::child_message_chan
         if (UNLIKELY(!st_res)) {
             throw std::system_error(std::move(st_res).error(), "fstatat /dev/console");
         }
-        auto type = os::to_fs_file_type(st_res->st_mode);
+        const auto type = os::to_fs_file_type(st_res->st_mode);
 
         if (UNLIKELY(type == std::filesystem::file_type::symlink)) {
             LINYAPS_BOX_LOG_DEBUG("/dev/console is a symlink; removing it");
@@ -1615,8 +1621,8 @@ void configure_terminal(const container &container, protocol::child_message_chan
     mount.vfs_flags = utils::bitflags<vfs_flag>{ vfs_flag::bind };
 
     std::ignore = container_ns::do_bind_mount(root, mount);
-    auto console_fd = std::move(master).take();
-    auto ref = console_fd.ref();
+    const auto console_fd = std::move(master).take();
+    const auto ref = console_fd.ref();
     sync.send_console_fd(ref);
 }
 
@@ -1633,7 +1639,7 @@ int clone_fn(void *data) noexcept
         logger.set_forwarder(std::make_unique<protocol::sync_socket_forwarder>(args.sync));
 
         if (getenv("LINYAPS_BOX_CONTAINER_PROCESS_TRACE_ME") != nullptr) {
-            auto signal_USR1_handler = []([[maybe_unused]] int) {
+            const auto signal_USR1_handler = []([[maybe_unused]] int) {
                 static constexpr char msg[] = "[DEBUG] Signal USR1 received.\n";
                 std::ignore = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
             };
@@ -1660,7 +1666,7 @@ int clone_fn(void *data) noexcept
 
         auto &sync = args.sync;
 
-        utils::close_range(3U + static_cast<unsigned>(args.preserve_fds),
+        utils::close_range(3 + args.preserve_fds,
                            std::numeric_limits<unsigned>::max(),
                            CLOSE_RANGE_CLOEXEC);
 
@@ -1692,10 +1698,10 @@ int clone_fn(void *data) noexcept
         wait_prestart_hooks_result(oci_config, sync);
         wait_create_runtime_result(oci_config, sync);
 
-        auto status = container.status();
+        const auto status = container.status();
         create_container_hooks(container, status, sync);
         // TODO: selinux label/apparmor profile
-        auto has_mount_ns = oci_config.linux_ && oci_config.linux_->namespaces
+        const auto has_mount_ns = oci_config.linux_ && oci_config.linux_->namespaces
           && std::any_of(oci_config.linux_->namespaces->cbegin(),
                          oci_config.linux_->namespaces->cend(),
                          [](const auto &ns) {
@@ -1807,7 +1813,7 @@ void set_rlimits(const std::vector<linyaps_box::config::rlimit> &rlimits)
 {
     std::for_each(rlimits.begin(), rlimits.end(), [](const linyaps_box::config::rlimit &rlimit) {
         const struct ::rlimit rl{ rlimit.soft, rlimit.hard };
-        auto resource = utils::to_rlimit_resource(rlimit.type_);
+        const auto resource = utils::to_rlimit_resource(rlimit.type_);
         LINYAPS_BOX_LOG_DEBUG("Set rlimit {}: Soft={}, Hard={}",
                               rlimit.type_,
                               rlimit.soft,
@@ -1928,12 +1934,12 @@ void set_deny_groups(container &container, const std::filesystem::path &filepath
         throw std::runtime_error("denying setgroups");
     }
 
-    auto file = os::throw_if_error(os::open(
+    const auto file = os::throw_if_error(os::open(
       filepath,
       { os::sys::open_flag::cloexec | os::sys::open_flag::create | os::sys::open_flag::truncate,
         os::sys::access_mode::write_only },
       std::filesystem::perms::owner_read | std::filesystem::perms::owner_write));
-    auto ret = ::write(file.get(), "deny", 4);
+    const auto ret = ::write(file.get(), "deny", 4);
     if (ret < 0) {
         throw std::system_error{ errno, std::system_category(), "write setgroups" };
     }
@@ -1956,7 +1962,7 @@ void configure_gid_mapping(pid_t pid, container &container)
 
     std::string content;
     const auto len = gid_mappings_v.size();
-    auto self_process = std::filesystem::path{ "/proc" } / std::to_string(pid);
+    const auto self_process = std::filesystem::path{ "/proc" } / std::to_string(pid);
     const auto is_single_mapping = (gid_mappings_v.size() == 1 && gid_mappings_v[0].size == 1
                                     && gid_mappings_v[0].host_id == gid_mappings_v[0].container_id);
     if (is_single_mapping) {
@@ -1972,12 +1978,12 @@ void configure_gid_mapping(pid_t pid, container &container)
         content.push_back(' ');
         content.append(std::to_string(mapping.size));
 
-        auto file = os::throw_if_error(os::open(
+        const auto file = os::throw_if_error(os::open(
           self_process / "gid_map",
           { os::sys::open_flag::cloexec | os::sys::open_flag::create | os::sys::open_flag::truncate,
             os::sys::access_mode::write_only },
           std::filesystem::perms::owner_read | std::filesystem::perms::owner_write));
-        auto ret = ::write(file.get(), content.data(), content.size());
+        const auto ret = ::write(file.get(), content.data(), content.size());
         if (ret > 0) {
             return;
         }
@@ -2018,7 +2024,7 @@ void configure_gid_mapping(pid_t pid, container &container)
         }
     };
 
-    auto file = os::throw_if_error(os::open(
+    const auto file = os::throw_if_error(os::open(
       self_process / "gid_map",
       { os::sys::open_flag::cloexec | os::sys::open_flag::create | os::sys::open_flag::truncate,
         os::sys::access_mode::write_only },
@@ -2051,7 +2057,7 @@ void configure_uid_mapping(pid_t pid, const container &container)
 
     std::string content;
     const auto len = uid_mappings_v.size();
-    auto self_process = std::filesystem::path{ "/proc" } / std::to_string(pid);
+    const auto self_process = std::filesystem::path{ "/proc" } / std::to_string(pid);
     const auto is_single_mapping = (uid_mappings_v.size() == 1 && uid_mappings_v[0].size == 1
                                     && uid_mappings_v[0].host_id == uid_mappings_v[0].container_id);
     if (is_single_mapping) {
@@ -2063,12 +2069,12 @@ void configure_uid_mapping(pid_t pid, const container &container)
         content.push_back(' ');
         content.append(std::to_string(mapping.size));
 
-        auto file = os::throw_if_error(os::open(
+        const auto file = os::throw_if_error(os::open(
           self_process / "uid_map",
           { os::sys::open_flag::cloexec | os::sys::open_flag::create | os::sys::open_flag::truncate,
             os::sys::access_mode::write_only },
           std::filesystem::perms::owner_read | std::filesystem::perms::owner_write));
-        auto ret = ::write(file.get(), content.data(), content.size());
+        const auto ret = ::write(file.get(), content.data(), content.size());
         if (ret > 0) {
             return;
         }
@@ -2112,7 +2118,7 @@ void configure_uid_mapping(pid_t pid, const container &container)
         }
     };
 
-    auto file = os::throw_if_error(os::open(
+    const auto file = os::throw_if_error(os::open(
       self_process / "uid_map",
       { os::sys::open_flag::cloexec | os::sys::open_flag::create | os::sys::open_flag::truncate,
         os::sys::access_mode::write_only },
@@ -2158,7 +2164,7 @@ void configure_container_namespaces(container &container, parent_message_channel
                                  return ns.type_ == ns::type::user;
                              })
                 != namespaces->end()) {
-                auto pid = container.status().pid;
+                const auto pid = container.status().pid;
 
                 // TODO: if not mapping a range of uid/gid, we could set uid/gid in the
                 // container process
@@ -2194,7 +2200,7 @@ void prestart_hooks(const container &container, parent_message_channel &sync)
 
     LINYAPS_BOX_LOG_DEBUG("Execute prestart hooks");
 
-    auto state = container.status();
+    const auto state = container.status();
     for (const auto &hook : container.get_config().hooks_->prestart.value()) {
         execute_hook(hook, state);
     }
@@ -2218,7 +2224,7 @@ void create_runtime_hooks(const container &container, parent_message_channel &sy
 
     LINYAPS_BOX_LOG_DEBUG("Execute create runtime hooks");
 
-    auto state = container.status();
+    const auto state = container.status();
     for (const auto &hook : container.get_config().hooks_->create_runtime.value()) {
         execute_hook(hook, state);
     }
@@ -2258,7 +2264,7 @@ void poststart_hooks(const container &container)
         return;
     }
 
-    auto state = container.status();
+    const auto state = container.status();
     for (const auto &hook : container.get_config().hooks_->poststart.value()) {
         execute_hook(hook, state);
     }
@@ -2270,7 +2276,7 @@ void poststop_hooks(const container &container) noexcept
         return;
     }
 
-    auto state = container.status();
+    const auto state = container.status();
     for (const auto &hook : container.get_config().hooks_->poststop.value()) {
         try {
             execute_hook(hook, state);
@@ -2309,12 +2315,12 @@ container::container(status_directory status_dir, const create_container_options
             throw std::runtime_error("bind mount must has a source");
         }
 
-        auto file = std::filesystem::path(mount.source.value());
+        const auto file = std::filesystem::path(mount.source.value());
         if (file.is_absolute()) {
             return;
         }
 
-        auto abs_src = std::filesystem::canonical(bundle / file);
+        const auto abs_src = std::filesystem::canonical(bundle / file);
         mount.source = abs_src.string();
     });
 
@@ -2397,7 +2403,7 @@ int container::run(run_container_options_t options)
 
         std::string owner;
 #ifndef LINYAPS_BOX_STATIC_LINK
-        auto *pw = getpwuid(host_uid_);
+        const auto *pw = getpwuid(host_uid_);
         if (pw != nullptr) {
             owner = pw->pw_name;
         }
@@ -2452,7 +2458,7 @@ int container::run(run_container_options_t options)
         auto in_flags = in.flags();
         auto out_flags = out.flags();
 
-        auto restore_if_changed = utils::make_defer([&]() noexcept {
+        const auto restore_if_changed = utils::make_defer([&]() noexcept {
             if (!changed) {
                 return;
             }
@@ -2504,7 +2510,7 @@ int container::run(run_container_options_t options)
 
 void container::cgroup_preenter(const cgroup_options &options, utils::file_descriptor &dirfd)
 {
-    auto type = utils::get_cgroup_type();
+    const auto type = utils::get_cgroup_type();
     if (type != utils::cgroup_t::unified) {
         return;
     }

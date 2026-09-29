@@ -4,8 +4,6 @@
 
 #include "linyaps_box/status_directory_manager.h"
 
-#include "linyaps_box/log/macro.h"
-
 #include <algorithm>
 #include <filesystem>
 #include <utility>
@@ -43,7 +41,7 @@ auto status_directory_manager::list() const -> std::vector<std::string>
         }
 
         const auto &path = entry.path();
-        auto status_file = path / "status.json";
+        const auto status_file = path / "status.json";
         if (!std::filesystem::exists(status_file, ec) || ec) {
             continue;
         }

@@ -25,7 +25,7 @@ auto detect_file_size_hint(utils::file_descriptor_ref fd) noexcept -> std::size_
         return 0;
     }
 
-    auto type = os::to_fs_file_type(stat->st_mode);
+    const auto type = os::to_fs_file_type(stat->st_mode);
     if (type == std::filesystem::file_type::regular) {
         const auto current_pos = ::lseek(fd, 0, SEEK_CUR);
         if (current_pos != -1 && stat->st_size > current_pos) {

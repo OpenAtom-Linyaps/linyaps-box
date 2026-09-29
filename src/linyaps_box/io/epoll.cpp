@@ -53,7 +53,8 @@ void Epoll::remove(const utils::file_descriptor &fd)
 
 auto Epoll::wait(int timeout) -> utils::span<const struct epoll_event>
 {
-    auto nevents = utils::epoll_wait(epoll_fd, events_buffer.data(), events_buffer.size(), timeout);
+    const auto nevents =
+      utils::epoll_wait(epoll_fd, events_buffer.data(), events_buffer.size(), timeout);
     return { events_buffer.data(), static_cast<std::size_t>(nevents) };
 }
 

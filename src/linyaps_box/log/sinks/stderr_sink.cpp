@@ -47,7 +47,7 @@ try {
 
     format_log(buf, ctx, format_, style);
 
-    auto bytes = utils::as_bytes(utils::span(buf.data(), buf.size()));
+    const auto bytes = utils::as_bytes(utils::span(buf.data(), buf.size()));
     std::ignore = stderr_fd.write_span(bytes);
 } catch (...) { // NOLINT
     // swallow

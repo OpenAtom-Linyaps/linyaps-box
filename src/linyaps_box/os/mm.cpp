@@ -37,7 +37,7 @@ auto mmap_anonymous(void *ptr,
 
 auto munmap(void *ptr, std::size_t length) noexcept -> Result<void>
 {
-    auto ret = ::munmap(ptr, length);
+    const auto ret = ::munmap(ptr, length);
     if (UNLIKELY(ret == -1)) {
         return unexpected{ make_error_code(errno) };
     }

@@ -61,7 +61,7 @@ void validate_identifiers(std::string_view input,
         }
 
         if (numeric_no_leading_zero && std::distance(begin, dot) > 1 && *begin == '0') {
-            auto all_digits = std::all_of(begin + 1, dot, [](char c) {
+            const auto all_digits = std::all_of(begin + 1, dot, [](char c) {
                 return c >= '0' && c <= '9';
             });
 
@@ -201,7 +201,7 @@ int compare_prerelease(const std::string &a, const std::string &b) noexcept
 
 semver::semver(std::string_view str)
 {
-    auto dot1 = str.find('.');
+    const auto dot1 = str.find('.');
     if (UNLIKELY(dot1 == std::string_view::npos)) {
         throw invalid_semver(fmt::format("invalid semver '{}': missing '.' after the major "
                                          "version (expected '<major>.<minor>.<patch>')",
@@ -209,7 +209,7 @@ semver::semver(std::string_view str)
     }
     parse_uint_segment(str, 0, dot1, "major version", major_);
 
-    auto dot2 = str.find('.', dot1 + 1);
+    const auto dot2 = str.find('.', dot1 + 1);
     if (UNLIKELY(dot2 == std::string_view::npos)) {
         throw invalid_semver(fmt::format("invalid semver '{}': missing '.' after the minor "
                                          "version (expected '<major>.<minor>.<patch>')",
@@ -228,21 +228,21 @@ semver::semver(std::string_view str)
     }
 
     if (str[patch_end] == '+') {
-        auto build = str.substr(patch_end + 1);
+        const auto build = str.substr(patch_end + 1);
         validate_identifiers(str, build, "build metadata", false);
         build_ = build;
         return;
     }
 
-    auto prerelease_begin = patch_end + 1;
-    auto plus = str.find('+', prerelease_begin);
-    auto prerelease =
+    const auto prerelease_begin = patch_end + 1;
+    const auto plus = str.find('+', prerelease_begin);
+    const auto prerelease =
       str.substr(prerelease_begin, plus == std::string_view::npos ? plus : plus - prerelease_begin);
     validate_identifiers(str, prerelease, "prerelease", true);
     prerelease_ = prerelease;
 
     if (plus != std::string_view::npos) {
-        auto build = str.substr(plus + 1);
+        const auto build = str.substr(plus + 1);
         validate_identifiers(str, build, "build metadata", false);
         build_ = build;
     }
@@ -372,10 +372,10 @@ namespace std {
 size_t
 hash<linyaps_box::utils::semver>::operator()(const linyaps_box::utils::semver &v) const noexcept
 {
-    auto h1 = hash<unsigned int>{ }(v.major_version());
-    auto h2 = hash<unsigned int>{ }(v.minor_version());
-    auto h3 = hash<unsigned int>{ }(v.patch_version());
-    auto h4 = hash<string>{ }(v.prerelease());
+    const auto h1 = hash<unsigned int>{ }(v.major_version());
+    const auto h2 = hash<unsigned int>{ }(v.minor_version());
+    const auto h3 = hash<unsigned int>{ }(v.patch_version());
+    const auto h4 = hash<string>{ }(v.prerelease());
     return h1 ^ (h2 << 1U) ^ (h3 << 2U) ^ (h4 << 3U);
 }
 

@@ -12,7 +12,7 @@ namespace linyaps_box::utils {
 
 auto sigfillset(sigset_t &set) -> void
 {
-    auto ret = ::sigfillset(&set);
+    const auto ret = ::sigfillset(&set);
     if (ret < 0) {
         throw std::system_error(errno, std::system_category(), "sigfillset");
     }
@@ -20,7 +20,7 @@ auto sigfillset(sigset_t &set) -> void
 
 auto sigismember(const sigset_t &set, int signo) -> bool
 {
-    auto ret = ::sigismember(&set, signo);
+    const auto ret = ::sigismember(&set, signo);
     if (ret < 0) {
         const std::string msg{ "failed to check signal " + std::to_string(signo) };
         throw std::system_error(errno, std::system_category(), msg);
@@ -31,7 +31,7 @@ auto sigismember(const sigset_t &set, int signo) -> bool
 
 auto sigprocmask(int how, const sigset_t &new_set, sigset_t *old_set) -> void
 {
-    auto ret = ::sigprocmask(how, &new_set, old_set);
+    const auto ret = ::sigprocmask(how, &new_set, old_set);
     if (ret < 0) {
         throw std::system_error(errno, std::system_category(), "sigprocmask");
     }
@@ -39,7 +39,7 @@ auto sigprocmask(int how, const sigset_t &new_set, sigset_t *old_set) -> void
 
 auto sigaction(int sig, const struct sigaction &new_act, struct sigaction *old_act) -> void
 {
-    auto ret = ::sigaction(sig, &new_act, old_act);
+    const auto ret = ::sigaction(sig, &new_act, old_act);
     if (ret < 0) {
         throw std::system_error(errno, std::system_category(), "sigaction");
     }
@@ -59,7 +59,7 @@ auto reset_signals(const sigset_t &set) -> void
             continue;
         }
 
-        auto ret = sigaction(sig, &act, nullptr);
+        const auto ret = sigaction(sig, &act, nullptr);
         if (ret < 0) {
             const std::string msg{ "failed to reset signal " + std::to_string(sig) };
             throw std::system_error(errno, std::system_category(), msg);
@@ -67,14 +67,14 @@ auto reset_signals(const sigset_t &set) -> void
     }
 }
 
-auto create_signalfd(sigset_t &set, bool nonblock) -> file_descriptor
+auto create_signalfd(const sigset_t &set, bool nonblock) -> file_descriptor
 {
     unsigned flags = SFD_CLOEXEC;
     if (nonblock) {
         flags |= SFD_NONBLOCK;
     }
 
-    auto ret = ::signalfd(-1, &set, static_cast<int>(flags));
+    const auto ret = ::signalfd(-1, &set, static_cast<int>(flags));
     if (ret < 0) {
         throw std::system_error(errno, std::system_category(), "signalfd");
     }
