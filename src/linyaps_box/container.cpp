@@ -9,7 +9,8 @@
 #include "linyaps_box/impl/disabled_cgroup_manager.h"
 #include "linyaps_box/infra/process_handle.h"
 #include "linyaps_box/infra/rootfs.h"
-#include "linyaps_box/infra/unix_socket.h"
+#include "linyaps_box/io/epoll.h"
+#include "linyaps_box/io/stream.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
@@ -37,6 +38,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <csignal>
 #include <fstream>
 #include <iostream>
@@ -85,16 +87,43 @@ namespace stage = protocol::stage;
     return std::string{ pid_ns.substr(prefix_len, pid_ns.size() - total_wrapper_len) };
 }
 
+// TODO: This is a temporary fix, we will completely rewrite this code in the future.
 void execute_hook(const oci_config::hooks_t::hook_t &hook, const container_status &state)
 {
-    // FIXME: hook state JSON is sent over a SEQPACKET socketpair, which discards
-    //  bytes beyond the hook's first read() buffer (e.g. Python's 8K) when the
-    //  message is larger — large `annotations` can truncate the JSON and make the
-    //  hook fail to parse its stdin.  runc, youki and crun all feed hook stdin via
-    //  a stream pipe (pipe2(O_CLOEXEC) + write_all) instead; replace this with
-    //  pipe2 + file_descriptor::write_span in a follow-up.
-    auto [parent, child] = infra::unix_socket::create_pair(os::sys::socket_type::seqpacket,
-                                                           os::sys::socket_flag::cloexec);
+    const auto make_pipe = []() -> std::pair<utils::file_descriptor, utils::file_descriptor> {
+        std::array<int, 2> buf{ };
+        const auto ret = pipe2(buf.data(), O_CLOEXEC);
+        if (UNLIKELY(ret != 0)) {
+            throw std::system_error(errno, std::system_category(), "failed to create hook pipe");
+        }
+
+        return std::make_pair(utils::file_descriptor{ buf[0] }, utils::file_descriptor{ buf[1] });
+    };
+
+    auto stdin_pipe = make_pipe();
+    auto stdin_read = std::move(stdin_pipe.first);
+    auto stdin_write = std::move(stdin_pipe.second);
+
+    auto error_pipe = make_pipe();
+    auto error_read = std::move(error_pipe.first);
+    auto error_write = std::move(error_pipe.second);
+
+    auto stderr_pipe = make_pipe();
+    auto stderr_read = std::move(stderr_pipe.first);
+    auto stderr_write = std::move(stderr_pipe.second);
+
+    sigset_t chld_set;
+    sigemptyset(&chld_set);
+    sigaddset(&chld_set, SIGCHLD);
+    sigset_t old_sigmask;
+    utils::sigprocmask(SIG_BLOCK, chld_set, &old_sigmask);
+    const auto restore_sigmask = utils::make_defer([&]() noexcept {
+        try {
+            utils::sigprocmask(SIG_SETMASK, old_sigmask, nullptr);
+        } catch (const std::exception &e) {
+            LINYAPS_BOX_LOG_WARN("failed to set signal mask: {}", e.what());
+        }
+    });
 
     auto pid = fork();
     if (pid < 0) {
@@ -102,9 +131,23 @@ void execute_hook(const oci_config::hooks_t::hook_t &hook, const container_statu
     }
 
     if (pid == 0) {
-        child.close();
-        parent.fd().duplicate_to(STDIN_FILENO, 0);
-        parent.close();
+        utils::sigprocmask(SIG_SETMASK, old_sigmask, nullptr);
+        stdin_write.close();
+        error_read.close();
+        stderr_read.close();
+        stdin_read.duplicate_to(STDIN_FILENO, 0);
+        stdin_read.close();
+
+        // stdout goes to /dev/null (falling back to the inherited descriptor if
+        // it is unreachable); stderr goes to the capture pipe.
+        if (auto dev_null =
+              os::open("/dev/null", { os::sys::open_flag::none, os::sys::access_mode::write_only });
+            dev_null) {
+            dev_null->duplicate_to(STDOUT_FILENO, 0);
+        }
+
+        stderr_write.duplicate_to(STDERR_FILENO, 0);
+        stderr_write.close();
 
         const auto *bin = hook.path.c_str();
         std::vector<const char *> c_args;
@@ -129,101 +172,294 @@ void execute_hook(const oci_config::hooks_t::hook_t &hook, const container_statu
                 const_cast<char *const *>(c_args.data()), // NOLINT
                 const_cast<char *const *>(c_env.data())); // NOLINT
 
-        LINYAPS_BOX_LOG_ERROR_ERRNO(errno,
-                                    "execute hook {} failed",
-                                    [&bin, &c_args]() -> std::string {
-                                        std::stringstream stream;
-                                        stream << bin;
-                                        for (const auto &arg : c_args) {
-                                            if (arg != nullptr) {
-                                                stream << " " << arg;
-                                            }
-                                        }
-                                        return std::move(stream).str();
-                                    }());
+        // Do not log in the child: in the container namespace the logger
+        // forwards over the sync protocol socket, so a log record here would
+        // corrupt the parent's message stream. Hand the formatted error to the
+        // parent over the error pipe and let it be reported outside instead.
+        const int exec_errno = errno;
+        auto exec_error = fmt::format("failed to execute hook {}: {}",
+                                      hook.path.string(),
+                                      std::generic_category().message(exec_errno));
+        std::ignore = io::write_all(error_write.ref(), utils::as_bytes(utils::span(exec_error)));
         _exit(EXIT_FAILURE);
     }
-    parent.close();
+    stdin_read.close();
+    error_write.close();
+    stderr_write.close();
 
     auto state_json = nlohmann::json(state).dump();
-    const auto *data = reinterpret_cast<const std::byte *>(state_json.data());
-    auto remaining = state_json.size();
+    const auto state_bytes = utils::as_bytes(utils::span(state_json));
+    std::size_t state_sent{ 0 };
 
-    if (auto r = child.send(utils::span(data, remaining)); !r) {
-        LINYAPS_BOX_LOG_WARN("failed to write state to hook stdin: {}", r.error().message());
+    stdin_write.set_nonblock(true);
+    error_read.set_nonblock(true);
+    stderr_read.set_nonblock(true);
+
+    io::Epoll poller;
+    if (UNLIKELY(!poller.add(stdin_write, EPOLLOUT))) {
+        throw std::runtime_error("failed to add hook stdin to epoll");
     }
 
-    child.close();
+    if (UNLIKELY(!poller.add(error_read, EPOLLIN))) {
+        throw std::runtime_error("failed to add hook error pipe to epoll");
+    }
 
+    if (UNLIKELY(!poller.add(stderr_read, EPOLLIN))) {
+        throw std::runtime_error("failed to add hook stderr to epoll");
+    }
+
+    auto signal_fd = utils::create_signalfd(chld_set);
+    if (UNLIKELY(!poller.add(signal_fd, EPOLLIN))) {
+        throw std::runtime_error("failed to add hook signalfd to epoll");
+    }
+
+    std::optional<std::chrono::steady_clock::time_point> deadline;
+    if (hook.timeout) {
+        deadline = std::chrono::steady_clock::now() + std::chrono::seconds(hook.timeout.value());
+    }
+
+    sigset_t pipe_signals;
+    sigemptyset(&pipe_signals);
+    sigaddset(&pipe_signals, SIGPIPE);
+    sigset_t old_pipe_mask;
+    utils::sigprocmask(SIG_BLOCK, pipe_signals, &old_pipe_mask);
+    const auto restore_pipe_mask = utils::make_defer([&]() noexcept {
+        const struct timespec zero_timeout{ };
+        while (sigtimedwait(&pipe_signals, nullptr, &zero_timeout) >= 0) { }
+
+        try {
+            utils::sigprocmask(SIG_SETMASK, old_pipe_mask, nullptr);
+        } catch (const std::exception &e) {
+            LINYAPS_BOX_LOG_WARN("failed to restore signal mask: {}", e.what());
+        }
+    });
+
+    utils::uninit_vector<std::byte> error_buf;
+    utils::uninit_vector<std::byte> stderr_buf;
+    bool stdin_done{ false };
+    bool error_done{ false };
+    bool stderr_done{ false };
+    bool stderr_truncated{ false };
+    bool child_exited{ false };
+    bool timed_out{ false };
     int status{ 0 };
-    if (!hook.timeout) {
-        pid_t ret = -1;
-        while (ret == -1) {
-            ret = waitpid(pid, &status, 0);
-            if (ret != -1) {
-                break;
-            }
 
-            if (errno == EINTR || errno == EAGAIN) {
-                continue;
-            }
-
-            throw std::system_error(errno,
-                                    std::system_category(),
-                                    "waitpid " + std::to_string(pid));
+    auto finish_stdin = [&]() -> void {
+        if (stdin_done) {
+            return;
         }
-    } else {
-        sigset_t mask;
-        sigemptyset(&mask);
-        sigaddset(&mask, SIGCHLD);
 
-        struct timespec ts{ };
-        ts.tv_sec = hook.timeout.value();
+        stdin_done = true;
+        poller.remove(stdin_write);
+        stdin_write.close();
+    };
 
-        siginfo_t info;
+    const auto flush_stdin = [&]() -> void {
+        while (state_sent < state_bytes.size()) {
+            auto [st, n] = stdin_write.write_span(state_bytes.subspan(state_sent));
+            state_sent += n;
+
+            if (st == utils::IOStatus::TryAgain) {
+                return; // wait for the next EPOLLOUT
+            }
+
+            if (st != utils::IOStatus::Success) {
+                // The hook closed stdin early (EPIPE) or stopped reading.
+                LINYAPS_BOX_LOG_DEBUG("hook {} stopped reading stdin after {} bytes",
+                                      hook.path.string(),
+                                      state_sent);
+                finish_stdin();
+                return;
+            }
+
+            if (n == 0) {
+                return;
+            }
+        }
+
+        finish_stdin();
+    };
+
+    const auto drain_error = [&]() -> void {
+        std::array<std::byte, 4096> chunk; // NOLINT
         while (true) {
-            auto sig = sigtimedwait(&mask, &info, &ts);
-            if (sig >= 0) {
-                if (info.si_pid != pid) {
-                    continue;
-                }
-
-                auto ret = waitpid(pid, &status, 0);
-                if (ret < 0) {
-                    throw std::system_error(errno,
-                                            std::system_category(),
-                                            "waitpid " + std::to_string(pid));
-                }
-
-                break;
+            auto [st, n] = error_read.read_span(chunk);
+            if (n > 0) {
+                error_buf.insert(error_buf.end(), chunk.begin(), chunk.begin() + n);
             }
 
-            if (errno == EAGAIN) {
-                kill(pid, SIGKILL);
-                waitpid(pid, &status, 0);
-                break;
+            if (st == utils::IOStatus::TryAgain) {
+                return;
             }
 
-            if (errno == EINTR) {
+            if (st != utils::IOStatus::Success) {
+                // Eof/Closed: exec succeeded (or the pipe broke).
+                error_done = true;
+                poller.remove(error_read);
+                error_read.close();
+                return;
+            }
+        }
+    };
+
+    constexpr std::size_t max_hook_stderr = 64 * 1024;
+
+    const auto drain_stderr = [&]() -> void {
+        std::array<std::byte, 4096> chunk; // NOLINT
+        while (true) {
+            auto [st, n] = stderr_read.read_span(chunk);
+            if (n > 0) {
+                const auto room = max_hook_stderr - std::min(stderr_buf.size(), max_hook_stderr);
+                const auto take = std::min(room, n);
+                stderr_buf.insert(stderr_buf.end(), chunk.begin(), chunk.begin() + take);
+                if (take < n) {
+                    stderr_truncated = true;
+                }
+            }
+
+            if (st == utils::IOStatus::TryAgain) {
+                return;
+            }
+
+            if (st != utils::IOStatus::Success) {
+                stderr_done = true;
+                poller.remove(stderr_read);
+                stderr_read.close();
+                return;
+            }
+        }
+    };
+
+    const auto format_hook_error = [&](std::string message) -> std::string {
+        if (stderr_buf.empty()) {
+            return message;
+        }
+
+        message += ", stderr: ";
+        message.append(reinterpret_cast<const char *>(stderr_buf.data()), stderr_buf.size());
+        if (stderr_truncated) {
+            message += " (truncated)";
+        }
+        return message;
+    };
+
+    const auto handle_sigchld = [&]() -> void {
+        while (true) {
+            struct signalfd_siginfo info{ };
+            auto read_result = signal_fd.read(info);
+
+            if (read_result.status == utils::IOStatus::TryAgain) {
+                return;
+            }
+            if (read_result.status != utils::IOStatus::Success) {
+                return;
+            }
+            if (info.ssi_signo != static_cast<std::uint32_t>(SIGCHLD)
+                || info.ssi_pid != static_cast<std::uint32_t>(pid)) {
                 continue;
             }
 
-            throw std::system_error(errno, std::system_category(), "sigtimedwait");
+            auto reaped = os::waitpid(pid, status, WNOHANG);
+            if (UNLIKELY(!reaped)) {
+                throw std::system_error(reaped.error(), "waitpid " + std::to_string(pid));
+            }
+            if (*reaped == pid) {
+                child_exited = true;
+                return;
+            }
         }
+    };
+
+    flush_stdin();
+    drain_error();
+
+    while (!child_exited && !timed_out) {
+        int wait_timeout = -1; // no deadline: block until an fd is ready
+        if (deadline) {
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                     *deadline - std::chrono::steady_clock::now())
+                                     .count();
+            if (remaining <= 0) {
+                timed_out = true;
+                break;
+            }
+
+            wait_timeout =
+              static_cast<int>(std::min<long long>(remaining, std::numeric_limits<int>::max()));
+        }
+
+        const auto events = poller.wait(wait_timeout);
+        if (events.empty()) {
+            timed_out = true;
+            break;
+        }
+
+        for (const auto &event : events) {
+            const int fd = event.data.fd;
+
+            if (fd == stdin_write.get()) {
+                flush_stdin();
+            } else if (fd == error_read.get()) {
+                drain_error();
+            } else if (fd == stderr_read.get()) {
+                drain_stderr();
+            } else if (fd == signal_fd.get()) {
+                handle_sigchld();
+            }
+        }
+    }
+
+    if (!stdin_done) {
+        finish_stdin();
+    }
+
+    if (timed_out) {
+        std::ignore = os::kill_process(pid, SIGKILL);
+        auto reaped = os::waitpid(pid, status, 0);
+        if (UNLIKELY(!reaped)) {
+            throw std::system_error(reaped.error(), "waitpid " + std::to_string(pid));
+        }
+
+        if (!stderr_done) {
+            drain_stderr();
+        }
+
+        throw std::runtime_error(
+          format_hook_error("hook " + hook.path.string() + " timed out after "
+                            + std::to_string(hook.timeout.value()) + " seconds"));
+    }
+
+    if (!error_done) {
+        // The child is gone, so the remaining error output (if any) can be read
+        // to EOF without blocking.
+        error_read.set_nonblock(false);
+        std::ignore = io::read_to_end(error_read.ref(), error_buf);
+        error_read.close();
+    }
+
+    if (!stderr_done) {
+        drain_stderr();
+    }
+
+    if (!error_buf.empty()) {
+        throw std::runtime_error(format_hook_error(
+          std::string{ reinterpret_cast<const char *>(error_buf.data()), error_buf.size() }));
     }
 
     if (WIFEXITED(status)) {
         if (WEXITSTATUS(status) != 0) {
-            throw std::runtime_error("hook " + hook.path.string() + " failed with exit code "
-                                     + std::to_string(WEXITSTATUS(status)));
+            throw std::runtime_error(format_hook_error("hook " + hook.path.string()
+                                                       + " failed with exit code "
+                                                       + std::to_string(WEXITSTATUS(status))));
         }
 
         return;
     }
 
     if (WIFSIGNALED(status)) {
-        throw std::runtime_error("hook " + hook.path.string() + " terminated by signal "
-                                 + std::to_string(WTERMSIG(status)));
+        throw std::runtime_error(format_hook_error("hook " + hook.path.string()
+                                                   + " terminated by signal "
+                                                   + std::to_string(WTERMSIG(status))));
     }
 }
 
