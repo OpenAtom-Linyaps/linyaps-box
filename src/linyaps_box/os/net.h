@@ -27,7 +27,7 @@ enum class send_flag : uint16_t {
     nosignal = MSG_NOSIGNAL,
     oob = MSG_OOB,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(send_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(send_flag)
 LINYAPS_REGISTER_ENUM_TABLE(send_flag,
                             8,
                             { send_flag::none, "NONE" },
@@ -49,7 +49,7 @@ enum class recv_flag : uint32_t {
     trunc = MSG_TRUNC,
     waitall = MSG_WAITALL,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(recv_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(recv_flag)
 LINYAPS_REGISTER_ENUM_TABLE(recv_flag,
                             8,
                             { recv_flag::none, "NONE" },
@@ -70,7 +70,7 @@ enum class return_flag : uint32_t {
     errqueue = MSG_ERRQUEUE,
     cmsg_cloexec = MSG_CMSG_CLOEXEC,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(return_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(return_flag)
 LINYAPS_REGISTER_ENUM_TABLE(return_flag,
                             7,
                             { return_flag::none, "NONE" },
@@ -92,7 +92,7 @@ enum class socket_type : uint8_t {
     datagram = SOCK_DGRAM,
     raw = SOCK_RAW,
     rdm = SOCK_RDM,
-    seqpacket = SOCK_SEQPACKET
+    seqpacket = SOCK_SEQPACKET,
 };
 LINYAPS_REGISTER_ENUM_TABLE(socket_type,
                             5,
@@ -107,7 +107,7 @@ enum class socket_flag : uint32_t {
     nonblock = SOCK_NONBLOCK,
     cloexec = SOCK_CLOEXEC,
 };
-LINYAPS_ENABLE_BITMASK_ENUM(socket_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(socket_flag)
 LINYAPS_REGISTER_ENUM_TABLE(socket_flag,
                             3,
                             { socket_flag::none, "NONE" },
@@ -305,7 +305,7 @@ public:
         return buffer_.subspan(0, size_);
     }
 
-    operator utils::span<const std::byte>() const noexcept { return as_span(); }
+    explicit operator utils::span<const std::byte>() const noexcept { return as_span(); }
 
     auto clear() noexcept { size_ = 0; }
 
@@ -344,21 +344,14 @@ class ancillary_message_view
 {
 public:
     explicit ancillary_message_view(const struct cmsghdr &cmsg) noexcept
-        : cmsg_(&cmsg)
+        : cmsg_(cmsg)
     {
-        assert(cmsg_ != nullptr);
-        assert(cmsg_->cmsg_len >= CMSG_LEN(0) && "malformed cmsg_len");
+        assert(cmsg_.get().cmsg_len >= CMSG_LEN(0) && "malformed cmsg_len");
     }
 
-    [[nodiscard]] auto level() const noexcept -> int
-    {
-        return cmsg_ != nullptr ? cmsg_->cmsg_level : 0;
-    }
+    [[nodiscard]] auto level() const noexcept -> int { return cmsg_.get().cmsg_level; }
 
-    [[nodiscard]] auto type() const noexcept -> int
-    {
-        return cmsg_ != nullptr ? cmsg_->cmsg_type : 0;
-    }
+    [[nodiscard]] auto type() const noexcept -> int { return cmsg_.get().cmsg_type; }
 
     // Returns empty span for both legitimate zero-payload cmsg and malformed
     // cmsg_len (< CMSG_LEN(0)).  os layer does not distinguish; callers
@@ -383,12 +376,10 @@ public:
         return Tag::parse(raw_data());
     }
 
-    [[nodiscard]] const struct cmsghdr *raw_header() const noexcept { return cmsg_; }
-
-    [[nodiscard]] explicit operator bool() const noexcept { return cmsg_ != nullptr; }
+    [[nodiscard]] const struct cmsghdr &raw_header() const noexcept { return cmsg_.get(); }
 
 private:
-    const struct cmsghdr *cmsg_{ nullptr };
+    std::reference_wrapper<const struct cmsghdr> cmsg_;
 };
 
 class ancillary_buffer_view
@@ -416,11 +407,14 @@ public:
         iterator() noexcept = default;
 
         iterator(const std::byte *data, std::size_t size) noexcept
+            : data_(data)
+            , size_(size)
         {
-            if (data != nullptr && size >= sizeof(struct cmsghdr)) {
-                msg_.msg_control = const_cast<void *>(static_cast<const void *>(data));
-                msg_.msg_controllen = size;
-                current_ = CMSG_FIRSTHDR(&msg_);
+            if (data_ != nullptr && size_ >= sizeof(struct cmsghdr)) {
+                struct msghdr msg{ };
+                msg.msg_control = const_cast<void *>(static_cast<const void *>(data_));
+                msg.msg_controllen = size;
+                current_ = CMSG_FIRSTHDR(&msg);
             }
         }
 
@@ -429,7 +423,10 @@ public:
         iterator &operator++() noexcept
         {
             if (current_ != nullptr) {
-                current_ = CMSG_NXTHDR(&msg_, const_cast<struct cmsghdr *>(current_));
+                struct msghdr msg{ };
+                msg.msg_control = const_cast<void *>(static_cast<const void *>(data_));
+                msg.msg_controllen = size_;
+                current_ = CMSG_NXTHDR(&msg, const_cast<struct cmsghdr *>(current_));
             }
 
             return *this;
@@ -447,7 +444,8 @@ public:
         bool operator!=(const iterator &other) const noexcept { return !(*this == other); }
 
     private:
-        struct msghdr msg_{ };
+        const std::byte *data_{ nullptr };
+        std::size_t size_{ 0 };
         const struct cmsghdr *current_{ nullptr };
     };
 
@@ -506,7 +504,7 @@ auto send(utils::file_descriptor_ref fd,
 // If that ever changes, add a span<io_slice> overload back rather than changing this one.
 auto sendmsg(utils::file_descriptor_ref fd,
              const io_slice &iov,
-             ancillary_buffer_writer &control,
+             const ancillary_buffer_writer &control,
              utils::bitflags<sys::send_flag> flags = sys::send_flag::none) noexcept
   -> Result<std::size_t>;
 
@@ -517,7 +515,7 @@ auto recv(utils::file_descriptor_ref fd,
 
 auto recvmsg(utils::file_descriptor_ref fd,
              const mutable_io_slice &iov,
-             ancillary_buffer &control,
+             const ancillary_buffer &control,
              utils::bitflags<sys::recv_flag> flags = sys::recv_flag::none) noexcept
   -> Result<RecvMsg>;
 

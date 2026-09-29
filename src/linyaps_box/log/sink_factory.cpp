@@ -27,7 +27,7 @@ auto make_sink(std::string_view log_dest, output_format fmt, bool cee_syslog)
     constexpr auto file_log_perm =
       std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
 
-    auto idx = log_dest.find(':');
+    const auto idx = log_dest.find(':');
     if (idx == std::string_view::npos) {
         if (log_dest == "stderr") {
             return std::make_unique<stderr_sink>(stderr_spec{ }, fmt);
@@ -37,19 +37,22 @@ auto make_sink(std::string_view log_dest, output_format fmt, bool cee_syslog)
           file_spec{
             linyaps_box::os::throw_if_error(linyaps_box::os::open(std::filesystem::path{ log_dest },
                                                                   file_log_flag,
-                                                                  file_log_perm)) },
+                                                                  file_log_perm)),
+          },
           fmt);
     }
 
     auto scheme = log_dest.substr(0, idx);
-    auto content = log_dest.substr(idx + 1);
+    const auto content = log_dest.substr(idx + 1);
 
     if (scheme == "file") {
-        return std::make_unique<file_sink>(file_spec{ linyaps_box::os::throw_if_error(
-                                             linyaps_box::os::open(std::filesystem::path{ content },
-                                                                   file_log_flag,
-                                                                   file_log_perm)) },
-                                           fmt);
+        return std::make_unique<file_sink>(
+          file_spec{
+            linyaps_box::os::throw_if_error(linyaps_box::os::open(std::filesystem::path{ content },
+                                                                  file_log_flag,
+                                                                  file_log_perm)),
+          },
+          fmt);
     }
 
     if (scheme == "syslog") {

@@ -4,9 +4,7 @@
 
 #include "linyaps_box/utils/ns_flags.h"
 
-#include "linyaps_box/utils/utils.h"
-
-#include <csignal>
+#include <csignal> // IWYU pragma: keep
 
 #include <sched.h>
 
@@ -45,7 +43,7 @@ auto to_clone_flag(ns::type type) noexcept -> unsigned int
 
 auto generate_clone_flags(const std::optional<std::vector<ns>> &namespaces) noexcept -> unsigned int
 {
-    unsigned flag = SIGCHLD;
+    unsigned flag{ SIGCHLD };
     if (!namespaces) {
         return flag;
     }

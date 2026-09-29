@@ -93,7 +93,7 @@ void join_namespaces_in_order(std::vector<std::pair<ns::type, file_descriptor>> 
 
 auto open_namespace_fd(pid_t target_pid, ns::type ns_type) -> file_descriptor
 {
-    auto path = std::filesystem::path{ "/proc" } / std::to_string(target_pid) / "ns"
+    const auto path = std::filesystem::path{ "/proc" } / std::to_string(target_pid) / "ns"
       / to_proc_ns_string(ns_type);
     return os::throw_if_error(
       os::open(path, { os::sys::open_flag::cloexec, os::sys::access_mode::read_only }));

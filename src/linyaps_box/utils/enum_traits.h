@@ -81,12 +81,12 @@ constexpr auto popcount(T val) noexcept -> int
 }
 
 template <typename T>
-constexpr auto enable_bitmask_enum_tag(T *) noexcept -> std::false_type;
+constexpr auto enable_bitmask_enum_tag(const T *) noexcept -> std::false_type;
 
 template <typename E>
 constexpr auto check_is_bitmask_enum() noexcept
 {
-    return decltype(enable_bitmask_enum_tag(static_cast<E *>(nullptr)))::value;
+    return decltype(enable_bitmask_enum_tag(static_cast<const E *>(nullptr)))::value;
 }
 
 } // namespace detail
@@ -114,7 +114,8 @@ class enum_table;
 
 template <typename E, std::size_t N>
 constexpr auto make_enum_table(std::string_view type_name,
-                               const enum_entry<E> (&entries)[N]) noexcept -> enum_table<E, N>;
+                               const enum_entry<E> (&entries)[N]) noexcept // NOLINT
+  -> enum_table<E, N>;
 
 template <typename E, std::size_t N>
 constexpr auto verify_enum_table(const enum_table<E, N> &table) noexcept -> bool;
@@ -294,7 +295,7 @@ public:
 
     constexpr bitflags() noexcept = default;
 
-    constexpr bitflags(E flag) noexcept
+    constexpr bitflags(E flag) noexcept // NOLINT (cppcoreguidelines-explicit-constructor)
         : bits_(static_cast<underlying_type>(flag))
     {
     }
@@ -400,8 +401,9 @@ public:
 
     [[nodiscard]] friend constexpr auto operator~(bitflags rhs) noexcept -> bitflags
     {
-        return bitflags{ static_cast<underlying_type>(~rhs.bits_)
-                         & static_cast<underlying_type>(detail::known_mask<E>()) };
+        auto val = static_cast<underlying_type>(~rhs.bits_)
+          & static_cast<underlying_type>(detail::known_mask<E>());
+        return bitflags{ val };
     }
 
     [[nodiscard]] friend constexpr auto operator==(bitflags lhs, bitflags rhs) noexcept -> bool
@@ -478,16 +480,16 @@ constexpr E &operator^=(E &lhs, E rhs) noexcept
     return lhs = static_cast<E>(static_cast<U>(lhs) ^ static_cast<U>(rhs));
 }
 
-#define LINYAPS_ENABLE_BITMASK_ENUM(E)                                           \
-    [[maybe_unused]] constexpr ::std::true_type enable_bitmask_enum_tag(         \
-      [[maybe_unused]] E *ptr) noexcept /* NOLINT(bugprone-macro-parentheses) */ \
-    {                                                                            \
-        return { };                                                              \
+#define LINYAPS_ENABLE_BITMASK_ENUM(E)                                                 \
+    [[maybe_unused]] constexpr ::std::true_type enable_bitmask_enum_tag(               \
+      [[maybe_unused]] const E *ptr) noexcept /* NOLINT(bugprone-macro-parentheses) */ \
+    {                                                                                  \
+        return { };                                                                    \
     }
 
 #define LINYAPS_REGISTER_ENUM_TABLE(E, COUNT, ...)                                                \
     constexpr auto get_enum_table(/*NOLINT(bugprone-macro-parentheses)*/                          \
-                                  [[maybe_unused]] E *ptr) noexcept                               \
+                                  [[maybe_unused]] const E *ptr) noexcept                         \
     {                                                                                             \
         constexpr auto table = ::linyaps_box::utils::make_enum_table<E>(#E, { __VA_ARGS__ });     \
         constexpr auto valid = ::linyaps_box::utils::verify_enum_table(table);                    \

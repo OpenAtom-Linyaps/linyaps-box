@@ -79,7 +79,7 @@ auto send(utils::file_descriptor_ref fd,
 
 auto sendmsg(utils::file_descriptor_ref fd,
              const io_slice &iov,
-             ancillary_buffer_writer &control,
+             const ancillary_buffer_writer &control,
              utils::bitflags<sys::send_flag> flags) noexcept -> Result<std::size_t>
 {
     struct msghdr msg{ };
@@ -127,7 +127,7 @@ auto recv(utils::file_descriptor_ref fd,
 
 auto recvmsg(utils::file_descriptor_ref fd,
              const mutable_io_slice &iov,
-             ancillary_buffer &control,
+             const ancillary_buffer &control,
              utils::bitflags<sys::recv_flag> flags) noexcept -> Result<RecvMsg>
 {
     struct msghdr msg{ };
@@ -143,7 +143,7 @@ auto recvmsg(utils::file_descriptor_ref fd,
     msg.msg_namelen = linyaps_box::os::endpoint::capacity();
 
     while (true) {
-        auto ret = ::recvmsg(fd.get(), &msg, static_cast<int>(flags.to_raw()));
+        const auto ret = ::recvmsg(fd.get(), &msg, static_cast<int>(flags.to_raw()));
         if (UNLIKELY(ret < 0)) {
             if (errno == EINTR) {
                 continue;
@@ -210,16 +210,13 @@ auto ancillary_buffer_writer::try_push_raw(int level,
 
 auto ancillary_message_view::raw_data() const noexcept -> utils::span<const std::byte>
 {
-    if (cmsg_ == nullptr) {
-        return { };
-    }
-
-    const auto data_len = cmsg_->cmsg_len >= CMSG_LEN(0) ? cmsg_->cmsg_len - CMSG_LEN(0) : 0;
+    const auto data_len =
+      cmsg_.get().cmsg_len >= CMSG_LEN(0) ? cmsg_.get().cmsg_len - CMSG_LEN(0) : 0;
     if (data_len == 0) {
         return { };
     }
 
-    return { reinterpret_cast<const std::byte *>(CMSG_DATA(cmsg_)), data_len };
+    return { reinterpret_cast<const std::byte *>(CMSG_DATA(&cmsg_.get())), data_len };
 }
 
 auto socket(sys::address_family domain,
@@ -227,9 +224,9 @@ auto socket(sys::address_family domain,
             utils::bitflags<sys::socket_flag> flags,
             int protocol) noexcept -> Result<utils::file_descriptor>
 {
-    auto fd = ::socket(static_cast<int>(domain),
-                       static_cast<int>(type) | static_cast<int>(flags.to_raw()),
-                       protocol);
+    const auto fd = ::socket(static_cast<int>(domain),
+                             static_cast<unsigned int>(type) | flags.to_raw(),
+                             protocol);
     if (UNLIKELY(fd == -1)) {
         return unexpected{ make_error_code(errno) };
     }
@@ -245,7 +242,7 @@ auto socketpair(sys::address_family domain,
 {
     std::array<int, 2> fds; // NOLINT
     if (UNLIKELY(::socketpair(static_cast<int>(domain),
-                              static_cast<int>(type) | static_cast<int>(flags.to_raw()),
+                              static_cast<unsigned int>(type) | flags.to_raw(),
                               protocol,
                               fds.data())
                  == -1)) {

@@ -17,8 +17,8 @@ constexpr bool compatible_defer = std::is_nothrow_invocable_r_v<void, Fn>;
 
 // Execution policies for defer
 enum class defer_policy : std::uint8_t {
-    always,  // Always execute the cleanup function
-    on_error // Execute the cleanup function only when an exception is active
+    always,   // Always execute the cleanup function
+    on_error, // Execute the cleanup function only when an exception is active
 };
 
 // defer executes the function based on the specified policy when the object is destroyed

@@ -25,7 +25,7 @@ auto create_pty_pair() -> pty_data
 
     constexpr auto max_len = std::string_view::traits_type::length("/dev/pts/") + NAME_MAX + 1;
     std::array<char, max_len> buf; // NOLINT
-    auto name = os::throw_if_error(os::ptsname(master, buf), "failed to get pty path");
+    const auto name = os::throw_if_error(os::ptsname(master, buf), "failed to get pty path");
     os::throw_if_error(os::unlockpt(master), "failed to unlock pty");
 
     auto pts = std::filesystem::path{ name };
@@ -75,7 +75,7 @@ auto terminal_slave::setup_stdio() -> void
 auto terminal_slave::set_size(struct winsize size) -> void
 {
     if (size.ws_col == 0 || size.ws_row == 0) {
-        auto default_tty = linyaps_box::os::throw_if_error(
+        const auto default_tty = linyaps_box::os::throw_if_error(
           linyaps_box::os::open("/dev/tty",
                                 { linyaps_box::os::sys::open_flag::cloexec,
                                   linyaps_box::os::sys::access_mode::read_write }));

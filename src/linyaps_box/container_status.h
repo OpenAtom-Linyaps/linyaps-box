@@ -87,8 +87,9 @@ struct fmt::formatter<linyaps_box::container_status>
     {
         if (presentation == Presentation::plaintext) {
             std::array<char, 30> time_buf{ };
-            auto len = linyaps_box::utils::to_created_time(linyaps_box::utils::span{ time_buf },
-                                                           status.created);
+            const auto len =
+              linyaps_box::utils::to_created_time(linyaps_box::utils::span{ time_buf },
+                                                  status.created);
             return fmt::format_to(
               ctx.out(),
               "status{{ ociVersion: {}, id: {}, pid: {}, bundle: {}, annotations: {}, owner: {}, "

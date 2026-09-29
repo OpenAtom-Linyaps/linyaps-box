@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "linyaps_box/config/oci_config.h"
+#include "linyaps_box/config/capabilities.h"
+#include "linyaps_box/config/user.h"
 
 #include <optional>
 #include <vector>

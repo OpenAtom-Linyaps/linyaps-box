@@ -52,10 +52,10 @@ template <typename T>
 {
     static_assert(is_json_integer_v<T>, "get_number<T> supports plain integer types only");
 
-    auto number_out_of_range = [](const strict_json &j) {
+    auto number_out_of_range = [](const strict_json &json) {
         throw strict_json::type_error::create(302,
                                               "number out of range for the target integer type",
-                                              &j);
+                                              &json);
     };
 
     if (j.is_number_float()) {
@@ -89,10 +89,13 @@ template <typename T>
     if (j.is_number_integer()) {
         const auto value = *j.template get_ptr<const strict_json::number_integer_t *>();
         if (value < 0) {
-            if constexpr (std::is_unsigned_v<T>) {
-                number_out_of_range(j);
-            } else if (UNLIKELY(value
-                                < static_cast<std::int64_t>((std::numeric_limits<T>::min)()))) {
+            auto out_of_range = std::is_unsigned_v<T>;
+            if constexpr (!std::is_unsigned_v<T>) {
+                out_of_range =
+                  UNLIKELY(value < static_cast<std::int64_t>((std::numeric_limits<T>::min)()));
+            }
+
+            if (out_of_range) {
                 number_out_of_range(j);
             }
         } else if (UNLIKELY(static_cast<std::uint64_t>(value)

@@ -13,10 +13,12 @@ auto linyaps_box::command::run(const struct run_options &options, const global_o
 {
     status_directory_manager mgr(global.root);
     runtime_t runtime(std::move(mgr));
-    const create_container_options_t create_container_options{ global.manager,
-                                                               options.ID,
-                                                               options.bundle,
-                                                               options.config };
+    const create_container_options_t create_container_options{
+        global.manager,
+        options.ID,
+        options.bundle,
+        options.config,
+    };
     auto container = runtime.create_container(create_container_options);
 
     run_container_options_t run_options;

@@ -23,7 +23,7 @@ auto file_sink::log(fmt::memory_buffer &buf, const log_context &ctx) const noexc
 try {
     format_log(buf, ctx, format_, { });
 
-    auto bytes = utils::as_bytes(utils::span(buf.data(), buf.size()));
+    const auto bytes = utils::as_bytes(utils::span(buf.data(), buf.size()));
     std::ignore = fd.write_span(bytes);
 } catch (...) { // NOLINT
     // swallow

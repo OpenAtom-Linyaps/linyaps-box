@@ -17,7 +17,7 @@ namespace linyaps_box {
 auto to_json(utils::strict_json &j, const container_status &s) -> void
 {
     std::array<char, utils::max_created_time_len> created_buf{ };
-    auto len =
+    const auto len =
       linyaps_box::utils::to_created_time(linyaps_box::utils::span{ created_buf }, s.created);
     auto obj =
       utils::strict_json::object({ { "id", s.id },
@@ -130,23 +130,25 @@ auto derive_status(const container_status &s) -> runtime_status
 auto to_oci_json(container_status s, runtime_status rs) -> utils::strict_json
 {
     std::array<char, utils::max_created_time_len> created_buf{ };
-    auto len =
+    const auto len =
       linyaps_box::utils::to_created_time(linyaps_box::utils::span{ created_buf }, s.created);
-    return utils::strict_json::object({ { "id", std::move(s.id) },
-                                        { "pid", s.pid },
-                                        { "status", to_string_view(rs) },
-                                        { "bundle", s.bundle.string() },
-                                        { "created", std::string_view{ created_buf.data(), len } },
-                                        { "owner", std::move(s.owner) },
-                                        { "annotations", std::move(s.annotations) },
-                                        { "ociVersion", std::move(s.oci_version) } });
+    return utils::strict_json::object({
+      { "id", std::move(s.id) },
+      { "pid", s.pid },
+      { "status", to_string_view(rs) },
+      { "bundle", s.bundle.string() },
+      { "created", std::string_view{ created_buf.data(), len } },
+      { "owner", std::move(s.owner) },
+      { "annotations", std::move(s.annotations) },
+      { "ociVersion", std::move(s.oci_version) },
+    });
 }
 
 namespace detail {
 
 auto format_container_status_json(const container_status &status, bool pretty) -> std::string
 {
-    auto json = utils::strict_json(status);
+    const auto json = utils::strict_json(status);
     return json.dump(pretty ? 4 : -1);
 }
 

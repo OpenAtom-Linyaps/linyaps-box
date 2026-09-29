@@ -63,7 +63,7 @@ inline auto parse_iso8601(std::string_view str) -> std::chrono::nanoseconds
         throw std::invalid_argument("invalid iso8601 format");
     }
 
-    auto parse_integer =
+    const auto parse_integer =
       [](std::string_view sv, std::size_t offset, std::size_t len) -> std::uint64_t {
         std::uint64_t val{ 0 };
 
@@ -125,7 +125,7 @@ inline auto parse_iso8601(std::string_view str) -> std::chrono::nanoseconds
 
         static constexpr std::array<std::uint64_t, 10> pow10 = {
             1000000000ULL, 100000000ULL, 10000000ULL, 1000000ULL, 100000ULL,
-            10000ULL,      1000ULL,      100ULL,      10ULL,      1ULL
+            10000ULL,      1000ULL,      100ULL,      10ULL,      1ULL,
         };
 
         ns_val *= pow10[digits];
@@ -201,20 +201,22 @@ auto to_created_time(span<char, max_created_time_len> buf,
     const auto min = rem / 60;
     const auto sec = rem % 60;
 
-    static constexpr std::array<char, 201> digits_lut{ "0001020304050607080910111213141516171819"
-                                                       "2021222324252627282930313233343536373839"
-                                                       "4041424344454647484950515253545556575859"
-                                                       "6061626364656667686970717273747576777879"
-                                                       "8081828384858687888990919293949596979899" };
+    static constexpr std::array<char, 201> digits_lut{
+        "0001020304050607080910111213141516171819"
+        "2021222324252627282930313233343536373839"
+        "4041424344454647484950515253545556575859"
+        "6061626364656667686970717273747576777879"
+        "8081828384858687888990919293949596979899",
+    };
 
-    auto write_2dig = [](char *ptr, std::uint64_t val) -> char * {
+    const auto write_2dig = [](char *ptr, std::uint64_t val) -> char * {
         const auto idx = static_cast<std::size_t>(val * 2);
         ptr[0] = digits_lut[idx];
         ptr[1] = digits_lut[idx + 1];
         return ptr + 2;
     };
 
-    auto write_4dig = [write_2dig](char *ptr, std::uint64_t val) -> char * {
+    const auto write_4dig = [write_2dig](char *ptr, std::uint64_t val) -> char * {
         ptr = write_2dig(ptr, val / 100);
         return write_2dig(ptr, val % 100);
     };

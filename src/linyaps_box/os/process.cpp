@@ -46,7 +46,7 @@ auto pidfd_open(pid_t pid) noexcept -> Result<utils::file_descriptor>
 
 auto pidfd_send_signal(utils::file_descriptor_ref pidfd, int signal) noexcept -> Result<void>
 {
-    auto ret = ::syscall(nr_pidfd_send_signal, pidfd.get(), signal, nullptr, 0U);
+    const auto ret = ::syscall(nr_pidfd_send_signal, pidfd.get(), signal, nullptr, 0U);
     if (LIKELY(ret == 0)) {
         return { };
     }
@@ -96,8 +96,8 @@ auto umask(std::filesystem::perms perm) noexcept -> Result<std::filesystem::perm
         return unexpected{ std::make_error_code(std::errc::invalid_argument) };
     }
 
-    return std::filesystem::perms{ ::umask(
-      static_cast<mode_t>(perm & std::filesystem::perms::all)) };
+    const auto ret = ::umask(static_cast<mode_t>(perm & std::filesystem::perms::all));
+    return std::filesystem::perms{ ret };
 }
 
 auto set_child_subreaper(bool enabled) noexcept -> Result<void>
@@ -132,7 +132,7 @@ auto set_control_terminal(utils::file_descriptor_ref fd) noexcept -> Result<void
 
 [[nodiscard]] auto kill_process(pid_t pid, int signal) noexcept -> Result<void>
 {
-    auto ret = ::kill(pid, signal);
+    const auto ret = ::kill(pid, signal);
     if (LIKELY(ret == 0)) {
         return { };
     }

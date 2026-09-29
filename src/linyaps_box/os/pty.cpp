@@ -20,7 +20,7 @@ auto unlockpt(utils::file_descriptor_ref fd) noexcept -> Result<void>
 auto ptsname(utils::file_descriptor_ref fd, utils::span<char> buf) noexcept
   -> Result<std::string_view>
 {
-    auto ret = ::ptsname_r(fd, buf.data(), buf.size());
+    const auto ret = ::ptsname_r(fd, buf.data(), buf.size());
     if (LIKELY(ret == 0)) {
         return std::string_view{ buf.data() };
     }

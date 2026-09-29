@@ -24,7 +24,7 @@ unix_socket::unix_socket(utils::file_descriptor fd)
 
 unix_socket unix_socket::connect(const std::filesystem::path &path)
 {
-    auto ep = os::throw_if_error(os::endpoint::from_path(path));
+    const auto ep = os::throw_if_error(os::endpoint::from_path(path));
     auto fd = os::throw_if_error(os::socket(os::sys::address_family::unix,
                                             os::sys::socket_type::seqpacket,
                                             os::sys::socket_flag::cloexec));
@@ -111,7 +111,7 @@ auto unix_socket::recv_data_with_fds(utils::span<std::byte> data) const -> os::R
     std::array<std::byte, os::sys::cmsg::buffer_size(os::sys::cmsg::rights{ kMaxScmFds })>
       ctrl_buf{ };
 
-    os::ancillary_buffer control{ utils::span<std::byte>{ ctrl_buf } };
+    const os::ancillary_buffer control{ utils::span<std::byte>{ ctrl_buf } };
 
     const os::mutable_io_slice iov{ data };
     auto result = os::recvmsg(fd_.ref(), iov, control, os::sys::recv_flag::cmsg_cloexec);
@@ -120,10 +120,10 @@ auto unix_socket::recv_data_with_fds(utils::span<std::byte> data) const -> os::R
     }
 
     // take the raw fds from the control buffer and wrap them in file_descriptor to take ownership
-    auto raw_fds = result->control.rights();
+    const auto raw_fds = result->control.rights();
     std::vector<utils::file_descriptor> fds;
     fds.reserve(raw_fds.size());
-    for (auto raw_fd : raw_fds) {
+    for (const auto raw_fd : raw_fds) {
         fds.emplace_back(raw_fd);
     }
 

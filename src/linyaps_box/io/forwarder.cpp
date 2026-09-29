@@ -47,7 +47,7 @@ auto Forwarder::drive() -> bool
     bool is_completely_blocked{ false };
 
     while (io_quota > 0) {
-        auto quota_before = io_quota;
+        const auto quota_before = io_quota;
 
         const auto read_would_block = pull(io_quota);
         const auto write_would_block = push(io_quota);
