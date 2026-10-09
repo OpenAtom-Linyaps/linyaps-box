@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include "gtest_compat.h" // IWYU pragma: keep
 
 #include <linyaps_box/utils/semver.h>
 
+#include <array>
+#include <cstddef>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -210,6 +211,27 @@ TEST(Semver, OrderIsTrichotomous)
             const auto gt = b < a;
             EXPECT_EQ(static_cast<int>(lt) + static_cast<int>(eq) + static_cast<int>(gt), 1)
               << a.to_string() << " vs " << b.to_string();
+        }
+    }
+}
+
+TEST(Semver, OrderIsTransitive)
+{
+    // Property: the total order is transitive (a<b and b<c implies a<c). One
+    // loop over a strictly increasing chain covers every triple.
+    const std::array versions{
+        semver::semver("0.0.0"), semver::semver("1.0.0-alpha"), semver::semver("1.0.0-alpha.1"),
+        semver::semver("1.0.0"), semver::semver("1.2.3"),       semver::semver("2.0.0+build"),
+    };
+
+    for (std::size_t i = 0; i < versions.size(); ++i) {
+        for (std::size_t j = i + 1; j < versions.size(); ++j) {
+            ASSERT_LT(versions[i], versions[j])
+              << versions[i].to_string() << " !< " << versions[j].to_string();
+            for (std::size_t k = j + 1; k < versions.size(); ++k) {
+                EXPECT_LT(versions[i], versions[k])
+                  << versions[i].to_string() << " !< " << versions[k].to_string();
+            }
         }
     }
 }

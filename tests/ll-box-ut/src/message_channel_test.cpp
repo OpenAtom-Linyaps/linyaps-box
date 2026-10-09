@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gtest/gtest.h>
-
+#include "gtest_compat.h" // IWYU pragma: keep
 #include "linyaps_box/infra/unix_socket.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/sinks/stderr_sink.h"
@@ -42,7 +41,7 @@ auto make_transport_pair()
 auto setup_logger_sink() -> linyaps_box::log::level
 {
     auto &logger = linyaps_box::log::global_logger::instance();
-    auto saved = logger.get_level();
+    const auto saved = logger.get_level();
     std::vector<std::unique_ptr<linyaps_box::log::sink>> sinks;
     sinks.push_back(
       std::make_unique<linyaps_box::log::stderr_sink>(linyaps_box::log::stderr_spec{ },
@@ -183,18 +182,19 @@ INSTANTIATE_TEST_SUITE_P(All,
 
 TEST(MessageChannel, SerializeLog)
 {
-    auto now = std::chrono::system_clock::now().time_since_epoch();
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    msg::log original{ "permission denied",  "test_file", "test", 42, 0, now, 0,
-                       log_lvl::level::fatal };
+    msg::log original{
+        "permission denied", "test_file", "test", 42, 0, now, 0, log_lvl::level::fatal,
+    };
 #else
     msg::log original{ "permission denied", 0, now, 0, log_lvl::level::fatal };
 #endif
-    auto bytes = msg::serialize(msg::message{ original });
-    auto deserialized = msg::deserialize(bytes);
+    const auto bytes = msg::serialize(msg::message{ original });
+    const auto deserialized = msg::deserialize(bytes);
 
     ASSERT_TRUE(std::holds_alternative<msg::log>(deserialized));
-    auto &d = std::get<msg::log>(deserialized);
+    const auto &d = std::get<msg::log>(deserialized);
     EXPECT_EQ(d.lvl, log_lvl::level::fatal);
     EXPECT_EQ(d.message, "permission denied");
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
@@ -207,37 +207,28 @@ TEST(MessageChannel, SerializeLog)
 
     EXPECT_EQ(bytes.size(), log_wire_size(original));
     EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::log));
-}
 
-TEST(MessageChannel, EmptyLogMessage)
-{
+    // An all-empty log message is a valid payload too.
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    msg::log original{ "", "", "", 0, 0, std::chrono::nanoseconds{ 0 }, 0, log_lvl::level::fatal };
+    msg::log empty{ "", "", "", 0, 0, std::chrono::nanoseconds{ 0 }, 0, log_lvl::level::fatal };
 #else
-    msg::log original{ 0, 0, std::chrono::nanoseconds{ 0 }, 0, log_lvl::level::fatal };
+    msg::log empty{ 0, 0, std::chrono::nanoseconds{ 0 }, 0, log_lvl::level::fatal };
 #endif
-    auto bytes = msg::serialize(msg::message{ original });
-    auto deserialized = msg::deserialize(bytes);
+    const auto empty_bytes = msg::serialize(msg::message{ empty });
+    const auto empty_deserialized = msg::deserialize(empty_bytes);
 
-    ASSERT_TRUE(std::holds_alternative<msg::log>(deserialized));
-    auto &d = std::get<msg::log>(deserialized);
-    EXPECT_EQ(d.lvl, log_lvl::level::fatal);
-    EXPECT_TRUE(d.message.empty());
+    ASSERT_TRUE(std::holds_alternative<msg::log>(empty_deserialized));
+    const auto &e = std::get<msg::log>(empty_deserialized);
+    EXPECT_EQ(e.lvl, log_lvl::level::fatal);
+    EXPECT_TRUE(e.message.empty());
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-    EXPECT_TRUE(d.file.empty());
-    EXPECT_EQ(d.line, 0);
+    EXPECT_TRUE(e.file.empty());
+    EXPECT_EQ(e.line, 0);
 #endif
-    EXPECT_EQ(d.time, std::chrono::nanoseconds{ 0 });
+    EXPECT_EQ(e.time, std::chrono::nanoseconds{ 0 });
 
-    EXPECT_EQ(bytes.size(), log_wire_size(original));
-    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::log));
-}
-
-TEST(MessageChannel, UnknownMsgIdThrows)
-{
-    std::vector<std::byte> wire(1);
-    wire[0] = static_cast<std::byte>(42);
-    EXPECT_THROW(std::ignore = msg::deserialize(wire), std::runtime_error);
+    EXPECT_EQ(empty_bytes.size(), log_wire_size(empty));
+    EXPECT_EQ(empty_bytes[0], static_cast<std::byte>(proto::msg_id::log));
 }
 
 TEST(MessageChannel, SerializePidReport)
@@ -260,35 +251,55 @@ TEST(MessageChannel, TakeFdEmptyThrows)
     EXPECT_THROW(std::ignore = inc.take_fds(), std::runtime_error);
 }
 
-TEST(MessageChannel, UnknownStageTypeThrows)
+TEST(MessageChannel, UnknownMessageRejected)
 {
-    std::vector<std::byte> wire = { static_cast<std::byte>(proto::msg_id::stage),
-                                    std::byte{ 0xFF } };
-    EXPECT_THROW(std::ignore = msg::deserialize(wire), std::runtime_error);
+    const std::array<std::vector<std::byte>, 2> wires{
+        std::vector<std::byte>{ static_cast<std::byte>(42) },
+        std::vector<std::byte>{ static_cast<std::byte>(proto::msg_id::stage), std::byte{ 0xFF } },
+    };
+
+    for (const auto &wire : wires) {
+        EXPECT_THROW(std::ignore = msg::deserialize(wire), std::runtime_error);
+    }
 }
 
-TEST(MessageChannel, SerializeConsoleFd)
+TEST(MessageChannel, SerializeEmptyPayloadMessages)
 {
-    msg::console_fd original{ };
-    auto bytes = msg::serialize(msg::message{ original });
-    auto deserialized = msg::deserialize(bytes);
+    {
+        const msg::message original{ msg::console_fd{ } };
+        const auto bytes = msg::serialize(original);
+        const auto deserialized = msg::deserialize(bytes);
 
-    ASSERT_TRUE(std::holds_alternative<msg::console_fd>(deserialized));
+        ASSERT_TRUE(std::holds_alternative<msg::console_fd>(deserialized));
+        EXPECT_EQ(bytes.size(), sizeof(proto::msg_id));
+        EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::console_fd));
+    }
 
-    EXPECT_EQ(bytes.size(), sizeof(proto::msg_id));
-    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::console_fd));
+    {
+        const msg::message original{ msg::proceed{ } };
+        const auto bytes = msg::serialize(original);
+        const auto deserialized = msg::deserialize(bytes);
+
+        ASSERT_TRUE(std::holds_alternative<msg::proceed>(deserialized));
+        EXPECT_EQ(bytes.size(), sizeof(proto::msg_id));
+        EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::proceed));
+    }
 }
 
-TEST(MessageChannel, SerializeProceed)
+TEST(MessageChannel, SerializeDeserializeIsStable)
 {
-    msg::proceed original{ };
-    auto bytes = msg::serialize(msg::message{ original });
-    auto deserialized = msg::deserialize(bytes);
+    const std::vector<msg::message> messages{
+        msg::pid_report{ 4242 },
+        msg::stage{ proto::stage::type::prestart_done },
+        msg::console_fd{ },
+        msg::proceed{ },
+        make_log(log_lvl::level::info, "round trip"),
+    };
 
-    ASSERT_TRUE(std::holds_alternative<msg::proceed>(deserialized));
-
-    EXPECT_EQ(bytes.size(), sizeof(proto::msg_id));
-    EXPECT_EQ(bytes[0], static_cast<std::byte>(proto::msg_id::proceed));
+    for (const auto &message : messages) {
+        const auto bytes = msg::serialize(message);
+        EXPECT_EQ(msg::serialize(msg::deserialize(bytes)), bytes);
+    }
 }
 
 // ── socketpair tests ───────────────────────────────────────────────
@@ -304,7 +315,7 @@ TEST_F(ChannelTest, ChildToParentPidReport)
 
 TEST_F(ChannelTest, SendRecvStage)
 {
-    const thread_guard tg{ std::thread([&]() {
+    const thread_guard tg{ std::thread([&] {
         child->expect_stage(proto::stage::type::namespace_ready);
         child->send_stage(proto::stage::type::namespace_done);
     }) };
@@ -323,7 +334,7 @@ TEST(MessageChannel, SendRecvLog)
     auto inc = t2.recv();
     ASSERT_TRUE(inc.has_value());
     ASSERT_TRUE(std::holds_alternative<msg::log>(inc->body));
-    auto &d = std::get<msg::log>(inc->body);
+    const auto &d = std::get<msg::log>(inc->body);
     EXPECT_EQ(d.lvl, log_lvl::level::fatal);
     EXPECT_EQ(d.message, "test error");
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
@@ -336,7 +347,7 @@ TEST(MessageChannel, SendRecvLog)
 
 TEST_F(ChannelTest, WaitForUnexpectedStageThrows)
 {
-    const thread_guard tg{ std::thread([&]() {
+    const thread_guard tg{ std::thread([&] {
         child->send_stage(proto::stage::type::namespace_ready);
     }) };
 
@@ -348,11 +359,11 @@ TEST_F(ChannelTest, TakeFdFromIncoming)
 {
     auto [a, b] = linyaps_box::infra::unix_socket::create_pair(os::sys::socket_type::seqpacket,
                                                                os::sys::socket_flag::cloexec);
-    auto b_fd = b.release();
+    const auto b_fd = b.release();
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     fds.emplace_back(b_fd, true);
-    linyaps_box::utils::file_descriptor_ref ref{ fds.front() };
+    const linyaps_box::utils::file_descriptor_ref ref{ fds.front() };
     child->send_console_fd(ref);
 
     auto inc = parent->drain_logs();
@@ -390,8 +401,8 @@ TEST_F(ChannelTest, WaitForExecWithExecReady)
 
 TEST_F(ChannelTest, WaitForExecFailedAfterReady)
 {
-    auto saved = setup_logger_sink();
-    const thread_guard tg{ std::thread([&]() {
+    const auto saved = setup_logger_sink();
+    const thread_guard tg{ std::thread([&] {
         child->send_stage(proto::stage::type::exec_ready);
         proto::sync_socket_forwarder fwd(*child);
         fwd.forward(make_log_context(log_lvl::level::fatal, "execvpe"));
@@ -421,7 +432,7 @@ TEST(MessageChannel, LargeLogMessageRoundTrip)
     auto inc = t2.recv();
     ASSERT_TRUE(inc.has_value());
     ASSERT_TRUE(std::holds_alternative<msg::log>(inc->body));
-    auto &d = std::get<msg::log>(inc->body);
+    const auto &d = std::get<msg::log>(inc->body);
     EXPECT_EQ(d.message, long_msg);
 }
 
@@ -452,14 +463,14 @@ TEST_F(ChannelTest, SendRecvConsoleFd)
 {
     auto [a, b] = linyaps_box::infra::unix_socket::create_pair(os::sys::socket_type::seqpacket,
                                                                os::sys::socket_flag::cloexec);
-    auto b_fd = b.release();
+    const auto b_fd = b.release();
 
     std::vector<linyaps_box::utils::file_descriptor> fds;
     fds.emplace_back(b_fd, true);
-    linyaps_box::utils::file_descriptor_ref ref{ fds.front() };
+    const linyaps_box::utils::file_descriptor_ref ref{ fds.front() };
     child->send_console_fd(ref);
 
-    auto inc = parent->drain_logs();
+    const auto inc = parent->drain_logs();
     ASSERT_TRUE(std::holds_alternative<msg::console_fd>(inc.body));
     ASSERT_FALSE(inc.fds.empty());
 }
@@ -506,12 +517,12 @@ TEST(MessageChannel, MaxFdsTransfer)
 
 TEST_F(ChannelTest, ProceedRoundTrip)
 {
-    const thread_guard tg{ std::thread([&]() {
+    const thread_guard tg{ std::thread([&] {
         child->send_pid_report(42);
         child->expect_proceed();
     }) };
 
-    auto inc = parent->drain_logs();
+    const auto inc = parent->drain_logs();
     ASSERT_TRUE(std::holds_alternative<msg::pid_report>(inc.body));
     EXPECT_EQ(std::get<msg::pid_report>(inc.body).value, 42);
 
@@ -520,10 +531,10 @@ TEST_F(ChannelTest, ProceedRoundTrip)
 
 TEST_F(ChannelTest, SyncSocketForwarderEndToEnd)
 {
-    auto saved = setup_logger_sink();
+    const auto saved = setup_logger_sink();
 
     linyaps_box::protocol::sync_socket_forwarder fwd(*child);
-    auto ctx = make_log_context(log_lvl::level::error, "forwarder end_to_end");
+    const auto ctx = make_log_context(log_lvl::level::error, "forwarder end_to_end");
     fwd.forward(ctx);
 
     child->send_stage(proto::stage::type::exec_ready);
@@ -534,7 +545,7 @@ TEST_F(ChannelTest, SyncSocketForwarderEndToEnd)
 
 TEST_F(ChannelTest, WaitForDrainsInterleavedLogs)
 {
-    const thread_guard tg{ std::thread([&]() {
+    const thread_guard tg{ std::thread([&] {
         proto::sync_socket_forwarder fwd(*child);
         fwd.forward(make_log_context(log_lvl::level::debug, "dbg1"));
         fwd.forward(make_log_context(log_lvl::level::info, "info1"));
@@ -546,8 +557,8 @@ TEST_F(ChannelTest, WaitForDrainsInterleavedLogs)
 
 TEST_F(ChannelTest, WaitForDrainsLogsThenCloseThrows)
 {
-    auto saved = setup_logger_sink();
-    const thread_guard tg{ std::thread([&]() {
+    const auto saved = setup_logger_sink();
+    const thread_guard tg{ std::thread([&] {
         proto::sync_socket_forwarder fwd(*child);
         fwd.forward(make_log_context(log_lvl::level::error, "boom"));
         child.reset();
@@ -559,21 +570,21 @@ TEST_F(ChannelTest, WaitForDrainsLogsThenCloseThrows)
 
 TEST_F(ChannelTest, DrainLogsReturnsNonLogDatagram)
 {
-    const thread_guard tg{ std::thread([&]() {
+    const thread_guard tg{ std::thread([&] {
         proto::sync_socket_forwarder fwd(*child);
         fwd.forward(make_log_context(log_lvl::level::info, "ignored"));
         fwd.forward(make_log_context(log_lvl::level::debug, "also ignored"));
         child->send_pid_report(7);
     }) };
 
-    auto inc = parent->drain_logs();
+    const auto inc = parent->drain_logs();
     ASSERT_TRUE(std::holds_alternative<msg::pid_report>(inc.body));
     EXPECT_EQ(std::get<msg::pid_report>(inc.body).value, 7);
 }
 
 TEST_F(ChannelTest, DrainLogsThrowsOnClose)
 {
-    const thread_guard tg{ std::thread([&]() {
+    const thread_guard tg{ std::thread([&] {
         proto::sync_socket_forwarder fwd(*child);
         fwd.forward(make_log_context(log_lvl::level::info, "x"));
         child.reset();
@@ -584,8 +595,8 @@ TEST_F(ChannelTest, DrainLogsThrowsOnClose)
 
 TEST_F(ChannelTest, WaitForCloseThrowsSystemErrorWithErrno)
 {
-    auto saved = setup_logger_sink();
-    const thread_guard tg{ std::thread([&]() {
+    const auto saved = setup_logger_sink();
+    const thread_guard tg{ std::thread([&] {
         child->send_stage(proto::stage::type::exec_ready);
         auto ctx = make_log_context(log_lvl::level::fatal, "execvpe");
         ctx.errno_ = ENOENT;

@@ -2,12 +2,12 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gtest/gtest.h>
-
+#include "gtest_compat.h" // IWYU pragma: keep
 #include "linyaps_box/infra/process_handle.h"
 
 #include <fmt/format.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 
@@ -99,39 +99,22 @@ TEST(ParseProcStat, LargeStartTime)
     EXPECT_EQ(result->start_time, large_time);
 }
 
-TEST(ParseProcStat, MissingClosingParen)
+TEST(ParseProcStat, MalformedInputRejected)
 {
-    auto result =
-      infra::parse_proc_stat("42 bash S 1 42 42 34816 0 0 0 0 0 0 100 0 0 0 20 0 1 0 0 5");
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), std::errc::invalid_argument);
-}
+    // Every malformed line is rejected with invalid_argument; kept as one case
+    // per input so a failure still names the offending line via SCOPED_TRACE.
+    const std::array<const char *, 5> malformed{
+        "",
+        "42 (bash)",
+        "42 (bash) S 1 42 42",
+        "42 bash S 1 42 42 34816 0 0 0 0 0 0 100 0 0 0 20 0 1 0 0 5",
+        "42 (bash) S 1 42 42 34816 0 4194304 0 0 0 100 0 0 0 20 0 1 0 0 abc",
+    };
 
-TEST(ParseProcStat, EmptyLine)
-{
-    auto result = infra::parse_proc_stat("");
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), std::errc::invalid_argument);
-}
-
-TEST(ParseProcStat, CommOnly)
-{
-    auto result = infra::parse_proc_stat("42 (bash)");
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), std::errc::invalid_argument);
-}
-
-TEST(ParseProcStat, NonNumericStartTime)
-{
-    auto result =
-      infra::parse_proc_stat("42 (bash) S 1 42 42 34816 0 4194304 0 0 0 100 0 0 0 20 0 1 0 0 abc");
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), std::errc::invalid_argument);
-}
-
-TEST(ParseProcStat, TooFewFields)
-{
-    auto result = infra::parse_proc_stat("42 (bash) S 1 42 42");
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), std::errc::invalid_argument);
+    for (const auto *line : malformed) {
+        SCOPED_TRACE(line);
+        const auto result = infra::parse_proc_stat(line);
+        ASSERT_FALSE(result.has_value());
+        EXPECT_EQ(result.error(), std::errc::invalid_argument);
+    }
 }

@@ -2,10 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
-#include <linyaps_box/utils/span.h>
+#include "gtest_compat.h" // IWYU pragma: keep
+#include "linyaps_box/utils/span.h"
 
 #include <array>
 #include <cstddef>
@@ -27,16 +25,6 @@ using ::testing::IsEmpty;
 using ::testing::Not;
 using ::testing::Pointee;
 using ::testing::SizeIs;
-
-// gtest >= 1.10 renamed TYPED_TEST_CASE to TYPED_TEST_SUITE. The build only
-// shims INSTANTIATE_TEST_SUITE_P, so keep a local shim to stay 1.8.1 friendly.
-// The trailing comma passes an explicit (empty) name-generator pack: newer
-// TYPED_TEST_SUITE is variadic and omitting it is a post-C++17 extension.
-#ifdef TYPED_TEST_SUITE
-#  define SPAN_TYPED_TEST_SUITE(Suite, Types) TYPED_TEST_SUITE(Suite, Types, )
-#else
-#  define SPAN_TYPED_TEST_SUITE(Suite, Types) TYPED_TEST_CASE(Suite, Types)
-#endif
 
 namespace {
 
@@ -131,7 +119,7 @@ protected:
 };
 
 using SpanExtents = ::testing::Types<utils::span<int>, utils::span<int, 5>>;
-SPAN_TYPED_TEST_SUITE(SpanViewTest, SpanExtents);
+TYPED_TEST_SUITE(SpanViewTest, SpanExtents, );
 
 TYPED_TEST(SpanViewTest, Observers)
 {

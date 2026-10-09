@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gtest/gtest.h>
-
+#include "gtest_compat.h" // IWYU pragma: keep
 #include "linyaps_box/log/formatter.h"
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
@@ -147,7 +146,7 @@ struct stderr_capture
         std::array<char, 4096> buf{ };
 
         while (true) {
-            auto n = ::read(pipe_fd[0], buf.data(), buf.size());
+            const auto n = ::read(pipe_fd[0], buf.data(), buf.size());
             if (n < 0) {
                 if (errno == EINTR) {
                     continue;
@@ -249,7 +248,7 @@ class LevelFilterTest : public ::testing::TestWithParam<FilterCase>
 TEST_P(LevelFilterTest, Filtering)
 {
     auto &logger = linyaps_box::log::global_logger::instance();
-    auto saved_level = logger.get_level();
+    const auto saved_level = logger.get_level();
     logger.unset_backend();
 
     stderr_capture cap;
@@ -280,7 +279,7 @@ TEST_P(LevelFilterTest, Filtering)
         break;
     }
 
-    auto output = cap.extract();
+    const auto output = cap.extract();
     EXPECT_EQ(!output.empty(), GetParam().expect_output);
 
     logger.unset_backend();
@@ -312,7 +311,7 @@ TEST_F(LogFixture, StderrSinkBasicOutput)
 
     LINYAPS_BOX_LOG_INFO("hello {}", 42);
 
-    auto output = cap.extract();
+    const auto output = cap.extract();
     EXPECT_NE(output.find("hello 42"), std::string::npos);
     EXPECT_NE(output.find("[INFO ]"), std::string::npos);
 }
@@ -333,7 +332,7 @@ TEST_F(LogFixture, SourceLocationPropagation)
 
     LINYAPS_BOX_LOG_INFO("loc");
 
-    auto output = cap.extract();
+    const auto output = cap.extract();
     EXPECT_NE(output.find("log_test.cpp"), std::string::npos);
     EXPECT_NE(output.find(__func__), std::string::npos);
 }
@@ -381,10 +380,10 @@ TEST_F(LogFixture, DispatchContext)
         logger.set_sinks(std::move(sinks));
     }
 
-    auto ctx = make_ctx(linyaps_box::log::level::error, "raw dispatch", "test.cpp", "fn", 42);
+    const auto ctx = make_ctx(linyaps_box::log::level::error, "raw dispatch", "test.cpp", "fn", 42);
     logger.dispatch_context(ctx);
 
-    auto output = cap.extract();
+    const auto output = cap.extract();
     EXPECT_NE(output.find("raw dispatch"), std::string::npos);
     EXPECT_NE(output.find("[ERROR]"), std::string::npos);
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
@@ -402,7 +401,7 @@ TEST(SyslogSink, CeePrefixInJsonMode)
     ASSERT_EQ(sink.backend().calls.size(), 1U);
     EXPECT_EQ(sink.backend().calls[0].msg.substr(0, 6), "@cee: ");
 
-    auto json = sink.backend().calls[0].msg.substr(6);
+    const auto json = sink.backend().calls[0].msg.substr(6);
     EXPECT_NE(json.find(R"("message":"denied")"), std::string::npos);
     EXPECT_NE(json.find(R"("level":"ERROR")"), std::string::npos);
 }
@@ -472,7 +471,7 @@ TEST_F(LogFixture, MultiSinkOutput)
 
     LINYAPS_BOX_LOG_INFO("multi sink test {}", 42);
 
-    auto output = cap.extract();
+    const auto output = cap.extract();
     EXPECT_NE(output.find("multi sink test 42"), std::string::npos);
     EXPECT_NE(output.find("[INFO ]"), std::string::npos);
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
@@ -504,7 +503,7 @@ TEST_F(LogFixture, JsonFormatOutput)
 
     LINYAPS_BOX_LOG_INFO("json test {}", 42);
 
-    auto output = cap.extract();
+    const auto output = cap.extract();
     EXPECT_NE(output.find(R"("level":"INFO")"), std::string::npos);
     EXPECT_NE(output.find(R"("message":"json test 42")"), std::string::npos);
     EXPECT_NE(output.find(R"("pid":)"), std::string::npos);
@@ -527,7 +526,7 @@ TEST_F(LogFixture, ErrnoPropagationText)
 
     LINYAPS_BOX_LOG_ERROR_ERRNO(13, "operation failed");
 
-    auto output = cap.extract();
+    const auto output = cap.extract();
     EXPECT_NE(output.find("operation failed"), std::string::npos);
     EXPECT_NE(output.find("Permission denied"), std::string::npos);
 }
@@ -547,7 +546,7 @@ TEST_F(LogFixture, ErrnoPropagationJson)
 
     LINYAPS_BOX_LOG_ERROR_ERRNO(13, "operation failed");
 
-    auto output = cap.extract();
+    const auto output = cap.extract();
     EXPECT_NE(output.find("\"message\":\"operation failed\""), std::string::npos);
     EXPECT_NE(output.find("\"error_code\":13"), std::string::npos);
     EXPECT_NE(output.find("\"error_message\":\"Permission denied\""), std::string::npos);
@@ -583,54 +582,12 @@ auto format_to_string(const linyaps_box::log::log_context &ctx, linyaps_box::log
     return { buf.data(), buf.size() };
 }
 
-TEST(FormatLog, TextBasic)
-{
-    const auto ctx = make_ctx_with_time({ }, linyaps_box::log::level::error, "hello");
-    const auto out = format_to_string(ctx, linyaps_box::log::output_format::text);
-    EXPECT_NE(out.find("[ERROR]"), std::string::npos);
-    EXPECT_NE(out.find("hello"), std::string::npos);
-}
-
-#ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
-TEST(FormatLog, TextSourceLocation)
-{
-    const auto ctx =
-      make_ctx_with_time({ }, linyaps_box::log::level::warn, "message", "f.cpp", "g", 7);
-    const auto out = format_to_string(ctx, linyaps_box::log::output_format::text);
-    EXPECT_NE(out.find("f.cpp:7 g"), std::string::npos);
-}
-#endif
-
-TEST(FormatLog, TextErrno)
-{
-    const auto ctx = make_ctx_with_time({ }, linyaps_box::log::level::error, "fail", "", "", 0, 13);
-    const auto out = format_to_string(ctx, linyaps_box::log::output_format::text);
-    EXPECT_NE(out.find("Permission denied"), std::string::npos);
-}
-
 TEST(FormatLog, TextMultilineIndent)
 {
     const auto ctx = make_ctx_with_time({ }, linyaps_box::log::level::info, "line1\nline2");
     const auto out = format_to_string(ctx, linyaps_box::log::output_format::text);
     // second line should be prefixed with base_indent (4 spaces)
     EXPECT_NE(out.find("\n    line2"), std::string::npos);
-}
-
-TEST(FormatLog, JsonFields)
-{
-    const auto ctx = make_ctx_with_time({ }, linyaps_box::log::level::info, "payload");
-    const auto out = format_to_string(ctx, linyaps_box::log::output_format::json);
-    EXPECT_NE(out.find(R"("level":"INFO")"), std::string::npos);
-    EXPECT_NE(out.find(R"("message":"payload")"), std::string::npos);
-    EXPECT_NE(out.find(R"("pid":)"), std::string::npos);
-}
-
-TEST(FormatLog, JsonErrnoFields)
-{
-    const auto ctx = make_ctx_with_time({ }, linyaps_box::log::level::error, "fail", "", "", 0, 13);
-    const auto out = format_to_string(ctx, linyaps_box::log::output_format::json);
-    EXPECT_NE(out.find(R"("error_code":13)"), std::string::npos);
-    EXPECT_NE(out.find(R"("error_message":"Permission denied")"), std::string::npos);
 }
 
 TEST(FormatLog, JsonNanosecondPadding)
