@@ -33,6 +33,7 @@ foreach(test ${linyaps-box_SMOKE_TESTS})
     set_tests_properties(
         "${test}"
         PROPERTIES
+            LABELS integration
             RESOURCE_LOCK st-data
             ENVIRONMENT
                 "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/glibc_leaks.txt"
