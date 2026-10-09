@@ -2,9 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
+#include "gtest_compat.h" // IWYU pragma: keep
 #include "linyaps_box/utils/rlimit.h"
 
 #include <sys/resource.h>

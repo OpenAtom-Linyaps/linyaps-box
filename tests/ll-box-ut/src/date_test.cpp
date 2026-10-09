@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gtest/gtest.h>
-
+#include "gtest_compat.h" // IWYU pragma: keep
 #include "linyaps_box/utils/date.h"
 
 #include <array>
@@ -26,7 +25,7 @@ auto format(std::chrono::system_clock::time_point tp,
             utils::subsecond_precision p = utils::subsecond_precision::microseconds) -> std::string
 {
     std::array<char, utils::max_created_time_len> buf{ };
-    auto len = utils::to_created_time(utils::span{ buf }, tp, p);
+    const auto len = utils::to_created_time(utils::span{ buf }, tp, p);
     return std::string{ buf.data(), len };
 }
 
@@ -51,14 +50,22 @@ TEST(ToCreatedTime, NanosecondsPrecision)
 
 TEST(FromCreatedTime, RoundTripMicroseconds)
 {
-    auto tp = make_time_point(1'700'000'000'123'456'000);
+    const auto tp = make_time_point(1'700'000'000'123'456'000);
     EXPECT_EQ(utils::from_created_time(format(tp)), tp);
 }
 
-TEST(FromCreatedTime, RoundTripNanoseconds)
+TEST(FromCreatedTime, RoundTripVariants)
 {
-    auto tp = make_time_point(1'700'000'000'123'456'789);
-    EXPECT_EQ(utils::from_created_time(format(tp, utils::subsecond_precision::nanoseconds)), tp);
+    const std::array<std::chrono::system_clock::time_point, 2> time_points{
+        make_time_point(1'700'000'000'123'456'789),
+        std::chrono::system_clock::time_point{
+          std::chrono::nanoseconds{ std::numeric_limits<std::int64_t>::max() } },
+    };
+
+    for (const auto &tp : time_points) {
+        EXPECT_EQ(utils::from_created_time(format(tp, utils::subsecond_precision::nanoseconds)),
+                  tp);
+    }
 }
 
 TEST(FromCreatedTime, LegacyPureNanos)
@@ -121,12 +128,4 @@ TEST(FromCreatedTime, EmptyFractionThrows)
 {
     EXPECT_THROW(std::ignore = utils::from_created_time("2026-01-01T00:00:00.Z"),
                  std::invalid_argument);
-}
-
-TEST(FromCreatedTime, MaxRepresentableRoundTrip)
-{
-    auto ns = std::chrono::nanoseconds{ std::numeric_limits<std::int64_t>::max() };
-    auto tp = std::chrono::system_clock::time_point{ ns };
-    auto str = format(tp, utils::subsecond_precision::nanoseconds);
-    EXPECT_EQ(utils::from_created_time(str), tp);
 }

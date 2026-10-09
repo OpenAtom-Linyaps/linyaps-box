@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gtest/gtest.h>
-
+#include "gtest_compat.h" // IWYU pragma: keep
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/sinks/stderr_sink.h"
 
