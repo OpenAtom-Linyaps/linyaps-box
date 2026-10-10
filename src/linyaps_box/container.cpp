@@ -831,11 +831,35 @@ public:
         const auto &oci_config = container.get().get_config();
 
         const auto has_mount_ns = oci_config.linux_ && oci_config.linux_->namespaces
-          && std::any_of(oci_config.linux_->namespaces->begin(),
-                         oci_config.linux_->namespaces->end(),
+          && std::any_of(oci_config.linux_->namespaces->cbegin(),
+                         oci_config.linux_->namespaces->cend(),
                          [](const auto &ns) {
                              return ns.type_ == ns::type::mount;
                          });
+        // rootfsPropagation is applied to the current root ("/"). With a private
+        // mount namespace this runs before pivot_root (and is restored after the
+        // pivot); without one it intentionally affects the runtime mount
+        // namespace, instead of being silently ignored.
+        unsigned long prop{ 0 };
+        if (oci_config.linux_ && oci_config.linux_->rootfs_propagation_) {
+            prop = to_os_rootfs_propagation(*oci_config.linux_->rootfs_propagation_);
+        } else if (has_mount_ns) {
+            // rootfsPropagation is OPTIONAL per spec, Without a private mount
+            // namespace there is nothing to apply by default.
+            prop = MS_REC | MS_PRIVATE;
+        }
+
+        if (prop != 0) {
+            // change the propagation type of rootfs mountpoint to configured type
+            // otherwise bind mount will inherit the propagation type of rootfs mountpoint
+            do_propagation_mount(os::throw_if_error(os::openat(
+                                   utils::file_descriptor_ref::cwd(),
+                                   "/",
+                                   { os::sys::open_flag::directory | os::sys::open_flag::cloexec,
+                                     os::sys::access_mode::path })),
+                                 prop);
+        }
+
         if (!has_mount_ns) {
             LINYAPS_BOX_LOG_DEBUG("no unshared mount namespace");
             return;
@@ -843,25 +867,6 @@ public:
 
         // we will pivot root later
         LINYAPS_BOX_LOG_DEBUG("Configure rootfs");
-        unsigned long prop{ 0 };
-        if (oci_config.linux_->rootfs_propagation_) {
-            prop = to_os_rootfs_propagation(*oci_config.linux_->rootfs_propagation_);
-        } else {
-            // rootfsPropagation is OPTIONAL per spec (nullopt when absent); the
-            // runtime default mirrors crun (linux.c setup_mount_namespace):
-            // MS_REC|MS_PRIVATE.  (runc defaults to MS_REC|MS_SLAVE instead —
-            // an implementation choice, not spec.)
-            prop = MS_REC | MS_PRIVATE;
-        }
-
-        // change the propagation type of rootfs mountpoint to configured type
-        // otherwise bind mount will inherit the propagation type of rootfs mountpoint
-        do_propagation_mount(os::throw_if_error(os::openat(
-                               utils::file_descriptor_ref::cwd(),
-                               "/",
-                               { os::sys::open_flag::directory | os::sys::open_flag::cloexec,
-                                 os::sys::access_mode::path })),
-                             prop);
 
         // make sure the parent mountpoint of new root is private
         // pivot root will fail if it has shared propagation type
@@ -1254,15 +1259,7 @@ private:
 
 void configure_mounts(container &container, const std::filesystem::path &rootfs)
 {
-    LINYAPS_BOX_LOG_DEBUG("=== configure_mounts START ===");
     LINYAPS_BOX_LOG_DEBUG("Configure mounts");
-
-    const auto &oci_config = container.get_config();
-
-    if (oci_config.mounts.empty()) {
-        LINYAPS_BOX_LOG_DEBUG("Nothing to do");
-        return;
-    }
 
     auto m = std::make_unique<mounter>(os::throw_if_error(infra::Root::open(rootfs)), container);
 
