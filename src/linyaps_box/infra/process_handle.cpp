@@ -64,15 +64,12 @@ auto read_stat_through(utils::file_descriptor_ref proc_fd) noexcept -> os::Resul
     }
     auto stat_fd = std::move(*stat_fd_ref);
 
-    utils::uninit_vector<std::byte> buf;
-    buf.reserve(stat_buf_size);
-    auto bytes_read_res = io::read_to_end(stat_fd, buf);
-    if (UNLIKELY(!bytes_read_res)) {
-        return os::unexpected{ bytes_read_res.error() };
+    const auto buf = io::read_all(stat_fd, stat_buf_size);
+    if (UNLIKELY(!buf)) {
+        return os::unexpected{ buf.error() };
     }
 
-    return parse_proc_stat(
-      std::string_view{ reinterpret_cast<char *>(buf.data()), *bytes_read_res }); // NOLINT
+    return parse_proc_stat(*buf);
 }
 
 } // namespace

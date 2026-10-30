@@ -80,18 +80,14 @@ auto read_status(const std::filesystem::path &path) -> linyaps_box::container_st
 {
     using namespace linyaps_box::os;
 
-    const auto fd = throw_if_error(
-      open(path, sys::open_option{ sys::open_flag::cloexec, sys::access_mode::read_only }));
+    const auto content =
+      throw_if_error(linyaps_box::io::read_all(path), "failed to read status file");
 
-    linyaps_box::utils::uninit_vector<std::byte> buf;
-    const auto len = throw_if_error(linyaps_box::io::read_to_end(fd, buf));
-
-    if (UNLIKELY(len == 0)) {
+    if (UNLIKELY(content.empty())) {
         throw std::runtime_error(fmt::format("status file is empty: {}", path));
     }
 
-    const auto j = linyaps_box::utils::strict_parse(
-      std::string_view{ reinterpret_cast<const char *>(buf.data()), len });
+    const auto j = linyaps_box::utils::strict_parse(content);
     return j.get<linyaps_box::container_status>();
 }
 

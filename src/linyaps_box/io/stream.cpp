@@ -9,15 +9,17 @@
 #include "linyaps_box/utils/utils.h"
 
 #include <algorithm>
-#include <cstring>
 
 namespace linyaps_box::io {
 
 namespace {
 
-constexpr std::size_t probe_size = 32;
 constexpr std::size_t default_buf_size = 8192;
 
+// Sizes the first read when the caller has no hint: a regular file's st_size
+// minus whatever the descriptor has already consumed.  /proc files report
+// st_size 0 and fall through to default_buf_size, which is why the read loop
+// still has to grow.
 auto detect_file_size_hint(utils::file_descriptor_ref fd) noexcept -> std::size_t
 {
     auto stat = os::fstat(fd);
@@ -36,83 +38,60 @@ auto detect_file_size_hint(utils::file_descriptor_ref fd) noexcept -> std::size_
     return 0;
 }
 
-auto probe_read(utils::file_descriptor_ref fd, utils::uninit_vector<std::byte> &buf) noexcept
-  -> os::Result<std::size_t>
-{
-    std::array<std::byte, probe_size> probe; // NOLINT
-    auto n = os::read(fd, probe);
-    if (UNLIKELY(!n)) {
-        return os::unexpected{ n.error() };
-    }
-
-    const auto bytes_read = *n;
-    if (bytes_read > 0) {
-        const auto old_size = buf.size();
-        buf.resize(old_size + bytes_read);
-        std::memcpy(buf.data() + old_size, probe.data(), bytes_read);
-    }
-
-    return bytes_read;
-}
 } // namespace
 
-auto read_to_end(utils::file_descriptor_ref fd, utils::uninit_vector<std::byte> &buf) noexcept
-  -> os::Result<std::size_t>
+auto read_all(utils::file_descriptor_ref fd, std::size_t hint) noexcept -> os::Result<std::string>
 {
-    const auto start_len = buf.size();
-    const auto size_hint = detect_file_size_hint(fd);
-    if (size_hint > 0) {
-        buf.reserve(buf.size() + size_hint + 1);
-    } else if (buf.capacity() - buf.size() < default_buf_size) {
-        buf.reserve(buf.size() + default_buf_size);
-    }
+    const auto size_hint = hint != 0 ? hint : detect_file_size_hint(fd);
 
-    const auto start_cap = buf.capacity();
-    if (start_cap - buf.size() < probe_size) {
-        auto read_res = probe_read(fd, buf);
-        if (UNLIKELY(!read_res)) {
-            return os::unexpected{ read_res.error() };
-        }
+    // A std::string cannot commit uninitialised storage (C++17), so the expected
+    // size is sized up front, the reads fill that tail and `used` tracks what was
+    // actually written; the tail is truncated before returning.
+    // TODO(C++23): resize_and_overwrite would let the reads fill uninitialised
+    // storage instead of a value-initialised tail.
+    std::string out;
+    out.resize(size_hint > 0 ? size_hint + 1 : default_buf_size);
 
-        if (*read_res == 0) {
-            return 0; // EOF
-        }
-    }
-
-    std::size_t max_read_size =
-      (size_hint > 0) ? std::max(size_hint, default_buf_size) : default_buf_size;
-
+    std::size_t used{ 0 };
     while (true) {
-        if (buf.size() == buf.capacity()) {
-            const auto current_cap = buf.capacity();
-            const auto growth = std::max(current_cap, default_buf_size);
-            buf.reserve(current_cap + growth);
+        if (UNLIKELY(used == out.size())) {
+            out.resize(out.size() + std::max(out.size(), default_buf_size));
         }
 
-        const auto old_size = buf.size();
-        const auto spare_capacity = buf.capacity() - old_size;
-        const auto to_read = std::min(spare_capacity, max_read_size);
-
-        const utils::span spare_space{ buf.data() + old_size, to_read };
-
-        auto n = os::read(fd, spare_space);
+        const auto want = out.size() - used;
+        auto n = os::read(fd, utils::as_writable_bytes(utils::span{ out.data() + used, want }));
         if (UNLIKELY(!n)) {
             return os::unexpected{ n.error() };
         }
 
-        const auto bytes_read = *n;
-        if (bytes_read == 0) {
+        if (*n == 0) {
             break;
         }
 
-        buf.resize(old_size + bytes_read);
-
-        if (size_hint == 0 && to_read >= max_read_size && bytes_read == to_read) {
-            max_read_size = std::min(max_read_size * 2, static_cast<std::size_t>(1024 * 1024));
-        }
+        used += *n;
     }
 
-    return buf.size() - start_len;
+    out.resize(used);
+    return out;
+}
+
+auto read_all(const std::filesystem::path &path) noexcept -> os::Result<std::string>
+{
+    auto fd = os::open(path, { os::sys::open_flag::cloexec, os::sys::access_mode::read_only });
+    if (UNLIKELY(!fd)) {
+        return os::unexpected{ fd.error() };
+    }
+
+    const auto stat = os::fstat(*fd);
+    if (UNLIKELY(!stat)) {
+        return os::unexpected{ stat.error() };
+    }
+
+    if (UNLIKELY(os::to_fs_file_type(stat->st_mode) != std::filesystem::file_type::regular)) {
+        return os::unexpected{ std::make_error_code(std::errc::invalid_argument) };
+    }
+
+    return read_all(*fd, static_cast<std::size_t>(stat->st_size));
 }
 
 auto write_all(utils::file_descriptor_ref fd, utils::span<const std::byte> buf) noexcept

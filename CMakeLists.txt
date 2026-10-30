@@ -286,7 +286,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/config/seccomp.cpp
     src/linyaps_box/config/time_offset.cpp
     src/linyaps_box/config/user.cpp
-    src/linyaps_box/config/utils.cpp
     src/linyaps_box/container.cpp
     src/linyaps_box/container_monitor.cpp
     src/linyaps_box/container_ref.cpp
