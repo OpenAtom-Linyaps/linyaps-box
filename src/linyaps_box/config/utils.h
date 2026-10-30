@@ -17,7 +17,4 @@ namespace linyaps_box::config {
     return key.size() == len && key.compare(0, len, name) == 0;
 }
 
-[[nodiscard]] auto read_json_to(const std::filesystem::path &path,
-                                utils::uninit_vector<std::byte> &buffer) -> std::size_t;
-
 } // namespace linyaps_box::config

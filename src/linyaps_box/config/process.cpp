@@ -5,6 +5,8 @@
 #include "linyaps_box/config/process.h"
 
 #include "linyaps_box/config/utils.h"
+#include "linyaps_box/io/stream.h"
+#include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/enum_formatter.h" // IWYU pragma: keep
 #include "linyaps_box/utils/environ.h"
 #include "linyaps_box/utils/strict_json.h"
@@ -176,13 +178,9 @@ auto process::parse(std::string_view content) -> process
 
 auto process::parse(const std::filesystem::path &path) -> process
 {
-    utils::uninit_vector<std::byte> buf;
-    auto len = read_json_to(path, buf);
-
-    const std::string_view content_view{ reinterpret_cast<const char *>(buf.data()), // NOLINT
-                                         len };
-
-    return parse(content_view);
+    const auto content =
+      os::throw_if_error(io::read_all(path), fmt::format("failed to read config file: {}", path));
+    return parse(std::string_view{ content });
 }
 
 } // namespace linyaps_box::config

@@ -5,9 +5,13 @@
 #include "linyaps_box/config/oci_config.h"
 
 #include "linyaps_box/config/utils.h"
+#include "linyaps_box/io/stream.h"
+#include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/semver.h"
 #include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
+
+#include <fmt/std.h>
 
 #include <filesystem>
 #include <stdexcept>
@@ -111,13 +115,9 @@ auto oci_config::parse(std::string_view content) -> oci_config
 
 auto oci_config::parse(const std::filesystem::path &path) -> oci_config
 {
-    utils::uninit_vector<std::byte> buf;
-    auto len = read_json_to(path, buf);
-
-    const std::string_view content_view{ reinterpret_cast<const char *>(buf.data()), // NOLINT
-                                         len };
-
-    return parse(content_view);
+    const auto content =
+      os::throw_if_error(io::read_all(path), fmt::format("failed to read config file: {}", path));
+    return parse(std::string_view{ content });
 }
 
 } // namespace linyaps_box::config

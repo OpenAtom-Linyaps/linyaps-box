@@ -98,43 +98,6 @@ Overload(T...) -> Overload<T...>;
 
 auto gen_random_string(std::size_t len) noexcept -> std::string;
 
-template <typename T>
-struct uninit_allocator
-{
-    static_assert(std::is_trivially_default_constructible_v<T>,
-                  "uinit_allocator can only be used with trivially default constructible types!");
-    using value_type = T;
-
-    uninit_allocator() noexcept = default;
-
-    T *allocate(std::size_t n) { return static_cast<T *>(::operator new(n * sizeof(T))); }
-
-    void deallocate(T *p, [[maybe_unused]] std::size_t size) noexcept { ::operator delete(p); }
-
-    template <typename U, typename... Args>
-    void construct(U *ptr, Args &&...args) noexcept
-    {
-        static_assert(std::is_trivially_copyable_v<U>,
-                      "uninit_allocator requires trivially copyable types");
-
-        if constexpr (sizeof...(Args) > 0) {
-            ::new (static_cast<void *>(ptr)) U(std::forward<Args>(args)...);
-        }
-    }
-
-    template <typename U>
-    void destroy([[maybe_unused]] U *ptr) noexcept
-    {
-    }
-
-    bool operator==([[maybe_unused]] const uninit_allocator &other) const noexcept { return true; }
-
-    bool operator!=([[maybe_unused]] const uninit_allocator &other) const noexcept { return false; }
-};
-
-template <typename T>
-using uninit_vector = std::vector<T, uninit_allocator<T>>;
-
 // c++ 20 to_array
 template <typename T, std::size_t N>
 constexpr auto to_array(T (&arr)[N]) noexcept

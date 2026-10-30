@@ -26,6 +26,7 @@ set(linyaps-box_UNIT_TESTS_SOURCE
     src/rlimit_test.cpp
     src/semver_test.cpp
     src/span_test.cpp
+    src/stream_test.cpp
     src/strict_json_test.cpp
     src/vfs_test.cpp
 )
