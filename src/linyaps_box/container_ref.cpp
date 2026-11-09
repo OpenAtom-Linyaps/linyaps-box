@@ -526,7 +526,7 @@ auto container_ref::exec(exec_container_option option) const -> int
 
     os::throw_if_error(os::set_child_subreaper(true));
 
-    const auto config = config::oci_config::parse(status_dir_.config());
+    const auto config = config::oci_config::load(status_dir_.config());
     const auto &proc = resolve_final_process(option, config);
 
     config::validate(proc);

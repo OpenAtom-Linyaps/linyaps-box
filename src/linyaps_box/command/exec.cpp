@@ -24,7 +24,7 @@ try {
     option.preserve_fds = options.preserve_fds;
 
     if (options.process_file) {
-        option.proc = config::process::parse(*options.process_file);
+        option.proc = config::process::load(options.process_file.value());
     }
 
     option.cwd = std::move(options.cwd);
