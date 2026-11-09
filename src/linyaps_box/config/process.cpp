@@ -176,7 +176,7 @@ auto process::parse(std::string_view content) -> process
     return process_config;
 }
 
-auto process::parse(const std::filesystem::path &path) -> process
+auto process::load(const std::filesystem::path &path) -> process
 {
     const auto content =
       os::throw_if_error(io::read_all(path), fmt::format("failed to read config file: {}", path));

@@ -2297,7 +2297,7 @@ container::container(status_directory status_dir, const create_container_options
     }
 
     LINYAPS_BOX_LOG_DEBUG("load oci_config from {}", config_path);
-    this->config = oci_config::parse(config_path);
+    this->config = oci_config::load(config_path);
     auto &mount = this->config.mounts;
     std::for_each(mount.begin(), mount.end(), [this](linyaps_box::config::mount &mount) {
         if (mount.destination.is_relative()) {

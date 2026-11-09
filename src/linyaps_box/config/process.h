@@ -25,7 +25,7 @@ struct process
     // exec process is a special case, it is not a full OCI config, but we still want to use the
     // same parsing and validation logic as the process section of an OCI config.
     static auto parse(std::string_view content) -> process;
-    static auto parse(const std::filesystem::path &path) -> process;
+    static auto load(const std::filesystem::path &path) -> process;
 
     std::optional<capabilities> capabilities_;
     std::optional<exec_cpu_affinity> exec_cpu_affinity_;

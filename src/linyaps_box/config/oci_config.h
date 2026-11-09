@@ -27,7 +27,7 @@ struct oci_config
     static constexpr auto version = "1.3.0"sv;
 
     static auto parse(std::string_view content) -> oci_config;
-    static auto parse(const std::filesystem::path &path) -> oci_config;
+    static auto load(const std::filesystem::path &path) -> oci_config;
 
     std::optional<process> process_;
     std::optional<std::string> hostname;

@@ -157,7 +157,7 @@ TEST(ProcessParse, ParseContentSucceeds)
     EXPECT_EQ(process.user_.gid, 2U);
 }
 
-TEST(ProcessParse, ParseFromFileSucceeds)
+TEST(ProcessParse, LoadFromFileSucceeds)
 {
     const auto path = std::filesystem::path{ "process_parse_test.json" };
     {
@@ -165,7 +165,7 @@ TEST(ProcessParse, ParseFromFileSucceeds)
         out << R"({"cwd": "/", "args": ["/bin/echo"], "user": {"uid": 1, "gid": 2}})";
     }
 
-    const auto process = process::parse(path);
+    const auto process = process::load(path);
     EXPECT_EQ(process.user_.uid, 1U);
     EXPECT_THAT(process.args, ElementsAre("/bin/echo"));
 

@@ -113,7 +113,7 @@ auto oci_config::parse(std::string_view content) -> oci_config
     return config;
 }
 
-auto oci_config::parse(const std::filesystem::path &path) -> oci_config
+auto oci_config::load(const std::filesystem::path &path) -> oci_config
 {
     const auto content =
       os::throw_if_error(io::read_all(path), fmt::format("failed to read config file: {}", path));

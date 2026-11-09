@@ -100,7 +100,7 @@ TEST(OciConfigParse, UnknownTopLevelKeyIgnored)
 
 TEST(OciConfigParse, MissingConfigFileThrows)
 {
-    EXPECT_THROW(oci_config::parse(std::filesystem::path{ "/nonexistent/config.json" }),
+    EXPECT_THROW(oci_config::load(std::filesystem::path{ "/nonexistent/config.json" }),
                  std::runtime_error);
 }
 
@@ -126,14 +126,14 @@ TEST(OciConfigParse, OfficialSpecExampleParses)
 
 TEST(OciConfigParse, ParseFromFileSucceeds)
 {
-    const auto config = oci_config::parse(std::filesystem::path{ "data/oci.json" });
+    const auto config = oci_config::load(std::filesystem::path{ "data/oci.json" });
     EXPECT_THAT(config.hostname, Eq("test-host"));
     ASSERT_TRUE(config.process_.has_value());
 }
 
 TEST(OciConfigParse, ParseDirectoryThrows)
 {
-    EXPECT_THROW(oci_config::parse(std::filesystem::path{ "data" }), std::runtime_error);
+    EXPECT_THROW(oci_config::load(std::filesystem::path{ "data" }), std::runtime_error);
 }
 
 } // namespace
