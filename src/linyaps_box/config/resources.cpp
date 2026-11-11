@@ -4,77 +4,32 @@
 
 #include "linyaps_box/config/resources.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 
-#include <fmt/format.h>
-
-#include <string_view>
+#include <algorithm>
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, resources &v)
-{
-    utils::require_object(j);
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "unified")) {
-            if (!val.is_null()) {
-                val.get_to(v.unified.emplace());
-            }
-        } else if (key_matches(k, "devices")) {
-            if (!val.is_null()) {
-                val.get_to(v.devices.emplace());
-            }
-        } else if (key_matches(k, "pids")) {
-            if (!val.is_null()) {
-                val.get_to(v.pids_.emplace());
-            }
-        } else if (key_matches(k, "memory")) {
-            if (!val.is_null()) {
-                val.get_to(v.memory_.emplace());
-            }
-        } else if (key_matches(k, "cpu")) {
-            if (!val.is_null()) {
-                val.get_to(v.cpu_.emplace());
-            }
-        } else if (key_matches(k, "hugepageLimits")) {
-            if (!val.is_null()) {
-                val.get_to(v.hugepage_limits.emplace());
-            }
-        } else if (key_matches(k, "blockIO")) {
-            if (!val.is_null()) {
-                val.get_to(v.block_io_.emplace());
-            }
-        } else if (key_matches(k, "network")) {
-            if (!val.is_null()) {
-                val.get_to(v.network_.emplace());
-            }
-        } else if (key_matches(k, "rdma")) {
-            if (!val.is_null()) {
-                val.get_to(v.rdma_.emplace());
-            }
-        }
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(resources,
+                          resources_schema,
+                          "resources",
+                          field<&resources::unified>("unified").ignore_null(),
+                          field<&resources::devices>("devices").ignore_null(),
+                          field<&resources::pids_>("pids").ignore_null(),
+                          field<&resources::memory_>("memory").ignore_null(),
+                          field<&resources::cpu_>("cpu").ignore_null(),
+                          field<&resources::hugepage_limits>("hugepageLimits").ignore_null(),
+                          field<&resources::block_io_>("blockIO").ignore_null(),
+                          field<&resources::network_>("network").ignore_null(),
+                          field<&resources::rdma_>("rdma").ignore_null())
 
 void validate(const resources &v)
 {
-    if (v.memory_) {
-        validate(*v.memory_);
-    }
-
-    if (v.cpu_) {
-        validate(*v.cpu_);
-    }
-
-    if (v.block_io_) {
-        validate(*v.block_io_);
-    }
-
-    if (v.network_) {
-        validate(*v.network_);
-    }
+    validate_if_present(v.memory_);
+    validate_if_present(v.cpu_);
+    validate_if_present(v.block_io_);
+    validate_if_present(v.network_);
 
     if (v.rdma_) {
         std::for_each(v.rdma_->cbegin(), v.rdma_->cend(), [](const auto &entry) {

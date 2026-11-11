@@ -9,7 +9,7 @@
 #include "linyaps_box/config/mount.h"
 #include "linyaps_box/config/process.h"
 #include "linyaps_box/config/root.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <filesystem>
 #include <optional>
@@ -27,20 +27,21 @@ struct oci_config
     static constexpr auto version = "1.3.0"sv;
 
     static auto parse(std::string_view content) -> oci_config;
+    // Explicit file entry: reads the file (system errors preserved), then
+    // parses the text.
     static auto load(const std::filesystem::path &path) -> oci_config;
 
     std::optional<process> process_;
     std::optional<std::string> hostname;
     std::optional<std::string> domainname;
-    std::vector<mount> mounts;
+    std::optional<std::vector<mount>> mounts;
     std::optional<linux> linux_;
     std::optional<hooks> hooks_;
     std::optional<root> root_;
     std::optional<std::unordered_map<std::string, std::string>> annotations;
 };
 
-void from_json(const utils::strict_json &j, oci_config &v);
-
 void validate(const oci_config &v);
 
+auto ops_of(json::object_tag<oci_config>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

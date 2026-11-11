@@ -4,79 +4,43 @@
 
 #include "linyaps_box/config/block_io.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 
-#include <string_view>
+#include <algorithm>
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, block_io::weight_device &v)
-{
-    utils::require_object(j);
-    j.at("major").get_to(v.major);
-    j.at("minor").get_to(v.minor);
+LINYAPS_BOX_CONFIG_SCHEMA(block_io::weight_device,
+                          block_io_weight_device_schema,
+                          "block_io.weight_device",
+                          field<&block_io::weight_device::major>("major").required(),
+                          field<&block_io::weight_device::minor>("minor").required(),
+                          field<&block_io::weight_device::weight>("weight").ignore_null(),
+                          field<&block_io::weight_device::leaf_weight>("leafWeight").ignore_null())
 
-    if (auto it = j.find("weight"); it != j.end() && !it->is_null()) {
-        it->get_to(v.weight.emplace());
-    }
+LINYAPS_BOX_CONFIG_SCHEMA(block_io::throttle_device,
+                          block_io_throttle_device_schema,
+                          "block_io.throttle_device",
+                          field<&block_io::throttle_device::major>("major").required(),
+                          field<&block_io::throttle_device::minor>("minor").required(),
+                          field<&block_io::throttle_device::rate>("rate").required())
 
-    if (auto it = j.find("leafWeight"); it != j.end() && !it->is_null()) {
-        it->get_to(v.leaf_weight.emplace());
-    }
-}
-
-void from_json(const utils::strict_json &j, block_io::throttle_device &v)
-{
-    utils::require_object(j);
-    j.at("major").get_to(v.major);
-    j.at("minor").get_to(v.minor);
-    j.at("rate").get_to(v.rate);
-}
-
-void from_json(const utils::strict_json &j, block_io &v)
-{
-    utils::require_object(j);
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "weight")) {
-            if (!val.is_null()) {
-                val.get_to(v.weight.emplace());
-            }
-        } else if (key_matches(k, "leafWeight")) {
-            if (!val.is_null()) {
-                val.get_to(v.leaf_weight.emplace());
-            }
-        } else if (key_matches(k, "weightDevice")) {
-            if (!val.is_null()) {
-                val.get_to(v.weight_devices.emplace());
-            }
-        } else if (key_matches(k, "throttleReadBpsDevice")) {
-            if (!val.is_null()) {
-                val.get_to(v.throttle_read_bps_device.emplace());
-            }
-        } else if (key_matches(k, "throttleWriteBpsDevice")) {
-            if (!val.is_null()) {
-                val.get_to(v.throttle_write_bps_device.emplace());
-            }
-        } else if (key_matches(k, "throttleReadIOPSDevice")) {
-            if (!val.is_null()) {
-                val.get_to(v.throttle_read_iops_device.emplace());
-            }
-        } else if (key_matches(k, "throttleWriteIOPSDevice")) {
-            if (!val.is_null()) {
-                val.get_to(v.throttle_write_iops_device.emplace());
-            }
-        }
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(
+  block_io,
+  block_io_schema,
+  "block_io",
+  field<&block_io::weight>("weight").ignore_null(),
+  field<&block_io::leaf_weight>("leafWeight").ignore_null(),
+  field<&block_io::weight_devices>("weightDevice").ignore_null(),
+  field<&block_io::throttle_read_bps_device>("throttleReadBpsDevice").ignore_null(),
+  field<&block_io::throttle_write_bps_device>("throttleWriteBpsDevice").ignore_null(),
+  field<&block_io::throttle_read_iops_device>("throttleReadIOPSDevice").ignore_null(),
+  field<&block_io::throttle_write_iops_device>("throttleWriteIOPSDevice").ignore_null())
 
 void validate(const block_io::weight_device &v)
 {
-    if (UNLIKELY(!v.weight && !v.leaf_weight)) {
-        throw std::runtime_error("block_io weightDevice requires weight or leafWeight");
-    }
+    require(v.weight || v.leaf_weight, "block_io weightDevice requires weight or leafWeight");
 }
 
 void validate(const block_io &v)

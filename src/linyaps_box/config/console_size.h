@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 namespace linyaps_box::config {
 
@@ -14,6 +14,5 @@ struct console_size
     unsigned short width;
 };
 
-void from_json(const utils::strict_json &j, console_size &v);
-
+auto ops_of(json::object_tag<console_size>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

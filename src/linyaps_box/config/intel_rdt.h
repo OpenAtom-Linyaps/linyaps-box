@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <optional>
 #include <string>
@@ -21,8 +21,7 @@ struct intel_rdt
     std::optional<bool> enable_monitoring;
 };
 
-void from_json(const utils::strict_json &j, intel_rdt &v);
-
 void validate(const intel_rdt &v);
 
+auto ops_of(json::object_tag<intel_rdt>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

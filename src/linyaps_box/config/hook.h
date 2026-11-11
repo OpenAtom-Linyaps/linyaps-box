@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <filesystem>
 #include <optional>
@@ -21,8 +21,7 @@ struct hook
     std::optional<int> timeout;
 };
 
-void from_json(const utils::strict_json &j, hook &v);
-
 void validate(std::string_view label, const hook &v);
 
+auto ops_of(json::object_tag<hook>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

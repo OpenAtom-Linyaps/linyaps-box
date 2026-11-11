@@ -4,49 +4,25 @@
 
 #include "linyaps_box/config/hooks.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/json/parser.h"
 
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, hooks &v)
-{
-    utils::require_object(j);
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "prestart")) {
-            if (!val.is_null()) {
-                val.get_to(v.prestart.emplace());
-            }
-        } else if (key_matches(k, "createRuntime")) {
-            if (!val.is_null()) {
-                val.get_to(v.create_runtime.emplace());
-            }
-        } else if (key_matches(k, "createContainer")) {
-            if (!val.is_null()) {
-                val.get_to(v.create_container.emplace());
-            }
-        } else if (key_matches(k, "startContainer")) {
-            if (!val.is_null()) {
-                val.get_to(v.start_container.emplace());
-            }
-        } else if (key_matches(k, "poststart")) {
-            if (!val.is_null()) {
-                val.get_to(v.poststart.emplace());
-            }
-        } else if (key_matches(k, "poststop")) {
-            if (!val.is_null()) {
-                val.get_to(v.poststop.emplace());
-            }
-        }
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(hooks,
+                          hooks_schema,
+                          "hooks",
+                          field<&hooks::prestart>("prestart").ignore_null(),
+                          field<&hooks::create_runtime>("createRuntime").ignore_null(),
+                          field<&hooks::create_container>("createContainer").ignore_null(),
+                          field<&hooks::start_container>("startContainer").ignore_null(),
+                          field<&hooks::poststart>("poststart").ignore_null(),
+                          field<&hooks::poststop>("poststop").ignore_null())
 
 void validate(const hooks &v)
 {
-    auto validate_hooks = [](std::string_view label, const auto &hooks) {
+    const auto validate_hooks = [](std::string_view label, const auto &hooks) {
         for (const auto &h : hooks) {
             validate(label, h);
         }

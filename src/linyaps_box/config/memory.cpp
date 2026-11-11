@@ -4,61 +4,29 @@
 
 #include "linyaps_box/config/memory.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
+#include "linyaps_box/log/macro.h"
 
 #include <fmt/format.h>
 
+#include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, memory &v)
-{
-    utils::require_object(j);
-    // Single-pass traversal for perf
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "limit")) {
-            if (!val.is_null()) {
-                val.get_to(v.limit.emplace());
-            }
-        } else if (key_matches(k, "reservation")) {
-            if (!val.is_null()) {
-                val.get_to(v.reservation.emplace());
-            }
-        } else if (key_matches(k, "swap")) {
-            if (!val.is_null()) {
-                val.get_to(v.swap.emplace());
-            }
-        } else if (key_matches(k, "kernel")) {
-            if (!val.is_null()) {
-                val.get_to(v.kernel.emplace());
-            }
-        } else if (key_matches(k, "kernelTCP")) {
-            if (!val.is_null()) {
-                val.get_to(v.kernel_tcp.emplace());
-            }
-        } else if (key_matches(k, "swappiness")) {
-            if (!val.is_null()) {
-                val.get_to(v.swappiness.emplace());
-            }
-        } else if (key_matches(k, "disableOOMKiller")) {
-            if (!val.is_null()) {
-                val.get_to(v.disable_OOM_killer.emplace());
-            }
-        } else if (key_matches(k, "useHierarchy")) {
-            if (!val.is_null()) {
-                val.get_to(v.use_hierarchy.emplace());
-            }
-        } else if (key_matches(k, "checkBeforeUpdate")) {
-            if (!val.is_null()) {
-                val.get_to(v.check_before_update.emplace());
-            }
-        }
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(memory,
+                          memory_schema,
+                          "memory",
+                          field<&memory::limit>("limit").ignore_null(),
+                          field<&memory::reservation>("reservation").ignore_null(),
+                          field<&memory::swap>("swap").ignore_null(),
+                          field<&memory::kernel>("kernel").ignore_null(),
+                          field<&memory::kernel_tcp>("kernelTCP").ignore_null(),
+                          field<&memory::swappiness>("swappiness").ignore_null(),
+                          field<&memory::disable_OOM_killer>("disableOOMKiller").ignore_null(),
+                          field<&memory::use_hierarchy>("useHierarchy").ignore_null(),
+                          field<&memory::check_before_update>("checkBeforeUpdate").ignore_null())
 
 void validate(const memory &v)
 {

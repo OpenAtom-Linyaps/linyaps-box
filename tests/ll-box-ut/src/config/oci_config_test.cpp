@@ -89,7 +89,7 @@ TEST(OciConfigParse, NullProcessAccepted)
 TEST(OciConfigParse, NullMountsAccepted)
 {
     const auto config = parse_config(R"(  "mounts": null)");
-    EXPECT_TRUE(config.mounts.empty());
+    EXPECT_FALSE(config.mounts.has_value());
 }
 
 TEST(OciConfigParse, UnknownTopLevelKeyIgnored)
@@ -121,7 +121,8 @@ TEST(OciConfigParse, OfficialSpecExampleParses)
     EXPECT_THAT(config.process_->cwd.string(), Eq("/"));
     ASSERT_TRUE(config.linux_.has_value());
     ASSERT_TRUE(config.linux_->namespaces.has_value());
-    EXPECT_FALSE(config.mounts.empty());
+    ASSERT_TRUE(config.mounts.has_value());
+    EXPECT_FALSE(config.mounts->empty());
 }
 
 TEST(OciConfigParse, ParseFromFileSucceeds)

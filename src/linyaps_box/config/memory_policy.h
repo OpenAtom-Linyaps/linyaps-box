@@ -4,8 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -15,12 +15,12 @@ namespace linyaps_box::config {
 
 enum class memory_policy_flag : std::uint8_t {
     none = 0U,
-    numa_balancing = (1U << 0),
-    relative_nodes = (1U << 1),
-    static_nodes = (1U << 2),
+    numa_balancing = (1U << 0U),
+    relative_nodes = (1U << 1U),
+    static_nodes = (1U << 2U),
 };
 
-LINYAPS_ENABLE_BITMASK_ENUM(memory_policy_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(memory_policy_flag)
 
 LINYAPS_REGISTER_ENUM_TABLE(memory_policy_flag,
                             3,
@@ -41,7 +41,7 @@ struct memory_policy
     };
 
     std::optional<std::string> nodes;
-    utils::bitflags<memory_policy_flag> flags;
+    std::optional<utils::bitflags<memory_policy_flag>> flags;
     mode mode_;
 };
 
@@ -56,8 +56,7 @@ LINYAPS_REGISTER_ENUM_TABLE(memory_policy::mode,
                             { memory_policy::mode::preferred_many, "MPOL_PREFERRED_MANY" },
                             { memory_policy::mode::local, "MPOL_LOCAL" })
 
-void from_json(const utils::strict_json &j, memory_policy &v);
-
 void validate(const memory_policy &v);
 
+auto ops_of(json::object_tag<memory_policy>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

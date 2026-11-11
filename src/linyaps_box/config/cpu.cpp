@@ -4,73 +4,47 @@
 
 #include "linyaps_box/config/cpu.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/format.h>
 
-#include <stdexcept>
-#include <string_view>
+#include <cstdint>
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, cpu &v)
-{
-    utils::require_object(j);
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "shares")) {
-            if (!val.is_null()) {
-                val.get_to(v.shares.emplace());
-            }
-        } else if (key_matches(k, "quota")) {
-            if (!val.is_null()) {
-                val.get_to(v.quota.emplace());
-            }
-        } else if (key_matches(k, "burst")) {
-            if (!val.is_null()) {
-                val.get_to(v.burst.emplace());
-            }
-        } else if (key_matches(k, "period")) {
-            if (!val.is_null()) {
-                val.get_to(v.period.emplace());
-            }
-        } else if (key_matches(k, "realtimeRuntime")) {
-            if (!val.is_null()) {
-                val.get_to(v.realtime_runtime.emplace());
-            }
-        } else if (key_matches(k, "realtimePeriod")) {
-            if (!val.is_null()) {
-                val.get_to(v.realtime_period.emplace());
-            }
-        } else if (key_matches(k, "cpus")) {
-            if (!val.is_null()) {
-                val.get_to(v.cpus.emplace());
-            }
-        } else if (key_matches(k, "mems")) {
-            if (!val.is_null()) {
-                val.get_to(v.mems.emplace());
-            }
-        } else if (key_matches(k, "idle")) {
-            if (!val.is_null()) {
-                auto idle_val = val.get<int64_t>();
-                if (UNLIKELY(idle_val != 0 && idle_val != 1)) {
-                    throw std::runtime_error(fmt::format("cpu.idle must be 0 or 1: {}", idle_val));
-                }
+namespace {
 
-                v.idle_.emplace((idle_val == 1) ? cpu::idle::idle : cpu::idle::none);
-            }
-        }
+auto read_idle(const json::detail::value_view &value) -> cpu::idle
+{
+    const auto idle = json::detail::number_from<std::int64_t>(value);
+    if (UNLIKELY(idle != 0 && idle != 1)) {
+        throw json::decode_error{ "cpu.idle must be 0 or 1" };
     }
+
+    return idle == 1 ? cpu::idle::idle : cpu::idle::none;
 }
+
+} // namespace
+
+LINYAPS_BOX_CONFIG_SCHEMA(cpu,
+                          cpu_schema,
+                          "cpu",
+                          field<&cpu::shares>("shares").ignore_null(),
+                          field<&cpu::quota>("quota").ignore_null(),
+                          field<&cpu::burst>("burst").ignore_null(),
+                          field<&cpu::period>("period").ignore_null(),
+                          field<&cpu::realtime_runtime>("realtimeRuntime").ignore_null(),
+                          field<&cpu::realtime_period>("realtimePeriod").ignore_null(),
+                          field<&cpu::cpus>("cpus").ignore_null(),
+                          field<&cpu::mems>("mems").ignore_null(),
+                          field<&cpu::idle_, &read_idle>("idle").ignore_null())
 
 void validate(const cpu &v)
 {
-    if (UNLIKELY(v.quota && *v.quota > 0 && v.burst
-                 && *v.burst > static_cast<uint64_t>(*v.quota))) {
-        throw std::runtime_error("cpu.quota must be no smaller than cpu.burst");
-    }
+    require(!v.quota || *v.quota <= 0 || !v.burst || *v.burst <= static_cast<uint64_t>(*v.quota),
+            "cpu.quota must be no smaller than cpu.burst");
 }
 
 } // namespace linyaps_box::config

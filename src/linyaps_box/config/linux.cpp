@@ -4,8 +4,7 @@
 
 #include "linyaps_box/config/linux.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/json/parser.h"
 
 #include <fmt/std.h>
 
@@ -16,92 +15,26 @@
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, linux &v)
-{
-    utils::require_object(j);
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "uidMappings")) {
-            if (!val.is_null()) {
-                val.get_to(v.uid_mappings.emplace());
-            }
-        } else if (key_matches(k, "gidMappings")) {
-            if (!val.is_null()) {
-                val.get_to(v.gid_mappings.emplace());
-            }
-        } else if (key_matches(k, "namespaces")) {
-            if (!val.is_null()) {
-                val.get_to(v.namespaces.emplace());
-            }
-        } else if (key_matches(k, "devices")) {
-            if (!val.is_null()) {
-                val.get_to(v.devices.emplace());
-            }
-        } else if (key_matches(k, "netDevices")) {
-            if (!val.is_null()) {
-                val.get_to(v.network_devices.emplace());
-            }
-        } else if (key_matches(k, "cgroupsPath")) {
-            if (!val.is_null()) {
-                val.get_to(v.cgroups_path.emplace());
-            }
-        } else if (key_matches(k, "maskedPaths")) {
-            if (!val.is_null()) {
-                val.get_to(v.masked_paths.emplace());
-            }
-        } else if (key_matches(k, "readonlyPaths")) {
-            if (!val.is_null()) {
-                val.get_to(v.readonly_paths.emplace());
-            }
-        } else if (key_matches(k, "mountLabel")) {
-            if (!val.is_null()) {
-                val.get_to(v.mount_label.emplace());
-            }
-        } else if (key_matches(k, "rootfsPropagation")) {
-            if (!val.is_null()) {
-                auto prop_name = val.get<std::string_view>();
-                auto prop_opt = utils::enum_table_v<rootfs_propagation>.from_name(prop_name);
-                if (UNLIKELY(!prop_opt)) {
-                    throw std::runtime_error(
-                      fmt::format("unknown rootfsPropagation value: {}", prop_name));
-                }
-
-                v.rootfs_propagation_.emplace(*prop_opt);
-            }
-        } else if (key_matches(k, "sysctl")) {
-            if (!val.is_null()) {
-                val.get_to(v.sysctl.emplace());
-            }
-        } else if (key_matches(k, "timeOffsets")) {
-            if (!val.is_null()) {
-                auto &offsets = v.time_offsets.emplace();
-                for (const auto &[clock_name, offset_json] : val.items()) {
-                    offsets.emplace(clock_name, offset_json.get<time_offset>());
-                }
-            }
-        } else if (key_matches(k, "personality")) {
-            if (!val.is_null()) {
-                val.get_to(v.personality_.emplace());
-            }
-        } else if (key_matches(k, "memoryPolicy")) {
-            if (!val.is_null()) {
-                val.get_to(v.memory_policy_.emplace());
-            }
-        } else if (key_matches(k, "intelRdt")) {
-            if (!val.is_null()) {
-                val.get_to(v.intel_rdt_.emplace());
-            }
-        } else if (key_matches(k, "resources")) {
-            if (!val.is_null()) {
-                val.get_to(v.resources_.emplace());
-            }
-        } else if (key_matches(k, "seccomp")) {
-            if (!val.is_null()) {
-                val.get_to(v.seccomp_.emplace());
-            }
-        }
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(linux,
+                          linux_schema,
+                          "linux",
+                          field<&linux::uid_mappings>("uidMappings").ignore_null(),
+                          field<&linux::gid_mappings>("gidMappings").ignore_null(),
+                          field<&linux::namespaces>("namespaces").ignore_null(),
+                          field<&linux::devices>("devices").ignore_null(),
+                          field<&linux::network_devices>("netDevices").ignore_null(),
+                          field<&linux::cgroups_path>("cgroupsPath").ignore_null(),
+                          field<&linux::rootfs_propagation_>("rootfsPropagation").ignore_null(),
+                          field<&linux::sysctl>("sysctl").ignore_null(),
+                          field<&linux::time_offsets>("timeOffsets").ignore_null(),
+                          field<&linux::personality_>("personality").ignore_null(),
+                          field<&linux::memory_policy_>("memoryPolicy").ignore_null(),
+                          field<&linux::intel_rdt_>("intelRdt").ignore_null(),
+                          field<&linux::resources_>("resources").ignore_null(),
+                          field<&linux::seccomp_>("seccomp").ignore_null(),
+                          field<&linux::masked_paths>("maskedPaths").ignore_null(),
+                          field<&linux::readonly_paths>("readonlyPaths").ignore_null(),
+                          field<&linux::mount_label>("mountLabel").ignore_null())
 
 void validate(const linux &v)
 {

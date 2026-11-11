@@ -4,16 +4,10 @@
 
 #include "linyaps_box/config/pids.h"
 
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/json/parser.h"
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, pids &v)
-{
-    utils::require_object(j);
-    if (auto it = j.find("limit"); it != j.end() && !it->is_null()) {
-        it->get_to(v.limit.emplace());
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(pids, pids_schema, "pids", field<&pids::limit>("limit").ignore_null())
 
 } // namespace linyaps_box::config

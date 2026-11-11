@@ -700,12 +700,11 @@ auto do_propagation_mount(const utils::file_descriptor &destination, unsigned lo
                                 { os::sys::open_flag::cloexec, os::sys::access_mode::path }));
 
                     // mask /sys/fs/cgroup to prevent host cgroup leakage unless explicitly mounted
+                    const auto &mounts = container.get_config().mounts;
                     const auto has_cgroup_mount =
-                      std::any_of(container.get_config().mounts.cbegin(),
-                                  container.get_config().mounts.cend(),
-                                  [](const auto &m) {
-                                      return m.destination == "/sys/fs/cgroup";
-                                  });
+                      mounts && std::any_of(mounts->cbegin(), mounts->cend(), [](const auto &m) {
+                          return m.destination == "/sys/fs/cgroup";
+                      });
 
                     if (!has_cgroup_mount) {
                         LINYAPS_BOX_LOG_DEBUG("mask /sys/fs/cgroup");
@@ -823,7 +822,8 @@ public:
         : container(container)
         , root(std::move(rootfd))
     {
-        remounts.reserve(this->container.get().get_config().mounts.size());
+        const auto &mounts = this->container.get().get_config().mounts;
+        remounts.reserve(mounts ? mounts->size() : 0);
     }
 
     void configure_rootfs()
@@ -904,7 +904,12 @@ public:
 
     void do_mounts()
     {
-        for (const auto &mount : container.get().get_config().mounts) {
+        const auto &mounts = container.get().get_config().mounts;
+        if (!mounts) {
+            return;
+        }
+
+        for (const auto &mount : *mounts) {
             this->mount_one(mount);
         }
     }
@@ -2298,28 +2303,29 @@ container::container(status_directory status_dir, const create_container_options
 
     LINYAPS_BOX_LOG_DEBUG("load oci_config from {}", config_path);
     this->config = oci_config::load(config_path);
-    auto &mount = this->config.mounts;
-    std::for_each(mount.begin(), mount.end(), [this](linyaps_box::config::mount &mount) {
-        if (mount.destination.is_relative()) {
-            throw std::runtime_error("destination of mount point is relative");
-        }
+    if (auto &mounts = this->config.mounts; mounts) {
+        std::for_each(mounts->begin(), mounts->end(), [this](linyaps_box::config::mount &mount) {
+            if (mount.destination.is_relative()) {
+                throw std::runtime_error("destination of mount point is relative");
+            }
 
-        if ((to_os_vfs_flags(mount.vfs_flags) & MS_BIND) == 0) {
-            return;
-        }
+            if ((to_os_vfs_flags(mount.vfs_flags) & MS_BIND) == 0) {
+                return;
+            }
 
-        if (!mount.source) {
-            throw std::runtime_error("bind mount must has a source");
-        }
+            if (!mount.source) {
+                throw std::runtime_error("bind mount must has a source");
+            }
 
-        const auto file = std::filesystem::path(mount.source.value());
-        if (file.is_absolute()) {
-            return;
-        }
+            const auto file = std::filesystem::path(mount.source.value());
+            if (file.is_absolute()) {
+                return;
+            }
 
-        const auto abs_src = std::filesystem::canonical(bundle / file);
-        mount.source = abs_src.string();
-    });
+            const auto abs_src = std::filesystem::canonical(bundle / file);
+            mount.source = abs_src.string();
+        });
+    }
 
     host_uid_ = ::geteuid();
     host_gid_ = ::getegid();

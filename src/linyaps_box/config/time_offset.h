@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -17,8 +17,7 @@ struct time_offset
     std::optional<uint32_t> nanosecs;
 };
 
-void from_json(const utils::strict_json &j, time_offset &v);
-
 void validate(const time_offset &v);
 
+auto ops_of(json::object_tag<time_offset>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

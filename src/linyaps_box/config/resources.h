@@ -12,7 +12,7 @@
 #include "linyaps_box/config/network.h"
 #include "linyaps_box/config/pids.h"
 #include "linyaps_box/config/rdma.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <optional>
 #include <string>
@@ -34,8 +34,7 @@ struct resources
     std::optional<std::unordered_map<std::string, std::string>> unified;
 };
 
-void from_json(const utils::strict_json &j, resources &v);
-
 void validate(const resources &v);
 
+auto ops_of(json::object_tag<resources>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

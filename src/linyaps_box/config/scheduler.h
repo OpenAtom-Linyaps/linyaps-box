@@ -4,8 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -14,16 +14,16 @@ namespace linyaps_box::config {
 
 enum class scheduler_flag : std::uint8_t {
     none = 0U,
-    reset_on_fork = (1U << 0),
-    reclaim = (1U << 1),
-    dl_overrun = (1U << 2),
-    keep_policy = (1U << 3),
-    keep_params = (1U << 4),
-    util_clamp_min = (1U << 5),
-    util_clamp_max = (1U << 6),
+    reset_on_fork = (1U << 0U),
+    reclaim = (1U << 1U),
+    dl_overrun = (1U << 2U),
+    keep_policy = (1U << 3U),
+    keep_params = (1U << 4U),
+    util_clamp_min = (1U << 5U),
+    util_clamp_max = (1U << 6U),
 };
 
-LINYAPS_ENABLE_BITMASK_ENUM(scheduler_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(scheduler_flag)
 
 LINYAPS_REGISTER_ENUM_TABLE(scheduler_flag,
                             7,
@@ -44,7 +44,7 @@ struct scheduler
     std::optional<uint64_t> period;
     std::optional<int32_t> nice;
     std::optional<int32_t> priority;
-    utils::bitflags<scheduler_flag> flags;
+    std::optional<utils::bitflags<scheduler_flag>> flags;
     policy policy_;
 };
 
@@ -58,8 +58,7 @@ LINYAPS_REGISTER_ENUM_TABLE(scheduler::policy,
                             { scheduler::policy::idle, "SCHED_IDLE" },
                             { scheduler::policy::deadline, "SCHED_DEADLINE" })
 
-void from_json(const utils::strict_json &j, scheduler &v);
-
 void validate(const scheduler &v);
 
+auto ops_of(json::object_tag<scheduler>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

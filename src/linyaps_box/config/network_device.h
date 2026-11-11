@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <optional>
 #include <string>
@@ -16,6 +16,5 @@ struct network_device
     std::optional<std::string> name;
 };
 
-void from_json(const utils::strict_json &j, network_device &v);
-
+auto ops_of(json::object_tag<network_device>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

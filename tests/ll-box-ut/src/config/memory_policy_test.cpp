@@ -59,7 +59,8 @@ TEST(MemoryPolicyParse, HappyPath)
     EXPECT_EQ(config.linux_->memory_policy_->mode_, memory_policy::mode::bind);
     ASSERT_TRUE(config.linux_->memory_policy_->nodes.has_value());
     EXPECT_EQ(*config.linux_->memory_policy_->nodes, "0,2");
-    EXPECT_TRUE(config.linux_->memory_policy_->flags.contains(memory_policy_flag::static_nodes));
+    ASSERT_TRUE(config.linux_->memory_policy_->flags.has_value());
+    EXPECT_TRUE(config.linux_->memory_policy_->flags->contains(memory_policy_flag::static_nodes));
 }
 
 TEST(MemoryPolicyParse, NullPolicyAccepted)

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -17,8 +17,7 @@ struct rdma
     std::optional<uint32_t> hca_objects;
 };
 
-void from_json(const utils::strict_json &j, rdma &v);
-
 void validate(const rdma &v);
 
+auto ops_of(json::object_tag<rdma>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

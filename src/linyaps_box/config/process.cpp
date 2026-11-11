@@ -4,12 +4,12 @@
 
 #include "linyaps_box/config/process.h"
 
-#include "linyaps_box/config/utils.h"
+#include "linyaps_box/config/validation.h"
 #include "linyaps_box/io/stream.h"
+#include "linyaps_box/json/parser.h"
 #include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/enum_formatter.h" // IWYU pragma: keep
 #include "linyaps_box/utils/environ.h"
-#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
@@ -22,156 +22,101 @@
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, process &v)
-{
-    utils::require_object(j);
-    bool have_cwd{ false };
-    bool have_args{ false };
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "terminal")) {
-            if (!val.is_null()) {
-                val.get_to(v.terminal.emplace());
-            }
-        } else if (key_matches(k, "consoleSize")) {
-            if (!val.is_null()) {
-                val.get_to(v.console_size_.emplace());
-            }
-        } else if (key_matches(k, "cwd")) {
-            val.get_to(v.cwd);
-            have_cwd = true;
-        } else if (key_matches(k, "env")) {
-            if (!val.is_null()) {
-                val.get_to(v.env.emplace());
-            }
-        } else if (key_matches(k, "args")) {
-            val.get_to(v.args);
-            have_args = true;
-        } else if (key_matches(k, "rlimits")) {
-            if (!val.is_null()) {
-                val.get_to(v.rlimits.emplace());
-            }
-        } else if (key_matches(k, "apparmorProfile")) {
-            if (!val.is_null()) {
-                val.get_to(v.apparmor_profile.emplace());
-            }
-        } else if (key_matches(k, "capabilities")) {
-            if (!val.is_null()) {
-                val.get_to(v.capabilities_.emplace());
-            }
-        } else if (key_matches(k, "noNewPrivileges")) {
-            if (!val.is_null()) {
-                val.get_to(v.no_new_privileges.emplace());
-            }
-        } else if (key_matches(k, "oomScoreAdj")) {
-            if (!val.is_null()) {
-                val.get_to(v.oom_score_adj.emplace());
-            }
-        } else if (key_matches(k, "scheduler")) {
-            if (!val.is_null()) {
-                val.get_to(v.scheduler_.emplace());
-            }
-        } else if (key_matches(k, "selinuxLabel")) {
-            if (!val.is_null()) {
-                val.get_to(v.selinux_label.emplace());
-            }
-        } else if (key_matches(k, "ioPriority")) {
-            if (!val.is_null()) {
-                val.get_to(v.io_priority_.emplace());
-            }
-        } else if (key_matches(k, "execCPUAffinity")) {
-            if (!val.is_null()) {
-                val.get_to(v.exec_cpu_affinity_.emplace());
-            }
-        } else if (key_matches(k, "user")) {
-            if (!val.is_null()) {
-                val.get_to(v.user_);
-            } else {
-                v.user_ = { };
-            }
-        }
-    }
+namespace {
 
+void process_post_parse(process &v)
+{
     // consoleSize only meaningful with terminal enabled
     if (!v.terminal.value_or(false)) {
         v.console_size_.reset();
     }
+}
 
-    if (UNLIKELY(!have_cwd)) {
-        throw std::runtime_error("process.cwd is required");
+void validate_environment(const process &v)
+{
+    if (!v.env) {
+        return;
     }
 
-    if (UNLIKELY(!have_args)) {
-        throw std::runtime_error("process.args is required");
+    const auto invalid = std::find_if(v.env->cbegin(), v.env->cend(), utils::is_invalid_env);
+    if (UNLIKELY(invalid != v.env->cend())) {
+        throw std::runtime_error(fmt::format("process.env contains a invalid env: {}", *invalid));
     }
 }
 
-void validate(const process &v)
+void validate_rlimits(const process &v)
 {
-    // Capability names are deliberately not validated here. Unlike the
-    // closed value sets (seccomp actions, namespace types, ...), the OCI
-    // runtime spec (config.md, "capabilities") mandates that a value which
-    // cannot be mapped to a relevant kernel interface MUST be logged as a
-    // warning and the runtime SHOULD NOT fail the container because of it.
-    // security/privilege.cpp::parse_names implements exactly that behavior,
-    // so unknown names are surfaced at runtime as warnings, not here.
+    if (!v.rlimits) {
+        return;
+    }
+
+    std::bitset<16> seen;
+    for (const auto &rl : *v.rlimits) {
+        const auto type_val = static_cast<std::size_t>(rl.type_);
+        require(type_val < seen.size(), "invalid rlimit type value out of range");
+        require(!seen.test(type_val), "duplicate rlimit type: {}", rl.type_);
+        seen.set(type_val);
+    }
+}
+
+// A build capability, not a model invariant: capabilities need the compile-time
+// switch.  Kept as its own step so validate() stays a plain composition.
+void require_capabilities_build(const process &v)
+{
     if (v.capabilities_) {
 #ifndef LINYAPS_BOX_ENABLE_CAP
         throw std::runtime_error("capabilities support is not compiled in");
 #endif
     }
+}
+
+} // namespace
+
+LINYAPS_BOX_CONFIG_SCHEMA_WITH_POST(
+  process,
+  process_schema,
+  "process",
+  process_post_parse,
+  field<&process::terminal>("terminal").ignore_null(),
+  field<&process::console_size_>("consoleSize").ignore_null(),
+  field<&process::cwd>("cwd").required(),
+  field<&process::env>("env").ignore_null(),
+  field<&process::args>("args").required(),
+  field<&process::rlimits>("rlimits").ignore_null(),
+  field<&process::apparmor_profile>("apparmorProfile").ignore_null(),
+  field<&process::capabilities_>("capabilities").ignore_null(),
+  field<&process::no_new_privileges>("noNewPrivileges").ignore_null(),
+  field<&process::oom_score_adj>("oomScoreAdj").ignore_null(),
+  field<&process::scheduler_>("scheduler").ignore_null(),
+  field<&process::selinux_label>("selinuxLabel").ignore_null(),
+  field<&process::io_priority_>("ioPriority").ignore_null(),
+  field<&process::exec_cpu_affinity_>("execCPUAffinity").ignore_null(),
+  field<&process::user_>("user").ignore_null())
+
+void validate(const process &v)
+{
+    // Unknown capability names are not rejected here: the OCI spec requires them
+    // to be warned about at runtime instead.
+    require_capabilities_build(v);
 
     validate(v.user_);
 
-    if (UNLIKELY(!v.cwd.is_absolute())) {
-        throw std::runtime_error(
-          fmt::format("process.cwd must be an absolute path, got: {}", v.cwd));
-    }
+    require(v.cwd.is_absolute(), "process.cwd must be an absolute path, got: {}", v.cwd);
 
-    if (v.env) {
-        auto invalid = std::find_if(v.env->cbegin(), v.env->cend(), utils::is_invalid_env);
-        if (UNLIKELY(invalid != v.env->cend())) {
-            throw std::runtime_error(
-              fmt::format("process.env contains a invalid env: {}", *invalid));
-        }
-    }
+    validate_environment(v);
 
-    if (UNLIKELY(v.args.empty())) {
-        throw std::runtime_error("process.args must not be empty");
-    }
+    require(!v.args.empty(), "process.args must not be empty");
 
-    if (v.rlimits) {
-        std::bitset<16> seen;
-        for (const auto &rl : *v.rlimits) {
-            auto type_val = static_cast<size_t>(rl.type_);
-            if (UNLIKELY(type_val >= seen.size())) {
-                throw std::runtime_error("invalid rlimit type value out of range");
-            }
+    validate_rlimits(v);
 
-            if (UNLIKELY(seen.test(type_val))) {
-                throw std::runtime_error(fmt::format("duplicate rlimit type: {}", rl.type_));
-            }
-
-            seen.set(type_val);
-        }
-    }
-
-    if (v.scheduler_) {
-        validate(*v.scheduler_);
-    }
-
-    if (v.io_priority_) {
-        validate(*v.io_priority_);
-    }
-
-    if (v.exec_cpu_affinity_) {
-        validate(*v.exec_cpu_affinity_);
-    }
+    validate_if_present(v.scheduler_);
+    validate_if_present(v.io_priority_);
+    validate_if_present(v.exec_cpu_affinity_);
 }
 
 auto process::parse(std::string_view content) -> process
 {
-    auto process_config = utils::strict_parse(content).get<process>();
+    auto process_config = json::parse_as<process>(content);
     validate(process_config);
     return process_config;
 }

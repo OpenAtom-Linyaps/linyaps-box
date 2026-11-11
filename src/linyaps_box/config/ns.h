@@ -4,14 +4,14 @@
 
 #pragma once
 
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/utils/span.h"
 
 #include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string_view>
-#include <vector>
 
 namespace linyaps_box::config {
 
@@ -43,8 +43,8 @@ LINYAPS_REGISTER_ENUM_TABLE(ns::type,
                             { ns::type::cgroup, "cgroup" },
                             { ns::type::time, "time" })
 
-void from_json(const utils::strict_json &j, ns &v);
+void validate(const ns &v);
+void validate(utils::span<const ns> v);
 
-void validate(const std::vector<ns> &v);
-
+auto ops_of(json::object_tag<ns>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

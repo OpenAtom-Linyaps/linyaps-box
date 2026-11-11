@@ -4,8 +4,7 @@
 
 #include "linyaps_box/config/device_rule.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/json/parser.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/format.h>
@@ -14,57 +13,35 @@
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, device_rule &v)
+namespace {
+
+auto read_access(const json::detail::value_view &val) -> utils::bitflags<device_rule_access_flag>
 {
-    utils::require_object(j);
-    bool have_allow{ false };
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "allow")) {
-            val.get_to(v.allow);
-            have_allow = true;
-        } else if (key_matches(k, "type")) {
-            if (!val.is_null()) {
-                auto type_name = val.get<std::string_view>();
-                auto type_opt = utils::enum_table_v<device_rule::type>.from_name(type_name);
-                if (UNLIKELY(!type_opt)) {
-                    throw std::runtime_error(
-                      fmt::format("device_rule.type must be one of a/c/b: {}", type_name));
-                }
-
-                v.type_.emplace(*type_opt);
-            }
-        } else if (key_matches(k, "major")) {
-            if (!val.is_null()) {
-                val.get_to(v.major.emplace());
-            }
-        } else if (key_matches(k, "minor")) {
-            if (!val.is_null()) {
-                val.get_to(v.minor.emplace());
-            }
-        } else if (key_matches(k, "access")) {
-            if (!val.is_null()) {
-                auto access_str = val.get<std::string_view>();
-                utils::bitflags<device_rule_access_flag> access_flags;
-                for (const auto c : access_str) {
-                    auto flag_opt = utils::enum_table_v<device_rule_access_flag>.from_name(
-                      std::string_view(&c, 1));
-                    if (UNLIKELY(!flag_opt)) {
-                        throw std::runtime_error(
-                          fmt::format("device_rule.access must be a composition of r/w/m: {}", c));
-                    }
-
-                    access_flags |= *flag_opt;
-                }
-
-                v.access = access_flags;
-            }
+    const auto access_str = val.as_string_view();
+    utils::bitflags<device_rule_access_flag> access_flags;
+    for (const auto c : access_str) {
+        auto flag_opt =
+          utils::enum_table_v<device_rule_access_flag>.from_name(std::string_view(&c, 1));
+        if (UNLIKELY(!flag_opt)) {
+            throw json::decode_error{
+                fmt::format("device_rule.access must be a composition of r/w/m: {}", c)
+            };
         }
+
+        access_flags |= *flag_opt;
     }
 
-    if (UNLIKELY(!have_allow)) {
-        throw std::runtime_error("device_rule.allow is required");
-    }
+    return access_flags;
 }
 
+} // namespace
+
+LINYAPS_BOX_CONFIG_SCHEMA(device_rule,
+                          device_rule_schema,
+                          "device_rule",
+                          field<&device_rule::allow>("allow").required(),
+                          field<&device_rule::type_>("type").ignore_null(),
+                          field<&device_rule::major>("major").ignore_null(),
+                          field<&device_rule::minor>("minor").ignore_null(),
+                          field<&device_rule::access, &read_access>("access").ignore_null())
 } // namespace linyaps_box::config

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <filesystem>
 
@@ -13,11 +13,12 @@ namespace linyaps_box::config {
 struct root
 {
     std::filesystem::path path;
+
+    // Missing or null readonly preserves this OCI default.
     bool readonly{ false };
 };
 
-void from_json(const utils::strict_json &j, root &v);
-
 void validate(const root &v);
 
+auto ops_of(json::object_tag<root>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

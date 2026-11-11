@@ -4,13 +4,12 @@
 
 #include "linyaps_box/config/exec_cpu_affinity.h"
 
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::config {
@@ -26,33 +25,21 @@ namespace {
 
 } // namespace
 
+LINYAPS_BOX_CONFIG_SCHEMA(exec_cpu_affinity,
+                          exec_cpu_affinity_schema,
+                          "exec_cpu_affinity",
+                          field<&exec_cpu_affinity::initial>("initial").ignore_null(),
+                          field<&exec_cpu_affinity::final>("final").ignore_null())
+
 void validate(const exec_cpu_affinity &v)
 {
-    if (v.initial) {
-        const std::string_view val = v.initial.value();
-        if (UNLIKELY(!is_valid_cpu_affinity(val))) {
-            throw std::runtime_error(fmt::format("process.execCPUAffinity is invalid: {}", val));
-        }
-    }
+    require(!v.initial || is_valid_cpu_affinity(*v.initial), [&] {
+        return fmt::format("process.execCPUAffinity is invalid: {}", *v.initial);
+    });
 
-    if (v.final) {
-        const std::string_view val = v.final.value();
-        if (UNLIKELY(!is_valid_cpu_affinity(val))) {
-            throw std::runtime_error(fmt::format("process.execCPUAffinity is invalid: {}", val));
-        }
-    }
-}
-
-void from_json(const utils::strict_json &j, exec_cpu_affinity &v)
-{
-    utils::require_object(j);
-    if (auto it = j.find("initial"); it != j.end() && !it->is_null()) {
-        it->get_to(v.initial.emplace());
-    }
-
-    if (auto it = j.find("final"); it != j.end() && !it->is_null()) {
-        it->get_to(v.final.emplace());
-    }
+    require(!v.final || is_valid_cpu_affinity(*v.final), [&] {
+        return fmt::format("process.execCPUAffinity is invalid: {}", *v.final);
+    });
 }
 
 } // namespace linyaps_box::config

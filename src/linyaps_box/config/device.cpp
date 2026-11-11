@@ -4,77 +4,29 @@
 
 #include "linyaps_box/config/device.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 
 #include <fmt/std.h>
 
-#include <stdexcept>
-#include <string_view>
-
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, device &v)
-{
-    utils::require_object(j);
-    bool have_type{ false };
-    bool have_path{ false };
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "type")) {
-            auto type_str = val.get<std::string_view>();
-            auto type_opt = utils::enum_table_v<device::type>.from_name(type_str);
-            if (UNLIKELY(!type_opt)) {
-                throw std::runtime_error(
-                  fmt::format("device.type must be one of c/b/u/p: {}", type_str));
-            }
-
-            v.type_ = *type_opt;
-            have_type = true;
-        } else if (key_matches(k, "path")) {
-            val.get_to(v.path);
-            have_path = true;
-        } else if (key_matches(k, "fileMode")) {
-            if (!val.is_null()) {
-                val.get_to(v.mode.emplace());
-            }
-        } else if (key_matches(k, "major")) {
-            if (!val.is_null()) {
-                val.get_to(v.major.emplace());
-            }
-        } else if (key_matches(k, "minor")) {
-            if (!val.is_null()) {
-                val.get_to(v.minor.emplace());
-            }
-        } else if (key_matches(k, "uid")) {
-            if (!val.is_null()) {
-                val.get_to(v.uid.emplace());
-            }
-        } else if (key_matches(k, "gid")) {
-            if (!val.is_null()) {
-                val.get_to(v.gid.emplace());
-            }
-        }
-    }
-
-    if (UNLIKELY(!have_type)) {
-        throw std::runtime_error("device.type is required");
-    }
-    if (UNLIKELY(!have_path)) {
-        throw std::runtime_error("device.path is required");
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(device,
+                          device_schema,
+                          "device",
+                          field<&device::type_>("type").required(),
+                          field<&device::path>("path").required(),
+                          field<&device::mode>("fileMode").ignore_null(),
+                          field<&device::major>("major").ignore_null(),
+                          field<&device::minor>("minor").ignore_null(),
+                          field<&device::uid>("uid").ignore_null(),
+                          field<&device::gid>("gid").ignore_null())
 
 void validate(const device &v)
 {
-    if (UNLIKELY(!v.path.is_absolute())) {
-        throw std::runtime_error(fmt::format("device.path must be an absolute path: {}", v.path));
-    }
-
-    if (UNLIKELY(v.type_ != device::type::fifo && (!v.major || !v.minor))) {
-        throw std::runtime_error("device.major and device.minor are required unless type is p");
-    }
+    require(v.path.is_absolute(), "device.path must be an absolute path: {}", v.path);
+    require(v.type_ == device::type::fifo || (v.major && v.minor),
+            "device.major and device.minor are required unless type is p");
 }
 
 } // namespace linyaps_box::config

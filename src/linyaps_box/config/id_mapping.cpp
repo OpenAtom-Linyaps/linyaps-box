@@ -4,16 +4,15 @@
 
 #include "linyaps_box/config/id_mapping.h"
 
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/json/parser.h"
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, id_mapping &v)
-{
-    utils::require_object(j);
-    j.at("hostID").get_to(v.host_id);
-    j.at("containerID").get_to(v.container_id);
-    j.at("size").get_to(v.size);
-}
+LINYAPS_BOX_CONFIG_SCHEMA(id_mapping,
+                          id_mapping_schema,
+                          "id_mapping",
+                          field<&id_mapping::host_id>("hostID").required(),
+                          field<&id_mapping::container_id>("containerID").required(),
+                          field<&id_mapping::size>("size").required())
 
 } // namespace linyaps_box::config

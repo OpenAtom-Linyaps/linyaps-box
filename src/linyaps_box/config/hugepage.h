@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <cstdint>
 #include <string>
@@ -17,8 +17,7 @@ struct hugepage_limit
     uint64_t limit;
 };
 
-void from_json(const utils::strict_json &j, hugepage_limit &v);
-
 void validate(const hugepage_limit &v);
 
+auto ops_of(json::object_tag<hugepage_limit>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

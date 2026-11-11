@@ -4,34 +4,22 @@
 
 #include "linyaps_box/config/io_priority.h"
 
-#include "linyaps_box/utils/strict_json.h"
-
-#include <fmt/format.h>
-
-#include <stdexcept>
-#include <string_view>
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, io_priority &v)
-{
-    utils::require_object(j);
-    auto name = j.at("class").get<std::string_view>();
-    const auto opt = utils::enum_table_v<io_priority::class_t>.from_name(name);
-    if (UNLIKELY(!opt)) {
-        throw std::runtime_error(fmt::format("unknown I/O priority class: {}", name));
-    }
-
-    v.class_ = *opt;
-    v.priority = j.value("priority", 0);
-}
+LINYAPS_BOX_CONFIG_SCHEMA(io_priority,
+                          io_priority_schema,
+                          "io_priority",
+                          field<&io_priority::class_>("class").required(),
+                          field<&io_priority::priority>("priority"))
 
 void validate(const io_priority &v)
 {
-    if (UNLIKELY(v.priority < 0 || v.priority > 7)) {
-        throw std::runtime_error(
-          fmt::format("io priority must be in range [0, 7], got: {}", v.priority));
-    }
+    require(v.priority >= 0 && v.priority <= 7,
+            "io priority must be in range [0, 7], got: {}",
+            v.priority);
 }
 
 } // namespace linyaps_box::config

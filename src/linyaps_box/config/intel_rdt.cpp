@@ -4,45 +4,23 @@
 
 #include "linyaps_box/config/intel_rdt.h"
 
-#include "linyaps_box/config/utils.h"
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
-
-#include <fmt/format.h>
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
+#include "linyaps_box/log/macro.h"
 
 #include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, intel_rdt &v)
-{
-    utils::require_object(j);
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "closID")) {
-            if (!val.is_null()) {
-                val.get_to(v.clos_id.emplace());
-            }
-        } else if (key_matches(k, "l3CacheSchema")) {
-            if (!val.is_null()) {
-                val.get_to(v.l3_cache_schema.emplace());
-            }
-        } else if (key_matches(k, "memBwSchema")) {
-            if (!val.is_null()) {
-                val.get_to(v.memory_bandwidth_schema.emplace());
-            }
-        } else if (key_matches(k, "schemata")) {
-            if (!val.is_null()) {
-                val.get_to(v.schemata.emplace());
-            }
-        } else if (key_matches(k, "enableMonitoring")) {
-            if (!val.is_null()) {
-                val.get_to(v.enable_monitoring.emplace());
-            }
-        }
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(intel_rdt,
+                          intel_rdt_schema,
+                          "intel_rdt",
+                          field<&intel_rdt::clos_id>("closID").ignore_null(),
+                          field<&intel_rdt::l3_cache_schema>("l3CacheSchema").ignore_null(),
+                          field<&intel_rdt::memory_bandwidth_schema>("memBwSchema").ignore_null(),
+                          field<&intel_rdt::schemata>("schemata").ignore_null(),
+                          field<&intel_rdt::enable_monitoring>("enableMonitoring").ignore_null())
 
 void validate(const intel_rdt &v)
 {

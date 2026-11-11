@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -24,8 +24,7 @@ struct memory
     std::optional<bool> check_before_update;
 };
 
-void from_json(const utils::strict_json &j, memory &v);
-
 void validate(const memory &v);
 
+auto ops_of(json::object_tag<memory>) -> const json::frame_ops &;
 } // namespace linyaps_box::config
