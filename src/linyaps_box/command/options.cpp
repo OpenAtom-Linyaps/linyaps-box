@@ -7,6 +7,7 @@
 #include "linyaps_box/config/oci_config.h"
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/environ.h"
+#include "linyaps_box/utils/utils.h"
 #include "linyaps_box/version.h"
 
 #include <CLI/CLI.hpp>

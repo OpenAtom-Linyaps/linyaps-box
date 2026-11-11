@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "linyaps_box/utils/utils.h"
-
 #include <array>
 #include <cstddef>
 #include <optional>
@@ -92,11 +90,13 @@ constexpr auto check_is_bitmask_enum() noexcept
 } // namespace detail
 
 template <typename E>
-constexpr bool is_bitmask_enum_v = detail::check_is_bitmask_enum<E>();
+inline constexpr bool is_bitmask_enum_v = std::is_enum_v<E> && detail::check_is_bitmask_enum<E>();
 
 template <typename E>
 struct enum_entry
 {
+    static_assert(std::is_enum_v<E>, "enum_entry requires an enum type");
+
     // GCC 8's constexpr evaluator requires the defaulted default constructor
     // to initialize every member; without `= {}` the implicit default ctor
     // leaves `value` uninitialized and is not usable in constant expressions.
@@ -114,7 +114,7 @@ class enum_table;
 
 template <typename E, std::size_t N>
 constexpr auto make_enum_table(std::string_view type_name,
-                               const enum_entry<E> (&entries)[N]) noexcept // NOLINT
+                               const std::array<enum_entry<E>, N> &entries) noexcept
   -> enum_table<E, N>;
 
 template <typename E, std::size_t N>
@@ -123,6 +123,8 @@ constexpr auto verify_enum_table(const enum_table<E, N> &table) noexcept -> bool
 template <typename E, std::size_t N>
 class enum_table
 {
+    static_assert(std::is_enum_v<E>, "enum_table requires an enum type");
+
 public:
     constexpr enum_table(std::string_view name, std::array<enum_entry<E>, N> arr) noexcept
         : type_name_(name)
@@ -167,17 +169,37 @@ private:
     std::array<enum_entry<E>, N> entries_;
 };
 
+namespace detail {
+
+template <typename E, typename Table>
+struct is_enum_table_for : std::false_type
+{
+};
+
+template <typename E, std::size_t N>
+struct is_enum_table_for<E, enum_table<E, N>> : std::is_enum<E>
+{
+};
+
+} // namespace detail
+
 template <typename E, typename = void>
-constexpr bool has_enum_table_v = false;
+inline constexpr bool has_enum_table_v = false;
 
 template <typename E>
-constexpr bool
-  has_enum_table_v<E, std::void_t<decltype(get_enum_table(static_cast<E *>(nullptr)))>> = true;
+inline constexpr bool
+  has_enum_table_v<E, std::void_t<decltype(get_enum_table(static_cast<E *>(nullptr)))>> = [] {
+      static_assert(detail::is_enum_table_for<
+                      std::remove_cv_t<E>,
+                      std::decay_t<decltype(get_enum_table(static_cast<E *>(nullptr)))>>::value,
+                    "get_enum_table must return an enum_table for the requested enum or bitflags");
+      return true;
+  }();
 
 // The registered table for an enum, exposed as a namespace-scope variable
-// template so that it has static storage: every specialization is an
-// implicitly inline (COMDAT), constant-initialized object with no runtime
-// guard. Callers read it by reference, so the table is never copied.
+// template so that it has static storage. Explicit inline gives each
+// specialization one shared, constant-initialized object across translation
+// units, with no runtime guard. Callers read it by reference.
 //
 // Why a variable template instead of a constexpr accessor?
 //   A `static` local variable inside a `constexpr` function is a C++23
@@ -198,7 +220,11 @@ constexpr bool
 // `get_enum_table` accessor that returns a reference to a `static constexpr`
 // local.
 template <typename E>
-constexpr auto enum_table_v = get_enum_table(static_cast<E *>(nullptr));
+inline constexpr auto enum_table_v = [] {
+    static_assert(has_enum_table_v<E>,
+                  "get_enum_table must return an enum_table for the requested enum or bitflags");
+    return get_enum_table(static_cast<E *>(nullptr));
+}();
 
 namespace detail {
 
@@ -209,10 +235,13 @@ constexpr auto known_mask() noexcept -> enum_underlying_t<E>
     using U = enum_underlying_t<E>;
 
     if constexpr (has_enum_table_v<E>) {
-        U mask{ 0 };
-        for (const auto &entry : enum_table_v<E>.entries()) {
-            mask |= static_cast<U>(entry.value);
-        }
+        constexpr U mask = [] {
+            U result{ 0 };
+            for (const auto &entry : enum_table_v<E>.entries()) {
+                result |= static_cast<U>(entry.value);
+            }
+            return result;
+        }();
 
         return mask;
     } else {
@@ -227,24 +256,28 @@ constexpr auto known_mask() noexcept -> enum_underlying_t<E>
 } // namespace detail
 
 template <typename E, std::size_t N>
-constexpr auto make_enum_table(
-  std::string_view type_name,
-  const enum_entry<E> (&entries)[N]) noexcept // NOLINT(cppcoreguidelines-avoid-c-arrays)
+constexpr auto make_enum_table(std::string_view type_name,
+                               const std::array<enum_entry<E>, N> &entries) noexcept
   -> enum_table<E, N>
 {
-    auto arr = utils::to_array(entries);
+    auto arr = entries;
 
     // generate an ordered table at compile time
     if constexpr (is_bitmask_enum_v<E>) {
-        using U = std::make_unsigned_t<detail::enum_underlying_t<E>>;
+        using underlying = detail::enum_underlying_t<E>;
+        static_assert(!std::is_same_v<underlying, bool>,
+                      "bitmask enums require a non-bool underlying type");
+        if constexpr (!std::is_same_v<underlying, bool>) {
+            using U = std::make_unsigned_t<underlying>;
 
-        detail::shell_sort(arr, [](const enum_entry<E> &a, const enum_entry<E> &b) {
-            const auto a_u = static_cast<U>(a.value);
-            const auto b_u = static_cast<U>(b.value);
-            const auto a_pop = detail::popcount(a_u);
-            const auto b_pop = detail::popcount(b_u);
-            return a_pop > b_pop || (a_pop == b_pop && a_u < b_u);
-        });
+            detail::shell_sort(arr, [](const enum_entry<E> &a, const enum_entry<E> &b) {
+                const auto a_u = static_cast<U>(a.value);
+                const auto b_u = static_cast<U>(b.value);
+                const auto a_pop = detail::popcount(a_u);
+                const auto b_pop = detail::popcount(b_u);
+                return a_pop > b_pop || (a_pop == b_pop && a_u < b_u);
+            });
+        }
     }
 
     return enum_table<E, N>(type_name, std::move(arr));
@@ -292,6 +325,8 @@ public:
 
     static_assert(!std::is_signed_v<underlying_type>,
                   "bitflags<E> requires an unsigned underlying type");
+    static_assert(!std::is_same_v<underlying_type, bool>,
+                  "bitflags<E> requires a non-bool underlying type");
 
     constexpr bitflags() noexcept = default;
 
@@ -401,8 +436,7 @@ public:
 
     [[nodiscard]] friend constexpr auto operator~(bitflags rhs) noexcept -> bitflags
     {
-        auto val = static_cast<underlying_type>(~rhs.bits_)
-          & static_cast<underlying_type>(detail::known_mask<E>());
+        const auto val = static_cast<underlying_type>(~rhs.bits_ & detail::known_mask<E>());
         return bitflags{ val };
     }
 
@@ -424,6 +458,15 @@ private:
 
     underlying_type bits_{ 0 };
 };
+
+namespace detail {
+
+template <typename E, std::size_t N>
+struct is_enum_table_for<bitflags<E>, enum_table<std::remove_cv_t<E>, N>> : std::true_type
+{
+};
+
+} // namespace detail
 
 // NOTE: DO NOT use this function directly!
 // use enum_table_v instead.
@@ -481,6 +524,7 @@ constexpr E &operator^=(E &lhs, E rhs) noexcept
 }
 
 #define LINYAPS_ENABLE_BITMASK_ENUM(E)                                                 \
+    static_assert(::std::is_enum_v<E>, "bitmask registration requires an enum type");  \
     [[maybe_unused]] constexpr ::std::true_type enable_bitmask_enum_tag(               \
       [[maybe_unused]] const E *ptr) noexcept /* NOLINT(bugprone-macro-parentheses) */ \
     {                                                                                  \
@@ -491,12 +535,16 @@ constexpr E &operator^=(E &lhs, E rhs) noexcept
     constexpr auto get_enum_table(/*NOLINT(bugprone-macro-parentheses)*/                          \
                                   [[maybe_unused]] const E *ptr) noexcept                         \
     {                                                                                             \
-        constexpr auto table = ::linyaps_box::utils::make_enum_table<E>(#E, { __VA_ARGS__ });     \
+        constexpr auto entry_count =                                                              \
+          ::std::initializer_list<::linyaps_box::utils::enum_entry<E>>{ __VA_ARGS__ }.size();     \
+        static_assert(entry_count == static_cast<::std::size_t>(COUNT),                           \
+                      "enum_table entry count mismatch for " #E ": expected " #COUNT " entries"); \
+        constexpr auto table = ::linyaps_box::utils::make_enum_table<E>(                          \
+          #E,                                                                                     \
+          ::std::array<::linyaps_box::utils::enum_entry<E>, entry_count>{ { __VA_ARGS__ } });     \
         constexpr auto valid = ::linyaps_box::utils::verify_enum_table(table);                    \
         static_assert(valid,                                                                      \
                       "enum_table validation failed for " #E                                      \
                       ": duplicate name or value detected!");                                     \
-        static_assert(table.entries().size() == static_cast<std::size_t>(COUNT),                  \
-                      "enum_table entry count mismatch for " #E ": expected " #COUNT " entries"); \
         return table;                                                                             \
     }

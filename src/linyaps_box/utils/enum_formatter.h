@@ -10,12 +10,11 @@
 
 #include <algorithm>
 
-// Out-of-line definitions of the fmt-dependent methods of enum_table.
-// Kept separate from enum_traits.h so that headers which only need the
-// bitmask / enum-table infrastructure (e.g. config.h) do not pull in
-// <fmt/format.h>.
+// The single {fmt} integration point for enums and enum entries.
 
-namespace linyaps_box::utils::detail {
+namespace linyaps_box::utils {
+
+namespace detail {
 
 struct enum_entry_view
 {
@@ -23,10 +22,6 @@ struct enum_entry_view
     uint64_t value;
 };
 
-// Constexpr packing of an enum table for flag formatting.  N is deduced from
-// the table's type (not from a local variable) so the std::array size is a
-// type-level constant — referencing a local constexpr's size() as a template
-// argument breaks constant evaluation in templates under Clang.
 template <typename E, std::size_t N>
 constexpr auto make_enum_data(const enum_table<E, N> &table)
 {
@@ -87,7 +82,7 @@ OutputIt format_flags_impl(OutputIt out,
         return std::copy(none_sv.cbegin(), none_sv.cend(), out);
     }
 
-    std::copy(type_name.cbegin(), type_name.cend(), out);
+    out = std::copy(type_name.cbegin(), type_name.cend(), out);
     *out++ = '(';
 
     bool first{ true };
@@ -120,7 +115,15 @@ OutputIt format_flags_impl(OutputIt out,
     return out;
 }
 
-} // namespace linyaps_box::utils::detail
+} // namespace detail
+
+template <typename E>
+constexpr auto format_as(const enum_entry<E> &entry) noexcept -> std::string_view
+{
+    return entry.name;
+}
+
+} // namespace linyaps_box::utils
 
 template <typename T>
 struct fmt::formatter<T, std::enable_if_t<linyaps_box::utils::has_enum_table_v<T>, char>>
@@ -157,11 +160,12 @@ struct fmt::formatter<T, std::enable_if_t<linyaps_box::utils::has_enum_table_v<T
         using Traits = linyaps_box::utils::detail::enum_or_bitflags_traits<T>;
         using E = typename Traits::enum_type;
         using U = typename Traits::underlying_type;
+        using raw_type = std::conditional_t<std::is_same_v<U, bool>, unsigned, U>;
 
-        const U raw_val = Traits::to_raw(value);
+        const auto raw_val = static_cast<raw_type>(Traits::to_raw(value));
 
         if (presentation == Presentation::Hex) {
-            using UnsignedU = std::make_unsigned_t<U>;
+            using UnsignedU = std::make_unsigned_t<raw_type>;
             return fmt::format_to(ctx.out(), "0x{:x}", static_cast<UnsignedU>(raw_val));
         }
 
