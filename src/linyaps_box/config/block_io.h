@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -38,14 +38,13 @@ struct block_io
     std::optional<std::vector<throttle_device>> throttle_write_iops_device;
 };
 
-void from_json(const utils::strict_json &j, block_io::weight_device &v);
-
 void validate(const block_io::weight_device &v);
-
-void from_json(const utils::strict_json &j, block_io::throttle_device &v);
-
-void from_json(const utils::strict_json &j, block_io &v);
 
 void validate(const block_io &v);
 
+auto ops_of(json::object_tag<block_io>) -> const json::frame_ops &;
+
+auto ops_of(json::object_tag<block_io::weight_device>) -> const json::frame_ops &;
+
+auto ops_of(json::object_tag<block_io::throttle_device>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

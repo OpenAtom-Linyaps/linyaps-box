@@ -5,8 +5,8 @@
 #pragma once
 
 #include "linyaps_box/config/id_mapping.h"
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -152,7 +152,7 @@ LINYAPS_REGISTER_ENUM_TABLE(mount::idmap_type,
                             { mount::idmap_type::idmap, "idmap" },
                             { mount::idmap_type::ridmap, "ridmap" })
 
-void from_json(const utils::strict_json &j, mount &v);
+auto ops_of(json::object_tag<mount>) -> const json::frame_ops &;
 
 void validate(const mount &v);
 

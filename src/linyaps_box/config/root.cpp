@@ -4,25 +4,20 @@
 
 #include "linyaps_box/config/root.h"
 
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
-
-#include <stdexcept>
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, root &v)
-{
-    utils::require_object(j);
-    j.at("path").get_to(v.path);
-    v.readonly = j.value("readonly", false);
-}
+LINYAPS_BOX_CONFIG_SCHEMA(root,
+                          root_schema,
+                          "root",
+                          field<&root::path>("path").required(),
+                          field<&root::readonly>("readonly"))
 
 void validate(const root &v)
 {
-    if (UNLIKELY(v.path.empty())) {
-        throw std::runtime_error("root.path must not be empty");
-    }
+    require(!v.path.empty(), "root.path must not be empty");
 }
 
 } // namespace linyaps_box::config

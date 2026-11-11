@@ -4,11 +4,10 @@
 
 #include "linyaps_box/config/oci_config.h"
 
-#include "linyaps_box/config/utils.h"
 #include "linyaps_box/io/stream.h"
+#include "linyaps_box/json/parser.h"
 #include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/semver.h"
-#include "linyaps_box/utils/strict_json.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
@@ -19,59 +18,38 @@
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, oci_config &v)
-{
-    utils::require_object(j);
-    bool have_oci_version{ false };
-    for (const auto &[key, val] : j.items()) {
-        const auto k = std::string_view{ key };
-        if (key_matches(k, "ociVersion")) {
-            auto semver = linyaps_box::utils::semver(val.get<std::string_view>());
-            if (UNLIKELY(
-                  !linyaps_box::utils::semver(oci_config::version).is_compatible_with(semver))) {
-                throw std::runtime_error("unsupported OCI version: " + semver.to_string());
-            }
+namespace {
 
-            have_oci_version = true;
-        } else if (key_matches(k, "process")) {
-            if (!val.is_null()) {
-                val.get_to(v.process_.emplace());
-            }
-        } else if (key_matches(k, "hostname")) {
-            if (!val.is_null()) {
-                val.get_to(v.hostname.emplace());
-            }
-        } else if (key_matches(k, "domainname")) {
-            if (!val.is_null()) {
-                val.get_to(v.domainname.emplace());
-            }
-        } else if (key_matches(k, "linux")) {
-            if (!val.is_null()) {
-                val.get_to(v.linux_.emplace());
-            }
-        } else if (key_matches(k, "hooks")) {
-            if (!val.is_null()) {
-                val.get_to(v.hooks_.emplace());
-            }
-        } else if (key_matches(k, "mounts")) {
-            if (!val.is_null()) {
-                val.get_to(v.mounts);
-            }
-        } else if (key_matches(k, "root")) {
-            if (!val.is_null()) {
-                val.get_to(v.root_.emplace());
-            }
-        } else if (key_matches(k, "annotations")) {
-            if (!val.is_null()) {
-                val.get_to(v.annotations.emplace());
-            }
-        }
+void check_oci_version(const json::detail::value_view &val)
+{
+    if (UNLIKELY(!val.is_string())) {
+        val.raise_expected("string");
     }
 
-    if (!have_oci_version) {
-        throw std::runtime_error("oci_config.ociVersion is required");
+    try {
+        const auto semver = linyaps_box::utils::semver(val.as_string_view());
+        if (UNLIKELY(!linyaps_box::utils::semver(oci_config::version).is_compatible_with(semver))) {
+            throw json::decode_error{ "unsupported OCI version: " + semver.to_string() };
+        }
+    } catch (const linyaps_box::utils::invalid_semver &e) {
+        throw json::decode_error{ e.what() };
     }
 }
+
+} // namespace
+
+LINYAPS_BOX_CONFIG_SCHEMA(oci_config,
+                          oci_config_schema,
+                          "oci_config",
+                          check<&check_oci_version>("ociVersion").required(),
+                          field<&oci_config::process_>("process").ignore_null(),
+                          field<&oci_config::hostname>("hostname").ignore_null(),
+                          field<&oci_config::domainname>("domainname").ignore_null(),
+                          field<&oci_config::linux_>("linux").ignore_null(),
+                          field<&oci_config::hooks_>("hooks").ignore_null(),
+                          field<&oci_config::mounts>("mounts").ignore_null(),
+                          field<&oci_config::root_>("root").ignore_null(),
+                          field<&oci_config::annotations>("annotations").ignore_null())
 
 void validate(const oci_config &v)
 {
@@ -91,8 +69,10 @@ void validate(const oci_config &v)
         validate(*v.hooks_);
     }
 
-    for (const auto &m : v.mounts) {
-        validate(m);
+    if (v.mounts) {
+        for (const auto &m : *v.mounts) {
+            validate(m);
+        }
     }
 
     if (!v.annotations) {
@@ -108,7 +88,7 @@ void validate(const oci_config &v)
 
 auto oci_config::parse(std::string_view content) -> oci_config
 {
-    auto config = utils::strict_parse(content).get<oci_config>();
+    auto config = json::parse_as<oci_config>(content);
     validate(config);
     return config;
 }

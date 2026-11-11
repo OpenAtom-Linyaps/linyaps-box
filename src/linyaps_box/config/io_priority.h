@@ -4,8 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 
@@ -25,8 +25,7 @@ LINYAPS_REGISTER_ENUM_TABLE(io_priority::class_t,
                             { io_priority::class_t::best_effort, "IOPRIO_CLASS_BE" },
                             { io_priority::class_t::idle, "IOPRIO_CLASS_IDLE" })
 
-void from_json(const utils::strict_json &j, io_priority &v);
-
 void validate(const io_priority &v);
 
+auto ops_of(json::object_tag<io_priority>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

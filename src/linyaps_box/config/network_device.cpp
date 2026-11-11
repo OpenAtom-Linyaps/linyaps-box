@@ -4,16 +4,13 @@
 
 #include "linyaps_box/config/network_device.h"
 
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/json/parser.h"
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, network_device &v)
-{
-    utils::require_object(j);
-    if (auto it = j.find("name"); it != j.end() && !it->is_null()) {
-        it->get_to(v.name.emplace());
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(network_device,
+                          network_device_schema,
+                          "network_device",
+                          field<&network_device::name>("name").ignore_null())
 
 } // namespace linyaps_box::config

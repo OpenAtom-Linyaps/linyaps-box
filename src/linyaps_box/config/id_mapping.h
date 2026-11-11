@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <cstdint>
 
@@ -17,6 +17,5 @@ struct id_mapping
     uint32_t size;
 };
 
-void from_json(const utils::strict_json &j, id_mapping &v);
-
+auto ops_of(json::object_tag<id_mapping>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

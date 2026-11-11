@@ -4,11 +4,11 @@
 
 #include "linyaps_box/config/memory_policy.h"
 
-#include "linyaps_box/utils/strict_json.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 
 #include <fmt/format.h>
 
-#include <stdexcept>
 #include <string_view>
 
 namespace linyaps_box::config {
@@ -22,87 +22,39 @@ namespace {
 
 } // namespace
 
-void from_json(const utils::strict_json &j, memory_policy &v)
-{
-    utils::require_object(j);
-    auto mode_name = j.at("mode").get<std::string_view>();
-    auto mode_opt = utils::enum_table_v<memory_policy::mode>.from_name(mode_name);
-    if (UNLIKELY(!mode_opt)) {
-        throw std::runtime_error(fmt::format("unknown memory policy mode: {}", mode_name));
-    }
-    v.mode_ = *mode_opt;
-
-    if (auto nodes_it = j.find("nodes"); nodes_it != j.cend() && !nodes_it->is_null()) {
-        nodes_it->get_to(v.nodes.emplace());
-    }
-
-    if (auto flags_it = j.find("flags"); flags_it != j.cend() && !flags_it->is_null()) {
-        utils::bitflags<memory_policy_flag> flags;
-        for (const auto &f : *flags_it) {
-            const auto flag_str = f.get<std::string_view>();
-            auto flag_opt = utils::enum_table_v<memory_policy_flag>.from_name(flag_str);
-            if (UNLIKELY(!flag_opt)) {
-                throw std::runtime_error(fmt::format("unknown memory policy flag: {}", flag_str));
-            }
-
-            flags |= *flag_opt;
-        }
-
-        v.flags = flags;
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(memory_policy,
+                          memory_policy_schema,
+                          "memory_policy",
+                          field<&memory_policy::mode_>("mode").required(),
+                          field<&memory_policy::nodes>("nodes").ignore_null(),
+                          field<&memory_policy::flags>("flags").ignore_null())
 
 void validate(const memory_policy &v)
 {
     using mode = memory_policy::mode;
+    const auto flags = v.flags.value_or(utils::bitflags<memory_policy_flag>{ });
+    const bool has_nodes = v.nodes && has_node_tokens(*v.nodes);
+    const bool has_static_or_relative = flags.contains(memory_policy_flag::static_nodes)
+      || flags.contains(memory_policy_flag::relative_nodes);
 
-    if (UNLIKELY(v.flags.contains(memory_policy_flag::static_nodes)
-                 && v.flags.contains(memory_policy_flag::relative_nodes))) {
-        throw std::runtime_error("memoryPolicy flags MPOL_F_STATIC_NODES and MPOL_F_RELATIVE_NODES "
-                                 "are mutually exclusive");
-    }
-
-    if (UNLIKELY(v.flags.contains(memory_policy_flag::numa_balancing) && v.mode_ != mode::bind
-                 && v.mode_ != mode::preferred_many)) {
-        throw std::runtime_error(
-          "memoryPolicy flag MPOL_F_NUMA_BALANCING requires MPOL_BIND or MPOL_PREFERRED_MANY");
-    }
-
-    const auto has_nodes = v.nodes && has_node_tokens(*v.nodes);
-
-    switch (v.mode_) {
-    case mode::default_: {
-        if (UNLIKELY(has_nodes)) {
-            throw std::runtime_error("memoryPolicy mode MPOL_DEFAULT must not specify nodes");
-        }
-    } break;
-    case mode::local: {
-        if (UNLIKELY(has_nodes || v.flags.contains(memory_policy_flag::static_nodes)
-                     || v.flags.contains(memory_policy_flag::relative_nodes))) {
-            throw std::runtime_error(
-              "memoryPolicy mode MPOL_LOCAL accepts neither nodes nor static/relative flags");
-        }
-    } break;
-    case mode::preferred: {
-        if (UNLIKELY(!has_nodes
-                     && (v.flags.contains(memory_policy_flag::static_nodes)
-                         || v.flags.contains(memory_policy_flag::relative_nodes)))) {
-            throw std::runtime_error(
-              "memoryPolicy mode MPOL_PREFERRED with empty nodes rejects static/relative flags");
-        }
-    } break;
-    case mode::bind:
-    case mode::interleave:
-    case mode::preferred_many:
-        [[fallthrough]];
-    case mode::weighted_interleave: {
-        if (UNLIKELY(!has_nodes)) {
-            throw std::runtime_error(
-              "memoryPolicy mode MPOL_BIND/MPOL_INTERLEAVE/MPOL_PREFERRED_MANY/"
-              "MPOL_WEIGHTED_INTERLEAVE requires at least one node");
-        }
-    } break;
-    }
+    require(!(flags.contains(memory_policy_flag::static_nodes)
+              && flags.contains(memory_policy_flag::relative_nodes)),
+            "memoryPolicy flags MPOL_F_STATIC_NODES and MPOL_F_RELATIVE_NODES are mutually "
+            "exclusive");
+    require(!flags.contains(memory_policy_flag::numa_balancing) || v.mode_ == mode::bind
+              || v.mode_ == mode::preferred_many,
+            "memoryPolicy flag MPOL_F_NUMA_BALANCING requires MPOL_BIND or MPOL_PREFERRED_MANY");
+    require(v.mode_ != mode::default_ || !has_nodes,
+            "memoryPolicy mode MPOL_DEFAULT must not specify nodes");
+    require(v.mode_ != mode::local || (!has_nodes && !has_static_or_relative),
+            "memoryPolicy mode MPOL_LOCAL accepts neither nodes nor static/relative flags");
+    require(v.mode_ != mode::preferred || has_nodes || !has_static_or_relative,
+            "memoryPolicy mode MPOL_PREFERRED with empty nodes rejects static/relative flags");
+    require((v.mode_ != mode::bind && v.mode_ != mode::interleave && v.mode_ != mode::preferred_many
+             && v.mode_ != mode::weighted_interleave)
+              || has_nodes,
+            "memoryPolicy mode MPOL_BIND/MPOL_INTERLEAVE/MPOL_PREFERRED_MANY/"
+            "MPOL_WEIGHTED_INTERLEAVE requires at least one node");
 }
 
 } // namespace linyaps_box::config

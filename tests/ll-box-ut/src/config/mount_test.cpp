@@ -28,8 +28,9 @@ TEST(MountParse, FixtureMounts)
     const auto content = load_fixture("data/oci.json");
     const auto config = oci_config::parse(std::string_view{ content });
 
-    EXPECT_THAT(config.mounts, SizeIs(4));
-    const auto &proc_mount = config.mounts[0];
+    ASSERT_TRUE(config.mounts.has_value());
+    EXPECT_THAT(*config.mounts, SizeIs(4));
+    const auto &proc_mount = (*config.mounts)[0];
     // Compare the string form: gtest 1.8.1 treats std::filesystem::path as a
     // container (path has begin()/end()) and recurses forever when printing
     // it, even for a passing matcher. Path-valued assertions elsewhere in the
@@ -37,17 +38,17 @@ TEST(MountParse, FixtureMounts)
     EXPECT_THAT(proc_mount.destination.string(), Eq("/proc"));
     EXPECT_THAT(proc_mount.type, Eq("proc"));
 
-    const auto &bind_mount = config.mounts[1];
+    const auto &bind_mount = (*config.mounts)[1];
     EXPECT_THAT(bind_mount.source, Eq("/tmp/data"));
     EXPECT_TRUE(bind_mount.vfs_flags.contains(vfs_flag::bind));
     EXPECT_TRUE(bind_mount.vfs_flags.contains(vfs_flag::ro));
 
-    const auto &rw_mount = config.mounts[2];
+    const auto &rw_mount = (*config.mounts)[2];
     EXPECT_TRUE(rw_mount.vfs_flags.contains(vfs_flag::nosuid));
     EXPECT_FALSE(rw_mount.vfs_flags.contains(vfs_flag::ro));
     EXPECT_TRUE(rw_mount.vfs_flags.contains(vfs_flag::noatime));
 
-    const auto &rec_mount = config.mounts[3];
+    const auto &rec_mount = (*config.mounts)[3];
     EXPECT_TRUE(rec_mount.vfs_flags.contains(vfs_flag::bind));
     EXPECT_TRUE(rec_mount.vfs_flags.contains(vfs_flag::rec));
     EXPECT_TRUE(rec_mount.propagation_flags.contains(propagation_flag::private_));
@@ -62,7 +63,8 @@ TEST(MountParse, UnknownMountOptionFallsToData)
     const auto config =
       parse_config(R"(  "mounts": [{"destination": "/mnt", "source": "/tmp", "type": "none",
               "options": ["ro", "mode=0755"]}])");
-    const auto &mnt = config.mounts[0];
+    ASSERT_TRUE(config.mounts.has_value());
+    const auto &mnt = (*config.mounts)[0];
     EXPECT_TRUE(mnt.vfs_flags.contains(vfs_flag::ro));
     EXPECT_THAT(mnt.data, HasSubstr("mode=0755"));
     EXPECT_THAT(mnt.data, Not(HasSubstr("ro")));
@@ -73,7 +75,8 @@ TEST(MountParse, RecognizedOptionsNotInData)
     const auto config =
       parse_config(R"(  "mounts": [{"destination": "/mnt", "source": "/tmp", "type": "none",
               "options": ["nosuid", "strictatime", "mode=755", "size=65536k"]}])");
-    const auto &mnt = config.mounts[0];
+    ASSERT_TRUE(config.mounts.has_value());
+    const auto &mnt = (*config.mounts)[0];
     EXPECT_TRUE(mnt.vfs_flags.contains(vfs_flag::nosuid));
     EXPECT_TRUE(mnt.vfs_flags.contains(vfs_flag::strictatime));
     EXPECT_THAT(mnt.data, HasSubstr("mode=755"));
@@ -126,10 +129,11 @@ TEST(MountParse, SpecUidMappingsTakePrecedenceOverInlineIdmap)
      "gidMappings": [{"containerID": 0, "hostID": 2000, "size": 1}],
      "options": ["idmap=uids=0:1000:1,gids=0:1000:1"]}
   ])");
-    ASSERT_TRUE(config.mounts[0].uid_mappings.has_value());
-    EXPECT_EQ((*config.mounts[0].uid_mappings)[0].host_id, 2000U);
-    ASSERT_TRUE(config.mounts[0].gid_mappings.has_value());
-    EXPECT_EQ((*config.mounts[0].gid_mappings)[0].host_id, 2000U);
+    ASSERT_TRUE(config.mounts.has_value());
+    ASSERT_TRUE((*config.mounts)[0].uid_mappings.has_value());
+    EXPECT_EQ((*(*config.mounts)[0].uid_mappings)[0].host_id, 2000U);
+    ASSERT_TRUE((*config.mounts)[0].gid_mappings.has_value());
+    EXPECT_EQ((*(*config.mounts)[0].gid_mappings)[0].host_id, 2000U);
 }
 
 TEST(MountParse, InlineIdmapAppliedWithoutSpecField)
@@ -138,10 +142,11 @@ TEST(MountParse, InlineIdmapAppliedWithoutSpecField)
     {"destination": "/mnt", "source": "/tmp", "type": "none",
      "options": ["idmap=uids=0:1000:1,gids=0:1000:1"]}
   ])");
-    ASSERT_TRUE(config.mounts[0].uid_mappings.has_value());
-    EXPECT_EQ((*config.mounts[0].uid_mappings)[0].host_id, 1000U);
-    ASSERT_TRUE(config.mounts[0].gid_mappings.has_value());
-    EXPECT_EQ((*config.mounts[0].gid_mappings)[0].host_id, 1000U);
+    ASSERT_TRUE(config.mounts.has_value());
+    ASSERT_TRUE((*config.mounts)[0].uid_mappings.has_value());
+    EXPECT_EQ((*(*config.mounts)[0].uid_mappings)[0].host_id, 1000U);
+    ASSERT_TRUE((*config.mounts)[0].gid_mappings.has_value());
+    EXPECT_EQ((*(*config.mounts)[0].gid_mappings)[0].host_id, 1000U);
 }
 
 TEST(MountParse, IdmapAndRidmapMutuallyExclusive)
@@ -168,8 +173,9 @@ TEST(MountParse, RecAttrOptionsParsed)
     {"destination": "/mnt", "source": "/tmp", "type": "none",
      "options": ["rro", "rnosuid", "rrw"]}
   ])");
-    ASSERT_TRUE(config.mounts[0].rec_attr.has_value());
-    const auto &attr = *config.mounts[0].rec_attr;
+    ASSERT_TRUE(config.mounts.has_value());
+    ASSERT_TRUE((*config.mounts)[0].rec_attr.has_value());
+    const auto &attr = *(*config.mounts)[0].rec_attr;
     EXPECT_TRUE(attr.set.contains(recursive_attr_flag::rdonly));
     EXPECT_TRUE(attr.set.contains(recursive_attr_flag::nosuid));
     EXPECT_TRUE(attr.clr.contains(recursive_attr_flag::rdonly));
@@ -181,9 +187,10 @@ TEST(MountParse, RecAttrClrOnlyParsed)
     {"destination": "/mnt", "source": "/tmp", "type": "none",
      "options": ["rrw"]}
   ])");
-    ASSERT_TRUE(config.mounts[0].rec_attr.has_value());
-    EXPECT_TRUE(config.mounts[0].rec_attr->set.empty());
-    EXPECT_TRUE(config.mounts[0].rec_attr->clr.contains(recursive_attr_flag::rdonly));
+    ASSERT_TRUE(config.mounts.has_value());
+    ASSERT_TRUE((*config.mounts)[0].rec_attr.has_value());
+    EXPECT_TRUE((*config.mounts)[0].rec_attr->set.empty());
+    EXPECT_TRUE((*config.mounts)[0].rec_attr->clr.contains(recursive_attr_flag::rdonly));
 }
 
 TEST(MountParse, ExtensionOptionsParsed)
@@ -192,7 +199,8 @@ TEST(MountParse, ExtensionOptionsParsed)
     {"destination": "/mnt", "source": "/tmp", "type": "none",
      "options": ["copy-symlink", "tmpcopyup"]}
   ])");
-    const auto flags = config.mounts[0].extension_flags;
+    ASSERT_TRUE(config.mounts.has_value());
+    const auto flags = (*config.mounts)[0].extension_flags;
     EXPECT_NE(flags & mount::extension::copy_symlink, mount::extension::none);
     EXPECT_NE(flags & mount::extension::tmpcopyup, mount::extension::none);
 }

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <filesystem>
 #include <optional>
@@ -22,8 +22,7 @@ struct user
     std::optional<std::vector<gid_t>> additional_gids;
 };
 
-void from_json(const utils::strict_json &j, user &v);
-
 void validate(const user &v);
 
+auto ops_of(json::object_tag<user>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

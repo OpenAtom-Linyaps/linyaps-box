@@ -4,41 +4,32 @@
 
 #include "linyaps_box/config/network.h"
 
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
+
+#include <algorithm>
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, network::priority &v)
-{
-    utils::require_object(j);
-    j.at("name").get_to(v.name);
-    j.at("priority").get_to(v.priority);
-}
+LINYAPS_BOX_CONFIG_SCHEMA(network::priority,
+                          network_priority_schema,
+                          "network.priority",
+                          field<&network::priority::name>("name").required(),
+                          field<&network::priority::priority>("priority").required())
 
-void from_json(const utils::strict_json &j, network &v)
-{
-    utils::require_object(j);
-    if (auto it = j.find("classID"); it != j.end() && !it->is_null()) {
-        it->get_to(v.class_id.emplace());
-    }
-
-    if (auto it = j.find("priorities"); it != j.end() && !it->is_null()) {
-        it->get_to(v.priorities.emplace());
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(network,
+                          network_schema,
+                          "network",
+                          field<&network::class_id>("classID").ignore_null(),
+                          field<&network::priorities>("priorities").ignore_null())
 
 void validate(const network &v)
 {
-    if (!v.priorities) {
-        return;
+    if (v.priorities) {
+        std::for_each(v.priorities->cbegin(), v.priorities->cend(), [](const auto &p) {
+            require(!p.name.empty(), "network.priorities name must not be empty");
+        });
     }
-
-    std::for_each(v.priorities->cbegin(), v.priorities->cend(), [](const auto &p) {
-        if (UNLIKELY(p.name.empty())) {
-            throw std::runtime_error("network.priorities name must not be empty");
-        }
-    });
 }
 
 } // namespace linyaps_box::config

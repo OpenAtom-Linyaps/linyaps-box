@@ -278,7 +278,10 @@ struct member_traits<Member Owner::*>
 template <auto Callback, typename Signature>
 inline constexpr bool is_non_null_callback_v = [] {
     if constexpr (std::is_convertible_v<decltype(Callback), Signature>) {
-        return Callback != nullptr;
+        // Avoid GCC's UBSan-sensitive constexpr comparison of template function pointers.
+        using callback = std::integral_constant<Signature, Callback>;
+        using null_callback = std::integral_constant<Signature, nullptr>;
+        return !std::is_same_v<callback, null_callback>;
     }
 
     return false;
@@ -1663,7 +1666,8 @@ template <auto Parse>
 {
     if constexpr (std::is_pointer_v<decltype(Parse)>
                   && std::is_function_v<std::remove_pointer_t<decltype(Parse)>>) {
-        static_assert(Parse != nullptr, "custom_array() requires a non-null function pointer");
+        static_assert(detail::is_non_null_callback_v<Parse, decltype(Parse)>,
+                      "custom_array() requires a non-null function pointer");
         return detail::custom_array_field<Parse>{ name };
     } else {
         static_assert(std::is_pointer_v<decltype(Parse)>

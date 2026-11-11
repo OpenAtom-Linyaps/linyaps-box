@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -16,6 +16,5 @@ struct pids
     std::optional<int64_t> limit;
 };
 
-void from_json(const utils::strict_json &j, pids &v);
-
+auto ops_of(json::object_tag<pids>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

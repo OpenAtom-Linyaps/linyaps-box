@@ -4,8 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -14,12 +14,12 @@ namespace linyaps_box::config {
 
 enum class device_rule_access_flag : std::uint8_t {
     none = 0U,
-    read = (1U << 0),
-    write = (1U << 1),
-    mknod = (1U << 2),
+    read = (1U << 0U),
+    write = (1U << 1U),
+    mknod = (1U << 2U),
 };
 
-LINYAPS_ENABLE_BITMASK_ENUM(device_rule_access_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(device_rule_access_flag)
 
 LINYAPS_REGISTER_ENUM_TABLE(device_rule_access_flag,
                             3,
@@ -35,7 +35,7 @@ struct device_rule
     std::optional<type> type_;
     std::optional<int64_t> major;
     std::optional<int64_t> minor;
-    utils::bitflags<device_rule_access_flag> access;
+    std::optional<utils::bitflags<device_rule_access_flag>> access;
 };
 
 LINYAPS_REGISTER_ENUM_TABLE(device_rule::type,
@@ -44,6 +44,5 @@ LINYAPS_REGISTER_ENUM_TABLE(device_rule::type,
                             { device_rule::type::character, "c" },
                             { device_rule::type::block, "b" })
 
-void from_json(const utils::strict_json &j, device_rule &v);
-
+auto ops_of(json::object_tag<device_rule>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

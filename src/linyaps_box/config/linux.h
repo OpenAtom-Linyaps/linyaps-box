@@ -14,6 +14,7 @@
 #include "linyaps_box/config/resources.h"
 #include "linyaps_box/config/seccomp.h"
 #include "linyaps_box/config/time_offset.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <filesystem>
 #include <optional>
@@ -53,7 +54,7 @@ struct linux
     std::optional<rootfs_propagation> rootfs_propagation_;
 };
 
-void from_json(const utils::strict_json &j, linux &v);
+auto ops_of(json::object_tag<linux>) -> const json::frame_ops &;
 
 void validate(const linux &v);
 

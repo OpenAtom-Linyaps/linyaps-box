@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "linyaps_box/config/user.h"
+#include "linyaps_box/json/parser.h"
 #include "linyaps_box/utils/strict_json.h"
 
 #include <cstdint>
@@ -86,20 +87,17 @@ TEST(JsonShape, RequireObjectRejected)
     EXPECT_NO_THROW(require_object(json::parse("{}")));
 }
 
-// End-to-end guard for the type-encoded invariant: config from_json must run on
-// utils::strict_json, so container-element and scalar extraction are checked.
-// If a from_json ever regresses to a plain nlohmann::json parameter, this fails.
+// Config parsing must check scalar and container-element conversions through
+// the SAX entry point; the legacy backend remains covered by the other cases.
 TEST(JsonShape, ConfigExtractionIsChecked)
 {
     // additionalGids is std::vector<gid_t>; 2^32 does not fit in gid_t.
-    EXPECT_THROW(
-      std::ignore =
-        strict_parse(R"({"uid":0,"gid":0,"additionalGids":[4294967296]})").get<config::user>(),
-      json::exception);
+    EXPECT_THROW(std::ignore = linyaps_box::json::parse_as<config::user>(
+                   R"({"uid":0,"gid":0,"additionalGids":[4294967296]})"),
+                 linyaps_box::json::decode_error);
 
-    EXPECT_NO_THROW(
-      std::ignore =
-        strict_parse(R"({"uid":0,"gid":0,"additionalGids":[1,2]})").get<config::user>());
+    EXPECT_NO_THROW(std::ignore = linyaps_box::json::parse_as<config::user>(
+                      R"({"uid":0,"gid":0,"additionalGids":[1,2]})"));
 }
 
 TEST(JsonShape, ParseRejectsDuplicateKeys)

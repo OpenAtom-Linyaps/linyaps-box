@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <optional>
 #include <string>
@@ -17,8 +17,7 @@ struct exec_cpu_affinity
     std::optional<std::string> final;
 };
 
-void from_json(const utils::strict_json &j, exec_cpu_affinity &v);
-
 void validate(const exec_cpu_affinity &v);
 
+auto ops_of(json::object_tag<exec_cpu_affinity>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

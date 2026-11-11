@@ -4,8 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -27,6 +27,5 @@ LINYAPS_REGISTER_ENUM_TABLE(personality::domain,
                             { personality::domain::linux, "LINUX" },
                             { personality::domain::linux32, "LINUX32" })
 
-void from_json(const utils::strict_json &j, personality &v);
-
+auto ops_of(json::object_tag<personality>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

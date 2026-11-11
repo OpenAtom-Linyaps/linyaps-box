@@ -4,40 +4,28 @@
 
 #include "linyaps_box/config/user.h"
 
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
+#include "linyaps_box/config/validation.h"
+#include "linyaps_box/json/parser.h"
 
-#include <fmt/format.h>
+#include <filesystem>
+
+#include <sys/types.h>
 
 namespace linyaps_box::config {
 
-void from_json(const utils::strict_json &j, user &v)
-{
-    utils::require_object(j);
-    j.at("uid").get_to(v.uid);
-    j.at("gid").get_to(v.gid);
-
-    if (auto it = j.find("umask"); it != j.end() && !it->is_null()) {
-        v.umask.emplace() = static_cast<std::filesystem::perms>(
-          utils::detail::get_number<std::underlying_type_t<std::filesystem::perms>>(*it));
-    }
-
-    if (auto it = j.find("additionalGids"); it != j.end() && !it->is_null()) {
-        it->get_to(v.additional_gids.emplace());
-    }
-}
+LINYAPS_BOX_CONFIG_SCHEMA(user,
+                          user_schema,
+                          "user",
+                          field<&user::uid>("uid").required(),
+                          field<&user::gid>("gid").required(),
+                          field<&user::umask>("umask").ignore_null(),
+                          field<&user::additional_gids>("additionalGids").ignore_null())
 
 void validate(const user &v)
 {
-    if (!v.umask) {
-        return;
-    }
-
-    auto val = v.umask.value();
-    if (UNLIKELY((val & ~std::filesystem::perms::all) != std::filesystem::perms::none)) {
-        throw std::runtime_error(
-          fmt::format("user.umask is invalid: 0{:o}", static_cast<mode_t>(val)));
-    }
+    require(!v.umask || (*v.umask & ~std::filesystem::perms::all) == std::filesystem::perms::none,
+            "user.umask is invalid: 0{:o}",
+            static_cast<mode_t>(v.umask.value_or(std::filesystem::perms::none)));
 }
 
 } // namespace linyaps_box::config

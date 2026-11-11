@@ -4,8 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -17,13 +17,13 @@ namespace linyaps_box::config {
 
 enum class seccomp_flag : std::uint8_t {
     none = 0U,
-    tsync = (1U << 0),
-    log = (1U << 1),
-    spec_allow = (1U << 2),
-    wait_killable_recv = (1U << 3),
+    tsync = (1U << 0U),
+    log = (1U << 1U),
+    spec_allow = (1U << 2U),
+    wait_killable_recv = (1U << 3U),
 };
 
-LINYAPS_ENABLE_BITMASK_ENUM(seccomp_flag);
+LINYAPS_ENABLE_BITMASK_ENUM(seccomp_flag)
 
 LINYAPS_REGISTER_ENUM_TABLE(seccomp_flag,
                             4,
@@ -44,7 +44,7 @@ struct seccomp
         log,
         notify,
         trace,
-        trap
+        trap,
     };
 
     enum class arch : uint8_t {
@@ -97,7 +97,7 @@ struct seccomp
     std::optional<std::filesystem::path> listener_path;
     std::optional<std::vector<syscall>> syscalls;
     std::optional<std::uint32_t> default_errno_ret;
-    utils::bitflags<seccomp_flag> flags;
+    std::optional<utils::bitflags<seccomp_flag>> flags;
     action default_action;
 };
 
@@ -149,14 +149,13 @@ LINYAPS_REGISTER_ENUM_TABLE(seccomp::syscall::arg::op,
                             { seccomp::syscall::arg::op::ge, "SCMP_CMP_GE" },
                             { seccomp::syscall::arg::op::masked_eq, "SCMP_CMP_MASKED_EQ" })
 
-void from_json(const utils::strict_json &j, seccomp::syscall::arg &v);
-
-void from_json(const utils::strict_json &j, seccomp::syscall &v);
-
-void from_json(const utils::strict_json &j, seccomp &v);
-
 void validate(const seccomp::syscall &v);
 
 void validate(const seccomp &v);
 
+auto ops_of(json::object_tag<seccomp>) -> const json::frame_ops &;
+
+auto ops_of(json::object_tag<seccomp::syscall>) -> const json::frame_ops &;
+
+auto ops_of(json::object_tag<seccomp::syscall::arg>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

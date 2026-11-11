@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "linyaps_box/utils/strict_json_fwd.h"
+#include "linyaps_box/json/dsl_fwd.h"
 
 #include <optional>
 #include <string>
@@ -21,6 +21,5 @@ struct capabilities
     std::optional<std::vector<std::string>> ambient;
 };
 
-void from_json(const utils::strict_json &j, capabilities &v);
-
+auto ops_of(json::object_tag<capabilities>) -> const json::frame_ops &;
 } // namespace linyaps_box::config

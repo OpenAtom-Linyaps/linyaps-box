@@ -4,8 +4,8 @@
 
 #pragma once
 
+#include "linyaps_box/json/dsl_fwd.h"
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/strict_json_fwd.h"
 
 #include <cstdint>
 #include <optional>
@@ -29,8 +29,7 @@ struct cpu
 
 LINYAPS_REGISTER_ENUM_TABLE(cpu::idle, 2, { cpu::idle::none, "none" }, { cpu::idle::idle, "idle" })
 
-void from_json(const utils::strict_json &j, cpu &v);
-
 void validate(const cpu &v);
 
+auto ops_of(json::object_tag<cpu>) -> const json::frame_ops &;
 } // namespace linyaps_box::config
