@@ -4,6 +4,8 @@
 
 #include "linyaps_box/os/mm.h"
 
+#include "linyaps_box/utils/utils.h"
+
 namespace linyaps_box::os {
 
 auto mmap(void *ptr,
