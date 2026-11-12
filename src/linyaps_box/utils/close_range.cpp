@@ -113,11 +113,14 @@ void linyaps_box::utils::close_range(uint first, uint last, int flags)
         syscall_close_range(first, last, flags);
     } catch (const std::system_error &e) {
         auto code = e.code().value();
-        if (code != ENOSYS) {
+        if (code != ENOSYS && code != EINVAL) {
             throw;
         }
 
-        support_close_range = false;
+        if (code == ENOSYS) {
+            support_close_range = false;
+        }
+
         close_range_fallback(first, last, flags);
     }
 }
