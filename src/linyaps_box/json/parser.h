@@ -46,6 +46,7 @@
 #include "linyaps_box/json/error.h"
 #include "linyaps_box/utils/enum_formatter.h" // IWYU pragma: keep
 #include "linyaps_box/utils/enum_traits.h"
+#include "linyaps_box/utils/utf8.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/format.h>
@@ -1259,12 +1260,11 @@ struct array_frame_ops<std::vector<X, A>> : public frame_handler<array_frame_ops
     static auto on_object_begin(frame &f, frame_stack &st) -> void
     {
         auto &vec = f.target.as<vec_type>();
-        const auto index = vec.size();
         if constexpr (is_object_element_v<X>) {
             push_child_frame(st, vec.emplace_back());
         } else {
             raise_decoded(st,
-                          location_edge::element(index),
+                          location_edge::element(vec.size()),
                           type_error_message(element_expected_name<X>(), "object"));
         }
     }
@@ -1570,7 +1570,12 @@ public:
                      [[maybe_unused]] const std::string &last_token,
                      const exception_t &ex) -> bool
     {
-        throw decode_error{ fmt::format("at input byte {}: {}", position, ex.what()) };
+        // nlohmann's token string keeps bytes above 0x1F verbatim, so a rejected
+        // ill-formed UTF-8 input produces a message with the same ill-formed
+        // bytes.
+        throw decode_error{
+            fmt::format("at input byte {}: {}", position, utils::to_valid_utf8_lossy(ex.what()))
+        };
     }
 
 private:
