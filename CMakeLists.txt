@@ -508,8 +508,8 @@ linyaps_box_dependency(
     fmt
     10.1.0
     fmtlib/fmt
-    12.2.0
-    1be298e1bd68957e4cd352e1f676f00e07dcfb57
+    12.2.1
+    208219daff58f2a7438f6931cc2ddc358acf33ef
 )
 if(linyaps-box_OFFLINE_BUILD)
     set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
