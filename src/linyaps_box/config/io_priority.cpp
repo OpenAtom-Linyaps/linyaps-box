@@ -13,7 +13,7 @@ LINYAPS_BOX_CONFIG_SCHEMA(io_priority,
                           io_priority_schema,
                           "io_priority",
                           field<&io_priority::class_>("class").required(),
-                          field<&io_priority::priority>("priority"))
+                          field<&io_priority::priority>("priority").required())
 
 void validate(const io_priority &v)
 {

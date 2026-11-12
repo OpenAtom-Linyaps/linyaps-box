@@ -13,7 +13,7 @@ LINYAPS_BOX_CONFIG_SCHEMA(root,
                           root_schema,
                           "root",
                           field<&root::path>("path").required(),
-                          field<&root::readonly>("readonly"))
+                          field<&root::readonly>("readonly").ignore_null())
 
 void validate(const root &v)
 {
