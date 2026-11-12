@@ -7,10 +7,12 @@
 #include "linyaps_box/log/backend.h"
 #include "linyaps_box/log/utils.h"
 #include "linyaps_box/utils/span.h"
+#include "linyaps_box/utils/utf8.h"
 
 #include <fmt/format.h>
 
 #include <array>
+#include <optional>
 #include <string>
 
 #include <sys/uio.h>
@@ -34,6 +36,17 @@ struct has_valid_journald_backend<
 
 template <typename T>
 constexpr inline bool has_valid_journald_backend_v = has_valid_journald_backend<T>::value;
+
+[[nodiscard]] inline auto journald_field(std::string_view value, std::string &buffer)
+  -> std::string_view
+{
+    if (utils::is_valid_utf8(value, utils::nul_rule::forbidden)) {
+        return value;
+    }
+
+    utils::to_valid_utf8_lossy(value, buffer, utils::nul_rule::forbidden);
+    return buffer;
+}
 
 } // namespace detail
 
@@ -75,25 +88,34 @@ public:
 #endif
           ;
 
-        std::array<struct iovec, max_fields> iov{ };
+        std::array<std::size_t, max_fields> offsets{ };
+        std::array<std::size_t, max_fields> lengths{ };
         std::size_t n = 0;
 
         auto add_field = [&](std::string_view key, const auto &value) {
-            const auto start = buf.size();
+            offsets[n] = buf.size();
             fmt::format_to(std::back_inserter(buf), "{}={}", key, value);
-            iov[n] = { buf.data() + start, buf.size() - start };
+            lengths[n] = buf.size() - offsets[n];
             ++n;
         };
 
-        add_field("MESSAGE", ctx.message);
+        std::string buffer;
+        add_field("MESSAGE", detail::journald_field(ctx.message, buffer));
         add_field("PRIORITY", to_syslog_priority(ctx.lvl));
-        add_field("SYSLOG_IDENTIFIER", ident_);
+        add_field("SYSLOG_IDENTIFIER", detail::journald_field(ident_, buffer));
 #ifdef LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION
         add_field("CODE_FILE", ctx.file);
         add_field("CODE_LINE", ctx.line);
         add_field("CODE_FUNC", ctx.function);
 #endif
         add_field("ERRNO", ctx.errno_);
+
+        // Appending may reallocate `buf`, so take the pointers only once every
+        // field has been formatted.
+        std::array<struct iovec, max_fields> iov{ };
+        for (std::size_t i = 0; i < n; ++i) {
+            iov[i] = { buf.data() + offsets[i], lengths[i] };
+        }
 
         Backend::send({ iov.data(), n });
     } catch (...) { // NOLINT
