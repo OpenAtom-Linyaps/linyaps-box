@@ -113,12 +113,14 @@ auto format_log(fmt::memory_buffer &buf,
                 fmt::text_style style) noexcept -> void
 {
     switch (fmt) {
-    case output_format::text:
+    case output_format::text: {
         format_text(buf, ctx, style);
-        break;
-    case output_format::json:
-        fmt::format_to(std::back_inserter(buf), "{}\n", nlohmann::json(ctx).dump());
-        break;
+    } break;
+    case output_format::json: {
+        buf.append(
+          nlohmann::json(ctx).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
+        buf.push_back('\n');
+    } break;
     }
 }
 
