@@ -336,6 +336,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/session.cpp
     src/linyaps_box/utils/setns.cpp
     src/linyaps_box/utils/signal.cpp
+    src/linyaps_box/utils/utf8.cpp
     src/linyaps_box/utils/strict_json.cpp
     src/linyaps_box/utils/utils.cpp
 )
