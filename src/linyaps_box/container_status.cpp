@@ -5,28 +5,46 @@
 #include "linyaps_box/container_status.h"
 
 #include "linyaps_box/infra/process_handle.h"
+#include "linyaps_box/json/parser.h"
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/utils/date.h"
-#include "linyaps_box/utils/strict_json.h"
-#include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
+#include <nlohmann/json.hpp>
+
+#include <array>
+#include <stdexcept>
+#include <utility>
 
 namespace linyaps_box {
 
-auto to_json(utils::strict_json &j, const container_status &s) -> void
+namespace {
+
+auto read_created(const json::detail::value_view &val) -> std::chrono::system_clock::time_point
+{
+    try {
+        return utils::from_created_time(val.as_string_view());
+    } catch (const std::invalid_argument &e) {
+        throw json::decode_error{ e.what() };
+    }
+}
+
+} // namespace
+
+auto to_json(nlohmann::json &j, const container_status &s) -> void
 {
     std::array<char, utils::max_created_time_len> created_buf{ };
     const auto len =
       linyaps_box::utils::to_created_time(linyaps_box::utils::span{ created_buf }, s.created);
-    auto obj =
-      utils::strict_json::object({ { "id", s.id },
-                                   { "pid", s.pid },
-                                   { "bundle", s.bundle.string() },
-                                   { "created", std::string_view{ created_buf.data(), len } },
-                                   { "owner", s.owner },
-                                   { "annotations", s.annotations },
-                                   { "ociVersion", s.oci_version } });
+    auto obj = nlohmann::json::object({
+      { "id", s.id },
+      { "pid", s.pid },
+      { "bundle", s.bundle.string() },
+      { "created", std::string_view{ created_buf.data(), len } },
+      { "owner", s.owner },
+      { "annotations", s.annotations },
+      { "ociVersion", s.oci_version },
+    });
 
     if (s.process_start_time) {
         obj["process-start-time"] = *s.process_start_time;
@@ -35,34 +53,7 @@ auto to_json(utils::strict_json &j, const container_status &s) -> void
     j = std::move(obj);
 }
 
-auto from_json(const utils::strict_json &j, container_status &s) -> void
-{
-    utils::require_object(j);
-    j.at("id").get_to(s.id);
-    j.at("pid").get_to(s.pid);
-
-    const auto it = j.find("process-start-time");
-    if (UNLIKELY(it == j.cend())) {
-        s.process_start_time = std::nullopt;
-    } else {
-        if (UNLIKELY(it->is_null())) {
-            throw utils::strict_json::type_error::create(
-              302,
-              "Key 'process-start-time' exists but is null",
-              &j);
-        }
-
-        s.process_start_time = it->get<std::uint64_t>();
-    }
-
-    s.bundle = j.at("bundle").get<std::string>();
-    s.created = utils::from_created_time(j.at("created").get<std::string_view>());
-    j.at("owner").get_to(s.owner);
-    j.at("annotations").get_to(s.annotations);
-    j.at("ociVersion").get_to(s.oci_version);
-}
-
-auto to_string_view(runtime_status s) -> std::string_view
+auto to_string_view(runtime_status s) noexcept -> std::string_view
 {
     using namespace std::string_view_literals;
     switch (s) {
@@ -127,31 +118,23 @@ auto derive_status(const container_status &s) -> runtime_status
     return runtime_status::RUNNING;
 }
 
-auto to_oci_json(container_status s, runtime_status rs) -> utils::strict_json
+auto to_oci_json(const container_status &s, runtime_status status) -> nlohmann::json
 {
-    std::array<char, utils::max_created_time_len> created_buf{ };
-    const auto len =
-      linyaps_box::utils::to_created_time(linyaps_box::utils::span{ created_buf }, s.created);
-    return utils::strict_json::object({
-      { "id", std::move(s.id) },
-      { "pid", s.pid },
-      { "status", to_string_view(rs) },
-      { "bundle", s.bundle.string() },
-      { "created", std::string_view{ created_buf.data(), len } },
-      { "owner", std::move(s.owner) },
-      { "annotations", std::move(s.annotations) },
-      { "ociVersion", std::move(s.oci_version) },
-    });
+    auto result = nlohmann::json(s);
+    result["status"] = to_string_view(status);
+    return result;
 }
 
-namespace detail {
-
-auto format_container_status_json(const container_status &status, bool pretty) -> std::string
-{
-    const auto json = utils::strict_json(status);
-    return json.dump(pretty ? 4 : -1);
-}
-
-} // namespace detail
+LINYAPS_BOX_CONFIG_SCHEMA(container_status,
+                          container_status_schema,
+                          "container_status",
+                          field<&container_status::id>("id").required(),
+                          field<&container_status::pid>("pid").required(),
+                          field<&container_status::process_start_time>("process-start-time"),
+                          field<&container_status::bundle>("bundle").required(),
+                          field<&container_status::created, &read_created>("created").required(),
+                          field<&container_status::owner>("owner").required(),
+                          field<&container_status::annotations>("annotations").required(),
+                          field<&container_status::oci_version>("ociVersion").required())
 
 } // namespace linyaps_box

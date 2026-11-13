@@ -2,16 +2,15 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include <gtest/gtest.h>
-
+#include "gtest_compat.h" // IWYU pragma: keep
 #include "linyaps_box/container_status.h"
-#include "linyaps_box/utils/strict_json.h" // IWYU pragma: keep
+#include "linyaps_box/json/parser.h"
+
+#include <nlohmann/json.hpp>
 
 #include <chrono>
 #include <cstdint>
 #include <string>
-
-using json = linyaps_box::utils::strict_json;
 
 namespace {
 
@@ -38,8 +37,8 @@ auto make_status(bool with_start_time) -> linyaps_box::container_status
 TEST(ContainerStatusJson, RoundTripWithStartTime)
 {
     auto s = make_status(true);
-    auto ret = json(s).dump();
-    auto parsed = linyaps_box::utils::strict_parse(ret).get<linyaps_box::container_status>();
+    const auto ret = nlohmann::json(s).dump();
+    auto parsed = linyaps_box::json::parse_as<linyaps_box::container_status>(ret);
 
     EXPECT_EQ(parsed.id, s.id);
     EXPECT_EQ(parsed.oci_version, s.oci_version);
@@ -55,7 +54,7 @@ TEST(ContainerStatusJson, RoundTripWithStartTime)
 TEST(ContainerStatusJson, OmitKeyWhenNullopt)
 {
     auto s = make_status(false);
-    auto j = json(s);
+    const auto j = nlohmann::json(s);
 
     EXPECT_FALSE(j.contains("process-start-time"));
 }
@@ -63,7 +62,7 @@ TEST(ContainerStatusJson, OmitKeyWhenNullopt)
 TEST(ContainerStatusJson, IncludeKeyWhenSet)
 {
     auto s = make_status(true);
-    auto j = json(s);
+    const auto j = nlohmann::json(s);
 
     EXPECT_TRUE(j.contains("process-start-time"));
     EXPECT_EQ(j.at("process-start-time").get<std::uint64_t>(), std::uint64_t{ 123456789 });
@@ -71,31 +70,22 @@ TEST(ContainerStatusJson, IncludeKeyWhenSet)
 
 TEST(ContainerStatusJson, MissingKeyYieldsNullopt)
 {
-    auto j = linyaps_box::utils::strict_json::object({ { "id", "c1" },
-                                                       { "pid", 100 },
-                                                       { "bundle", "/b" },
-                                                       { "created", "2023-11-14T22:13:20.123456Z" },
-                                                       { "owner", "o" },
-                                                       { "annotations", json::object() },
-                                                       { "ociVersion", "1.0.2" } });
+    const auto *text = R"({"id":"c1","pid":100,"bundle":"/b",)"
+                       R"("created":"2023-11-14T22:13:20.123456Z","owner":"o",)"
+                       R"("annotations":{},"ociVersion":"1.0.2"})";
 
-    linyaps_box::container_status parsed;
-    linyaps_box::from_json(j, parsed);
+    const auto parsed = linyaps_box::json::parse_as<linyaps_box::container_status>(text);
 
     EXPECT_FALSE(parsed.process_start_time.has_value());
 }
 
+// An explicit null for process-start-time fails (it is not "missing").
 TEST(ContainerStatusJson, ExplicitNullThrows)
 {
-    auto j = json::object({ { "id", "c1" },
-                            { "pid", 100 },
-                            { "process-start-time", nullptr },
-                            { "bundle", "/b" },
-                            { "created", "2023-11-14T22:13:20.123456Z" },
-                            { "owner", "o" },
-                            { "annotations", json::object() },
-                            { "ociVersion", "1.0.2" } });
+    const auto *text = R"({"id":"c1","pid":100,"process-start-time":null,"bundle":"/b",)"
+                       R"("created":"2023-11-14T22:13:20.123456Z","owner":"o",)"
+                       R"("annotations":{},"ociVersion":"1.0.2"})";
 
-    linyaps_box::container_status parsed;
-    EXPECT_THROW(linyaps_box::from_json(j, parsed), json::type_error);
+    EXPECT_THROW(std::ignore = linyaps_box::json::parse_as<linyaps_box::container_status>(text),
+                 linyaps_box::json::decode_error);
 }
