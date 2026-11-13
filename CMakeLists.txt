@@ -310,6 +310,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/os/fs.cpp
     src/linyaps_box/os/io.cpp
     src/linyaps_box/os/mm.cpp
+    src/linyaps_box/os/mount.cpp
     src/linyaps_box/os/net.cpp
     src/linyaps_box/os/pipe.cpp
     src/linyaps_box/os/process.cpp
@@ -321,6 +322,10 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/protocol/sync_socket_forwarder.cpp
     src/linyaps_box/runtime.cpp
     src/linyaps_box/security/privilege.cpp
+    src/linyaps_box/specconv/capabilities.cpp
+    src/linyaps_box/specconv/mount.cpp
+    src/linyaps_box/specconv/namespace.cpp
+    src/linyaps_box/specconv/process.cpp
     src/linyaps_box/status_directory.cpp
     src/linyaps_box/status_directory_manager.cpp
     src/linyaps_box/terminal.cpp
@@ -330,8 +335,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/utils/environ.cpp
     src/linyaps_box/utils/epoll.cpp
     src/linyaps_box/utils/file_describer.cpp
-    src/linyaps_box/utils/ns_flags.cpp
-    src/linyaps_box/utils/rlimit.cpp
     src/linyaps_box/utils/semver.cpp
     src/linyaps_box/utils/session.cpp
     src/linyaps_box/utils/setns.cpp

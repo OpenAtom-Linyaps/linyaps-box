@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -113,5 +114,8 @@ constexpr auto to_array(T (&&arr)[N]) noexcept
 
 template <auto... Values>
 using shrink_macros_t = typename detail::shrink_macros<Values...>::type;
+
+[[noreturn]] auto unreachable(std::string_view text, std::optional<int> exit_code = std::nullopt)
+  -> void;
 
 } // namespace linyaps_box::utils

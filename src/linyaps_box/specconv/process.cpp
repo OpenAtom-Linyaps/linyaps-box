@@ -2,11 +2,16 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include "linyaps_box/utils/rlimit.h"
+#include "linyaps_box/specconv/process.h"
+
+#include "linyaps_box/utils/utils.h"
+
+#include <cassert>
+#include <limits>
 
 #include <sys/resource.h>
 
-namespace linyaps_box::utils {
+namespace linyaps_box::specconv {
 
 using namespace linyaps_box::config;
 
@@ -48,7 +53,23 @@ auto to_rlimit_resource(rlimit::type type) noexcept -> int
         return RLIMIT_STACK;
     }
 
-    __builtin_unreachable();
+    utils::unreachable("unknown rlimit type");
 }
 
-} // namespace linyaps_box::utils
+auto to_rlim_t(std::uint64_t value) noexcept -> std::optional<rlim_t>
+{
+    constexpr auto native_infinity = static_cast<std::uint64_t>(RLIM_INFINITY);
+    constexpr auto uint64_max = std::numeric_limits<std::uint64_t>::max();
+
+    if (value == native_infinity || value == uint64_max) {
+        return RLIM_INFINITY;
+    }
+
+    if (value > native_infinity) {
+        return std::nullopt;
+    }
+
+    return static_cast<rlim_t>(value);
+}
+
+} // namespace linyaps_box::specconv

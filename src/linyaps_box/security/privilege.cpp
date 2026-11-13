@@ -8,6 +8,7 @@
 #include "linyaps_box/os/fs.h"
 #include "linyaps_box/os/io.h"
 #include "linyaps_box/os/process.h"
+#include "linyaps_box/specconv/capabilities.h"
 #include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/utils.h"
 
@@ -99,8 +100,8 @@ auto parse_names(const std::optional<std::vector<std::string>> &names)
     std::vector<int> vals;
     vals.reserve(names->size());
     for (const auto &name : *names) {
-        cap_value_t v{ };
-        if (UNLIKELY(cap_from_name(name.c_str(), &v) < 0)) {
+        const auto value = specconv::to_capability(name);
+        if (UNLIKELY(!value)) {
             // config.md capabilities: a value which cannot be mapped to a
             // relevant kernel interface MUST be logged as a warning, and the
             // runtime SHOULD NOT fail the container because of it.
@@ -108,7 +109,7 @@ auto parse_names(const std::optional<std::vector<std::string>> &names)
             continue;
         }
 
-        vals.push_back(v);
+        vals.push_back(*value);
     }
 
     return vals;

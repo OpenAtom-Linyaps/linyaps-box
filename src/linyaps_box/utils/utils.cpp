@@ -4,6 +4,8 @@
 
 #include "linyaps_box/utils/utils.h"
 
+#include "linyaps_box/log/macro.h"
+
 #include <chrono>
 #include <random>
 #include <thread>
@@ -49,5 +51,16 @@ auto gen_random_string(std::size_t len) noexcept -> std::string
     }
 
     return result;
+}
+
+auto unreachable(std::string_view text, std::optional<int> exit_code) -> void
+{
+    LINYAPS_BOX_LOG_FATAL(text);
+
+    if (exit_code) {
+        _exit(exit_code.value());
+    }
+
+    std::terminate();
 }
 } // namespace linyaps_box::utils

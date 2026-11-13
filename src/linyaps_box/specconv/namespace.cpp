@@ -2,13 +2,15 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include "linyaps_box/utils/ns_flags.h"
+#include "linyaps_box/specconv/namespace.h"
+
+#include "linyaps_box/utils/utils.h"
 
 #include <csignal> // IWYU pragma: keep
 
 #include <sched.h>
 
-namespace linyaps_box::utils {
+namespace linyaps_box::specconv {
 
 using namespace linyaps_box::config;
 
@@ -38,7 +40,7 @@ auto to_clone_flag(ns::type type) noexcept -> unsigned int
 #endif
     }
 
-    __builtin_unreachable();
+    utils::unreachable("unknown ns type");
 }
 
 auto generate_clone_flags(const std::optional<std::vector<ns>> &namespaces) noexcept -> unsigned int
@@ -50,8 +52,6 @@ auto generate_clone_flags(const std::optional<std::vector<ns>> &namespaces) noex
 
     for (const auto &ns : *namespaces) {
         if (ns.path) {
-            // A namespace entry with a `path` is joined via setns(2), not
-            // created, so it contributes no clone flag.
             continue;
         }
 
@@ -61,4 +61,28 @@ auto generate_clone_flags(const std::optional<std::vector<ns>> &namespaces) noex
     return flag;
 }
 
-} // namespace linyaps_box::utils
+auto to_proc_ns_name(ns::type type) noexcept -> std::string_view
+{
+    switch (type) {
+    case ns::type::ipc:
+        return "ipc";
+    case ns::type::uts:
+        return "uts";
+    case ns::type::mount:
+        return "mnt";
+    case ns::type::pid:
+        return "pid";
+    case ns::type::net:
+        return "net";
+    case ns::type::user:
+        return "user";
+    case ns::type::cgroup:
+        return "cgroup";
+    case ns::type::time:
+        return "time";
+    }
+
+    utils::unreachable("unknown ns name");
+}
+
+} // namespace linyaps_box::specconv

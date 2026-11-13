@@ -6,6 +6,7 @@
 
 #include "linyaps_box/config/oci_config.h"
 #include "linyaps_box/log/macro.h"
+#include "linyaps_box/specconv/capabilities.h"
 #include "linyaps_box/utils/environ.h"
 #include "linyaps_box/utils/utils.h"
 #include "linyaps_box/version.h"
@@ -281,8 +282,7 @@ auto register_exec(CLI::App &app, linyaps_box::command::exec_options &opts) -> C
     cmd->add_option("-c,--cap", opts.caps, "Set capabilities")
       ->type_name("CAP")
       ->check([](const std::string &str) {
-          cap_value_t val{ };
-          if (cap_from_name(str.c_str(), &val) < 0) {
+          if (!linyaps_box::specconv::to_capability(str)) {
               throw CLI::ValidationError("--cap", "invalid capability: " + str);
           }
 
