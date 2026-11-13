@@ -13,11 +13,11 @@
 #include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/protocol/sync_socket_forwarder.h"
 #include "linyaps_box/security/privilege.h"
+#include "linyaps_box/specconv/process.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/environ.h"
-#include "linyaps_box/utils/rlimit.h"
 #include "linyaps_box/utils/session.h"
 #include "linyaps_box/utils/setns.h"
 #include "linyaps_box/utils/utils.h"
@@ -194,8 +194,18 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
     }
 
     for (const auto &rl : *proc.rlimits) {
-        const auto resource = utils::to_rlimit_resource(rl.type_);
-        const struct ::rlimit limit{ rl.soft, rl.hard };
+        const auto resource = specconv::to_rlimit_resource(rl.type_);
+        const auto soft = specconv::to_rlim_t(rl.soft);
+        const auto hard = specconv::to_rlim_t(rl.hard);
+        if (!soft || !hard) {
+            throw std::runtime_error(
+              fmt::format("rlimit {} (soft={}, hard={}) is not representable on this platform",
+                          resource,
+                          rl.soft,
+                          rl.hard));
+        }
+
+        const struct ::rlimit limit{ *soft, *hard };
         if (::setrlimit(resource, &limit) != 0) {
             _exit(EXIT_FAILURE);
         }

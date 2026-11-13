@@ -17,10 +17,6 @@
 
 #include <sys/types.h>
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
-#  include <sys/capability.h>
-#endif
-
 namespace linyaps_box::command {
 
 struct global_options

@@ -7,7 +7,7 @@
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
 #include "linyaps_box/os/io.h"
-#include "linyaps_box/os/kernel_constants.h"
+#include "linyaps_box/os/mount.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h> // for std::filesystem::path
@@ -147,7 +147,8 @@ constexpr auto max_symlinks = 128;
         return unexpected{ std::move(stat).error() };
     }
 
-    if (UNLIKELY(static_cast<unsigned long>(stat->f_flags) & os::sys::st_nosymfollow) != 0) {
+    if (UNLIKELY(os::sys::decode_f_flags(static_cast<unsigned long>(stat->f_flags))
+                   .contains(os::sys::statfs_flag::nosymfollow))) {
         return unexpected{ std::make_error_code(std::errc::too_many_symbolic_link_levels) };
     }
 

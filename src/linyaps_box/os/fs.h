@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "linyaps_box/os/kernel_constants.h"
 #include "linyaps_box/os/result.h"
 #include "linyaps_box/utils/enum_traits.h"
 #include "linyaps_box/utils/file_describer.h"
@@ -282,8 +281,21 @@ LINYAPS_REGISTER_ENUM_TABLE(memfd_flag,
                             { memfd_flag::hugetlb, "MFD_HUGETLB" })
 
 enum class statx_flag : std::uint16_t {
-    mnt_id = statx_mnt_id,
-    mnt_id_unique = statx_mnt_id_unique,
+    mnt_id =
+#ifdef STATX_MNT_ID
+      STATX_MNT_ID
+#else
+      0x00001000U
+#endif
+    ,
+
+    mnt_id_unique =
+#ifdef STATX_MNT_ID_UNIQUE
+      STATX_MNT_ID_UNIQUE
+#else
+      0x00004000U
+#endif
+    ,
 };
 LINYAPS_ENABLE_BITMASK_ENUM(statx_flag)
 LINYAPS_REGISTER_ENUM_TABLE(statx_flag,

@@ -20,10 +20,8 @@ set(linyaps-box_UNIT_TESTS_SOURCE
     src/log_test.cpp
     src/main.cpp
     src/message_channel_test.cpp
-    src/ns_flags_test.cpp
     src/parse_proc_stat_test.cpp
     src/ringbuffer_test.cpp
-    src/rlimit_test.cpp
     src/semver_test.cpp
     src/span_test.cpp
     src/stream_test.cpp

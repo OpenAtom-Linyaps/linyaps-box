@@ -6,6 +6,7 @@
 
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
+#include "linyaps_box/specconv/namespace.h"
 #include "linyaps_box/utils/enum_formatter.h" // IWYU pragma: keep
 #include "linyaps_box/utils/utils.h"
 
@@ -21,34 +22,6 @@
 #include <fcntl.h>
 #include <sched.h>
 #include <unistd.h>
-
-namespace {
-
-auto to_proc_ns_string(linyaps_box::config::ns::type type) noexcept -> std::string_view
-{
-    switch (type) {
-    case linyaps_box::config::ns::type::ipc:
-        return "ipc";
-    case linyaps_box::config::ns::type::uts:
-        return "uts";
-    case linyaps_box::config::ns::type::mount:
-        return "mnt";
-    case linyaps_box::config::ns::type::pid:
-        return "pid";
-    case linyaps_box::config::ns::type::net:
-        return "net";
-    case linyaps_box::config::ns::type::user:
-        return "user";
-    case linyaps_box::config::ns::type::cgroup:
-        return "cgroup";
-    case linyaps_box::config::ns::type::time:
-        return "time";
-    }
-
-    __builtin_unreachable();
-}
-
-} // namespace
 
 namespace linyaps_box::utils {
 
@@ -94,7 +67,7 @@ void join_namespaces_in_order(std::vector<std::pair<ns::type, file_descriptor>> 
 auto open_namespace_fd(pid_t target_pid, ns::type ns_type) -> file_descriptor
 {
     const auto path = std::filesystem::path{ "/proc" } / std::to_string(target_pid) / "ns"
-      / to_proc_ns_string(ns_type);
+      / specconv::to_proc_ns_name(ns_type);
     return os::throw_if_error(
       os::open(path, { os::sys::open_flag::cloexec, os::sys::access_mode::read_only }));
 }
@@ -146,7 +119,7 @@ auto verify_namespace_fd(const file_descriptor &fd, ns::type type) -> void
     }
 
     const auto type_from_fd = target.substr(0, colon_pos);
-    const auto expected = to_proc_ns_string(type);
+    const auto expected = specconv::to_proc_ns_name(type);
     if (UNLIKELY(type_from_fd != expected)) {
         throw std::runtime_error(
           fmt::format("namespace fd /proc/self/fd/{} resolves to '{}' namespace, not '{}'",
