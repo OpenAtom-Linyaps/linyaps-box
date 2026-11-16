@@ -258,6 +258,17 @@ struct open_how
     open_option opt;
     std::filesystem::perms perms;
     utils::bitflags<openat2_resolve> resolve;
+
+    [[nodiscard]] constexpr auto native_flags() const noexcept -> std::uint64_t
+    {
+        auto flags = static_cast<std::uint64_t>(opt);
+#if defined(O_LARGEFILE) && (O_LARGEFILE != 0)
+        if ((flags & static_cast<std::uint64_t>(O_PATH)) == 0) {
+            flags |= static_cast<std::uint64_t>(O_LARGEFILE);
+        }
+#endif
+        return flags;
+    }
 };
 
 struct linux_dirent64

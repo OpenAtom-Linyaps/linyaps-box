@@ -18,12 +18,15 @@ enum class arch : uint8_t {
     loong64, // new world
     mips64,  // n64 ABI
     sw64,
+    i386,
 };
 
 #ifdef LINYAPS_BOX_TARGET_ARCH_SW64
 constexpr auto target_arch = arch::sw64;
 #elif defined(LINYAPS_BOX_TARGET_ARCH_X86_64)
 constexpr auto target_arch = arch::x86_64;
+#elif defined(LINYAPS_BOX_TARGET_ARCH_I386)
+constexpr auto target_arch = arch::i386;
 #elif defined(LINYAPS_BOX_TARGET_ARCH_AARCH64)
 constexpr auto target_arch = arch::aarch64;
 #elif defined(LINYAPS_BOX_TARGET_ARCH_RISCV64)
@@ -44,6 +47,19 @@ struct syscall_nr;
 //    https://github.com/torvalds/linux/blob/704340f1cd0dcef829eb62f5b48ae95a2ce17bdf/arch/x86/entry/syscalls/syscall_64.tbl
 template <>
 struct syscall_nr<arch::x86_64>
+{
+    static constexpr int pidfd_send_signal = 424;
+    static constexpr int pidfd_open = 434;
+    static constexpr int openat2 = 437;
+    static constexpr int close_range = 436;
+};
+
+// i386 (32-bit x86) uses a separate table:
+//    https://github.com/torvalds/linux/blob/704340f1cd0dcef829eb62f5b48ae95a2ce17bdf/arch/x86/entry/syscalls/syscall_32.tbl
+// The numbers below happen to coincide with x86_64, but the tables are
+// independent, so keep a dedicated specialization.
+template <>
+struct syscall_nr<arch::i386>
 {
     static constexpr int pidfd_send_signal = 424;
     static constexpr int pidfd_open = 434;

@@ -1,6 +1,6 @@
 include(CheckCXXSourceCompiles)
 
-# Detect target 64-bit architecture and return result via output variable.
+# Detect target architecture and return result via output variable.
 #
 # out_var: The variable name in caller scope to store the result string.
 function(detect_architecture out_var)
@@ -33,6 +33,22 @@ int main() { return 0; }"
 
     if(_ARCH_IS_X86_64)
         set(${out_var} "X86_64" PARENT_SCOPE)
+        return()
+    endif()
+
+    # i386: GCC/Clang predefine __i386__ / __i386
+    # also true for -m32 on x86_64.
+    check_cxx_source_compiles(
+        "
+  #if !defined(__i386__) && !defined(__i386)
+  #  error not i386
+  #endif
+  int main() { return 0; }"
+        _ARCH_IS_I386
+    )
+
+    if(_ARCH_IS_I386)
+        set(${out_var} "I386" PARENT_SCOPE)
         return()
     endif()
 
@@ -106,5 +122,5 @@ int main() { return 0; }"
         return()
     endif()
 
-    message(FATAL_ERROR "Unsupported 64-bit target architecture")
+    message(FATAL_ERROR "Unsupported target architecture")
 endfunction()

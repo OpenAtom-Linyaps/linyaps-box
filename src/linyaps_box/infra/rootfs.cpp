@@ -830,7 +830,7 @@ auto Root::create_directories(const std::filesystem::path &path,
 {
     const auto raw = static_cast<unsigned>(perms);
     // Reject file type bits, setuid, setgid — mkdirat silently ignores them
-    if ((raw & ~07777) != 0 || (raw & ~01777) != 0) {
+    if ((raw & ~07777U) != 0 || (raw & ~01777U) != 0) {
         return unexpected{ std::make_error_code(std::errc::invalid_argument) };
     }
 
