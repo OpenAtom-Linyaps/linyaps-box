@@ -85,6 +85,23 @@ auto openat(utils::file_descriptor_ref dirfd,
     }
 }
 
+#if defined(O_LARGEFILE) && (O_LARGEFILE != 0)
+static_assert((sys::open_how{ sys::open_option{ sys::open_flag::none, sys::access_mode::read_only },
+                              std::filesystem::perms::none,
+                              utils::bitflags<sys::openat2_resolve>{ } }
+                 .native_flags()
+               & static_cast<std::uint64_t>(O_LARGEFILE))
+                != 0,
+              "openat2 must request O_LARGEFILE on descriptors opened for I/O");
+static_assert((sys::open_how{ sys::open_option{ sys::open_flag::none, sys::access_mode::path },
+                              std::filesystem::perms::none,
+                              utils::bitflags<sys::openat2_resolve>{ } }
+                 .native_flags()
+               & static_cast<std::uint64_t>(O_LARGEFILE))
+                == 0,
+              "O_PATH must not carry O_LARGEFILE (openat2 rejects it with EINVAL)");
+#endif
+
 auto openat2(utils::file_descriptor_ref dirfd,
              const std::filesystem::path &path,
              const sys::open_how &how) noexcept -> Result<utils::file_descriptor>
@@ -95,7 +112,7 @@ auto openat2(utils::file_descriptor_ref dirfd,
         uint64_t mode;
         uint64_t resolve;
     } linux_open_how{
-        static_cast<uint64_t>(how.opt),
+        how.native_flags(),
         static_cast<uint64_t>(how.perms),
         how.resolve.to_raw(),
     };
@@ -120,7 +137,6 @@ auto unlinkat(utils::file_descriptor_ref dirfd,
               utils::bitflags<sys::at_flag> flags) noexcept -> Result<void>
 {
     if (UNLIKELY(::unlinkat(dirfd, path.c_str(), flags.to_raw()) < 0)) {
-
         return unexpected{ make_error_code(errno) };
     }
 
@@ -323,7 +339,6 @@ auto fcntl_setfl(utils::file_descriptor_ref fd, utils::bitflags<sys::open_flag> 
   -> Result<void>
 {
     if (UNLIKELY(::fcntl(fd, F_SETFL, flag.to_raw()) < 0)) {
-
         return unexpected(make_error_code(errno));
     }
 

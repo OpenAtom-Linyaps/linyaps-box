@@ -23,6 +23,12 @@ endif()
 
 option(linyaps-box_STATIC "Build linyaps-box as statically-linked binary." OFF)
 
+option(
+    linyaps-box_ENABLE_TIME64
+    "Require 64-bit time_t (requires glibc 2.34+ on 32-bit glibc targets)."
+    OFF
+)
+
 option(linyaps-box_ENABLE_SECCOMP "Build linyaps-box with seccomp support." ON)
 
 option(
@@ -170,6 +176,41 @@ include(DetectArch)
 detect_architecture(TARGET_ARCH)
 
 message(STATUS "Detected architecture: ${TARGET_ARCH}")
+
+if(linyaps-box_ENABLE_TIME64)
+    function(linyaps_box_check_time64)
+        include(CMakePushCheckState)
+        include(CheckCXXSourceCompiles)
+        cmake_push_check_state(RESET)
+
+        set(CMAKE_REQUIRED_DEFINITIONS -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64)
+        check_cxx_source_compiles(
+            "
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+static_assert(sizeof(time_t) == 8, \"64-bit time_t is required\");
+static_assert(sizeof(off_t) == 8, \"64-bit off_t is required\");
+int main() {
+    struct stat st{};
+    struct timespec ts{};
+    return ::fstat(-1, &st) + ::clock_gettime(CLOCK_REALTIME, &ts);
+}"
+            LINYAPS_BOX_HAVE_TIME64
+        )
+        cmake_pop_check_state()
+
+        if(NOT LINYAPS_BOX_HAVE_TIME64)
+            message(
+                FATAL_ERROR
+                "TIME64 requires working 64-bit time and file interfaces.
+                 On 32-bit glibc targets, use a glibc 2.34+ toolchain/sysroot,
+                 or disable this option to retain the libc's default time ABI."
+            )
+        endif()
+    endfunction()
+    linyaps_box_check_time64()
+endif()
 
 # ==============================================================================
 
@@ -599,13 +640,11 @@ target_compile_definitions(
         "LINYAPS_BOX_TARGET_ARCH_${TARGET_ARCH}"
         "LINYAPS_BOX_DEFAULT_LOG_LEVEL_NAME=${linyaps-box_DEFAULT_LOG_LEVEL}"
         "LINYAPS_BOX_ACTIVE_LOG_LEVEL_NAME=${linyaps-box_ACTIVE_LOG_LEVEL}"
-)
-
-target_compile_definitions(
-    "${linyaps-box_LIBRARY}"
-    PUBLIC
         "$<$<BOOL:${linyaps-box_STATIC}>:LINYAPS_BOX_STATIC_LINK>"
         "LINYAPS_BOX_LOG_ENABLE_SOURCE_LOCATION"
+        _FILE_OFFSET_BITS=64
+        "$<$<BOOL:${linyaps-box_ENABLE_TIME64}>:_TIME_BITS=64>"
+        _GNU_SOURCE
 )
 
 if(linyaps-box_ENABLE_SECCOMP)
