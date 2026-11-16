@@ -39,7 +39,7 @@ auto to_string_view(runtime_status s) noexcept -> std::string_view;
 
 auto to_json(nlohmann::json &j, const container_status &s) -> void;
 
-[[nodiscard]] auto derive_status(const container_status &s) -> runtime_status;
+[[nodiscard]] auto query_runtime_status(const container_status &s) -> runtime_status;
 
 auto to_oci_json(const container_status &s, runtime_status status) -> nlohmann::json;
 
