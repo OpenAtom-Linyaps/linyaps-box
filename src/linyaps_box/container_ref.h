@@ -28,9 +28,7 @@ struct exec_container_option
     std::optional<bool> no_new_privs;
     std::vector<std::string> extra_envs;
     std::vector<std::string> command;
-#ifdef LINYAPS_BOX_ENABLE_CAP
     std::optional<std::vector<std::string>> caps;
-#endif
 
     std::optional<infra::unix_socket> console_socket;
 };

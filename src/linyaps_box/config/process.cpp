@@ -59,17 +59,6 @@ void validate_rlimits(const process &v)
     }
 }
 
-// A build capability, not a model invariant: capabilities need the compile-time
-// switch.  Kept as its own step so validate() stays a plain composition.
-void require_capabilities_build(const process &v)
-{
-    if (v.capabilities_) {
-#ifndef LINYAPS_BOX_ENABLE_CAP
-        throw std::runtime_error("capabilities support is not compiled in");
-#endif
-    }
-}
-
 } // namespace
 
 LINYAPS_BOX_CONFIG_SCHEMA_WITH_POST(
@@ -95,10 +84,6 @@ LINYAPS_BOX_CONFIG_SCHEMA_WITH_POST(
 
 void validate(const process &v)
 {
-    // Unknown capability names are not rejected here: the OCI spec requires them
-    // to be warned about at runtime instead.
-    require_capabilities_build(v);
-
     validate(v.user_);
 
     require(v.cwd.is_absolute(), "process.cwd must be an absolute path, got: {}", v.cwd);

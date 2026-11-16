@@ -48,9 +48,7 @@ try {
         option.console_socket = infra::unix_socket::connect(*options.console_socket);
     }
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
     option.caps = std::move(options.caps);
-#endif
 
     return container->second.exec(std::move(option));
 } catch (const std::exception &e) {

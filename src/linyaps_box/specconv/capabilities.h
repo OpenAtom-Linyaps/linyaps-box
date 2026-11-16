@@ -9,7 +9,6 @@
 
 namespace linyaps_box::specconv {
 
-[[nodiscard]] auto to_capability([[maybe_unused]] const std::string &name) noexcept
-  -> std::optional<int>;
+[[nodiscard]] auto to_capability(const std::string &name) noexcept -> std::optional<int>;
 
 } // namespace linyaps_box::specconv

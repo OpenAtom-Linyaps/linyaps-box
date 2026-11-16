@@ -278,7 +278,6 @@ auto register_exec(CLI::App &app, linyaps_box::command::exec_options &opts) -> C
     cmd->add_flag("-t,--tty", opts.tty, "Allocate a pseudo-TTY");
     add_preserve_fds(cmd, opts.preserve_fds);
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
     cmd->add_option("-c,--cap", opts.caps, "Set capabilities")
       ->type_name("CAP")
       ->check([](const std::string &str) {
@@ -288,7 +287,6 @@ auto register_exec(CLI::App &app, linyaps_box::command::exec_options &opts) -> C
 
           return std::string{ };
       });
-#endif
     cmd->add_flag("--no-new-privs",
                   opts.no_new_privs,
                   "Set the no new privileges value for the process");
