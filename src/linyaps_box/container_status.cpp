@@ -70,7 +70,7 @@ auto to_string_view(runtime_status s) noexcept -> std::string_view
     __builtin_unreachable();
 }
 
-auto derive_status(const container_status &s) -> runtime_status
+auto query_runtime_status(const container_status &s) -> runtime_status
 {
     if (s.pid <= 0) {
         return runtime_status::CREATING;

@@ -33,7 +33,7 @@ auto list(const list_options &options, const global_options &global) -> int
         ptr->reserve(statuses.size());
 
         for (const auto &s : statuses) {
-            const auto rs = derive_status(s);
+            const auto rs = query_runtime_status(s);
             j += to_oci_json(s, rs);
         }
 
@@ -58,7 +58,7 @@ auto list(const list_options &options, const global_options &global) -> int
 
     std::array<char, 30> time_buf{ };
     for (const auto &s : statuses) {
-        const auto rs = derive_status(s);
+        const auto rs = query_runtime_status(s);
         const auto len = utils::to_created_time(utils::span{ time_buf }, s.created);
         fmt::println(format_style,
                      s.id,

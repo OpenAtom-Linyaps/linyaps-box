@@ -154,7 +154,7 @@ void execute_hook(const hook &hook, const container_status &state)
     }
     parent.close();
 
-    auto state_json = to_oci_json(state, derive_status(state)).dump();
+    auto state_json = to_oci_json(state, query_runtime_status(state)).dump();
     const auto *data = reinterpret_cast<const std::byte *>(state_json.data());
     const auto remaining = state_json.size();
 
