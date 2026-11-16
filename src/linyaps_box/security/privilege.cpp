@@ -13,6 +13,7 @@
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/std.h>
+#include <sys/capability.h>
 #include <sys/prctl.h>
 
 #include <algorithm>
@@ -22,10 +23,6 @@
 
 #include <grp.h>
 #include <unistd.h>
-
-#ifdef LINYAPS_BOX_ENABLE_CAP
-#  include <sys/capability.h>
-#endif
 
 namespace linyaps_box::security {
 
@@ -87,8 +84,6 @@ bool should_setgroups(bool can, bool has_additional_gids)
 
     return false;
 }
-
-#ifdef LINYAPS_BOX_ENABLE_CAP
 
 auto parse_names(const std::optional<std::vector<std::string>> &names)
   -> std::optional<std::vector<int>>
@@ -200,25 +195,6 @@ void apply_ambient(const std::optional<std::vector<int>> &ambient)
         }
     });
 }
-
-#else
-
-auto parse_names(const std::optional<std::vector<std::string>> &) -> std::optional<std::vector<int>>
-{
-    return std::nullopt;
-}
-
-auto drop_bounding(const std::optional<std::vector<int>> &) -> void { }
-
-void apply_caps(const std::optional<std::vector<int>> &,
-                const std::optional<std::vector<int>> &,
-                const std::optional<std::vector<int>> &)
-{
-}
-
-auto apply_ambient(const std::optional<std::vector<int>> &) -> void { }
-
-#endif
 
 } // anonymous namespace
 

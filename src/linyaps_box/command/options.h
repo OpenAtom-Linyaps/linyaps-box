@@ -47,9 +47,7 @@ struct exec_options
     std::optional<std::filesystem::path> console_socket;
     std::optional<std::filesystem::path> process_file;
     std::optional<std::filesystem::path> cwd;
-#ifdef LINYAPS_BOX_ENABLE_CAP
     std::optional<std::vector<std::string>> caps;
-#endif
     std::string ID;
     std::vector<std::string> envs;
     std::vector<std::string> command;

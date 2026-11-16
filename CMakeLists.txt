@@ -25,8 +25,6 @@ option(linyaps-box_STATIC "Build linyaps-box as statically-linked binary." OFF)
 
 option(linyaps-box_ENABLE_SECCOMP "Build linyaps-box with seccomp support." ON)
 
-option(linyaps-box_ENABLE_CAP "Build linyaps-box with capability support" ON)
-
 option(
     linyaps-box_ENABLE_SYSTEMD_INTEGRATION
     "Build with journald (systemd) support."
@@ -396,11 +394,9 @@ if(linyaps-box_ENABLE_SECCOMP)
     # TODO: detect seccomp_arch_resolve_name and use if available
 endif()
 
-if(linyaps-box_ENABLE_CAP)
-    # TODO: maybe remove libcap and implement it by ourself ?
-    pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap>=2.25)
-    list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
-endif()
+# TODO: maybe remove libcap and implement it by ourself ?
+pkg_check_modules(libcap REQUIRED IMPORTED_TARGET libcap>=2.25)
+list(APPEND linyaps-box_LIBRARY_LINK_LIBRARIES PUBLIC PkgConfig::libcap)
 
 if(linyaps-box_ENABLE_SYSTEMD_INTEGRATION)
     pkg_check_modules(libsystemd REQUIRED IMPORTED_TARGET libsystemd)
@@ -624,13 +620,6 @@ if(linyaps-box_ENABLE_SECCOMP)
             PUBLIC SECCOMP_ARCH_RESOLVE_NAME=1
         )
     endif()
-endif()
-
-if(linyaps-box_ENABLE_CAP)
-    target_compile_definitions(
-        "${linyaps-box_LIBRARY}"
-        PUBLIC LINYAPS_BOX_ENABLE_CAP
-    )
 endif()
 
 if(linyaps-box_ENABLE_SYSTEMD_INTEGRATION)

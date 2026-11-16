@@ -103,7 +103,6 @@ auto resolve_final_process(linyaps_box::exec_container_option &option,
         proc.user_.gid = *option.gid;
     }
 
-#ifdef LINYAPS_BOX_ENABLE_CAP
     if (option.caps) {
         if (!proc.capabilities_) {
             proc.capabilities_.emplace();
@@ -135,7 +134,6 @@ auto resolve_final_process(linyaps_box::exec_container_option &option,
                          });
         }
     }
-#endif
 
     return proc;
 }
