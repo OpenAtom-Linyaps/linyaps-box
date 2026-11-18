@@ -9,6 +9,7 @@
 #include "linyaps_box/config/oci_config.h"
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -52,6 +53,23 @@ TEST(HookParse, HappyPath)
     EXPECT_THAT(*config.hooks_->prestart->at(0).env, ElementsAre("FOO=bar"));
     ASSERT_TRUE(config.hooks_->prestart->at(0).timeout.has_value());
     EXPECT_EQ(*config.hooks_->prestart->at(0).timeout, 10);
+}
+
+TEST(HookParse, DeprecatedPrestartParsed)
+{
+    const auto config = parse_config(R"(  "hooks": {"prestart": [{"path": "/bin/true"}]})");
+    ASSERT_TRUE(config.hooks_.has_value());
+    ASSERT_TRUE(config.hooks_->prestart.has_value());
+    EXPECT_EQ((*config.hooks_->prestart)[0].path.string(), "/bin/true");
+}
+
+TEST(HookParse, CreateRuntimeHooksParsed)
+{
+    const auto config = parse_config(R"(  "hooks": {"createRuntime": [{"path": "/bin/true"}]})");
+    ASSERT_TRUE(config.hooks_.has_value());
+    EXPECT_FALSE(config.hooks_->prestart.has_value());
+    ASSERT_TRUE(config.hooks_->create_runtime.has_value());
+    EXPECT_EQ((*config.hooks_->create_runtime)[0].path.string(), "/bin/true");
 }
 
 } // namespace

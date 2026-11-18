@@ -9,6 +9,7 @@
 #include "linyaps_box/config/oci_config.h"
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -131,6 +132,31 @@ TEST(SeccompParse, DefaultActionRequiredRejected)
     EXPECT_THROW(std::ignore = parse_config(
                    R"(  "linux": {"seccomp": {"architectures": ["SCMP_ARCH_X86_64"]}})"),
                  std::runtime_error);
+}
+
+TEST(SeccompParse, DefaultErrnoRetWithTraceActionAccepted)
+{
+    const auto config = parse_config(
+      R"(  "linux": {"seccomp": {"defaultAction": "SCMP_ACT_TRACE", "defaultErrnoRet": 1}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->seccomp_.has_value());
+}
+
+TEST(SeccompParse, SyscallErrnoRetWithTraceActionAccepted)
+{
+    const auto config = parse_config(
+      R"(  "linux": {"seccomp": {"defaultAction": "SCMP_ACT_ALLOW",
+              "syscalls": [{"names": ["chmod"], "action": "SCMP_ACT_TRACE", "errnoRet": 1}]}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->seccomp_.has_value());
+}
+
+TEST(SeccompParse, DefaultErrnoRetWithErrnoActionAccepted)
+{
+    const auto config = parse_config(
+      R"(  "linux": {"seccomp": {"defaultAction": "SCMP_ACT_ERRNO", "defaultErrnoRet": 1}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->seccomp_.has_value());
 }
 
 } // namespace

@@ -12,6 +12,7 @@
 #include <fmt/format.h>
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -63,6 +64,15 @@ TEST(CpuParse, QuotaSmallerThanBurstRejected)
     EXPECT_THROW(std::ignore = parse_config(
                    R"(  "linux": {"resources": {"cpu": {"quota": 100, "burst": 200}}})"),
                  std::runtime_error);
+}
+
+TEST(CpuParse, UnlimitedQuotaAcceptsBurst)
+{
+    const auto config =
+      parse_config(R"(  "linux": {"resources": {"cpu": {"quota": -1, "burst": 1000}}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->resources_.has_value());
+    ASSERT_TRUE(config.linux_->resources_->cpu_.has_value());
 }
 
 } // namespace
