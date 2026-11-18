@@ -9,6 +9,7 @@
 #include "linyaps_box/config/oci_config.h"
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -88,6 +89,61 @@ TEST(SchedulerParse, PolicyRequiredRejected)
       std::ignore = parse_config(
         "",
         R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"nice": 0}})"),
+      std::runtime_error);
+}
+
+TEST(SchedulerParse, NiceAcceptedForBatchPolicy)
+{
+    const auto config = parse_config(
+      "",
+      R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_BATCH", "nice": 5}})");
+    ASSERT_TRUE(config.process_->scheduler_.has_value());
+    EXPECT_THAT(config.process_->scheduler_->nice.value_or(0), Eq(5));
+}
+
+TEST(SchedulerParse, NiceBelowRangeRejected)
+{
+    EXPECT_THROW(
+      std::ignore = parse_config(
+        "",
+        R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_BATCH", "nice": -30}})"),
+      std::runtime_error);
+}
+
+TEST(SchedulerParse, ZeroPriorityAcceptedForOtherPolicy)
+{
+    const auto config = parse_config(
+      "",
+      R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_OTHER", "priority": 0}})");
+    ASSERT_TRUE(config.process_->scheduler_.has_value());
+    EXPECT_THAT(config.process_->scheduler_->priority.value_or(1), Eq(0));
+}
+
+TEST(SchedulerParse, DeadlineParametersAcceptedForDeadlinePolicy)
+{
+    const auto config = parse_config(
+      "",
+      R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_DEADLINE", "runtime": 100000, "deadline": 200000, "period": 300000}})");
+    ASSERT_TRUE(config.process_->scheduler_.has_value());
+    ASSERT_TRUE(config.process_->scheduler_->runtime.has_value());
+    EXPECT_THAT(config.process_->scheduler_->runtime.value_or(0), Eq(100000U));
+}
+
+TEST(SchedulerParse, RealtimePriorityAccepted)
+{
+    const auto config = parse_config(
+      "",
+      R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_FIFO", "priority": 10}})");
+    ASSERT_TRUE(config.process_->scheduler_.has_value());
+    EXPECT_THAT(config.process_->scheduler_->priority.value_or(0), Eq(10));
+}
+
+TEST(SchedulerParse, PeriodWithNonDeadlinePolicyRejected)
+{
+    EXPECT_THROW(
+      std::ignore = parse_config(
+        "",
+        R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "scheduler": {"policy": "SCHED_OTHER", "period": 1000}})"),
       std::runtime_error);
 }
 

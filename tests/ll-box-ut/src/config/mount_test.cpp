@@ -12,6 +12,7 @@
 #include <fmt/format.h>
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -212,6 +213,54 @@ TEST(MountParse, InlineIdmapMutuallyExclusiveRejected)
      "options": ["idmap", "ridmap=uids=0:1000:1"]}
   ])"),
                  std::runtime_error);
+}
+
+TEST(MountParse, OptionsMustBeAnArray)
+{
+    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": "ro"}
+  ])"),
+                 std::runtime_error);
+}
+
+TEST(MountParse, OptionsElementMustBeAString)
+{
+    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": [{"ro": true}]}
+  ])"),
+                 std::runtime_error);
+
+    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": [["ro"]]}
+  ])"),
+                 std::runtime_error);
+}
+
+TEST(MountParse, NullOptionsAccepted)
+{
+    const auto config = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": null}
+  ])");
+    ASSERT_TRUE(config.mounts.has_value());
+    EXPECT_EQ((*config.mounts)[0].destination.string(), "/mnt");
+}
+
+TEST(MountParse, UnknownOptionBeforeKnownEntriesFallsToData)
+{
+    const auto config = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": ["aaa"]}
+  ])");
+    ASSERT_TRUE(config.mounts.has_value());
+    EXPECT_THAT((*config.mounts)[0].data, HasSubstr("aaa"));
+}
+
+TEST(MountParse, UnknownOptionAfterKnownEntriesFallsToData)
+{
+    const auto config = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": ["zzz"]}
+  ])");
+    ASSERT_TRUE(config.mounts.has_value());
+    EXPECT_THAT((*config.mounts)[0].data, HasSubstr("zzz"));
 }
 
 } // namespace

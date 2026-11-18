@@ -20,6 +20,7 @@ namespace linyaps_box::test {
     if (!in) {
         throw std::runtime_error{ std::string{ "cannot open fixture: " } + name };
     }
+
     std::ostringstream buf;
     buf << in.rdbuf();
     return buf.str();

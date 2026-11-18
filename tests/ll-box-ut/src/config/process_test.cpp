@@ -11,6 +11,7 @@
 #include <fstream>
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {

@@ -13,6 +13,7 @@
 #include <tuple>
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -31,7 +32,7 @@ using linyaps_box::test::parse_config;
         policy += fmt::format(R"(, "flags": {})", flags);
     }
 
-    policy += "}";
+    policy += '}';
     return fmt::format(R"(  "linux": {{"memoryPolicy": {}}})", policy);
 }
 
@@ -88,7 +89,7 @@ class MemoryPolicyModeNodesTest
 
 TEST_P(MemoryPolicyModeNodesTest, ModeNodesConsistency)
 {
-    const auto &[mode, nodes, rejected] = GetParam();
+    const auto [mode, nodes, rejected] = GetParam();
     const auto content = policy_json(mode, nodes, nullptr);
 
     if (rejected) {

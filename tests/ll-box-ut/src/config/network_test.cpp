@@ -9,6 +9,7 @@
 #include "linyaps_box/config/oci_config.h"
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {

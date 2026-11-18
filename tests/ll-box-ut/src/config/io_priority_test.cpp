@@ -9,6 +9,7 @@
 #include "linyaps_box/config/oci_config.h"
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -42,6 +43,15 @@ TEST(IoPriorityParse, HappyPath)
     ASSERT_TRUE(config.process_->io_priority_.has_value());
     EXPECT_EQ(config.process_->io_priority_->class_, io_priority::class_t::best_effort);
     EXPECT_EQ(config.process_->io_priority_->priority, 4);
+}
+
+TEST(IoPriorityParse, NegativePriorityRejected)
+{
+    EXPECT_THROW(
+      std::ignore = parse_config(
+        "",
+        R"({"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}, "ioPriority": {"class": "IOPRIO_CLASS_BE", "priority": -1}})"),
+      std::runtime_error);
 }
 
 } // namespace

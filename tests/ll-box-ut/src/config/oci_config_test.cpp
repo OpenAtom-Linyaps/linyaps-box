@@ -12,6 +12,7 @@
 #include <string>
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -135,6 +136,26 @@ TEST(OciConfigParse, ParseFromFileSucceeds)
 TEST(OciConfigParse, ParseDirectoryThrows)
 {
     EXPECT_THROW(oci_config::load(std::filesystem::path{ "data" }), std::runtime_error);
+}
+
+// `ociVersion` is a string holding a semantic version; both a non-string value
+// and an unparsable version are contract errors.
+TEST(OciConfigParse, NonStringOciVersionRejected)
+{
+    const auto content = R"({
+  "ociVersion": 1,
+  "process": {"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}}
+})"sv;
+    EXPECT_THROW(oci_config::parse(std::string_view{ content }), std::runtime_error);
+}
+
+TEST(OciConfigParse, MalformedOciVersionRejected)
+{
+    const auto content = R"({
+  "ociVersion": "not-a-version",
+  "process": {"cwd": "/", "args": ["/bin/true"], "user": {"uid": 0, "gid": 0}}
+})"sv;
+    EXPECT_THROW(oci_config::parse(std::string_view{ content }), std::runtime_error);
 }
 
 } // namespace

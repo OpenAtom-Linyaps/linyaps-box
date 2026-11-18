@@ -14,6 +14,7 @@
 #include <utility>
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
@@ -169,8 +170,6 @@ TEST(LinuxParse, IntelRdtSchemataNewlineRejected)
                  std::runtime_error);
 }
 
-// The fields below are OPTIONAL per the spec; assert the parsed values as well
-// as the omitted (absent) form.
 TEST(LinuxParse, NetDeviceNamesParsed)
 {
     const auto config =
@@ -208,6 +207,52 @@ TEST(LinuxParse, PersonalityDomainAndFlagsParsed)
     EXPECT_EQ(config.linux_->personality_->domain_, personality::domain::linux32);
     ASSERT_TRUE(config.linux_->personality_->flags.has_value());
     EXPECT_THAT(*config.linux_->personality_->flags, ElementsAre("ADDR_NO_RANDOMIZE"));
+}
+
+TEST(LinuxParse, DeviceMissingMinorRejected)
+{
+    EXPECT_THROW(std::ignore = parse_config(
+                   R"(  "linux": {"devices": [{"type": "c", "path": "/dev/foo", "major": 1}]})"),
+                 std::runtime_error);
+}
+
+TEST(LinuxParse, DistinctDevicesAccepted)
+{
+    const auto config = parse_config(
+      R"(  "linux": {"devices": [{"type": "c", "path": "/dev/a", "major": 1, "minor": 3},
+                                 {"type": "b", "path": "/dev/b", "major": 1, "minor": 4}]})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->devices.has_value());
+    EXPECT_EQ(config.linux_->devices->size(), 2U);
+}
+
+TEST(LinuxParse, UidMappingsWithJoinedUserNamespaceRejected)
+{
+    EXPECT_THROW(std::ignore = parse_config(
+                   R"(  "linux": {"uidMappings": [{"containerID": 0, "hostID": 1000, "size": 1}],
+                       "gidMappings": [{"containerID": 0, "hostID": 1000, "size": 1}],
+                       "namespaces": [{"type": "user", "path": "/proc/1/ns/user"}]})"),
+                 std::runtime_error);
+}
+
+TEST(LinuxParse, MappingsWithoutNamespacesAccepted)
+{
+    const auto config = parse_config(
+      R"(  "linux": {"uidMappings": [{"containerID": 0, "hostID": 1000, "size": 1}],
+                     "gidMappings": [{"containerID": 0, "hostID": 1000, "size": 1}]})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->uid_mappings.has_value());
+    EXPECT_EQ((*config.linux_->uid_mappings)[0].host_id, 1000U);
+}
+
+TEST(LinuxParse, SameTypeDevicesWithDifferentMajorKept)
+{
+    const auto config = parse_config(
+      R"(  "linux": {"devices": [{"type": "c", "path": "/dev/a", "major": 1, "minor": 3},
+                                 {"type": "c", "path": "/dev/b", "major": 2, "minor": 3}]})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->devices.has_value());
+    EXPECT_EQ(config.linux_->devices->size(), 2U);
 }
 
 } // namespace

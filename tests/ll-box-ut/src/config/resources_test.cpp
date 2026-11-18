@@ -9,11 +9,11 @@
 #include "linyaps_box/config/oci_config.h"
 
 namespace linyaps_box {
+
 using namespace linyaps_box::config;
 
 namespace {
 
-using testing::ElementsAre;
 using testing::Eq;
 using testing::SizeIs;
 
@@ -84,8 +84,6 @@ TEST(ResourcesParse, DeviceRuleAllowRequiredRejected)
                  std::runtime_error);
 }
 
-// An empty object yields a present-but-empty resource (distinct from the
-// "null" case, which leaves the optional unset).
 TEST(ResourcesParse, EmptyBlockIoParsedAsPresentButEmpty)
 {
     const auto config = parse_config(R"(  "linux": {"resources": {"blockIO": {}}})");
@@ -203,6 +201,15 @@ TEST(ResourcesParse, CpuMemoryBlockIoFieldsParsed)
     ASSERT_TRUE(res.block_io_.has_value());
     EXPECT_EQ(res.block_io_->weight.value_or(0), 500U);
     EXPECT_EQ(res.block_io_->leaf_weight.value_or(0), 300U);
+}
+
+TEST(ResourcesParse, BlockIOWeightDeviceLeafWeightAccepted)
+{
+    const auto config = parse_config(
+      R"(  "linux": {"resources": {"blockIO": {"weightDevice": [{"major": 8, "minor": 0, "leafWeight": 10}]}}})");
+    ASSERT_TRUE(config.linux_.has_value());
+    ASSERT_TRUE(config.linux_->resources_.has_value());
+    EXPECT_TRUE(config.linux_->resources_->block_io_.has_value());
 }
 
 } // namespace
