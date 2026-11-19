@@ -15,7 +15,7 @@ namespace linyaps_box::config {
 
 namespace {
 
-auto read_access(const json::detail::value_view &val) -> utils::bitflags<device_rule_access_flag>
+auto read_access(const json::value_view &val) -> utils::bitflags<device_rule_access_flag>
 {
     const auto access_str = val.as_string_view();
     utils::bitflags<device_rule_access_flag> access_flags;

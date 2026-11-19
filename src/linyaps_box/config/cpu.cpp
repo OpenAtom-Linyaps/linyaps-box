@@ -16,9 +16,9 @@ namespace linyaps_box::config {
 
 namespace {
 
-auto read_idle(const json::detail::value_view &value) -> cpu::idle
+auto read_idle(const json::value_view &value) -> cpu::idle
 {
-    const auto idle = json::detail::number_from<std::int64_t>(value);
+    const auto idle = value.as_integer<std::int64_t>();
     if (UNLIKELY(idle != 0 && idle != 1)) {
         throw json::decode_error{ "cpu.idle must be 0 or 1" };
     }

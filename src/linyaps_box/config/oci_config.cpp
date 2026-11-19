@@ -20,12 +20,8 @@ namespace linyaps_box::config {
 
 namespace {
 
-void check_oci_version(const json::detail::value_view &val)
+void check_oci_version(const json::value_view &val)
 {
-    if (UNLIKELY(!val.is_string())) {
-        val.raise_expected("string");
-    }
-
     try {
         const auto semver = linyaps_box::utils::semver(val.as_string_view());
         if (UNLIKELY(!linyaps_box::utils::semver(oci_config::version).is_compatible_with(semver))) {
