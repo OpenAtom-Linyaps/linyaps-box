@@ -35,7 +35,7 @@ namespace {
     return { };
 }
 
-auto read_path(const json::detail::value_view &val) -> std::filesystem::path
+auto read_path(const json::value_view &val) -> std::filesystem::path
 {
     std::filesystem::path fs_path{ val.as_string_view() };
     if (auto reason = ns_path_error(fs_path); !reason.empty()) {

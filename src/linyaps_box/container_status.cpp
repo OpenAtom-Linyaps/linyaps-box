@@ -20,7 +20,7 @@ namespace linyaps_box {
 
 namespace {
 
-auto read_created(const json::detail::value_view &val) -> std::chrono::system_clock::time_point
+auto read_created(const json::value_view &val) -> std::chrono::system_clock::time_point
 {
     try {
         return utils::from_created_time(val.as_string_view());

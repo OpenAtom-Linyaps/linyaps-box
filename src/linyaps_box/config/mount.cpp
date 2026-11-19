@@ -6,14 +6,11 @@
 
 #include "linyaps_box/config/validation.h"
 #include "linyaps_box/json/parser.h"
-#include "linyaps_box/log/macro.h"
 
 #include <fmt/std.h>
 
 #include <algorithm>
 #include <array>
-#include <bitset>
-#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -235,6 +232,11 @@ constexpr std::array<mount_option, 59> mount_options{
     },
 };
 
+constexpr auto option_name_less(std::string_view left, std::string_view right) noexcept -> bool
+{
+    return left.size() == right.size() ? left < right : left.size() < right.size();
+}
+
 constexpr auto make_sorted_mount_options() noexcept
   -> std::array<mount_option, mount_options.size()>
 {
@@ -242,7 +244,7 @@ constexpr auto make_sorted_mount_options() noexcept
     linyaps_box::utils::detail::shell_sort(
       out,
       [](const mount_option &a, const mount_option &b) noexcept {
-          return a.name < b.name;
+          return option_name_less(a.name, b.name);
       });
 
     return out;
@@ -256,7 +258,7 @@ constexpr auto sorted_mount_options = make_sorted_mount_options();
                                             sorted_mount_options.cend(),
                                             name,
                                             [](const mount_option &entry, std::string_view n) {
-                                                return entry.name < n;
+                                                return option_name_less(entry.name, n);
                                             });
     if (it != sorted_mount_options.cend() && it->name == name) {
         return &*it;
@@ -265,6 +267,9 @@ constexpr auto sorted_mount_options = make_sorted_mount_options();
     return nullptr;
 }
 
+// Recognizes the spec's bare `idmap`/`ridmap` mount options (idmapped mounts).
+// The inline `idmap=uids=…,gids=…` form is not part of the spec and is not
+// interpreted: such tokens fall through to the raw data string.
 void set_idmap(mount &target, mount::idmap_type type)
 {
     if (UNLIKELY(target.idmap.has_value() && *target.idmap != type)) {
@@ -309,28 +314,6 @@ void apply_known_option(mount &target, const mount_option &entry)
     }
 }
 
-[[nodiscard]] auto apply_extension(mount &target, std::string_view opt) -> bool
-{
-    const auto extension = utils::enum_table_v<mount::extension>.from_name(opt);
-    if (!extension) {
-        return false;
-    }
-
-    target.extension_flags |= *extension;
-    return true;
-}
-
-[[nodiscard]] auto apply_idmap_flag(mount &target, std::string_view opt) -> bool
-{
-    const auto type = utils::enum_table_v<mount::idmap_type>.from_name(opt);
-    if (!type) {
-        return false;
-    }
-
-    set_idmap(target, *type);
-    return true;
-}
-
 void append_mount_data(mount &target, std::string_view opt)
 {
     if (!target.data.empty()) {
@@ -340,278 +323,40 @@ void append_mount_data(mount &target, std::string_view opt)
     target.data.append(opt);
 }
 
-auto parse_id_mapping_chunk(std::string_view chunk) -> id_mapping
-{
-    // format: "containerID:hostID:size"
-    auto first_colon = chunk.find(':');
-    if (UNLIKELY(first_colon == std::string_view::npos)) {
-        throw json::decode_error(fmt::format("invalid id mapping: {}", chunk));
-    }
-
-    auto second_colon = chunk.find(':', first_colon + 1);
-    if (UNLIKELY(second_colon == std::string_view::npos)) {
-        throw json::decode_error(fmt::format("invalid id mapping: {}", chunk));
-    }
-
-    id_mapping mapping{ };
-    const char *const base = chunk.data();
-    auto [p1, ec1] = std::from_chars(base, base + first_colon, mapping.container_id);
-    // from_chars may stop early on trailing garbage; the whole field must be consumed.
-    if (UNLIKELY(ec1 != std::errc{ } || p1 != base + first_colon)) {
-        throw json::decode_error(fmt::format("invalid container id in mapping: {}", chunk));
-    }
-
-    auto [p2, ec2] = std::from_chars(base + first_colon + 1, base + second_colon, mapping.host_id);
-    if (UNLIKELY(ec2 != std::errc{ } || p2 != base + second_colon)) {
-        throw json::decode_error(fmt::format("invalid host id in mapping: {}", chunk));
-    }
-
-    auto [p3, ec3] = std::from_chars(base + second_colon + 1, base + chunk.size(), mapping.size);
-    if (UNLIKELY(ec3 != std::errc{ } || p3 != base + chunk.size())) {
-        throw json::decode_error(fmt::format("invalid size in mapping: {}", chunk));
-    }
-
-    return mapping;
-}
-
-auto parse_mappings(std::string_view value) -> std::optional<std::vector<id_mapping>>
-{
-    std::vector<id_mapping> result;
-    // Estimate capacity from comma count to avoid realloc during push_back
-    auto commas = std::count(value.begin(), value.end(), ',');
-    result.reserve(static_cast<std::size_t>(commas) + 1);
-
-    while (!value.empty()) {
-        auto comma_pos = value.find(',');
-        auto chunk = value.substr(0, comma_pos);
-        result.push_back(parse_id_mapping_chunk(chunk));
-
-        if (comma_pos == std::string_view::npos) {
-            break;
-        }
-
-        value = value.substr(comma_pos + 1);
-    }
-
-    return result;
-}
-
-struct inline_idmap_result
-{
-    std::optional<std::vector<id_mapping>> uid_mappings;
-    std::optional<std::vector<id_mapping>> gid_mappings;
-    mount::idmap_type type;
-};
-
-auto parse_inline_idmap_option(std::string_view opt, mount::idmap_type type) -> inline_idmap_result
-{
-    auto eq_pos = opt.find('=');
-    inline_idmap_result result;
-    result.type = type;
-    auto rest = opt.substr(eq_pos + 1);
-
-    while (!rest.empty()) {
-        auto comma_pos = rest.find(',');
-        auto part = rest.substr(0, comma_pos);
-
-        auto eq2_pos = part.find('=');
-        if (eq2_pos == std::string_view::npos) {
-            throw json::decode_error(fmt::format("invalid id mapping option: {}", opt));
-        }
-
-        auto key = part.substr(0, eq2_pos);
-        auto value = part.substr(eq2_pos + 1);
-
-        if (key == "uids") {
-            result.uid_mappings = parse_mappings(value);
-        } else if (key == "gids") {
-            result.gid_mappings = parse_mappings(value);
-        } else {
-            throw json::decode_error(fmt::format("unknown id mapping key: {}", key));
-        }
-
-        if (comma_pos == std::string_view::npos) {
-            break;
-        }
-
-        rest = rest.substr(comma_pos + 1);
-    }
-
-    return result;
-}
-
-// The schema uses bits [0, 6); the remaining bits track mount-local parsing
-// state. They never become part of the returned mount model.
-enum mapping_state : std::size_t {
-    explicit_uid = 6,
-    explicit_gid,
-    inline_uid,
-    inline_gid,
-};
-
-void parse_option(std::string_view option, mount &v, std::bitset<json::detail::max_fields> &state)
+void decode_mount_option(std::string_view option, mount &v)
 {
     if (const auto *entry = find_mount_option(option)) {
         apply_known_option(v, *entry);
         return;
     }
 
-    if (apply_extension(v, option) || apply_idmap_flag(v, option)) {
+    if (const auto extension = utils::enum_table_v<mount::extension>.from_name(option)) {
+        v.extension_flags |= *extension;
         return;
     }
 
-    if (const auto equal = option.find('='); equal != std::string_view::npos) {
-        if (const auto type =
-              utils::enum_table_v<mount::idmap_type>.from_name(option.substr(0, equal))) {
-            set_idmap(v, *type);
-            auto mappings = parse_inline_idmap_option(option, *type);
-            state.set(inline_uid, mappings.uid_mappings.has_value());
-            state.set(inline_gid, mappings.gid_mappings.has_value());
-            if (!state.test(explicit_uid)) {
-                v.uid_mappings = std::move(mappings.uid_mappings);
-            }
-            if (!state.test(explicit_gid)) {
-                v.gid_mappings = std::move(mappings.gid_mappings);
-            }
-            return;
-        }
+    // Only the exact `idmap`/`ridmap` tokens are the spec option; a value (e.g.
+    // `idmap=uids=0:1000:1`) is the removed inline form and falls to data.
+    if (const auto type = utils::enum_table_v<mount::idmap_type>.from_name(option)) {
+        set_idmap(v, *type);
+        return;
     }
 
     append_mount_data(v, option);
 }
 
-struct mount_options_ops : json::detail::frame_handler<mount_options_ops>
-{
-    static auto segment(const json::detail::frame &f) -> json::detail::location_edge
-    {
-        return json::detail::location_edge::element(f.active);
-    }
-
-    static auto on_key(json::detail::frame &f,
-                       json::detail::frame_stack &st,
-                       [[maybe_unused]] std::string &key) -> bool
-    {
-        json::detail::raise_decoded(st, segment(f), "unexpected object key inside an array");
-    }
-
-    static void on_value(json::detail::frame &f,
-                         json::detail::frame_stack &st,
-                         const json::detail::value_view &value)
-    {
-        const auto index = f.active++;
-        try {
-            parse_option(value.as_string_view(), f.target.as<mount>(), f.seen);
-        } catch (const json::decode_error &e) {
-            json::detail::raise_decoded(st, json::detail::location_edge::element(index), e.what());
-        }
-    }
-
-    static void on_object_begin(json::detail::frame &f, json::detail::frame_stack &st)
-    {
-        json::detail::raise_decoded(st, segment(f), "type must be string, but is object");
-    }
-
-    static void on_array_begin(json::detail::frame &f, json::detail::frame_stack &st)
-    {
-        json::detail::raise_decoded(st, segment(f), "type must be string, but is array");
-    }
-
-    static void on_end(json::detail::frame &f, json::detail::frame_stack &st)
-    {
-        const auto has_inline_uid = f.seen.test(inline_uid);
-        const auto has_inline_gid = f.seen.test(inline_gid);
-        st.pop();
-        st.top().seen.set(inline_uid, has_inline_uid);
-        st.top().seen.set(inline_gid, has_inline_gid);
-    }
-};
-
-struct mount_options_tag
-{
-    using target_type = mount;
-};
-
-auto ops_of(mount_options_tag) -> const json::frame_ops &
-{
-    static constexpr auto ops = mount_options_ops::make();
-    return ops;
-}
-
-struct mount_options_field : json::detail::field_descriptor<mount_options_field>
-{
-    using field_descriptor::field_descriptor;
-    static constexpr auto kind = json::detail::field_kind::array;
-
-    void assign_value(const json::detail::value_view &value, [[maybe_unused]] mount &target) const
-    {
-        if (!skip_null(value)) {
-            value.raise_expected("array");
-        }
-    }
-
-    void begin_array(json::detail::frame_stack &st, mount &target) const
-    {
-        const auto has_explicit_uid = st.top().seen.test(explicit_uid);
-        const auto has_explicit_gid = st.top().seen.test(explicit_gid);
-        st.push_frame(target, mount_options_tag{ });
-        auto &f = st.top();
-        f.active = 0;
-        f.seen.set(explicit_uid, has_explicit_uid);
-        f.seen.set(explicit_gid, has_explicit_gid);
-    }
-};
-
 struct mount_schema
 {
     static constexpr auto fields()
     {
+        using json::consume_strings;
         using json::field;
         return std::make_tuple(field<&mount::destination>("destination").required(),
                                field<&mount::source>("source").ignore_null(),
                                field<&mount::type>("type").ignore_null(),
                                field<&mount::uid_mappings>("uidMappings").ignore_null(),
                                field<&mount::gid_mappings>("gidMappings").ignore_null(),
-                               mount_options_field{ "options" }.ignore_null());
-    }
-};
-
-struct mount_ops : json::detail::object_frame_ops<mount, mount_schema>
-{
-    using base = json::detail::object_frame_ops<mount, mount_schema>;
-    static constexpr std::size_t uid_field = 3;
-    static constexpr std::size_t gid_field = 4;
-    static_assert(base::count == explicit_uid && inline_gid < json::detail::max_fields,
-                  "mount parsing state must not overlap schema field bits");
-    static_assert(std::get<uid_field>(base::table).name() == "uidMappings"
-                    && std::get<gid_field>(base::table).name() == "gidMappings",
-                  "mount mapping field indices must match the schema");
-    static_assert(json::detail::names_are_unique(mount_schema::fields()),
-                  "duplicate JSON field key in mount");
-
-    static void on_array_begin(json::detail::frame &f, json::detail::frame_stack &st)
-    {
-        if (f.active == uid_field) {
-            f.seen.set(explicit_uid);
-        } else if (f.active == gid_field) {
-            f.seen.set(explicit_gid);
-        }
-        base::on_array_begin(f, st);
-    }
-
-    static void on_end(json::detail::frame &f, json::detail::frame_stack &st)
-    {
-        const auto &target = f.target.as<mount>();
-        if (f.seen.test(explicit_uid) && f.seen.test(inline_uid)) {
-            LINYAPS_BOX_LOG_WARN(
-              "mount {}: inline idmap uid mapping ignored because uidMappings is specified",
-              target.destination);
-        }
-        if (f.seen.test(explicit_gid) && f.seen.test(inline_gid)) {
-            LINYAPS_BOX_LOG_WARN(
-              "mount {}: inline idmap gid mapping ignored because gidMappings is specified",
-              target.destination);
-        }
-        base::on_end(f, st);
+                               consume_strings<&decode_mount_option>("options").ignore_null());
     }
 };
 
@@ -619,8 +364,7 @@ struct mount_ops : json::detail::object_frame_ops<mount, mount_schema>
 
 auto ops_of(json::object_tag<mount>) -> const json::frame_ops &
 {
-    static constexpr auto ops = json::detail::frame_handler<mount_ops>::make();
-    return ops;
+    return json::make_object_ops<mount, mount_schema>();
 }
 
 void validate(const mount &v)

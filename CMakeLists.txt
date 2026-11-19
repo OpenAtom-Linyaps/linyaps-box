@@ -338,6 +338,7 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/io/epoll.cpp
     src/linyaps_box/io/forwarder.cpp
     src/linyaps_box/io/stream.cpp
+    src/linyaps_box/json/parser.cpp
     src/linyaps_box/log/formatter.cpp
     src/linyaps_box/log/logger.cpp
     src/linyaps_box/log/sink_factory.cpp

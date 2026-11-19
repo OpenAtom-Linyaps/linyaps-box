@@ -9,8 +9,6 @@
 #include "linyaps_box/config/mount.h"
 #include "linyaps_box/config/oci_config.h"
 
-#include <fmt/format.h>
-
 namespace linyaps_box {
 
 using namespace linyaps_box::config;
@@ -99,66 +97,9 @@ TEST(MountParse, RelativeDestinationRejected)
                  std::runtime_error);
 }
 
-class MountMalformedInlineIdmapTest : public testing::TestWithParam<const char *>
-{
-};
-
-TEST_P(MountMalformedInlineIdmapTest, Rejected)
-{
-    const auto content = fmt::format(
-      R"(  "mounts": [{{"destination": "/mnt", "source": "/tmp", "type": "none", "options": ["idmap={}"]}}])",
-      GetParam());
-    EXPECT_THROW(std::ignore = parse_config(content), std::runtime_error)
-      << "idmap option not rejected: " << GetParam();
-}
-
-INSTANTIATE_TEST_SUITE_P(MountParse,
-                         MountMalformedInlineIdmapTest,
-                         testing::Values("uids=1x2:0:100",
-                                         "uids=0:1000",
-                                         "uids=0:1x:2",
-                                         "uids=0:1000:x",
-                                         "uids=01000",
-                                         "uids",
-                                         "foo=1"));
-
-TEST(MountParse, SpecUidMappingsTakePrecedenceOverInlineIdmap)
-{
-    const auto config = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "uidMappings": [{"containerID": 0, "hostID": 2000, "size": 1}],
-     "gidMappings": [{"containerID": 0, "hostID": 2000, "size": 1}],
-     "options": ["idmap=uids=0:1000:1,gids=0:1000:1"]}
-  ])");
-    ASSERT_TRUE(config.mounts.has_value());
-    ASSERT_TRUE((*config.mounts)[0].uid_mappings.has_value());
-    EXPECT_EQ((*(*config.mounts)[0].uid_mappings)[0].host_id, 2000U);
-    ASSERT_TRUE((*config.mounts)[0].gid_mappings.has_value());
-    EXPECT_EQ((*(*config.mounts)[0].gid_mappings)[0].host_id, 2000U);
-}
-
-TEST(MountParse, InlineIdmapAppliedWithoutSpecField)
-{
-    const auto config = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap=uids=0:1000:1,gids=0:1000:1"]}
-  ])");
-    ASSERT_TRUE(config.mounts.has_value());
-    ASSERT_TRUE((*config.mounts)[0].uid_mappings.has_value());
-    EXPECT_EQ((*(*config.mounts)[0].uid_mappings)[0].host_id, 1000U);
-    ASSERT_TRUE((*config.mounts)[0].gid_mappings.has_value());
-    EXPECT_EQ((*(*config.mounts)[0].gid_mappings)[0].host_id, 1000U);
-}
-
-TEST(MountParse, IdmapAndRidmapMutuallyExclusive)
-{
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap", "ridmap"]}
-  ])"),
-                 std::runtime_error);
-}
-
+// uidMappings/gidMappings are spec v1.3.0 fields on mounts; they are parsed and
+// must be given together. The inline `idmap=…` option form is not in the spec
+// and is gone (such tokens now fall through as unknown options).
 TEST(MountParse, UidMappingsWithoutGidMappingsRejected)
 {
     EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
@@ -166,6 +107,55 @@ TEST(MountParse, UidMappingsWithoutGidMappingsRejected)
      "uidMappings": [{"containerID": 0, "hostID": 1000, "size": 1}]}
   ])"),
                  std::runtime_error);
+}
+
+TEST(MountParse, IdmapFlagsRecognized)
+{
+    const auto config = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": ["idmap"]}
+  ])");
+    ASSERT_TRUE(config.mounts.has_value());
+    const auto &mnt = (*config.mounts)[0];
+    ASSERT_TRUE(mnt.idmap.has_value());
+    EXPECT_EQ(*mnt.idmap, mount::idmap_type::idmap);
+    // A recognized option is not passed through to the data string.
+    EXPECT_THAT(mnt.data, Not(HasSubstr("idmap")));
+}
+
+TEST(MountParse, RidmapFlagRecognized)
+{
+    const auto config = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": ["ridmap"]}
+  ])");
+    ASSERT_TRUE(config.mounts.has_value());
+    const auto &mnt = (*config.mounts)[0];
+    ASSERT_TRUE(mnt.idmap.has_value());
+    EXPECT_EQ(*mnt.idmap, mount::idmap_type::ridmap);
+}
+
+TEST(MountParse, IdmapAndRidmapMutuallyExclusive)
+{
+    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none", "options": ["idmap", "ridmap"]}
+  ])"),
+                 std::runtime_error);
+}
+
+// The inline `idmap=uids=…,gids=…` form is not part of the OCI spec: it is not
+// decoded, and the whole token is carried into the data string as unknown.
+TEST(MountParse, InlineIdmapFormFallsToData)
+{
+    const auto config = parse_config(R"(  "mounts": [
+    {"destination": "/mnt", "source": "/tmp", "type": "none",
+     "options": ["ro", "idmap=uids=0:1000:1,gids=0:1000:1"]}
+  ])");
+    ASSERT_TRUE(config.mounts.has_value());
+    const auto &mnt = (*config.mounts)[0];
+    EXPECT_TRUE(mnt.vfs_flags.contains(vfs_flag::ro));
+    EXPECT_FALSE(mnt.uid_mappings.has_value());
+    EXPECT_FALSE(mnt.gid_mappings.has_value());
+    EXPECT_FALSE(mnt.idmap.has_value());
+    EXPECT_THAT(mnt.data, HasSubstr("idmap=uids=0:1000:1,gids=0:1000:1"));
 }
 
 TEST(MountParse, RecAttrOptionsParsed)
@@ -204,15 +194,6 @@ TEST(MountParse, ExtensionOptionsParsed)
     const auto flags = (*config.mounts)[0].extension_flags;
     EXPECT_NE(flags & mount::extension::copy_symlink, mount::extension::none);
     EXPECT_NE(flags & mount::extension::tmpcopyup, mount::extension::none);
-}
-
-TEST(MountParse, InlineIdmapMutuallyExclusiveRejected)
-{
-    EXPECT_THROW(std::ignore = parse_config(R"(  "mounts": [
-    {"destination": "/mnt", "source": "/tmp", "type": "none",
-     "options": ["idmap", "ridmap=uids=0:1000:1"]}
-  ])"),
-                 std::runtime_error);
 }
 
 TEST(MountParse, OptionsMustBeAnArray)

@@ -46,15 +46,12 @@
 #include "linyaps_box/json/error.h"
 #include "linyaps_box/utils/enum_formatter.h" // IWYU pragma: keep
 #include "linyaps_box/utils/enum_traits.h"
-#include "linyaps_box/utils/utf8.h"
 #include "linyaps_box/utils/utils.h"
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
-#include <nlohmann/json.hpp>
 
 #include <array>
-#include <bitset>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -74,16 +71,26 @@
 namespace linyaps_box::json {
 
 namespace detail {
-class value_view;
+class scalar_value;
+
 struct frame;
+
 class frame_stack;
+
 struct location_edge;
+
+template <auto Member, auto Read>
+struct converted_field;
+
+template <auto Check>
+struct checked_field;
+
 } // namespace detail
 
 struct frame_ops
 {
     bool (*on_key)(detail::frame &, detail::frame_stack &, std::string &);
-    void (*on_value)(detail::frame &, detail::frame_stack &, const detail::value_view &);
+    void (*on_value)(detail::frame &, detail::frame_stack &, const detail::scalar_value &);
     void (*on_object_begin)(detail::frame &, detail::frame_stack &);
     void (*on_array_begin)(detail::frame &, detail::frame_stack &);
     // Completes this frame at its closing bracket. nlohmann json guarantees bracket
@@ -113,159 +120,61 @@ struct map_tag
     using target_type = T;
 };
 
-template <auto Parse, typename Owner>
-struct string_array_tag
-{
-    using target_type = Owner;
-};
-
 namespace detail {
+
+using field_mask = std::uint32_t;
 
 inline constexpr std::size_t field_index_npos{ static_cast<std::size_t>(-1) };
 
-inline constexpr std::size_t max_fields{ 32 };
+inline constexpr auto max_fields = std::numeric_limits<field_mask>::digits;
 
-// Maximum JSON nesting depth accepted by the parser.
-inline constexpr std::size_t max_nesting_depth{ 128 };
+[[nodiscard]] auto type_error_message(std::string_view expected, std::string_view actual)
+  -> std::string;
 
 // A borrowed view of one JSON scalar value delivered by the SAX handler:
 // null, boolean, signed/unsigned integer, double, or a string pointing at the
 // lexer's reused buffer (valid until the next callback).
 // Object/array are handled by the SAX begin events, not carried here.
-class value_view
+class scalar_value
 {
 public:
     using storage =
       std::variant<std::monostate, bool, std::int64_t, std::uint64_t, double, std::string *>;
 
-    static auto make_null() noexcept -> value_view { return value_view{ std::monostate{ } }; }
-
-    static auto make_bool(bool b) noexcept -> value_view { return value_view{ b }; }
-
-    static auto make_int(std::int64_t n) noexcept -> value_view { return value_view{ n }; }
-
-    static auto make_uint(std::uint64_t n) noexcept -> value_view { return value_view{ n }; }
-
-    static auto make_float(double d) noexcept -> value_view { return value_view{ d }; }
+    static auto make_null() noexcept -> scalar_value;
+    static auto make_bool(bool b) noexcept -> scalar_value;
+    static auto make_int(std::int64_t n) noexcept -> scalar_value;
+    static auto make_uint(std::uint64_t n) noexcept -> scalar_value;
+    static auto make_float(double d) noexcept -> scalar_value;
 
     // non-const lvalue reference can't bind to a temporary
     // it could be prevented some lifetime issues
-    static auto make_string(std::string &s) noexcept -> value_view { return value_view{ &s }; }
+    static auto make_string(std::string &s) noexcept -> scalar_value;
 
-    [[nodiscard]] auto is_null() const noexcept -> bool
-    {
-        return std::holds_alternative<std::monostate>(value_);
-    }
+    [[nodiscard]] auto is_null() const noexcept -> bool;
+    [[nodiscard]] auto is_floating() const noexcept -> bool;
+    [[nodiscard]] auto is_unsigned() const noexcept -> bool;
+    [[nodiscard]] auto is_integer() const noexcept -> bool;
+    [[nodiscard]] auto is_number() const noexcept -> bool;
 
-    [[nodiscard]] auto is_string() const noexcept -> bool
-    {
-        return std::holds_alternative<std::string *>(value_);
-    }
+    [[nodiscard]] auto type_name() const noexcept -> std::string_view;
 
-    [[nodiscard]] auto is_floating() const noexcept -> bool
-    {
-        return std::holds_alternative<double>(value_);
-    }
+    [[noreturn]] auto raise_expected(std::string_view expected) const -> void;
 
-    [[nodiscard]] auto is_unsigned() const noexcept -> bool
-    {
-        return std::holds_alternative<std::uint64_t>(value_);
-    }
+    [[nodiscard]] auto as_bool() const -> bool;
+    [[nodiscard]] auto as_string_view() const -> std::string_view;
 
-    [[nodiscard]] auto is_integer() const noexcept -> bool
-    {
-        return std::holds_alternative<std::int64_t>(value_);
-    }
-
-    [[nodiscard]] auto is_number() const noexcept -> bool
-    {
-        return is_floating() || is_unsigned() || is_integer();
-    }
-
-    [[nodiscard]] auto type_name() const noexcept -> std::string_view
-    {
-        using namespace std::string_view_literals;
-        return std::visit(utils::Overload{
-                            [](std::monostate) noexcept {
-                                return "null"sv;
-                            },
-                            [](bool) noexcept {
-                                return "boolean"sv;
-                            },
-                            [](std::int64_t) noexcept {
-                                return "number"sv;
-                            },
-                            [](std::uint64_t) noexcept {
-                                return "number"sv;
-                            },
-                            [](double) noexcept {
-                                return "number"sv;
-                            },
-                            [](std::string *) noexcept {
-                                return "string"sv;
-                            },
-                          },
-                          value_);
-    }
-
-    [[noreturn]] auto raise_expected(std::string_view expected) const -> void
-    {
-        throw decode_error{ fmt::format("type must be {}, but is {}", expected, type_name()) };
-    }
-
-    [[nodiscard]] auto as_bool() const -> bool
-    {
-        if (const auto *p = std::get_if<bool>(&value_)) {
-            return *p;
-        }
-
-        raise_expected("boolean");
-    }
-
-    [[nodiscard]] auto as_string_view() const -> std::string_view
-    {
-        if (const auto *p = std::get_if<std::string *>(&value_)) {
-            return **p;
-        }
-
-        raise_expected("string");
-    }
-
-    [[nodiscard]] auto int_raw() const noexcept -> std::int64_t
-    {
-        return *std::get_if<std::int64_t>(&value_);
-    }
-
-    [[nodiscard]] auto uint_raw() const noexcept -> std::uint64_t
-    {
-        return *std::get_if<std::uint64_t>(&value_);
-    }
-
-    [[nodiscard]] auto float_raw() const noexcept -> double
-    {
-        return *std::get_if<double>(&value_);
-    }
+    [[nodiscard]] auto int_raw() const noexcept -> std::int64_t;
+    [[nodiscard]] auto uint_raw() const noexcept -> std::uint64_t;
+    [[nodiscard]] auto float_raw() const noexcept -> double;
 
 private:
-    explicit value_view(storage v) noexcept
-        : value_(v)
-    {
-    }
+    explicit scalar_value(storage v) noexcept;
 
     storage value_;
 };
 
-[[nodiscard]] inline auto type_error_message(std::string_view expected, std::string_view actual)
-  -> std::string
-{
-    return fmt::format("type must be {}, but is {}", expected, actual);
-}
-
-[[noreturn]] inline auto raise_type_error(std::string_view expected, std::string_view actual)
-  -> void
-{
-    throw decode_error{ type_error_message(expected, actual) };
-}
+[[noreturn]] auto raise_type_error(std::string_view expected, std::string_view actual) -> void;
 
 template <typename T>
 struct member_traits;
@@ -291,6 +200,7 @@ inline constexpr bool is_non_null_callback_v = [] {
 template <typename T>
 struct is_optional : std::false_type
 {
+    using type = T;
 };
 
 template <typename T>
@@ -303,19 +213,7 @@ template <typename T>
 inline constexpr bool is_optional_v = is_optional<T>::value;
 
 template <typename T>
-struct unwrap_optional
-{
-    using type = T;
-};
-
-template <typename T>
-struct unwrap_optional<std::optional<T>>
-{
-    using type = T;
-};
-
-template <typename T>
-using unwrap_optional_t = typename unwrap_optional<T>::type;
+using unwrap_optional_t = typename is_optional<T>::type;
 
 // A scalar is anything the value callbacks can fill directly: arithmetic,
 // bool, std::string, std::filesystem::path or an enum.
@@ -358,7 +256,6 @@ template <typename X, typename A>
 struct field_traits<std::vector<X, A>>
 {
     static constexpr field_kind kind = field_kind::array;
-    using element_type = X;
     using frame_tag = array_tag<std::vector<X, A>>;
 };
 
@@ -366,7 +263,6 @@ template <typename V>
 struct field_traits<std::unordered_map<std::string, V>>
 {
     static constexpr field_kind kind = field_kind::map;
-    using element_type = V;
     using frame_tag = map_tag<std::unordered_map<std::string, V>>;
 };
 
@@ -380,10 +276,7 @@ struct field_traits<utils::bitflags<E>>
 // A JSON number must never be silently truncated into the target integer:
 // nlohmann's own get<T>() is an unchecked static_cast and is undefined
 // behaviour when the double is not representable.
-[[noreturn]] inline auto raise_number_out_of_range() -> void
-{
-    throw decode_error{ "number out of range for the target integer type" };
-}
+[[noreturn]] auto raise_number_out_of_range() -> void;
 
 template <typename T>
 [[nodiscard]] auto checked_from_float(double value) -> T
@@ -426,6 +319,9 @@ template <typename T>
 [[nodiscard]] auto checked_from_signed(std::int64_t value) -> T
 {
     static_assert(std::is_integral_v<T>, "checked_from_signed requires an integer type");
+    // Only reached for a negative integer token: the lexer emits a
+    // non-negative integer as `number_unsigned`, so the value here is negative
+    // or `-0`.  The upper bound therefore never needs checking.
     if (value < 0) {
         bool out_of_range = std::is_unsigned_v<T>;
         if constexpr (!std::is_unsigned_v<T>) {
@@ -435,16 +331,13 @@ template <typename T>
         if (UNLIKELY(out_of_range)) {
             raise_number_out_of_range();
         }
-    } else if (UNLIKELY(static_cast<std::uint64_t>(value)
-                        > static_cast<std::uint64_t>((std::numeric_limits<T>::max)()))) {
-        raise_number_out_of_range();
     }
 
     return static_cast<T>(value);
 }
 
 template <typename T>
-auto number_from(const value_view &v) -> T
+auto number_from(const scalar_value &v) -> T
 {
     if constexpr (std::is_floating_point_v<T>) {
         if (LIKELY(v.is_number())) {
@@ -464,10 +357,6 @@ auto number_from(const value_view &v) -> T
         static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>,
                       "number_from requires a plain integer or floating type");
 
-        if (v.is_floating()) {
-            return checked_from_float<T>(v.float_raw());
-        }
-
         if (v.is_unsigned()) {
             return checked_from_unsigned<T>(v.uint_raw());
         }
@@ -476,9 +365,56 @@ auto number_from(const value_view &v) -> T
             return checked_from_signed<T>(v.int_raw());
         }
 
+        if (v.is_floating()) {
+            return checked_from_float<T>(v.float_raw());
+        }
+
         v.raise_expected("number");
     }
 }
+
+} // namespace detail
+
+// Borrowed, read-only view of one JSON scalar value, handed to scalar
+// conversion callbacks and check callbacks.
+// The parser's field descriptors are the only constructors.
+// the borrowed value and any returned string_view live for the duration of the
+// single callback that receives it.
+class value_view
+{
+public:
+    [[nodiscard]] auto as_string_view() const -> std::string_view
+    {
+        return value_->as_string_view();
+    }
+
+    // Checked integer read: accepts an integral value or an exactly
+    // representable double, and rejects a fractional part, an out-of-range
+    // value or a non-number with decode_error.
+    template <typename T>
+    [[nodiscard]] auto as_integer() const -> T
+    {
+        static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>,
+                      "as_integer<T> requires a plain integer type");
+        return detail::number_from<T>(*value_);
+    }
+
+private:
+    template <auto Member, auto Read>
+    friend struct detail::converted_field;
+
+    template <auto Check>
+    friend struct detail::checked_field;
+
+    explicit value_view(const detail::scalar_value &v) noexcept
+        : value_(&v)
+    {
+    }
+
+    const detail::scalar_value *value_;
+};
+
+namespace detail {
 
 template <typename E>
 [[nodiscard]] constexpr auto enum_from_name(std::string_view name) -> E
@@ -486,6 +422,7 @@ template <typename E>
     static_assert(utils::has_enum_table_v<E>, "enum requires a registered name table");
     constexpr auto &table = utils::enum_table_v<E>;
     const auto value = table.from_name(name);
+
     if (UNLIKELY(!value)) {
         using namespace std::string_view_literals;
 
@@ -501,7 +438,7 @@ template <typename E>
 }
 
 template <typename T>
-auto assign_enum(const value_view &v, T &out) -> void
+auto assign_enum(const scalar_value &v, T &out) -> void
 {
     if constexpr (utils::has_enum_table_v<T>) {
         out = enum_from_name<T>(v.as_string_view());
@@ -512,7 +449,7 @@ auto assign_enum(const value_view &v, T &out) -> void
 }
 
 template <typename U>
-void assign_scalar(const value_view &v, U &out)
+void assign_scalar(const scalar_value &v, U &out)
 {
     using T = std::remove_cv_t<U>;
     if constexpr (std::is_same_v<T, bool>) {
@@ -544,28 +481,23 @@ struct location_edge
     std::size_t index{ 0 };
     kind type{ kind::root };
 
-    [[nodiscard]] static auto root() noexcept -> location_edge { return { }; }
-
-    [[nodiscard]] static auto field(std::string_view n) noexcept -> location_edge
-    {
-        location_edge e;
-        e.type = kind::field;
-        e.name = n;
-        return e;
-    }
-
-    [[nodiscard]] static auto element(std::size_t i) noexcept -> location_edge
-    {
-        location_edge e;
-        e.type = kind::index;
-        e.index = i;
-        return e;
-    }
+    [[nodiscard]] static auto root() noexcept -> location_edge;
+    [[nodiscard]] static auto field(std::string_view n) noexcept -> location_edge;
+    [[nodiscard]] static auto element(std::size_t i) noexcept -> location_edge;
 };
 
 template <typename Derived>
 struct frame_handler
 {
+    // Only object and map frames can hold keys; a key inside an array-shaped
+    // frame (a plain vector or a string array) cannot occur, so those frames
+    // inherit this default instead of defining their own.
+    static auto on_key(frame &, frame_stack &, std::string &) -> bool
+    {
+        assert(false && "object key inside a frame that cannot hold keys");
+        return true;
+    }
+
     [[nodiscard]] static constexpr auto make() -> frame_ops
     {
         return frame_ops{
@@ -573,98 +505,6 @@ struct frame_handler
             &Derived::on_array_begin, &Derived::on_end,   &Derived::segment,
         };
     }
-};
-
-// Consumes the value of an unknown object key without pushing a frame.
-class skip_counter
-{
-public:
-    enum class action : bool { consume, handle };
-
-    enum class state : std::uint8_t {
-        idle,
-        skipping_value,
-        skipping_container,
-    };
-
-    [[nodiscard]] constexpr auto on_key() const noexcept -> action
-    {
-        return state_ == state::idle ? action::handle : action::consume;
-    }
-
-    [[nodiscard]] constexpr auto on_value() noexcept -> action
-    {
-        switch (state_) {
-        case state::idle: {
-            return action::handle;
-        }
-        case state::skipping_value: {
-            // The unknown key's value was a scalar: the skip is done.
-            state_ = state::idle;
-            return action::consume;
-        }
-        case state::skipping_container: {
-            return action::consume;
-        }
-        }
-
-        return action::handle;
-    }
-
-    [[nodiscard]] constexpr auto on_begin() noexcept -> action
-    {
-        switch (state_) {
-        case state::idle: {
-            return action::handle;
-        }
-        case state::skipping_value: {
-            // The unknown key's value is a container: start counting it.
-            state_ = state::skipping_container;
-            depth_ = 1;
-            return action::consume;
-        }
-        case state::skipping_container: {
-            ++depth_;
-            return action::consume;
-        }
-        }
-
-        return action::handle;
-    }
-
-    [[nodiscard]] constexpr auto on_end() noexcept -> action
-    {
-        switch (state_) {
-        case state::idle: {
-            return action::handle;
-        }
-        case state::skipping_value: {
-            // A key is always followed by a value or a container start, never by
-            // an end, so nlohmann's SAX stream cannot reach this.
-            assert(false && "container end right after an object key");
-            return action::consume;
-        }
-        case state::skipping_container: {
-            if (--depth_ == 0) {
-                state_ = state::idle;
-            }
-
-            return action::consume;
-        }
-        }
-
-        return action::handle;
-    }
-
-    constexpr auto begin_skip() noexcept -> void
-    {
-        state_ = state::skipping_value;
-        depth_ = 0;
-    }
-
-private:
-    std::size_t depth_{ 0 };
-    state state_{ state::idle };
 };
 
 // A type-erased, non-owning handle to the object a frame is filling.
@@ -697,101 +537,56 @@ private:
 
 // A frame fills one target object, array, or map.
 //
-// `child` and `key` borrow into the current map node and are read only during a
-// single member's value window (from its `on_key` until that value, with any
-// nested subtree, completes).  That window is safe because:
-//   - std::unordered_map never invalidates references/pointers to elements on
-//     insert or rehash (only iterators), so the node never moves; and
-//   - during the window we neither insert into this map (the next insert opens
-//     the next member's window) nor erase from it.
-// `child` also becomes the child frame's `target` for a nested value, within the
-// same window.
+// A map frame borrows its active node from on_key through that member's value.
+// Insertion and rehash preserve node addresses, and parsing never erases them.
 struct frame
 {
-    frame(target_ref t, const frame_ops &o) noexcept
-        : target(t)
-        , ops(&o)
-    {
-    }
+    frame(target_ref t, const frame_ops &o) noexcept;
 
     target_ref target;
 
     // A function-local static constexpr table, so the pointer stays valid.
-    const frame_ops *ops;
+    const frame_ops *ops{ nullptr };
 
     // Meaning depends on the frame kind:
     //   - object:        index of the active field in the schema table
     //   - string-array:  index of the next element to fill (flags/options)
     //   - plain vector / map: unused
     std::size_t active{ field_index_npos };
+    target_ref map_entry;
 
     // For object frames, the set of known fields that have been seen so far.
-    std::bitset<max_fields> seen;
-
-    // For map frames, borrowed handle into the current value's map node.
-    target_ref child;
-
-    // For map frames, borrowed view of the current key in the map node.
-    std::string_view key;
+    field_mask seen{ 0 };
 };
 
 class frame_stack
 {
 public:
-    frame_stack() { frames_.reserve(16); }
+    frame_stack();
 
-    [[nodiscard]] auto frames() const noexcept -> const std::vector<frame> & { return frames_; }
+    [[nodiscard]] auto frames() const noexcept -> const std::vector<frame> &;
 
     template <typename Tag>
     auto push_frame(typename Tag::target_type &target, Tag tag) -> void
     {
-        frames_.emplace_back(target_ref::of<typename Tag::target_type>(target), ops_of(tag));
+        push_frame(target_ref::of<typename Tag::target_type>(target), ops_of(tag));
     }
 
-    auto pop() -> void { frames_.pop_back(); }
+    auto push_frame(target_ref target, const frame_ops &ops) -> void;
 
-    [[nodiscard]] auto top() -> frame & { return frames_.back(); }
+    auto pop() -> void;
 
-    [[nodiscard]] auto empty() const noexcept -> bool { return frames_.empty(); }
+    [[nodiscard]] auto top() -> frame &;
+
+    [[nodiscard]] auto empty() const noexcept -> bool;
 
 private:
     std::vector<frame> frames_;
 };
 
-inline auto append_edge(nlohmann::json::json_pointer &path, const location_edge &edge) -> void
-{
-    switch (edge.type) {
-    case location_edge::kind::root: {
-    } break;
-    case location_edge::kind::field: {
-        path /= std::string{ edge.name };
-    } break;
-    case location_edge::kind::index: {
-        path /= edge.index;
-    } break;
-    }
-}
-
-[[nodiscard]] inline auto build_path(const frame_stack &st, const location_edge &leaf)
-  -> nlohmann::json::json_pointer
-{
-    nlohmann::json::json_pointer path;
-    const auto &frames = st.frames();
-    for (std::size_t i = 1; i < frames.size(); ++i) {
-        append_edge(path, frames[i - 1].ops->segment(frames[i - 1]));
-    }
-
-    append_edge(path, leaf);
-    return path;
-}
-
-[[noreturn]] inline auto raise_decoded(const frame_stack &st,
-                                       const location_edge &leaf,
-                                       std::string_view message) -> void
-{
-    const auto path = build_path(st, leaf).to_string();
-    throw decode_error{ fmt::format("at '{}': {}", path.empty() ? "<root>" : path, message) };
-}
+[[noreturn]] auto raise_decoded(const frame_stack &st,
+                                const location_edge &leaf,
+                                std::string_view message) -> void;
 
 template <typename Owner>
 auto push_child_frame(frame_stack &st, Owner &child) -> void
@@ -829,7 +624,7 @@ public:
         return result;
     }
 
-    [[nodiscard]] auto skip_null(const value_view &v) const -> bool
+    [[nodiscard]] auto skip_null(const scalar_value &v) const -> bool
     {
         if (!v.is_null()) {
             return false;
@@ -865,6 +660,18 @@ private:
     bool allows_null_{ false };
 };
 
+template <typename E>
+[[nodiscard]] constexpr auto element_expected_name() noexcept -> std::string_view
+{
+    if constexpr (is_scalar_v<E>) {
+        return scalar_expected_name<E>();
+    } else if constexpr (field_traits<E>::kind == field_kind::array) {
+        return "array";
+    } else {
+        return "object";
+    }
+}
+
 template <auto Member>
 struct member_field : public field_descriptor<member_field<Member>>
 {
@@ -877,7 +684,7 @@ struct member_field : public field_descriptor<member_field<Member>>
     static constexpr field_kind kind = field_traits<value_type>::kind;
 
     template <typename Owner>
-    auto assign_value(const value_view &v, Owner &obj) const -> void
+    auto assign_value(const scalar_value &v, Owner &obj) const -> void
     {
         if (this->skip_null(v)) {
             return;
@@ -892,7 +699,7 @@ struct member_field : public field_descriptor<member_field<Member>>
                 assign_scalar(v, obj.*Member);
             }
         } else {
-            v.raise_expected(element_name());
+            v.raise_expected(element_expected_name<value_type>());
         }
     }
 
@@ -902,7 +709,7 @@ struct member_field : public field_descriptor<member_field<Member>>
         if constexpr (kind == field_kind::object || kind == field_kind::map) {
             push_child_frame(st, payload(obj));
         } else {
-            raise_type_error(element_name(), "object");
+            raise_type_error(element_expected_name<value_type>(), "object");
         }
     }
 
@@ -912,20 +719,11 @@ struct member_field : public field_descriptor<member_field<Member>>
         if constexpr (kind == field_kind::array) {
             push_child_frame(st, payload(obj));
         } else {
-            raise_type_error(element_name(), "array");
+            raise_type_error(element_expected_name<value_type>(), "array");
         }
     }
 
 private:
-    [[nodiscard]] static constexpr auto element_name() noexcept -> std::string_view
-    {
-        if constexpr (kind == field_kind::scalar) {
-            return scalar_expected_name<value_type>();
-        } else {
-            return kind == field_kind::array ? "array" : "object";
-        }
-    }
-
     template <typename Owner>
     static auto payload(Owner &obj) -> value_type &
     {
@@ -952,10 +750,10 @@ struct converted_field : public field_descriptor<converted_field<Member, Read>>
                   "Payload(const value_view&)");
 
     template <typename Owner>
-    auto assign_value(const value_view &v, Owner &obj) const -> void
+    auto assign_value(const scalar_value &v, Owner &obj) const -> void
     {
         if (!this->skip_null(v)) {
-            obj.*Member = Read(v);
+            obj.*Member = Read(value_view{ v });
         }
     }
 };
@@ -973,53 +771,35 @@ struct checked_field : public field_descriptor<checked_field<Check>>
                   "void(const value_view&)");
 
     template <typename Owner>
-    auto assign_value(const value_view &v, [[maybe_unused]] Owner &obj) const -> void
+    auto assign_value(const scalar_value &v, [[maybe_unused]] Owner &obj) const -> void
     {
         if (!this->skip_null(v)) {
-            Check(v);
+            Check(value_view{ v });
         }
     }
 };
 
-template <auto Parse>
-struct custom_array_field : public field_descriptor<custom_array_field<Parse>>
-{
-    using base = field_descriptor<custom_array_field<Parse>>;
-    using base::base;
-
-    static constexpr field_kind kind = field_kind::array;
-
-    template <typename Owner>
-    auto assign_value(const value_view &v, [[maybe_unused]] Owner &obj) const -> void
-    {
-        if (!this->skip_null(v)) {
-            v.raise_expected("array");
-        }
-    }
-
-    template <typename Owner>
-    auto begin_array(frame_stack &st, Owner &obj) const -> void
-    {
-        st.push_frame(obj, string_array_tag<Parse, Owner>{ });
-        st.top().active = 0;
-    }
-};
-
-// A registered schema is a user-supplied struct with a static constexpr
-// `fields` (the tuple of field descriptors) plus, optionally, a
-// `post_parse(Owner &)` function.
 template <typename Schema, typename Owner, typename = void>
-struct has_post_parse : std::false_type
-{
-};
+inline constexpr bool has_post_parse_v = false;
 
 template <typename Schema, typename Owner>
-struct has_post_parse<Schema,
-                      Owner,
-                      std::void_t<decltype(Schema::post_parse(std::declval<Owner &>()))>>
-    : std::true_type
+inline constexpr bool
+  has_post_parse_v<Schema,
+                   Owner,
+                   std::void_t<decltype(Schema::post_parse(std::declval<Owner &>()))>> = true;
+
+// One compile-time array of every field name, shared by the key lookup, the
+// index-to-name access and the duplicate-name check, so the schema tuple is
+// expanded exactly once.
+template <typename Tuple>
+[[nodiscard]] constexpr auto field_names(const Tuple &fields)
 {
-};
+    return std::apply(
+      [](const auto &...field) {
+          return std::array<std::string_view, sizeof...(field)>{ field.name()... };
+      },
+      fields);
+}
 
 template <typename T, typename Schema>
 struct object_frame_ops : frame_handler<object_frame_ops<T, Schema>>
@@ -1029,28 +809,33 @@ struct object_frame_ops : frame_handler<object_frame_ops<T, Schema>>
     static constexpr std::size_t count = std::tuple_size_v<fields_type>;
     static_assert(count <= max_fields, "the schema has more fields than max_fields");
 
+    static constexpr auto names = field_names(table);
+
     [[nodiscard]] static auto segment(const frame &f) -> location_edge { return leaf_of(f); }
 
-    static auto on_value(frame &f, frame_stack &st, const value_view &v) -> void
+    static auto on_value(frame &f, frame_stack &st, const scalar_value &v) -> void
     {
-        try {
-            value_dispatch(f, v, std::make_index_sequence<count>{ });
-        } catch (const decode_error &e) {
-            raise_decoded(st, leaf_of(f), e.what());
-        }
+        visit_active(
+          f,
+          st,
+          [&](const auto &field, T &target) {
+              field.assign_value(v, target);
+          },
+          std::make_index_sequence<count>{ });
     }
 
     static auto on_key(frame &f, frame_stack &st, std::string &key) -> bool
     {
         const auto idx = find_key(key);
         if (idx != field_index_npos) {
-            if (UNLIKELY(f.seen.test(idx))) {
+            const auto bit = field_mask{ 1 } << idx;
+            if (UNLIKELY(f.seen & bit)) {
                 raise_decoded(st,
                               location_edge::field(name_at(idx)),
                               fmt::format("duplicate object key: '{}'", key));
             }
 
-            f.seen.set(idx);
+            f.seen |= bit;
             f.active = idx;
             return true;
         }
@@ -1063,124 +848,36 @@ struct object_frame_ops : frame_handler<object_frame_ops<T, Schema>>
 
     static auto on_object_begin(frame &f, frame_stack &st) -> void
     {
-        try {
-            object_dispatch(f, st, std::make_index_sequence<count>{ });
-        } catch (const decode_error &e) {
-            raise_decoded(st, leaf_of(f), e.what());
-        }
+        visit_active(
+          f,
+          st,
+          [&](const auto &field, T &target) {
+              field.begin_object(st, target);
+          },
+          std::make_index_sequence<count>{ });
     }
 
     static auto on_array_begin(frame &f, frame_stack &st) -> void
     {
-        try {
-            array_dispatch(f, st, std::make_index_sequence<count>{ });
-        } catch (const decode_error &e) {
-            raise_decoded(st, leaf_of(f), e.what());
-        }
+        visit_active(
+          f,
+          st,
+          [&](const auto &field, T &target) {
+              field.begin_array(st, target);
+          },
+          std::make_index_sequence<count>{ });
     }
 
-    static auto on_end(frame &f, frame_stack &st) -> void { finish(f, st); }
-
-private:
-    template <std::size_t... I>
-    static auto find_key_impl(std::string_view key,
-                              [[maybe_unused]] std::index_sequence<I...> seq) noexcept
-      -> std::size_t
+    static auto on_end(frame &f, frame_stack &st) -> void
     {
-        std::size_t result = field_index_npos;
-        std::ignore = ((result != field_index_npos
-                        || (std::get<I>(table).name() == key ? (result = I, true) : false))
-                       || ...);
-        return result;
-    }
-
-    template <std::size_t... I>
-    static auto name_at_impl(std::size_t i, [[maybe_unused]] std::index_sequence<I...> seq) noexcept
-      -> std::string_view
-    {
-        std::string_view result;
-        std::ignore = ((i == I ? (result = std::get<I>(table).name(), true) : false) || ...);
-        return result;
-    }
-
-    [[nodiscard]] static auto find_key(std::string_view key) noexcept -> std::size_t
-    {
-        return find_key_impl(key, std::make_index_sequence<count>{ });
-    }
-
-    [[nodiscard]] static auto name_at(std::size_t i) noexcept -> std::string_view
-    {
-        return name_at_impl(i, std::make_index_sequence<count>{ });
-    }
-
-    template <std::size_t I>
-    static auto value_one(frame &f, const value_view &v) -> void
-    {
-        auto &obj = f.target.as<T>();
-        std::get<I>(table).assign_value(v, obj);
-    }
-
-    template <std::size_t... I>
-    static auto value_dispatch(frame &f,
-                               const value_view &v,
-                               [[maybe_unused]] std::index_sequence<I...> seq) -> void
-    {
-        std::ignore = ((f.active == I ? (value_one<I>(f, v), true) : false) || ...);
-    }
-
-    [[nodiscard]] static auto leaf_of(const frame &f) noexcept -> location_edge
-    {
-        return f.active < count ? location_edge::field(name_at(f.active)) : location_edge::root();
-    }
-
-    template <std::size_t I>
-    static auto object_one(frame &f, frame_stack &st) -> void
-    {
-        auto &obj = f.target.as<T>();
-        std::get<I>(table).begin_object(st, obj);
-    }
-
-    template <std::size_t I>
-    static auto array_one(frame &f, frame_stack &st) -> void
-    {
-        auto &obj = f.target.as<T>();
-        std::get<I>(table).begin_array(st, obj);
-    }
-
-    template <std::size_t I>
-    static auto finish_one(frame &f, frame_stack &st) -> void
-    {
-        constexpr const auto &field = std::get<I>(table);
-        if constexpr (field.is_required()) {
-            if (!f.seen.test(I)) {
-                raise_decoded(st,
-                              location_edge::field(field.name()),
-                              fmt::format("{} is required", field.name()));
+        constexpr auto required = required_fields(std::make_index_sequence<count>{ });
+        if constexpr (required != 0) {
+            const auto missing = required & ~f.seen;
+            if (UNLIKELY(missing != 0)) {
+                raise_missing(st, missing);
             }
         }
-    }
-
-    template <std::size_t... I>
-    static auto object_dispatch(frame &f,
-                                frame_stack &st,
-                                [[maybe_unused]] std::index_sequence<I...> seq) -> void
-    {
-        std::ignore = ((f.active == I ? (object_one<I>(f, st), true) : false) || ...);
-    }
-
-    template <std::size_t... I>
-    static auto array_dispatch(frame &f,
-                               frame_stack &st,
-                               [[maybe_unused]] std::index_sequence<I...> seq) -> void
-    {
-        std::ignore = ((f.active == I ? (array_one<I>(f, st), true) : false) || ...);
-    }
-
-    static auto finish(frame &f, frame_stack &st) -> void
-    {
-        finish_dispatch(f, st, std::make_index_sequence<count>{ });
-
-        if constexpr (has_post_parse<Schema, T>::value) {
+        if constexpr (has_post_parse_v<Schema, T>) {
             try {
                 Schema::post_parse(f.target.as<T>());
             } catch (const decode_error &e) {
@@ -1191,26 +888,64 @@ private:
         st.pop();
     }
 
-    template <std::size_t... I>
-    static auto finish_dispatch(frame &f,
-                                frame_stack &st,
-                                [[maybe_unused]] std::index_sequence<I...> seq) -> void
+private:
+    template <typename Visit, std::size_t... I>
+    static auto visit_active(frame &f, frame_stack &st, Visit visit, std::index_sequence<I...>)
+      -> void
     {
-        (finish_one<I>(f, st), ...);
+        try {
+            std::ignore =
+              ((f.active == I && (visit(std::get<I>(table), f.target.as<T>()), true)) || ...);
+        } catch (const decode_error &e) {
+            raise_decoded(st, leaf_of(f), e.what());
+        }
+    }
+
+    // A fully unrolled scan against the compile-time name array: it measured
+    // faster than std::find over the same array, which loads each name at run
+    // time and does not unroll as well.
+    template <std::size_t... I>
+    static auto find_key_impl(std::string_view key,
+                              [[maybe_unused]] std::index_sequence<I...>) noexcept -> std::size_t
+    {
+        std::size_t result = field_index_npos;
+        std::ignore = ((names[I] == key && (result = I, true)) || ...);
+        return result;
+    }
+
+    [[nodiscard]] static auto find_key(std::string_view key) noexcept -> std::size_t
+    {
+        return find_key_impl(key, std::make_index_sequence<count>{ });
+    }
+
+    [[nodiscard]] static auto name_at(std::size_t i) noexcept -> std::string_view
+    {
+        return names[i];
+    }
+
+    [[nodiscard]] static auto leaf_of(const frame &f) noexcept -> location_edge
+    {
+        return f.active < count ? location_edge::field(name_at(f.active)) : location_edge::root();
+    }
+
+    template <std::size_t... I>
+    static constexpr auto required_fields(std::index_sequence<I...>) noexcept -> field_mask
+    {
+        return ((std::get<I>(table).is_required() ? field_mask{ 1 } << I : 0) | ... | 0);
+    }
+
+    [[noreturn]] static auto raise_missing(frame_stack &st, field_mask missing) -> void
+    {
+        std::size_t index = 0;
+        while ((missing & 1) == 0) {
+            missing >>= 1;
+            ++index;
+        }
+
+        const auto name = name_at(index);
+        raise_decoded(st, location_edge::field(name), fmt::format("{} is required", name));
     }
 };
-
-template <typename E>
-[[nodiscard]] constexpr auto element_expected_name() noexcept -> std::string_view
-{
-    if constexpr (is_scalar_v<E>) {
-        return scalar_expected_name<E>();
-    } else if constexpr (field_traits<E>::kind == field_kind::array) {
-        return "array";
-    } else {
-        return "object";
-    }
-}
 
 template <typename E>
 inline constexpr bool is_object_element_v =
@@ -1233,14 +968,7 @@ struct array_frame_ops<std::vector<X, A>> : public frame_handler<array_frame_ops
         return location_edge::element(vec.empty() ? 0 : vec.size() - 1);
     }
 
-    static auto on_key(frame &f, frame_stack &s, [[maybe_unused]] std::string &v) -> bool
-    {
-        raise_decoded(s,
-                      location_edge::element(f.target.as<vec_type>().size()),
-                      "unexpected object key inside an array");
-    }
-
-    static auto on_value(frame &f, frame_stack &s, const value_view &v) -> void
+    static auto on_value(frame &f, frame_stack &s, const scalar_value &v) -> void
     {
         auto &vec = f.target.as<vec_type>();
         const auto index = vec.size();
@@ -1293,10 +1021,11 @@ struct map_frame_ops<std::unordered_map<std::string, V>>
     : public frame_handler<map_frame_ops<std::unordered_map<std::string, V>>>
 {
     using map_type = std::unordered_map<std::string, V>;
+    using entry_type = typename map_type::value_type;
 
     [[nodiscard]] static auto segment(const frame &f) -> location_edge
     {
-        return location_edge::field(f.key);
+        return location_edge::field(f.map_entry.as<entry_type>().first);
     }
 
     static auto on_key(frame &f, frame_stack &s, std::string &key) -> bool
@@ -1311,22 +1040,21 @@ struct map_frame_ops<std::unordered_map<std::string, V>>
                           fmt::format("duplicate object key: '{}'", it->first));
         }
 
-        f.child = target_ref::of<V>(it->second);
-        f.key = it->first;
+        f.map_entry = target_ref::of<entry_type>(*it);
         return true;
     }
 
-    static auto on_value(frame &f, frame_stack &s, const value_view &v) -> void
+    static auto on_value(frame &f, frame_stack &s, const scalar_value &v) -> void
     {
         if constexpr (is_scalar_v<V>) {
             try {
-                assign_scalar(v, f.child.as<V>());
+                assign_scalar(v, f.map_entry.as<entry_type>().second);
             } catch (const decode_error &e) {
-                raise_decoded(s, location_edge::field(f.key), e.what());
+                raise_decoded(s, segment(f), e.what());
             }
         } else {
             raise_decoded(s,
-                          location_edge::field(f.key),
+                          segment(f),
                           type_error_message(element_expected_name<V>(), v.type_name()));
         }
     }
@@ -1334,22 +1062,18 @@ struct map_frame_ops<std::unordered_map<std::string, V>>
     static auto on_object_begin(frame &f, frame_stack &s) -> void
     {
         if constexpr (is_object_element_v<V>) {
-            push_child_frame(s, f.child.as<V>());
+            push_child_frame(s, f.map_entry.as<entry_type>().second);
         } else {
-            raise_decoded(s,
-                          location_edge::field(f.key),
-                          type_error_message(element_expected_name<V>(), "object"));
+            raise_decoded(s, segment(f), type_error_message(element_expected_name<V>(), "object"));
         }
     }
 
     static auto on_array_begin(frame &f, frame_stack &s) -> void
     {
         if constexpr (is_array_element_v<V>) {
-            push_child_frame(s, f.child.as<V>());
+            push_child_frame(s, f.map_entry.as<entry_type>().second);
         } else {
-            raise_decoded(s,
-                          location_edge::field(f.key),
-                          type_error_message(element_expected_name<V>(), "array"));
+            raise_decoded(s, segment(f), type_error_message(element_expected_name<V>(), "array"));
         }
     }
 
@@ -1357,49 +1081,62 @@ struct map_frame_ops<std::unordered_map<std::string, V>>
 };
 
 template <auto Parse, typename Owner>
-struct string_array_ops : public frame_handler<string_array_ops<Parse, Owner>>
+struct string_array_ops : frame_handler<string_array_ops<Parse, Owner>>
 {
-    static_assert(is_non_null_callback_v<Parse, void (*)(std::string_view, Owner &)>,
-                  "array element callback must be a non-null function pointer with signature "
-                  "void(string_view, Owner&)");
-
     [[nodiscard]] static auto segment(const frame &f) -> location_edge
     {
         return location_edge::element(f.active);
     }
 
-    static auto on_key(frame &f, frame_stack &s, [[maybe_unused]] std::string &v) -> bool
+    static auto on_value(frame &f, frame_stack &s, const scalar_value &v) -> void
     {
-        raise_decoded(s, location_edge::element(f.active), "unexpected object key inside an array");
-    }
-
-    static auto on_value(frame &f, frame_stack &s, const value_view &v) -> void
-    {
-        const auto index = f.active++;
-        if (UNLIKELY(!v.is_string())) {
-            raise_decoded(s,
-                          location_edge::element(index),
-                          type_error_message("string", v.type_name()));
-        }
-
+        // as_string_view() rejects a non-string with the exact message the old
+        // explicit type check raised; the catch still adds the element index.
+        const auto edge = location_edge::element(f.active++);
         try {
             Parse(v.as_string_view(), f.target.as<Owner>());
         } catch (const decode_error &e) {
-            raise_decoded(s, location_edge::element(index), e.what());
+            raise_decoded(s, edge, e.what());
         }
     }
 
     static auto on_object_begin(frame &f, frame_stack &s) -> void
     {
-        raise_decoded(s, location_edge::element(f.active), type_error_message("string", "object"));
+        raise_decoded(s, segment(f), type_error_message("string", "object"));
     }
 
     static auto on_array_begin(frame &f, frame_stack &s) -> void
     {
-        raise_decoded(s, location_edge::element(f.active), type_error_message("string", "array"));
+        raise_decoded(s, segment(f), type_error_message("string", "array"));
     }
 
-    static auto on_end([[maybe_unused]] frame &f, frame_stack &st) -> void { st.pop(); }
+    static auto on_end(frame &, frame_stack &s) -> void { s.pop(); }
+};
+
+template <auto Read>
+struct strings_field : public field_descriptor<strings_field<Read>>
+{
+    using base = field_descriptor<strings_field<Read>>;
+    using base::base;
+    static constexpr field_kind kind = field_kind::array;
+
+    template <typename Owner>
+    auto assign_value(const scalar_value &v, [[maybe_unused]] Owner &obj) const -> void
+    {
+        if (!this->skip_null(v)) {
+            v.raise_expected("array");
+        }
+    }
+
+    template <typename Owner>
+    auto begin_array(frame_stack &st, Owner &obj) const -> void
+    {
+        static_assert(is_non_null_callback_v<Read, void (*)(std::string_view, Owner &)>,
+                      "consume_strings requires a non-null callback void(string_view, Owner&)");
+        static constexpr auto ops = string_array_ops<Read, Owner>::make();
+        st.push_frame(target_ref::of<Owner>(obj), ops);
+        st.top().active = 0;
+    }
 };
 
 template <typename E>
@@ -1414,18 +1151,10 @@ struct array_frame_ops<utils::bitflags<E>>
 {
 };
 
-template <typename T, typename Schema>
-[[nodiscard]] auto make_object_frame_ops() -> const frame_ops &
+template <typename Tuple>
+constexpr auto names_are_unique(const Tuple &fields)
 {
-    static constexpr frame_ops ops = object_frame_ops<T, Schema>::make();
-    return ops;
-}
-
-template <typename Tuple, std::size_t... I>
-constexpr auto names_are_unique_impl(const Tuple &fields,
-                                     [[maybe_unused]] std::index_sequence<I...> seq)
-{
-    const std::array<std::string_view, sizeof...(I)> names{ std::get<I>(fields).name()... };
+    const auto names = field_names(fields);
     for (std::size_t i = 1; i < names.size(); ++i) {
         for (std::size_t j = 0; j < i; ++j) {
             if (names[i] == names[j]) {
@@ -1437,178 +1166,7 @@ constexpr auto names_are_unique_impl(const Tuple &fields,
     return true;
 }
 
-template <typename Tuple>
-constexpr auto names_are_unique(const Tuple &fields)
-{
-    return names_are_unique_impl(fields, std::make_index_sequence<std::tuple_size_v<Tuple>>{ });
-}
-
-// https://json.nlohmann.me/features/parsing/sax_interface
-template <typename Root>
-class sax_fill_parser
-{
-public:
-    using number_integer_t = nlohmann::json::number_integer_t;
-    using number_unsigned_t = nlohmann::json::number_unsigned_t;
-    using number_float_t = nlohmann::json::number_float_t;
-    using string_t = nlohmann::json::string_t;
-    using binary_t = nlohmann::json::binary_t;
-    using exception_t = nlohmann::json::exception;
-
-    explicit sax_fill_parser(Root &root)
-        : root_(root)
-    {
-    }
-
-    auto null() -> bool { return dispatch_value(value_view::make_null()); }
-
-    auto boolean(bool val) -> bool { return dispatch_value(value_view::make_bool(val)); }
-
-    auto number_integer(number_integer_t val) -> bool
-    {
-        return dispatch_value(value_view::make_int(val));
-    }
-
-    auto number_unsigned(number_unsigned_t val) -> bool
-    {
-        return dispatch_value(value_view::make_uint(val));
-    }
-
-    auto number_float(number_float_t val, [[maybe_unused]] const string_t &s) -> bool
-    {
-        return dispatch_value(value_view::make_float(val));
-    }
-
-    auto string(string_t &val) -> bool
-    {
-        check_nul(val, "string contains an embedded NUL byte");
-        return dispatch_value(value_view::make_string(val));
-    }
-
-    auto binary([[maybe_unused]] binary_t &val) -> bool
-    {
-        throw decode_error{ "binary values are not supported" };
-    }
-
-    auto start_object([[maybe_unused]] std::size_t elements) -> bool
-    {
-        if (UNLIKELY(++nesting_ > max_nesting_depth)) {
-            raise_root("JSON nesting exceeds the maximum depth");
-        }
-
-        if (UNLIKELY(state_.empty())) {
-            state_.push_frame(root_, object_tag<Root>{ });
-            return true;
-        }
-
-        if (skip_.on_begin() == skip_counter::action::handle) {
-            state_.top().ops->on_object_begin(state_.top(), state_);
-        }
-
-        return true;
-    }
-
-    auto key(string_t &val) -> bool
-    {
-        check_nul(val, "object key contains an embedded NUL byte");
-
-        if (UNLIKELY(state_.empty())) {
-            raise_root("unexpected object key outside of an object");
-        }
-
-        if (UNLIKELY(skip_.on_key() == skip_counter::action::consume)) {
-            return true;
-        }
-
-        if (!state_.top().ops->on_key(state_.top(), state_, val)) {
-            skip_.begin_skip();
-        }
-
-        return true;
-    }
-
-    auto end_object() -> bool
-    {
-        --nesting_;
-
-        if (skip_.on_end() == skip_counter::action::handle) {
-            state_.top().ops->on_end(state_.top(), state_);
-        }
-
-        return true;
-    }
-
-    auto start_array([[maybe_unused]] std::size_t elements) -> bool
-    {
-        if (UNLIKELY(++nesting_ > max_nesting_depth)) {
-            raise_root("JSON nesting exceeds the maximum depth");
-        }
-
-        if (UNLIKELY(state_.empty())) {
-            raise_root("type must be object, but is array");
-        }
-
-        if (skip_.on_begin() == skip_counter::action::handle) {
-            state_.top().ops->on_array_begin(state_.top(), state_);
-        }
-
-        return true;
-    }
-
-    auto end_array() -> bool
-    {
-        --nesting_;
-
-        if (skip_.on_end() == skip_counter::action::handle) {
-            state_.top().ops->on_end(state_.top(), state_);
-        }
-
-        return true;
-    }
-
-    auto parse_error(std::size_t position,
-                     [[maybe_unused]] const std::string &last_token,
-                     const exception_t &ex) -> bool
-    {
-        // nlohmann's token string keeps bytes above 0x1F verbatim, so a rejected
-        // ill-formed UTF-8 input produces a message with the same ill-formed
-        // bytes.
-        throw decode_error{
-            fmt::format("at input byte {}: {}", position, utils::to_valid_utf8_lossy(ex.what()))
-        };
-    }
-
-private:
-    [[noreturn]] static auto raise_root(std::string_view detail) -> void
-    {
-        throw decode_error{ fmt::format("at '<root>': {}", detail) };
-    }
-
-    auto dispatch_value(const value_view &v) -> bool
-    {
-        if (UNLIKELY(state_.empty())) {
-            raise_root(fmt::format("type must be object, but is {}", v.type_name()));
-        }
-
-        if (skip_.on_value() == skip_counter::action::handle) {
-            state_.top().ops->on_value(state_.top(), state_, v);
-        }
-
-        return true;
-    }
-
-    static auto check_nul(const string_t &val, const char *message) -> void
-    {
-        if (UNLIKELY(val.find('\0') != string_t::npos)) {
-            throw decode_error{ message };
-        }
-    }
-
-    Root &root_;
-    frame_stack state_;
-    skip_counter skip_;
-    std::size_t nesting_{ 0 };
-};
+void parse_document(std::string_view content, target_ref root, const frame_ops &root_ops);
 
 } // namespace detail
 
@@ -1626,13 +1184,6 @@ template <typename M>
 auto ops_of([[maybe_unused]] map_tag<M> tag) -> const frame_ops &
 {
     static constexpr frame_ops ops = detail::map_frame_ops<M>::make();
-    return ops;
-}
-
-template <auto Parse, typename Owner>
-auto ops_of([[maybe_unused]] string_array_tag<Parse, Owner> tag) -> const frame_ops &
-{
-    static constexpr frame_ops ops = detail::string_array_ops<Parse, Owner>::make();
     return ops;
 }
 
@@ -1666,19 +1217,21 @@ template <auto Check>
     return detail::checked_field<Check>{ name };
 }
 
-template <auto Parse>
-[[nodiscard]] constexpr auto custom_array(std::string_view name)
+// A string-array field whose elements are handed, one by one and in order, to
+// `Read(string_view, Owner &)`.
+template <auto Read>
+[[nodiscard]] constexpr auto consume_strings(std::string_view name)
 {
-    if constexpr (std::is_pointer_v<decltype(Parse)>
-                  && std::is_function_v<std::remove_pointer_t<decltype(Parse)>>) {
-        static_assert(detail::is_non_null_callback_v<Parse, decltype(Parse)>,
-                      "custom_array() requires a non-null function pointer");
-        return detail::custom_array_field<Parse>{ name };
-    } else {
-        static_assert(std::is_pointer_v<decltype(Parse)>
-                        && std::is_function_v<std::remove_pointer_t<decltype(Parse)>>,
-                      "custom_array() expects a function pointer");
-    }
+    return detail::strings_field<Read>{ name };
+}
+
+// The registration entry point a schema's ops_of(object_tag<Owner>) returns.
+template <typename Owner, typename Schema>
+[[nodiscard]] auto make_object_ops() -> const frame_ops &
+{
+    static_assert(detail::names_are_unique(Schema::fields()), "duplicate JSON field key");
+    static constexpr auto ops = detail::object_frame_ops<Owner, Schema>::make();
+    return ops;
 }
 
 template <typename T>
@@ -1690,69 +1243,63 @@ template <typename T>
     }
 
     T value{ };
-    detail::sax_fill_parser<T> parser(value);
-    std::ignore = nlohmann::json::sax_parse(content, &parser);
+    detail::parse_document(content, detail::target_ref::of<T>(value), ops_of(object_tag<T>{ }));
 
     return value;
 }
 
 } // namespace linyaps_box::json
 
-// Emits the type's schema struct -- object name, the field descriptor tuple and
-// the compile-time duplicate-name check -- together with its single registration
-// point: the ADL function `ops_of(object_tag<TYPE>)` the parser resolves.  A type
-// therefore opts in with one declaration in its own header and one macro call in
-// its .cpp, and no library template is specialized:
+// Emits a schema and its ADL registration. make_object_ops validates both
+// macro-generated and hand-written schemas. OBJECT remains for existing calls.
 //
 //   // header
 //   auto ops_of(json::object_tag<TYPE>) -> const json::frame_ops &;
 //   // .cpp
 //   LINYAPS_BOX_CONFIG_SCHEMA(TYPE, TYPE_schema, "object", field<&TYPE::member>("key"), ...)
 
-#define LINYAPS_BOX_CONFIG_SCHEMA(TYPE, SCHEMA, OBJECT, ...)                                   \
-    struct SCHEMA                                                                              \
-    {                                                                                          \
-        static constexpr auto fields()                                                         \
-        {                                                                                      \
-            using ::linyaps_box::json::check;                                                  \
-            using ::linyaps_box::json::custom_array;                                           \
-            using ::linyaps_box::json::field;                                                  \
-            return std::make_tuple(__VA_ARGS__);                                               \
-        }                                                                                      \
-    };                                                                                         \
-                                                                                               \
-    static_assert(::linyaps_box::json::detail::names_are_unique(SCHEMA::fields()),             \
-                  "duplicate JSON field key in " OBJECT);                                      \
-    auto ops_of(::linyaps_box::json::object_tag<TYPE>)->const ::linyaps_box::json::frame_ops & \
-    {                                                                                          \
-        return ::linyaps_box::json::detail::make_object_frame_ops<TYPE, SCHEMA>();             \
+#define LINYAPS_BOX_CONFIG_SCHEMA(TYPE, SCHEMA, OBJECT, ...)            \
+    struct SCHEMA                                                       \
+    {                                                                   \
+        static constexpr auto fields()                                  \
+        {                                                               \
+            using ::linyaps_box::json::check;                           \
+            using ::linyaps_box::json::consume_strings;                 \
+            using ::linyaps_box::json::field;                           \
+            return std::make_tuple(__VA_ARGS__);                        \
+        }                                                               \
+    };                                                                  \
+                                                                        \
+    [[maybe_unused]] auto ops_of(::linyaps_box::json::object_tag<TYPE>) \
+      ->const ::linyaps_box::json::frame_ops &                          \
+    {                                                                   \
+        return ::linyaps_box::json::make_object_ops<TYPE, SCHEMA>();    \
     }
 
-#define LINYAPS_BOX_CONFIG_SCHEMA_WITH_POST(TYPE, SCHEMA, OBJECT, POST, ...)                   \
-    struct SCHEMA                                                                              \
-    {                                                                                          \
-        static_assert(                                                                         \
-          ::linyaps_box::json::detail::is_non_null_callback_v<POST, void (*)(TYPE &)>,         \
-          "post_parse must be a non-null function pointer with signature void(Owner&)");       \
-        static constexpr auto fields()                                                         \
-        {                                                                                      \
-            using ::linyaps_box::json::check;                                                  \
-            using ::linyaps_box::json::custom_array;                                           \
-            using ::linyaps_box::json::field;                                                  \
-            return std::make_tuple(__VA_ARGS__);                                               \
-        }                                                                                      \
-                                                                                               \
-        static void post_parse(TYPE &value)                                                    \
-        {                                                                                      \
-            {                                                                                  \
-                POST(value);                                                                   \
-            }                                                                                  \
-        }                                                                                      \
-    };                                                                                         \
-                                                                                               \
-    static_assert(::linyaps_box::json::detail::names_are_unique(SCHEMA::fields()),             \
-                  "duplicate JSON field key in " OBJECT);                                      \
-    auto ops_of(::linyaps_box::json::object_tag<TYPE>)->const ::linyaps_box::json::frame_ops & \
-    {                                                                                          \
-        return ::linyaps_box::json::detail::make_object_frame_ops<TYPE, SCHEMA>();             \
+#define LINYAPS_BOX_CONFIG_SCHEMA_WITH_POST(TYPE, SCHEMA, OBJECT, POST, ...)             \
+    struct SCHEMA                                                                        \
+    {                                                                                    \
+        static_assert(                                                                   \
+          ::linyaps_box::json::detail::is_non_null_callback_v<POST, void (*)(TYPE &)>,   \
+          "post_parse must be a non-null function pointer with signature void(Owner&)"); \
+        static constexpr auto fields()                                                   \
+        {                                                                                \
+            using ::linyaps_box::json::check;                                            \
+            using ::linyaps_box::json::consume_strings;                                  \
+            using ::linyaps_box::json::field;                                            \
+            return std::make_tuple(__VA_ARGS__);                                         \
+        }                                                                                \
+                                                                                         \
+        static void post_parse(TYPE &value)                                              \
+        {                                                                                \
+            {                                                                            \
+                POST(value);                                                             \
+            }                                                                            \
+        }                                                                                \
+    };                                                                                   \
+                                                                                         \
+    [[maybe_unused]] auto ops_of(::linyaps_box::json::object_tag<TYPE>)                  \
+      ->const ::linyaps_box::json::frame_ops &                                           \
+    {                                                                                    \
+        return ::linyaps_box::json::make_object_ops<TYPE, SCHEMA>();                     \
     }
