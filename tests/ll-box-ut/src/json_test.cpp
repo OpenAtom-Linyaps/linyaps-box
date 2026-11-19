@@ -56,6 +56,155 @@ LINYAPS_BOX_CONFIG_SCHEMA(map_model,
                           "map_model",
                           field<&map_model::entries>("entries").required())
 
+struct inner_model
+{
+    std::optional<std::string> name;
+};
+
+LINYAPS_BOX_CONFIG_SCHEMA(inner_model,
+                          inner_model_schema,
+                          "inner_model",
+                          field<&inner_model::name>("name").ignore_null())
+
+struct shapes_model
+{
+    std::optional<std::vector<inner_model>> objects;
+    std::optional<std::unordered_map<std::string, inner_model>> by_name;
+    std::optional<std::vector<std::uint8_t>> bytes;
+    std::optional<inner_model> inner;
+    std::optional<bool> flag;
+};
+
+LINYAPS_BOX_CONFIG_SCHEMA(shapes_model,
+                          shapes_model_schema,
+                          "shapes_model",
+                          field<&shapes_model::objects>("objects").ignore_null(),
+                          field<&shapes_model::by_name>("byName").ignore_null(),
+                          field<&shapes_model::bytes>("bytes").ignore_null(),
+                          field<&shapes_model::inner>("inner").ignore_null(),
+                          field<&shapes_model::flag>("flag").ignore_null())
+
+namespace {
+
+enum class shape_kind : std::uint8_t { first, second };
+
+LINYAPS_REGISTER_ENUM_TABLE(shape_kind,
+                            2,
+                            { shape_kind::first, "FIRST" },
+                            { shape_kind::second, "SECOND" })
+
+struct enum_map_model
+{
+    std::unordered_map<std::string, shape_kind> entries;
+};
+
+LINYAPS_BOX_CONFIG_SCHEMA(enum_map_model,
+                          enum_map_model_schema,
+                          "enum_map_model",
+                          field<&enum_map_model::entries>("entries").required())
+
+struct enum_member_model
+{
+    shape_kind kind{ shape_kind::first };
+};
+
+LINYAPS_BOX_CONFIG_SCHEMA(enum_member_model,
+                          enum_member_model_schema,
+                          "enum_member_model",
+                          field<&enum_member_model::kind>("kind").required())
+
+struct double_model
+{
+    double value{ 0 };
+};
+
+LINYAPS_BOX_CONFIG_SCHEMA(double_model,
+                          double_model_schema,
+                          "double_model",
+                          field<&double_model::value>("value").required())
+
+struct post_parse_model
+{
+    std::optional<int> value;
+};
+
+void reject_negative(post_parse_model &v) // NOLINT
+{
+    if (v.value.value_or(0) < 0) {
+        throw json::decode_error{ "value must not be negative" };
+    }
+}
+
+LINYAPS_BOX_CONFIG_SCHEMA_WITH_POST(post_parse_model,
+                                    post_parse_model_schema,
+                                    "post_parse_model",
+                                    reject_negative,
+                                    field<&post_parse_model::value>("value").ignore_null())
+
+struct strings_model
+{
+    std::string joined;
+    int count{ 0 };
+};
+
+void collect_string(std::string_view s, strings_model &m)
+{
+    if (s == "reject") {
+        throw json::decode_error{ "string rejected by consumer" };
+    }
+
+    if (m.count != 0) {
+        m.joined.push_back(',');
+    }
+
+    m.joined.append(s);
+    ++m.count;
+}
+
+LINYAPS_BOX_CONFIG_SCHEMA(strings_model,
+                          strings_model_schema,
+                          "strings_model",
+                          json::consume_strings<&collect_string>("items").ignore_null())
+
+struct strings_list_model
+{
+    std::vector<strings_model> list;
+};
+
+LINYAPS_BOX_CONFIG_SCHEMA(strings_list_model,
+                          strings_list_model_schema,
+                          "strings_list_model",
+                          field<&strings_list_model::list>("list").required())
+
+struct nested_strings_model
+{
+    std::vector<nested_strings_model> children;
+    std::optional<strings_model> leaf;
+};
+
+LINYAPS_BOX_CONFIG_SCHEMA(nested_strings_model,
+                          nested_strings_schema,
+                          "nested_strings_model",
+                          field<&nested_strings_model::children>("children"),
+                          field<&nested_strings_model::leaf>("leaf"))
+
+struct facade_model
+{
+    std::int64_t n{ 0 };
+};
+
+auto read_integer(const json::value_view &v) -> std::int64_t
+{
+    return v.as_integer<std::int64_t>();
+}
+
+LINYAPS_BOX_CONFIG_SCHEMA(facade_model,
+                          facade_model_schema,
+                          "facade_model",
+                          field<&facade_model::n, &read_integer>("n").required())
+
+} // namespace
+
 namespace {
 
 TEST(JsonShape, MinimalModelRejectsDecodedNul)
@@ -312,8 +461,359 @@ TEST(JsonShape, ErrorContextPointsAtTheOffendingNode)
       std::string::npos);
     EXPECT_NE(parse_error_message<map_model>(R"({"entries":{"k":"a","k":"b"}})").find("/entries/k"),
               std::string::npos);
+    EXPECT_NE(parse_error_message<shapes_model>(R"({"byName":{"a/b~":{"name":1}}})")
+                .find("at '/byName/a~1b~0/name':"),
+              std::string::npos);
     EXPECT_NE(parse_error_message<number_model>(R"({"u32":0,"i64":0,"i32":0})").find("/u64"),
               std::string::npos);
+    EXPECT_NE(parse_error_message<number_model>(R"({"u64":0,"i32":0})").find("at '/u32':"),
+              std::string::npos);
+}
+
+TEST(JsonShapes, ArrayFieldRejectsWrongShapes)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"objects":{}})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"objects":"x"})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"objects":[1]})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"objects":[[]]})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"objects":[{"name":1}]})"),
+                 json::decode_error);
+}
+
+TEST(JsonShapes, MapFieldRejectsWrongShapes)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"byName":[]})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"byName":{"k":1}})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"byName":{"k":[]}})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"byName":{"k":{"name":1}}})"),
+                 json::decode_error);
+}
+
+TEST(JsonShapes, AcceptsContainerShapes)
+{
+    const auto model = json::parse_as<shapes_model>(
+      R"({"objects":[{"name":"a"},{}],"byName":{"k":{"name":"b"}},"bytes":[1,255],"flag":true})");
+    ASSERT_TRUE(model.objects.has_value());
+    EXPECT_EQ(model.objects->size(), 2U);
+    ASSERT_TRUE(model.by_name.has_value());
+    EXPECT_EQ(model.by_name->at("k").name, std::optional<std::string>{ "b" });
+    ASSERT_TRUE(model.bytes.has_value());
+    EXPECT_EQ(model.bytes->at(1), 255U);
+    EXPECT_TRUE(model.flag.value_or(false));
+}
+
+TEST(JsonNumberBinding, RejectsValuesOutOfRangeForTheMemberType)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"bytes":[256]})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"bytes":[-1]})"),
+                 json::decode_error);
+}
+
+TEST(JsonShape, BooleanFieldRejectsNonBooleans)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"flag":1})"), json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"flag":"true"})"),
+                 json::decode_error);
+}
+
+TEST(JsonShape, RejectsExcessivelyNestedObjects)
+{
+    std::string document = R"({"unknown":)";
+    for (int i = 0; i < 256; ++i) {
+        document += R"({"unknown":)";
+    }
+
+    document += '1';
+    for (int i = 0; i < 256; ++i) {
+        document += '}';
+    }
+
+    document += '}';
+
+    EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(document), json::decode_error);
+}
+
+TEST(JsonShapes, ScalarElementsRejectContainerValues)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"bytes":[{}]})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"bytes":[[]]})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"bytes":["x"]})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"byName":{"k":[]}})"),
+                 json::decode_error);
+}
+
+TEST(JsonShapes, ObjectFieldRejectsNonObjectShapes)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"inner":[]})"), json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"inner":1})"), json::decode_error);
+
+    const auto model = json::parse_as<shapes_model>(R"({"inner":{"name":"n"}})");
+    ASSERT_TRUE(model.inner.has_value());
+    EXPECT_EQ(model.inner->name, std::optional<std::string>{ "n" });
+}
+
+TEST(JsonNumberBinding, RejectsHugeUnsignedValues)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"bytes":[18446744073709551615]})"),
+                 json::decode_error);
+}
+
+TEST(JsonShapes, ScalarFieldRejectsContainerShapes)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"flag":{}})"), json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"flag":[]})"), json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"bytes":{}})"), json::decode_error);
+}
+
+TEST(JsonBinding, MapValueConversionFailureIsRejected)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<enum_map_model>(R"({"entries":{"k":"NOPE"}})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<map_model>(R"({"entries":{"k":{}}})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<map_model>(R"({"entries":{"k":[]}})"),
+                 json::decode_error);
+
+    const auto model = json::parse_as<enum_map_model>(R"({"entries":{"k":"SECOND"}})");
+    EXPECT_EQ(model.entries.count("k"), 1U);
+    EXPECT_TRUE(model.entries.at("k") == shape_kind::second);
+}
+
+TEST(JsonBinding, PostParseRejectionIsReported)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<post_parse_model>(R"({"value":-1})"),
+                 json::decode_error);
+
+    const auto model = json::parse_as<post_parse_model>(R"({"value":1})");
+    EXPECT_EQ(model.value.value_or(0), 1);
+}
+
+TEST(JsonNumberBinding, RejectsValuesAboveInt64ForUnsignedMembers)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<shapes_model>(R"({"bytes":[9223372036854775808]})"),
+                 json::decode_error);
+}
+
+TEST(JsonGrammar, NumberTokensFollowTheGrammar)
+{
+    for (const char *raw : {
+           "01",   "00",  "+1",       ".5",    "5.",    "1.",   "1e",    "1e+", "1e-",      "--1",
+           "0x10", "NaN", "Infinity", "1_000", "1.2.3", "01.5", "1e1e1", "0.",  "\xD9\xA3",
+         }) {
+        EXPECT_THROW(std::ignore = json::parse_as<number_model>(with_number("u64", raw)),
+                     json::decode_error)
+          << raw;
+    }
+
+    EXPECT_EQ(json::parse_as<number_model>(with_number("u64", "-0")).u64, 0U);
+    EXPECT_EQ(json::parse_as<number_model>(with_number("i32", "-0")).i32, 0);
+    EXPECT_EQ(json::parse_as<number_model>(with_number("u64", "1E+2")).u64, 100U);
+    EXPECT_EQ(json::parse_as<number_model>(with_number("u64", "1e2")).u64, 100U);
+    EXPECT_EQ(json::parse_as<number_model>(with_number("i32", "1.0e1")).i32, 10);
+}
+
+TEST(JsonGrammar, StringEscapesAreValidated)
+{
+    for (const char *document : {
+           R"({"value":"\x"})",
+           R"({"value":"\'"})",
+           R"({"value":"\u12"})",
+           R"({"value":"\uZZZZ"})",
+           R"({"value":"\U0041"})",
+         }) {
+        EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(document), json::decode_error)
+          << document;
+    }
+
+    for (const char control : { '\x01', '\x1f' }) {
+        std::string document = R"({"value":"a)";
+        document += control;
+        document += R"("})";
+        EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(document), json::decode_error);
+    }
+
+    EXPECT_THROW(std::ignore = json::parse_as<utf8_model>("{\"value\":\"a\nb\"}"),
+                 json::decode_error);
+
+    EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(R"({"value":"\uD800"})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(R"({"value":"\uDC00"})"),
+                 json::decode_error);
+
+    EXPECT_EQ(json::parse_as<utf8_model>(R"({"value":"a\tb"})").value,
+              std::optional<std::string>{ "a\tb" });
+    EXPECT_EQ(json::parse_as<utf8_model>(R"({"value":"\u0041"})").value,
+              std::optional<std::string>{ "A" });
+    EXPECT_EQ(json::parse_as<utf8_model>(R"({"value":"\uD83D\uDE00"})").value,
+              std::optional<std::string>{ "\xF0\x9F\x98\x80" });
+}
+
+TEST(JsonGrammar, StructureFollowsTheGrammar)
+{
+    for (const char *document : {
+           R"({value:1})",
+           R"({"value" 1})",
+           R"({"value"::1})",
+           R"({"value":1,})",
+           R"([1,])",
+           R"({'value':"x"})",
+           R"({"value":"x"}trailing)",
+           R"(// comment)",
+           R"({"value":/*c*/"x"})",
+           R"({"value":True})",
+           R"({"value":NaN})",
+           R"({"value":})",
+           R"({"value":1"})",
+         }) {
+        EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(document), json::decode_error)
+          << document;
+    }
+}
+
+TEST(JsonShape, RespectsTheViewLength)
+{
+    const std::string buffer = std::string{ R"({"value":"x"})" } + "garbage";
+    const std::string_view document{ buffer.data(), buffer.size() - 7 };
+
+    const auto model = json::parse_as<utf8_model>(document);
+    EXPECT_EQ(model.value, std::optional<std::string>{ "x" });
+    EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(buffer), json::decode_error);
+}
+
+TEST(JsonShape, ParsingIsStateless)
+{
+    constexpr std::string_view document = R"({"value":"x"})";
+
+    const auto first = json::parse_as<utf8_model>(document);
+    EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(R"({"value":1})"), json::decode_error);
+    const auto second = json::parse_as<utf8_model>(document);
+
+    EXPECT_EQ(first.value, std::optional<std::string>{ "x" });
+    EXPECT_EQ(second.value, first.value);
+}
+
+TEST(JsonStrings, ConsumeStringsInOrder)
+{
+    const auto model = json::parse_as<strings_model>(R"({"items": ["a", "b", "c"]})");
+    EXPECT_EQ(model.joined, "a,b,c");
+    EXPECT_EQ(model.count, 3);
+}
+
+TEST(JsonStrings, EmptyMissingAndNullItems)
+{
+    for (const char *document : { R"({"items": []})", R"({})", R"({"items": null})" }) {
+        const auto model = json::parse_as<strings_model>(document);
+        EXPECT_EQ(model.joined, "") << document;
+        EXPECT_EQ(model.count, 0) << document;
+    }
+}
+
+TEST(JsonStrings, RejectsWrongShapesAndElements)
+{
+    for (const char *document : {
+           R"({"items": "x"})",
+           R"({"items": 1})",
+           R"({"items": [1]})",
+           R"({"items": [null]})",
+           R"({"items": [{}]})",
+           R"({"items": [[]]})",
+           R"({"items": [true]})",
+         }) {
+        EXPECT_THROW(std::ignore = json::parse_as<strings_model>(document), json::decode_error)
+          << document;
+    }
+}
+
+TEST(JsonStrings, EachArrayWritesToItsOwnObject)
+{
+    const auto model = json::parse_as<strings_list_model>(
+      R"({"list": [{"items": ["a"]}, {"items": ["b", "c"]}, {"items": []}]})");
+    ASSERT_EQ(model.list.size(), 3U);
+    EXPECT_EQ(model.list[0].joined, "a");
+    EXPECT_EQ(model.list[0].count, 1);
+    EXPECT_EQ(model.list[1].joined, "b,c");
+    EXPECT_EQ(model.list[1].count, 2);
+    EXPECT_EQ(model.list[2].count, 0);
+}
+
+TEST(JsonStrings, CanParseAgainAfterFailure)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<strings_list_model>(
+                   R"({"list": [{"items": ["a"]}, {"items": ["b", 1]}]})"),
+                 json::decode_error);
+    const auto model = json::parse_as<strings_model>(R"({"items": ["c"]})");
+    EXPECT_EQ(model.joined, "c");
+    EXPECT_EQ(model.count, 1);
+}
+
+TEST(JsonStrings, LocatesConsumerFailureInDeeplyNestedObject)
+{
+    std::string input = R"({"leaf":{"items":["ok","reject"]}})";
+    std::string path;
+    for (int i = 0; i < 7; ++i) {
+        input = R"({"children":[)" + input + "]}";
+        path += "/children/0";
+    }
+
+    const auto message = parse_error_message<nested_strings_model>(input);
+    EXPECT_NE(message.find("at '" + path + "/leaf/items/1':"), std::string::npos);
+    EXPECT_NE(message.find("string rejected by consumer"), std::string::npos);
+}
+
+TEST(JsonShape, ValueViewFacadeReadsCheckedIntegers)
+{
+    EXPECT_EQ(json::parse_as<facade_model>(R"({"n": 42})").n, 42);
+    EXPECT_EQ(json::parse_as<facade_model>(R"({"n": 1.0})").n, 1);
+    EXPECT_THROW(std::ignore = json::parse_as<facade_model>(R"({"n": 1.5})"), json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<facade_model>(R"({"n": "x"})"), json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<facade_model>(R"({"n": true})"), json::decode_error);
+}
+
+TEST(JsonShapes, ContainerOnAConvertedFieldIsRejected)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<facade_model>(R"({"n": {}})"), json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<facade_model>(R"({"n": []})"), json::decode_error);
+}
+
+TEST(JsonShapes, ContainerOnAConsumeStringsFieldIsRejected)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<strings_model>(R"({"items": {}})"),
+                 json::decode_error);
+}
+
+TEST(JsonShapes, ContainerOnAnEnumMemberIsRejected)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<enum_member_model>(R"({"kind": {}})"),
+                 json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<enum_member_model>(R"({"kind": []})"),
+                 json::decode_error);
+}
+
+TEST(JsonShape, ScalarTypeNameCoversSignedAndFloat)
+{
+    EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(R"({"value": -1})"), json::decode_error);
+    EXPECT_THROW(std::ignore = json::parse_as<utf8_model>(R"({"value": 1.5})"), json::decode_error);
+}
+
+TEST(JsonNumberBinding, BindsFloatingMembers)
+{
+    EXPECT_DOUBLE_EQ(json::parse_as<double_model>(R"({"value": 1.5})").value, 1.5);
+    EXPECT_DOUBLE_EQ(json::parse_as<double_model>(R"({"value": 2})").value, 2.0);
+    // A signed integer and a non-number both reach the floating arm too.
+    EXPECT_DOUBLE_EQ(json::parse_as<double_model>(R"({"value": -1})").value, -1.0);
+    EXPECT_THROW(std::ignore = json::parse_as<double_model>(R"({"value": "x"})"),
+                 json::decode_error);
 }
 
 } // namespace
