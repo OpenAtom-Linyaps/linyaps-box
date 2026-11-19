@@ -116,6 +116,13 @@ auto Forwarder::push(std::size_t &bytes_quota) -> bool
 
         auto [status, bytes_written] = dst_.fd->write_span(span);
         if (status == utils::IOStatus::TryAgain) {
+            // write_span() can return TryAgain after a partial write (bytes_written > 0).
+            // Consume those bytes, otherwise the destination would receive the same
+            // ring window again on the next drive().
+            if (bytes_written > 0) {
+                rb->advance_tail(bytes_written);
+                bytes_quota -= std::min(bytes_quota, bytes_written);
+            }
             return true;
         }
 
