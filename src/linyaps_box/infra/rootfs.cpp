@@ -14,8 +14,9 @@
 #include <linux/magic.h>
 
 #include <algorithm>
-#include <cstring>
+#include <array>
 #include <deque>
+#include <memory>
 
 namespace linyaps_box::infra {
 namespace {
@@ -554,12 +555,7 @@ auto remove_all_in_dir(utils::file_descriptor_ref dirfd, const std::filesystem::
     }
     stack.push_back(task{ name.string(), std::move(*dup_res), false });
 
-    struct alignas(std::max_align_t) dirent_buf
-    {
-        std::array<std::byte, 32768> data;
-    };
-
-    auto buf = std::make_unique<dirent_buf>();
+    auto buf = std::make_unique<std::array<std::byte, 32768>>();
 
     while (!stack.empty()) {
         auto &t = stack.back();
@@ -594,50 +590,31 @@ auto remove_all_in_dir(utils::file_descriptor_ref dirfd, const std::filesystem::
 
             return unexpected{ subfd_res.error() };
         }
-        auto subfd = std::move(*subfd_res);
+        const auto subfd = std::move(*subfd_res);
 
         // Scan the directory.
+        os::directory dir{ subfd.ref(), *buf };
         while (true) {
-            auto n = os::getdents64(subfd.ref(), buf->data);
-            if (UNLIKELY(!n)) {
-                return unexpected(n.error());
+            auto next = dir.next();
+            if (UNLIKELY(!next)) {
+                return unexpected{ next.error() };
             }
 
-            if (*n == 0) {
+            if (!next->has_value()) {
                 break;
             }
 
-            for (std::size_t pos = 0; pos < *n;) {
-                if (UNLIKELY(*n - pos < sizeof(os::sys::linux_dirent64))) {
-                    return unexpected{ std::make_error_code(std::errc::io_error) };
-                }
-
-                os::sys::linux_dirent64 d{ };
-                std::memcpy(&d, buf->data.data() + pos, sizeof(d));
-                if (UNLIKELY(d.d_reclen < sizeof(os::sys::linux_dirent64)
-                             || pos + d.d_reclen > *n)) {
-                    return unexpected{ std::make_error_code(std::errc::io_error) };
-                }
-
-                // The trailing name is not part of the copied header; read it
-                // straight from the kernel buffer (char reads are always valid).
-                const std::string_view child_name{
-                    reinterpret_cast<const char *>(buf->data.data() + pos)
-                    + offsetof(os::sys::linux_dirent64, d_type) + 1
-                };
-
-                pos += d.d_reclen;
-                if (child_name == "." || child_name == "..") {
-                    continue;
-                }
-
-                auto subdup_res = os::fcntl_dupfd_cloexec(subfd.ref(), 0);
-                if (UNLIKELY(!subdup_res)) {
-                    return unexpected{ std::move(subdup_res).error() };
-                }
-
-                stack.push_back(task{ std::string{ child_name }, std::move(*subdup_res), false });
+            const auto child_name = next->value().name();
+            if (child_name == "." || child_name == "..") {
+                continue;
             }
+
+            auto subdup_res = os::fcntl_dupfd_cloexec(subfd.ref(), 0);
+            if (UNLIKELY(!subdup_res)) {
+                return unexpected{ std::move(subdup_res).error() };
+            }
+
+            stack.push_back(task{ std::string{ child_name }, std::move(*subdup_res), false });
         }
     }
 

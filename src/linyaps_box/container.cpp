@@ -14,6 +14,7 @@
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h"
+#include "linyaps_box/os/io.h"
 #include "linyaps_box/os/mount.h"
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/os/system.h"
@@ -25,7 +26,6 @@
 #include "linyaps_box/specconv/process.h"
 #include "linyaps_box/terminal.h"
 #include "linyaps_box/utils/cgroups.h"
-#include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/enum_formatter.h" // IWYU pragma: keep
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/session.h"
@@ -39,6 +39,7 @@
 #include <sys/mount.h>
 #include <sys/signalfd.h>
 #include <sys/statfs.h>
+#include <sys/syscall.h>
 #include <sys/sysmacros.h>
 
 #include <algorithm>
@@ -1582,9 +1583,10 @@ int clone_fn(void *data) noexcept
 
         auto &sync = args.sync;
 
-        utils::close_range(3 + args.preserve_fds,
-                           std::numeric_limits<unsigned>::max(),
-                           CLOSE_RANGE_CLOEXEC);
+        os::throw_if_error(os::close_range(3 + args.preserve_fds,
+                                           std::numeric_limits<unsigned>::max(),
+                                           os::sys::close_range_flag::cloexec),
+                           "close_range");
 
         auto &container = *args.container;
         const auto &oci_config = container.get_config();

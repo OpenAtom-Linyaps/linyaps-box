@@ -12,7 +12,11 @@
 #include <fmt/format.h>
 #include <sys/statfs.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <optional>
+#include <string_view>
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -427,6 +431,68 @@ LINYAPS_REGISTER_ENUM_TABLE(statx_flag,
   -> Result<utils::file_descriptor>;
 
 auto to_fs_file_type(mode_t val) noexcept -> std::filesystem::file_type;
+
+class directory;
+
+class dir_entry
+{
+public:
+    constexpr dir_entry() noexcept = default;
+
+    [[nodiscard]] constexpr auto name() const noexcept -> std::string_view { return name_; }
+
+    [[nodiscard]] constexpr auto inode() const noexcept -> uint64_t { return inode_; }
+
+    [[nodiscard]] constexpr auto type() const noexcept -> std::filesystem::file_type
+    {
+        return type_;
+    }
+
+private:
+    friend class directory;
+
+    constexpr dir_entry(std::string_view name,
+                        uint64_t inode,
+                        std::filesystem::file_type type) noexcept
+        : name_(name)
+        , inode_(inode)
+        , type_(type)
+    {
+    }
+
+    std::string_view name_;
+    uint64_t inode_{ 0 };
+    std::filesystem::file_type type_{ std::filesystem::file_type::unknown };
+};
+
+class directory
+{
+public:
+    directory(utils::file_descriptor_ref fd, utils::span<std::byte> buffer) noexcept
+        : buffer_(buffer)
+        , fd_(fd)
+    {
+    }
+
+    directory(const directory &) = delete;
+    auto operator=(const directory &) -> directory & = delete;
+    directory(directory &&) noexcept = default;
+    auto operator=(directory &&) noexcept -> directory & = default;
+    ~directory() noexcept = default;
+
+    [[nodiscard]] auto fd() const noexcept -> utils::file_descriptor_ref { return fd_; }
+
+    [[nodiscard]] auto next() noexcept -> Result<std::optional<dir_entry>>;
+
+private:
+    [[nodiscard]] auto fail(std::error_code ec) noexcept -> Result<std::optional<dir_entry>>;
+
+    utils::span<std::byte> buffer_;
+    std::error_code error_{ };
+    std::size_t pos_{ 0 };
+    std::size_t filled_{ 0 };
+    utils::file_descriptor_ref fd_;
+};
 
 } // namespace linyaps_box::os
 
