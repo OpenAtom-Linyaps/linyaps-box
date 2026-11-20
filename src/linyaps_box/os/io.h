@@ -5,8 +5,13 @@
 #pragma once
 
 #include "linyaps_box/os/result.h"
+#include "linyaps_box/utils/enum_traits.h"
 #include "linyaps_box/utils/file_describer.h"
 #include "linyaps_box/utils/span.h"
+
+#include <cstdint>
+
+#include <sys/types.h>
 
 namespace linyaps_box::os {
 
@@ -87,6 +92,43 @@ static_assert(alignof(mutable_io_slice) == alignof(struct iovec),
               "Alignment mismatch with struct iovec");
 static_assert(std::is_standard_layout_v<mutable_io_slice>,
               "mutable_io_slice must be standard layout");
+
+namespace sys {
+
+enum class close_range_flag : uint8_t {
+    none = 0,
+
+    unshare =
+#ifdef CLOSE_RANGE_UNSHARE
+      CLOSE_RANGE_UNSHARE
+#else
+      0x02
+#endif
+    ,
+
+    // since Linux 5.11
+    cloexec =
+#ifdef CLOSE_RANGE_CLOEXEC
+      CLOSE_RANGE_CLOEXEC
+#else
+      0x04
+#endif
+    ,
+};
+LINYAPS_ENABLE_BITMASK_ENUM(close_range_flag);
+LINYAPS_REGISTER_ENUM_TABLE(close_range_flag,
+                            3,
+                            { close_range_flag::none, "NONE" },
+                            { close_range_flag::unshare, "CLOSE_RANGE_UNSHARE" },
+                            { close_range_flag::cloexec, "CLOSE_RANGE_CLOEXEC" })
+
+} // namespace sys
+
+[[nodiscard]] auto
+close_range(unsigned int first,
+            unsigned int last,
+            utils::bitflags<sys::close_range_flag> flags = sys::close_range_flag::none) noexcept
+  -> Result<void>;
 
 auto read(utils::file_descriptor_ref fd, utils::span<std::byte> buf) noexcept
   -> Result<std::size_t>;

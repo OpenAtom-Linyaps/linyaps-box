@@ -9,13 +9,13 @@
 #include "linyaps_box/log/logger.h"
 #include "linyaps_box/log/macro.h"
 #include "linyaps_box/os/fs.h" // IWYU pragma: keep
+#include "linyaps_box/os/io.h"
 #include "linyaps_box/os/process.h"
 #include "linyaps_box/protocol/message_channel.h"
 #include "linyaps_box/protocol/sync_socket_forwarder.h"
 #include "linyaps_box/security/privilege.h"
 #include "linyaps_box/specconv/process.h"
 #include "linyaps_box/terminal.h"
-#include "linyaps_box/utils/close_range.h"
 #include "linyaps_box/utils/defer.h"
 #include "linyaps_box/utils/environ.h"
 #include "linyaps_box/utils/session.h"
@@ -257,9 +257,10 @@ void child_apply_rlimits(const linyaps_box::config::process &proc)
 
         child_apply_rlimits(proc);
 
-        linyaps_box::utils::close_range(3 + preserve_fds,
-                                        std::numeric_limits<unsigned>::max(),
-                                        CLOSE_RANGE_CLOEXEC);
+        os::throw_if_error(os::close_range(3 + preserve_fds,
+                                           std::numeric_limits<unsigned>::max(),
+                                           os::sys::close_range_flag::cloexec),
+                           "close_range");
 
         if (proc.user_.umask) {
             auto val = proc.user_.umask.value();

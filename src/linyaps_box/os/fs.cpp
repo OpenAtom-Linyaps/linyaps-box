@@ -13,6 +13,39 @@
 #  include <linux/openat2.h>
 #endif
 
+#include <cstddef>
+#include <cstring>
+#include <optional>
+
+#include <dirent.h>
+
+namespace {
+
+auto to_dir_entry_file_type(unsigned char d_type) noexcept -> std::filesystem::file_type
+{
+    switch (d_type) {
+    case DT_REG:
+        return std::filesystem::file_type::regular;
+    case DT_DIR:
+        return std::filesystem::file_type::directory;
+    case DT_LNK:
+        return std::filesystem::file_type::symlink;
+    case DT_BLK:
+        return std::filesystem::file_type::block;
+    case DT_CHR:
+        return std::filesystem::file_type::character;
+    case DT_FIFO:
+        return std::filesystem::file_type::fifo;
+    case DT_SOCK:
+        return std::filesystem::file_type::socket;
+    case DT_UNKNOWN:
+    default:
+        return std::filesystem::file_type::unknown;
+    }
+}
+
+} // namespace
+
 namespace linyaps_box::os {
 
 namespace sys {
@@ -118,8 +151,11 @@ auto openat2(utils::file_descriptor_ref dirfd,
     };
 
     while (true) {
-        const auto fd = static_cast<int>(
-          ::syscall(nr_openat2, dirfd, path.c_str(), &linux_open_how, sizeof(linux_open_how)));
+        const auto fd = static_cast<int>(::syscall(nr_openat2,
+                                                   dirfd.get(),
+                                                   path.c_str(),
+                                                   &linux_open_how,
+                                                   sizeof(linux_open_how)));
         if (LIKELY(fd >= 0)) {
             return utils::file_descriptor{ fd };
         }
@@ -379,11 +415,10 @@ auto fcntl_getfd(utils::file_descriptor_ref fd) noexcept -> Result<sys::fd_flag>
 auto getdents64(utils::file_descriptor_ref fd, utils::span<std::byte> buf) noexcept
   -> Result<std::size_t>
 {
-    // getdents64 was added after glibc 2.30 but we need support 2.28.
-    // so use syscall directly
-    auto ret = syscall(__NR_getdents64, fd, buf.data(), buf.size());
+    // getdents64 was added after glibc 2.30 but we need support 2.28,
+    // so use syscall directly.
+    auto ret = syscall(__NR_getdents64, fd.get(), buf.data(), buf.size());
     if (UNLIKELY(ret < 0)) {
-
         return unexpected{ make_error_code(errno) };
     }
 
@@ -516,6 +551,67 @@ auto to_fs_file_type(mode_t val) noexcept -> std::filesystem::file_type
     default:
         return std::filesystem::file_type::unknown;
     }
+}
+
+auto directory::fail(std::error_code ec) noexcept -> Result<std::optional<dir_entry>>
+{
+    error_ = ec;
+    return unexpected{ error_ };
+}
+
+auto directory::next() noexcept -> Result<std::optional<dir_entry>>
+{
+    if (UNLIKELY(static_cast<bool>(error_))) {
+        return unexpected{ error_ };
+    }
+
+    while (pos_ >= filled_) {
+        auto n = getdents64(fd_, buffer_);
+        if (UNLIKELY(!n)) {
+            return fail(n.error());
+        }
+
+        if (*n == 0) {
+            return std::optional<dir_entry>{ };
+        }
+
+        pos_ = 0;
+        filled_ = *n;
+    }
+
+    if (UNLIKELY(filled_ - pos_ < sizeof(sys::linux_dirent64))) {
+        return fail(std::make_error_code(std::errc::io_error));
+    }
+
+    // The kernel buffer is only byte-aligned, so load the fixed header with
+    // memcpy instead of casting a misaligned linux_dirent64*.
+    sys::linux_dirent64 raw{ };
+    std::memcpy(&raw, buffer_.data() + pos_, sizeof(raw));
+    if (UNLIKELY(raw.d_reclen < sizeof(sys::linux_dirent64) || pos_ + raw.d_reclen > filled_)) {
+        return fail(std::make_error_code(std::errc::io_error));
+    }
+
+    // d_name is a flexible array that must be NUL-terminated inside the
+    // record; bound the scan by d_reclen so a malformed (or forged) entry
+    // cannot make us read past the buffer.
+    constexpr auto name_offset = offsetof(sys::linux_dirent64, d_type) + 1;
+    static_assert(name_offset < sizeof(sys::linux_dirent64));
+
+    const char *name_ptr =
+      reinterpret_cast<const char *>(buffer_.data() + pos_) + name_offset; // NOLINT
+    const auto name_capacity = static_cast<std::size_t>(raw.d_reclen) - name_offset;
+    const void *name_end = std::memchr(name_ptr, '\0', name_capacity);
+    if (UNLIKELY(name_end == nullptr)) {
+        return fail(std::make_error_code(std::errc::io_error));
+    }
+
+    pos_ += raw.d_reclen;
+
+    return std::optional<dir_entry>{ dir_entry{
+      std::string_view{ name_ptr,
+                        static_cast<std::size_t>(static_cast<const char *>(name_end) - name_ptr) },
+      raw.d_ino,
+      to_dir_entry_file_type(raw.d_type) } };
 }
 
 } // namespace linyaps_box::os

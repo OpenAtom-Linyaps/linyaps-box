@@ -370,7 +370,6 @@ set(linyaps-box_LIBRARY_SOURCE
     src/linyaps_box/status_directory_manager.cpp
     src/linyaps_box/terminal.cpp
     src/linyaps_box/utils/cgroups.cpp
-    src/linyaps_box/utils/close_range.cpp
     src/linyaps_box/utils/date.cpp
     src/linyaps_box/utils/environ.cpp
     src/linyaps_box/utils/epoll.cpp
