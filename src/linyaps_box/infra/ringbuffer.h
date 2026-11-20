@@ -4,33 +4,25 @@
 
 #pragma once
 
-#include <memory>
+#include "linyaps_box/utils/span.h"
 
-namespace linyaps_box::compat {
-#ifdef __cpp_lib_hardware_interference_size
-using std::hardware_constructive_interference_size;
-using std::hardware_destructive_interference_size;
-#else
-// default to 64 bytes if not defined
-// if the platform has different cache line size, please define these macros accordingly
-constexpr std::size_t hardware_constructive_interference_size = 64;
-constexpr std::size_t hardware_destructive_interference_size = 64;
-#endif
-} // namespace linyaps_box::compat
+#include <cassert>
+#include <cstddef>
+#include <memory>
 
 namespace linyaps_box::infra {
 
-// Single-threaded, single-owner only ring buffer
-class alignas(compat::hardware_constructive_interference_size) ring_buffer
+// Single-threaded, single-owner only ring buffer.
+class ring_buffer
 {
 public:
     struct deleter
     {
         auto operator()(ring_buffer *rb) const noexcept -> void;
-        std::size_t total_size;
     };
 
     using ptr = std::unique_ptr<ring_buffer, deleter>;
+    static_assert(sizeof(ptr) == sizeof(void *), "ring_buffer::ptr must stay one pointer");
 
     ring_buffer(const ring_buffer &) = delete;
     ring_buffer &operator=(const ring_buffer &) = delete;
@@ -40,19 +32,9 @@ public:
 
     static auto create(std::size_t requested_capacity) -> ptr;
 
-    [[nodiscard]] auto get_read_ptr() const noexcept -> const std::byte *
-    {
-        return data_ptr_ + (tail_ & mask_);
-    }
-
     [[nodiscard]] auto get_read_ptr() noexcept -> std::byte *
     {
         return data_ptr_ + (tail_ & mask_);
-    }
-
-    [[nodiscard]] auto get_write_ptr() const noexcept -> const std::byte *
-    {
-        return data_ptr_ + (head_ & mask_);
     }
 
     [[nodiscard]] auto get_write_ptr() noexcept -> std::byte *
@@ -60,9 +42,27 @@ public:
         return data_ptr_ + (head_ & mask_);
     }
 
-    auto advance_head(std::size_t n) noexcept -> void { head_ += n; }
+    [[nodiscard]] auto readable() const noexcept -> utils::span<const std::byte>
+    {
+        return { data_ptr_ + (tail_ & mask_), head_ - tail_ };
+    }
 
-    auto advance_tail(std::size_t n) noexcept -> void { tail_ += n; }
+    [[nodiscard]] auto writable() noexcept -> utils::span<std::byte>
+    {
+        return { data_ptr_ + (head_ & mask_), (mask_ + 1) - (head_ - tail_) };
+    }
+
+    auto advance_head(std::size_t n) noexcept -> void
+    {
+        assert(n <= free_space());
+        head_ += n;
+    }
+
+    auto advance_tail(std::size_t n) noexcept -> void
+    {
+        assert(n <= size());
+        tail_ += n;
+    }
 
     [[nodiscard]] auto size() const noexcept -> std::size_t { return head_ - tail_; }
 

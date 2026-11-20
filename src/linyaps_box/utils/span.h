@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <iterator>
 #include <stdexcept>
+#include <string_view>
 #include <type_traits>
 
 namespace linyaps_box::utils {
